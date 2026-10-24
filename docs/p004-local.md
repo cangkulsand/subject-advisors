@@ -1,105 +1,73 @@
-# Run the P004 auth preview locally
+# Run the authentication baseline locally
 
-Use **Node.js 22.12+ and npm** from PowerShell, then open the app in your browser.
-
-## Start
+Requirements: Node.js 22.12+ and npm. From a checkout of main:
 
 ```powershell
-Set-Location 'D:/sharhan/development/subject advisors'
+npm.cmd ci
 npm.cmd run dev
 ```
 
-Open **http://127.0.0.1:5173**. Ctrl+C stops the frontend and API.
+Open **http://127.0.0.1:5173**. Ctrl+C stops both servers. On macOS/Linux, use npm.
 
-This command starts Vite on port 5173 and the local Wrangler Worker on port 8787.
-Vite proxies /api requests to the Worker. No Cloudflare login or public deployment is
-needed to run these local servers. The launcher creates blank .env.local and .dev.vars
-from templates only when those files do not exist; it never replaces existing settings.
+Vite runs on port 5173 and proxies /api to the local Wrangler Worker on port 8787.
+Cloudflare deployment/login is not required for this local preview. Real Clerk and
+Neon services still require internet access.
 
-On this machine the dependencies are available from the local package cache.
-On a fresh checkout, first run `npm.cmd install`. Registry access was blocked in the
-coding environment; the ignored local dependency links are not portable and no fresh
-install/lockfile verification is claimed.
+## Configure credentials
 
-## Enable real signup and login
+The launcher creates .env.local and .dev.vars from the committed blank examples
+only if the local files do not exist. It never overwrites existing settings.
 
-Without settings the browser displays a setup screen. Add values in your editor:
+.env.local contains only the public development key:
 
-**.env.local** (public browser key only):
 ```dotenv
 VITE_CLERK_PUBLISHABLE_KEY=<Clerk development publishable key>
 ```
 
-**.dev.vars** (backend only, ignored by Git):
+.dev.vars contains backend settings:
+
 ```dotenv
 CLERK_PUBLISHABLE_KEY=<same development publishable key>
 CLERK_SECRET_KEY=<matching development secret key>
-DATABASE_URL=<Neon development/test branch connection string>
+DATABASE_URL=<Neon development/test database URL>
 ```
 
-Use the existing Clerk application **app_3L8qWHdSOTcQ57axExEj4T6USV5**.
-Use its **development** instance. Enable email/password registration and email
-verification. Student access requires a verified primary @graduate.utm.my address.
-The frontend and backend keys must belong to that same instance.
-Do not paste secret keys into chat or put them in VITE variables.
+Get access to the team's selected Clerk development application and intended Neon
+development branch from the maintainer. All Clerk keys must belong to the same instance.
+Enable email/password registration with email verification. Student access requires
+the **current primary email** to be verified and end in the exact domain @graduate.utm.my.
 
-For Neon project **still-waterfall-91972583**, use a development/test branch. The older
-neonsetup.md command names production; it is not used by this local launcher.
-Apply `db/migrations/20261024_p004_user_access_assignment.sql` once to the selected
-development database using the Neon SQL editor or your migration runner. The local
-launcher does not create tables, deploy services or apply production migrations.
+Do not copy a secret key into any VITE variable or commit the local settings.
+Restart npm.cmd run dev after changing those files.
 
-Restart `npm.cmd run dev` after changing credentials. Open /sign-up or /sign-in.
-After authentication, /auth/complete initializes account access and redirects to
-/student/setup. That page is an explicit placeholder while P001's profile setup
-is unavailable. Coordinator/admin access requires trusted provisioning as documented
-in p004-auth-handoff.md.
+## Database migration
 
-## What runs
+On the selected development database, check whether public.user_access_assignment
+already exists. Apply db/migrations/20261024_p004_user_access_assignment.sql once
+only if absent. The launcher does not automatically migrate or deploy services.
+Branches cloned from a migrated branch already include its schema.
 
-- Frontend: React/Vite at http://127.0.0.1:5173.
-- API: Cloudflare Worker running locally via Wrangler at http://127.0.0.1:8787.
-- Authentication: the real Clerk development service after configuration.
-- Database: the real Neon development branch after configuration.
+The maintainer applied this migration on the originally configured Neon branch;
+that does not prove it exists on a different developer's branch.
 
-Clerk and Neon still require an internet connection. This is a local app connected to
-those services, not an offline replacement. No mocked auth is included in the launcher.
+## Try the flow
 
-The local entry points live under tools/auth/local; they are an isolated P004 preview.
-No profile forms, records, offerings, pathway or later-sprint dashboards are implemented.
+Open /sign-up or /sign-in. After a verified institutional login,
+/auth/complete initializes account access and directs students to /student/setup.
+The setup form is a P001 dependency, so the current route displays an explicit placeholder.
+Staff placeholders require approved assignments; see p004-auth-handoff.md.
 
-## Commands
+The setup screen appears when no frontend public key is configured.
+A generic configuration-presence check is available at /api/auth/local-status.
+configured=true only means required settings were loaded; it is not a live-service test.
 
-```powershell
-npm.cmd run typecheck
-npm.cmd run lint
-npm.cmd test
-npm.cmd run build
-npm.cmd run build:local
-npm.cmd run test:ui
-npm.cmd run types:local
-```
+## Troubleshooting
 
-build produces the reusable auth modules; build:local builds the preview frontend.
-types:local regenerates Worker environment declarations after changing configuration.
-Keep both generated types and credentials aligned when merging with FOUNDATION.
+- Configuration is incomplete: verify .dev.vars, then restart both servers.
+- Database table missing: apply the P004 migration to the branch named by DATABASE_URL.
+- Wrong/unverified email: resolve the current primary email in Clerk.
+- Port 5173 or 8787 occupied: stop the previous local preview before starting another.
+- Profile setup unavailable: expected until P001 integration; academic access stays blocked.
 
-If port 5173 or 8787 is in use, stop the previous local instance and retry. Ports do
-not silently change because the Clerk authorized origins must remain consistent.
-
-Configuration presence is not a live-service verification. Real email delivery,
-login/logout, Neon persistence and the migration still require testing with configured
-development credentials.
-
-References: [Wrangler local development](https://developers.cloudflare.com/workers/local-development/),
-[Vite server configuration](https://vite.dev/config/server-options).
-
-## Portable install verification — 2026-10-24
-
-A registry-backed package-lock.json is now included. A fresh npm ci installed 204
-packages without the original local dependency junctions. Typecheck, lint, module and
-Vite builds passed in the clean installation, along with 47 unit tests and 11 mocked
-browser checks. Five live database tests are opt-in and were skipped in that clean
-installation; they passed separately against the configured Neon database earlier.
-Use npm.cmd ci on a fresh checkout. Earlier cache-only/no-lock notes describe the
-initial setup and are superseded by this verification.
+The auth preview entry points are under tools/auth/local; other modules remain owned
+by their programmers. See README.md and CONTRIBUTING.md for the team workflow.

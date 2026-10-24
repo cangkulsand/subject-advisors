@@ -1,26 +1,32 @@
-# Subject Advisors — Programmer 4, Sprint 1
+# Subject Advisors
 
-P004 implements **UC01 registration** and **UC02 login/logout** for the UTMSPACE
-academic advisory project. It includes Clerk identity verification, institutional
-email checks, application roles/access status, Neon account binding, and a local
-React/Vite + Cloudflare Worker authentication preview.
+Initial `main` baseline for the AI-Powered Academic Advisory System for UTMSPACE
+part-time students. Teammates can clone this repository, run it locally and develop
+their assigned modules on separate feature branches.
 
-## Run locally
+This baseline includes **Programmer 4's Sprint 1 authentication (UC01 and UC02)**:
+Clerk signup/login/logout, verified institutional email checks, server-side roles and
+access status, and Neon account binding. Academic profile, records, offerings and
+pathway features remain assigned to their respective programmers.
+
+## Clone and run
 
 Requirements: Node.js 22.12+ and npm.
 
 ```powershell
+git clone https://github.com/cangkulsand/subject-advisors.git
+cd subject-advisors
 npm.cmd ci
 npm.cmd run dev
 ```
 
-Open **http://127.0.0.1:5173**. Stop both local servers with Ctrl+C.
+Open **http://127.0.0.1:5173**. Press Ctrl+C to stop the frontend and API.
+On macOS/Linux, use `npm` instead of `npm.cmd`.
 
-The launcher creates blank local settings from templates only if the settings files
-do not already exist. Without a browser key, the page displays setup instructions.
+The launcher creates local settings from the committed blank templates only when
+the files do not exist. With no browser key, the page shows setup instructions.
 
-Set your selected Clerk application's **development** publishable key in
-`.env.local`:
+Set the Clerk **development** publishable key in `.env.local`:
 
 ```dotenv
 VITE_CLERK_PUBLISHABLE_KEY=<development publishable key>
@@ -34,25 +40,47 @@ CLERK_SECRET_KEY=<matching development secret key>
 DATABASE_URL=<Neon development database connection URL>
 ```
 
-Apply `db/migrations/20261024_p004_user_access_assignment.sql` once to the chosen
-development database if the table does not exist. Never rerun CREATE TABLE blindly.
-Restart the local servers after editing settings.
+Obtain development access from the project maintainer. Each developer should use the
+intended development database/branch and apply the P004 migration only if its access
+table is absent. Existing branches may already contain the table.
+Restart the servers after editing environment files. Credentials remain local and
+are excluded by Git.
 
-The local preview needs internet access to Clerk and Neon. Its private API uses
-the real provider/session checks, with no authentication bypass.
+The frontend uses React/Vite on port 5173 and proxies /api to the Cloudflare Worker
+running locally on port 8787. Clerk and Neon require an internet connection.
+See [local setup](docs/p004-local.md) for provider and migration steps.
 
-## P004 behavior
+## Start your assigned work
 
-- Student primary email must be verified and have the exact domain graduate.utm.my.
-- Initialization creates one STUDENT/ACTIVE assignment and preserves existing roles
-  or suspended status.
-- Session validation checks the current Clerk session, including ended/revoked sessions.
-- Roles are STUDENT, COORDINATOR and SYSTEM_ADMIN, enforced on the backend.
-- New students reach /student/setup; the actual profile form belongs to P001.
-- Coordinator/admin routes are protected placeholders for later work.
+```powershell
+git switch main
+git pull --ff-only
+git switch -c feature/p001-s1-profile
+```
 
-The frontend uses port 5173 and proxies /api to the local Worker on port 8787.
-This is an isolated P004 preview awaiting FOUNDATION integration.
+Use the branch for your assigned owner:
+
+| Owner | Branch example | Sprint 1 scope |
+| --- | --- | --- |
+| P001 | feature/p001-s1-profile | UC03 profile; UC04 academic records |
+| P002 | feature/p002-s1-offerings | UC08 semester offerings |
+| P003 | feature/p003-s1-pathway | UC17 pathway prototype |
+| P004 | feature/p004-s1-auth-followup | UC01/UC02 authentication follow-up |
+| FOUNDATION | chore/foundation-s1 | Shared app/API/catalogue/tooling integration |
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing shared files. Open feature PRs
+against `main`; keep each PR within its selected owner scope.
+
+## Current integration boundaries
+
+- Shared auth identity and role checks: apps/api/src/modules/auth and middleware/auth.ts.
+- Private data must be scoped to the Clerk user ID returned by server authorization.
+- P001 supplies ProfileReader and the academic profile setup form. Missing profile
+  integration keeps academic access blocked.
+- Frontend components: apps/web/src/features/auth.
+- tools/auth/local is the runnable auth preview, not the final shared application shell.
+  FOUNDATION should integrate these modules through the documented interfaces.
+- The only implemented migration is P004's user_access_assignment table.
 
 ## Checks
 
@@ -62,30 +90,27 @@ npm.cmd run lint
 npm.cmd test
 npm.cmd run build
 npm.cmd run build:local
+npx.cmd playwright install chromium
 npm.cmd run test:ui
-npm.cmd run test:init-http
 ```
 
-test:init-http requires the local servers. It sends deliberately invalid tokens to
-verify bodyless initialization reaches session validation and nonempty payloads fail.
-test:ui uses explicitly mocked Clerk/API responses in Chromium. Install its browser
-once with `npx.cmd playwright install chromium`.
+With local servers running, `npm.cmd run test:init-http` exercises real HTTP body handling.
+test:ui uses explicitly mocked Clerk/API responses. The five optional live database
+tests require AUTH_TEST_DATABASE_URL and use temporary tables rather than persistent
+test accounts.
 
-The five optional live database tests run when AUTH_TEST_DATABASE_URL points to an
-approved test database. They use transaction-local temporary tables and do not create
-persistent test accounts.
+The baseline passed a fresh npm ci, 47 unit tests, 11 mocked browser checks, lint,
+typecheck and module/Vite builds. Five live Neon tests and ten real HTTP regressions
+passed separately. The user also reported passing signup/domain, logout/sign-in,
+privileged-page denial and account-idempotency checks. Peer review remains pending.
 
-## Integration and review
+## Team documentation
 
+- [Sprint 1 ownership and requirements](<docs/sprint1 (1).md>)
+- [Mandatory implementation workflow](docs/implementationguide.md)
+- [Shared theme guide](docs/themeguide.md)
+- [Contributing](CONTRIBUTING.md)
 - [Local setup](docs/p004-local.md)
-- [API, schema, provisioning and integration handoff](docs/p004-auth-handoff.md)
-- [P004 implementation plan](docs/p004-auth-plan.md)
+- [Auth API, schema and integration handoff](docs/p004-auth-handoff.md)
+- [P004 delivery summary](docs/p004-pr.md)
 - [Change records](docs/changes)
-- [Prepared PR description](docs/p004-pr.md)
-
-User-reported manual checks passed: registration/domain behavior, logout and sign-in,
-student denial on privileged pages, and reuse of the existing STUDENT/ACTIVE record.
-Human peer review and the shared FOUNDATION/P001 integration remain pending.
-
-Secrets, dependency folders and generated output are ignored. Other programmers'
-features are outside this P004 handoff.
