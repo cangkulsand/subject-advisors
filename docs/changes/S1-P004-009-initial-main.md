@@ -1,6 +1,6 @@
 # S1-P004-009-initial-main — Publish the shared starting branch
 
-- **Status:** IN_PROGRESS
+- **Status:** READY_FOR_REVIEW
 - **Date:** 2026-10-24
 - **Owner / scope:** P004 delivery / initial team repository
 - **User direction:** "this should be the main branch init..that can be use by others"
@@ -43,7 +43,7 @@ Human review is not implied by publishing the initial baseline.
   feature-PR, cache-only and no-lockfile instructions.
 - Existing P004 runtime modules and lockfile are unchanged.
 - Local p002 work and provider setup notes remain untracked.
-- GitHub publication is explicitly authorized and is the next operation.
+- Published main to the documented GitHub repository with a normal, non-force push; local main tracks origin/main.
 
 ## 3. Review
 
@@ -56,7 +56,8 @@ Human review is not implied by publishing the initial baseline.
   passed in change 008. No runtime/dependency change requires those checks to be repeated.
 - User-reported real account acceptance remains distinct from mocked browser tests.
 - Review outcome: PASS — SELF-REVIEW. Human peer review pending.
-- Remote main/HEAD verification will be recorded after the push succeeds.
+- Verified remote main and HEAD both point to initial publication commit a8bfcab. GitHub default branch is main.
+- Fresh GitHub clone succeeded on main: 61 tracked files, required team docs/examples present, portable lockfile, no local secrets or P002 work.
 
 ## 4. Changelog
 
@@ -65,4 +66,4 @@ Human review is not implied by publishing the initial baseline.
 - Changed: main branch designation, team onboarding, shared reference documentation.
 - Compatibility: no API/schema/runtime changes. Other owners branch from main.
 - Validation: secret/scope/link/whitespace checks passed; existing tested baseline retained.
-- Status: IN_PROGRESS — main ready for explicitly authorized initial publication.
+- Status: READY_FOR_REVIEW — main published and clone-verified as the shared starting branch. Peer review remains pending.
