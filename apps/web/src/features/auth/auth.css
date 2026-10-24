@@ -1,0 +1,4 @@
+.auth-panel { box-sizing: border-box; width: min(100%, 32rem); margin: 2rem auto; padding: 1rem; overflow-wrap: anywhere; font-family: system-ui, sans-serif; line-height: 1.5; }
+.auth-panel button { min-height: 2.75rem; margin: .5rem .5rem .5rem 0; padding: .5rem 1rem; cursor: pointer; }
+.auth-panel button:disabled { cursor: wait; }
+.auth-panel :focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }

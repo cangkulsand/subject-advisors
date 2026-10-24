@@ -1,0 +1,11 @@
+body { margin: 0; padding: 2rem 1rem; background: #f5f7fb; color: #17223a; font-family: system-ui, sans-serif; line-height: 1.6; }
+.local-card { box-sizing: border-box; max-width: 42rem; margin: 3rem auto; padding: clamp(1.25rem, 4vw, 3rem); background: white; border: 1px solid #d8dfeb; border-radius: 1rem; }
+.local-card h1 { line-height: 1.2; font-size: clamp(1.8rem, 5vw, 2.5rem); }
+.eyebrow { font-weight: 650; color: #425a80; }
+.local-card li { padding: .4rem 0; }
+code { overflow-wrap: anywhere; font-size: .9em; }
+nav { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1.5rem 0; }
+a { color: #244bab; }
+.primary-link { padding: .6rem 1rem; background: #244bab; color: white; border-radius: .4rem; text-decoration: none; }
+.note { font-size: .9rem; color: #4a5872; }
+:focus-visible { outline: 3px solid #2462c8; outline-offset: 4px; }

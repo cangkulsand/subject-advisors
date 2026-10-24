@@ -1,0 +1,31 @@
+{
+    "compilerOptions":  {
+                            "target":  "ES2022",
+                            "lib":  [
+                                        "ES2022",
+                                        "DOM",
+                                        "DOM.Iterable"
+                                    ],
+                            "module":  "ESNext",
+                            "moduleResolution":  "Bundler",
+                            "jsx":  "react-jsx",
+                            "strict":  true,
+                            "noUncheckedIndexedAccess":  true,
+                            "noUnusedLocals":  true,
+                            "noUnusedParameters":  true,
+                            "noEmit":  true,
+                            "skipLibCheck":  true,
+                            "types":  [
+                                          "node",
+                                          "vite/client"
+                                      ]
+                        },
+    "include":  [
+                    "apps/**/*.ts",
+                    "apps/**/*.tsx",
+                    "vitest.auth.config.ts",
+                    "tools/auth/local/**/*.ts",
+                    "tools/auth/local/**/*.tsx",
+                    "vite.auth.config.ts"
+                ]
+}

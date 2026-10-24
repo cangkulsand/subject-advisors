@@ -1,0 +1,10 @@
+node_modules/
+dist-auth/
+.env
+.env.*
+!.env.example
+.dev.vars*
+.wrangler/
+coverage/
+.npm-auth-cache/
+!.dev.vars.example

@@ -1,0 +1,6 @@
+# Backend-only development values. Copy to .dev.vars (ignored).
+# Match the selected app's development publishable key in .env.local.
+CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+# Use a Neon DEVELOPMENT/TEST branch with the P004 migration applied.
+DATABASE_URL=
