@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-26T01:58:09.706Z",
+  "target": {
+    "kind": "neon-development",
+    "database": "neondb",
+    "projectId": "still-waterfall-91972583",
+    "branchId": "br-shy-cherry-azuzy9v5",
+    "serverVersion": 180006
+  },
+  "appliedMigrations": [
+    {
+      "version": "0000",
+      "filename": "0000_preserve_legacy_p004.sql",
+      "sha256": "ce4164c83af86a2cb5fd88f32cf876238722fe48975b3bd5b481b81fb2b0b886",
+      "applied_at": "2026-10-26T01:51:35.690Z"
+    },
+    {
+      "version": "0001",
+      "filename": "0001_initial_schema.sql",
+      "sha256": "dc6ec0153a7a7b10608c61378ed58b4ca5ca1e8d361357fd1c8e5fdd2798d78d",
+      "applied_at": "2026-10-26T01:51:35.690Z"
+    },
+    {
+      "version": "0002",
+      "filename": "0002_copy_legacy_access.sql",
+      "sha256": "97fec50b4ad672be3c549927db99ebfb5523149dda24f13907cf2f41be98562c",
+      "applied_at": "2026-10-26T01:51:35.690Z"
+    }
+  ],
+  "pendingMigrations": 0,
+  "roleProbeRemaining": false,
+  "syntheticRowsRemaining": 0,
+  "preservation": {
+    "legacyArchiveExactMatch": "PASS",
+    "canonicalRoleStatusTimestampsPreserved": "PASS",
+    "legacyIdMappings": 1,
+    "originalAccessRows": 1,
+    "syntheticRowsRemaining": 0
+  }
+}

@@ -1,6 +1,8 @@
 import { build } from 'esbuild';
+import { prepareIntegration } from '../integration/prepare.mjs';
+await prepareIntegration();
 await build({
-  entryPoints: ['apps/api/src/modules/auth/index.ts'],
+  entryPoints: ['tools/auth/local/api.ts'],
   outfile: 'dist-auth/api.js', bundle: true, format: 'esm', platform: 'browser',
   conditions: ['worker', 'browser'], target: 'es2022',
 });

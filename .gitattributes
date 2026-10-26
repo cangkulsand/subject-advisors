@@ -1,0 +1,6 @@
+# Applied migrations are checksum-tracked. Preserve their exact bytes on every OS.
+db/migrations/*.sql -text whitespace=cr-at-eol,-blank-at-eof
+# Historical auth source retains its existing Git text normalization.
+db/migrations/20261024_p004_user_access_assignment.sql text=auto
+# This imported source guide uses intentional Markdown hard line breaks.
+docs/databaseimplementation.md whitespace=-blank-at-eol

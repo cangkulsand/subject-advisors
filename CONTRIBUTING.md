@@ -46,8 +46,14 @@ profile integration and trusted staff provisioning.
 ## Local services and secrets
 
 Run npm.cmd ci, configure local development settings, then npm.cmd run dev.
-Use your intended Neon development/test branch and approved Clerk development instance.
+Use the shared Neon development branch and approved Clerk development instance.
 Do not change production resources as part of local feature setup.
+
+For manual P001/P002 delivery, follow [copy-paste integration](docs/integration-copy-paste.md).
+The shared launcher prepares ignored owner registries automatically; profile, records
+and offerings use one navigation and Worker. Preserve shared package/router files when
+merging overlays, and include owner tests/fixtures. Run prepare:integration before a
+direct tsc/Vite command. The private p002/ tree is not auto-loaded or part of this baseline.
 
 .env.local and .dev.vars are ignored. Commit only blank examples. Obtain credentials
 privately from the project maintainer, and never add real student records to fixtures.

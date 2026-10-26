@@ -23,6 +23,7 @@
     "include":  [
                     "apps/**/*.ts",
                     "apps/**/*.tsx",
+                    "packages/shared/**/*.ts",
                     "vitest.auth.config.ts",
                     "tools/auth/local/**/*.ts",
                     "tools/auth/local/**/*.tsx",

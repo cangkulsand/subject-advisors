@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
 import { copyFile, constants } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { prepareIntegration } from '../integration/prepare.mjs';
 
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
+await prepareIntegration();
 for (const [template, target] of [['.env.example', '.env.local'], ['.dev.vars.example', '.dev.vars']]) {
   try { await copyFile(template, target, constants.COPYFILE_EXCL); console.log('Created ' + target + ' from template.'); }
   catch (error) { if (error.code !== 'EEXIST') throw error; }

@@ -1,0 +1,2401 @@
+{
+  "source": {
+    "path": "docs/UTMSPACE_SRS_SDD_v2.0_Formatted_Technical_Diagram_Titles (2).docx",
+    "sha256": "41a79fc45b37a429d1871bfc739d6edc76ae36188750398fe92f4c26fecd9168",
+    "version": "2.0",
+    "date": "2026-10-24",
+    "mappingAuthority": "SRS chapter 5.2; engineering changes explicitly documented"
+  },
+  "tables": [
+    {
+      "entity": "Programme",
+      "table": "programme",
+      "sourceSection": "5.2.1",
+      "columns": [
+        {
+          "name": "programme_id",
+          "sourceName": "programme_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique programme identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "programme_code",
+          "sourceName": "programme_code",
+          "sourceDefinition": "VARCHAR(20); U; NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": true,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique programme code.",
+          "implementedRequired": true
+        },
+        {
+          "name": "programme_name",
+          "sourceName": "programme_name",
+          "sourceDefinition": "VARCHAR(255); NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Official programme name.",
+          "implementedRequired": true
+        },
+        {
+          "name": "level",
+          "sourceName": "level",
+          "sourceDefinition": "VARCHAR(50); NULL",
+          "sqlType": "varchar(50)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional qualification or programme level.",
+          "implementedRequired": false
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20); NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional programme status.",
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "Curriculum",
+      "table": "curriculum",
+      "sourceSection": "5.2.2",
+      "columns": [
+        {
+          "name": "curriculum_id",
+          "sourceName": "curriculum_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique curriculum version identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_version",
+          "sourceName": "curriculum_version",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Version label for the curriculum.",
+          "implementedRequired": true
+        },
+        {
+          "name": "total_credit_required",
+          "sourceName": "total_credit_required",
+          "sourceDefinition": "INTEGER; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Credit total needed for graduation under this curriculum.",
+          "implementedRequired": true
+        },
+        {
+          "name": "effective_year",
+          "sourceName": "effective_year",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional year in which this curriculum takes effect.",
+          "implementedRequired": false
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20); NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional curriculum status.",
+          "implementedRequired": false
+        },
+        {
+          "name": "programme_id",
+          "sourceName": "programme_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Parent Programme.",
+          "references": [
+            "programme",
+            "programme_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "Subject",
+      "table": "subject",
+      "sourceSection": "5.2.3",
+      "columns": [
+        {
+          "name": "subject_id",
+          "sourceName": "subject_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique subject identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_code",
+          "sourceName": "subject_code",
+          "sourceDefinition": "VARCHAR(20); U; NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": true,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique subject code in the current ERD.",
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_name",
+          "sourceName": "subject_name",
+          "sourceDefinition": "VARCHAR(255); NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Subject title.",
+          "implementedRequired": true
+        },
+        {
+          "name": "credit_hours",
+          "sourceName": "credit_hours",
+          "sourceDefinition": "INTEGER; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Credit value assigned to the subject.",
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_category",
+          "sourceName": "subject_category",
+          "sourceDefinition": "VARCHAR(50); NULL",
+          "sqlType": "varchar(50)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional subject category.",
+          "implementedRequired": false
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20); NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional subject availability/status.",
+          "implementedRequired": false
+        },
+        {
+          "name": "include_in_offering_forecast",
+          "sourceName": "include_in_offering_forecast",
+          "sourceDefinition": "BOOLEAN; NOT NULL; DEFAULT TRUE",
+          "sqlType": "boolean",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Controls inclusion in M6 class-section recommendations; FALSE for FYP1, FYP2 and Industrial Training.",
+          "implementedRequired": true
+        },
+        {
+          "name": "class_type",
+          "sourceName": "class_type",
+          "sourceDefinition": "VARCHAR(20); NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "LECTURE or LAB for M6 capacity rules; future combined teaching components may require a separate mapping.",
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "CurriculumSubject",
+      "table": "curriculum_subject",
+      "sourceSection": "5.2.4",
+      "columns": [
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Identifier for the curriculum-subject mapping.",
+          "implementedRequired": true
+        },
+        {
+          "name": "is_compulsory",
+          "sourceName": "is_compulsory",
+          "sourceDefinition": "SMALLINT; NOT NULL",
+          "sqlType": "smallint",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Compulsory-subject flag (0 or 1 in the current ERD).",
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_category",
+          "sourceName": "subject_category",
+          "sourceDefinition": "VARCHAR(50); NOT NULL",
+          "sqlType": "varchar(50)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Subject classification within the applicable curriculum.",
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_id",
+          "sourceName": "curriculum_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References Curriculum.",
+          "references": [
+            "curriculum",
+            "curriculum_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_id",
+          "sourceName": "subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References Subject.",
+          "references": [
+            "subject",
+            "subject_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "CurriculumRequirement",
+      "table": "curriculum_requirement",
+      "sourceSection": "5.2.5",
+      "columns": [
+        {
+          "name": "requirement_id",
+          "sourceName": "requirement_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique graduation requirement identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "requirement_type",
+          "sourceName": "requirement_type",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Requirement category (e.g., compulsory or elective).",
+          "implementedRequired": true
+        },
+        {
+          "name": "required_credits",
+          "sourceName": "required_credits",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional minimum credits for this requirement.",
+          "implementedRequired": false
+        },
+        {
+          "name": "required_subjects",
+          "sourceName": "required_subjects",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional minimum number of subjects in this requirement.",
+          "implementedRequired": false
+        },
+        {
+          "name": "curriculum_id",
+          "sourceName": "Curriculumcurriculum_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References Curriculum; name retained exactly from the ERD.",
+          "references": [
+            "curriculum",
+            "curriculum_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "SubjectPrerequisite",
+      "table": "subject_prerequisite",
+      "sourceSection": "5.2.6",
+      "columns": [
+        {
+          "name": "prerequisite_id",
+          "sourceName": "prerequisite_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique dependency rule identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "requirement_type",
+          "sourceName": "requirement_type",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Type of prerequisite or associated requirement.",
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Dependent CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "required_curriculum_subject_id",
+          "sourceName": "required_curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Required or related CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "SubjectSemesterRule",
+      "table": "subject_semester_rule",
+      "sourceSection": "5.2.7",
+      "columns": [
+        {
+          "name": "rule_id",
+          "sourceName": "rule_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique semester restriction rule.",
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_type",
+          "sourceName": "semester_type",
+          "sourceDefinition": "VARCHAR(10); NOT NULL",
+          "sqlType": "varchar(10)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Allowed or configured semester type.",
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the restricted CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "AcademicSemester",
+      "table": "academic_semester",
+      "sourceSection": "5.2.8",
+      "columns": [
+        {
+          "name": "semester_id",
+          "sourceName": "semester_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique academic semester identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "academic_year",
+          "sourceName": "academic_year",
+          "sourceDefinition": "VARCHAR(9); NOT NULL",
+          "sqlType": "varchar(9)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Academic year label, e.g., 2026/2027.",
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_no",
+          "sourceName": "semester_no",
+          "sourceDefinition": "SMALLINT; NOT NULL",
+          "sqlType": "smallint",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Semester number: 1, 2 or 3.",
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_type",
+          "sourceName": "semester_type",
+          "sourceDefinition": "VARCHAR(10); NOT NULL",
+          "sqlType": "varchar(10)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "NORMAL for 1/2 or SHORT for 3.",
+          "implementedRequired": true
+        },
+        {
+          "name": "max_subjects",
+          "sourceName": "max_subjects",
+          "sourceDefinition": "SMALLINT; NOT NULL",
+          "sqlType": "smallint",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Configured subject-count limit for the semester.",
+          "implementedRequired": true
+        },
+        {
+          "name": "max_credits",
+          "sourceName": "max_credits",
+          "sourceDefinition": "SMALLINT; NOT NULL",
+          "sqlType": "smallint",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Configured credit limit for the semester.",
+          "implementedRequired": true
+        },
+        {
+          "name": "start_date",
+          "sourceName": "start_date",
+          "sourceDefinition": "DATE; NULL",
+          "sqlType": "date",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional starting date of the semester.",
+          "implementedRequired": false
+        },
+        {
+          "name": "end_date",
+          "sourceName": "end_date",
+          "sourceDefinition": "DATE; NULL",
+          "sqlType": "date",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional ending date of the semester.",
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "StudentProfile",
+      "table": "student_profile",
+      "sourceSection": "5.2.9",
+      "columns": [
+        {
+          "name": "student_id",
+          "sourceName": "student_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Internal academic student profile identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "clerk_user_id",
+          "sourceName": "clerk_user_id",
+          "sourceDefinition": "VARCHAR(255); U; NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": true,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique authenticated user identifier supplied by Clerk.",
+          "implementedRequired": true
+        },
+        {
+          "name": "matric_no",
+          "sourceName": "matric_no",
+          "sourceDefinition": "VARCHAR(30); NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional student matriculation number.",
+          "implementedRequired": false
+        },
+        {
+          "name": "student_name",
+          "sourceName": "student_name",
+          "sourceDefinition": "VARCHAR(255); NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Student display name.",
+          "implementedRequired": true
+        },
+        {
+          "name": "weekly_working_hours",
+          "sourceName": "weekly_working_hours",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional self-reported weekly employment hours.",
+          "implementedRequired": false
+        },
+        {
+          "name": "available_study_hours",
+          "sourceName": "available_study_hours",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional self-reported study time per week.",
+          "implementedRequired": false
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the profile was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "updated_at",
+          "sourceName": "updated_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the profile was last updated.",
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_id",
+          "sourceName": "curriculum_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the student's selected Curriculum.",
+          "references": [
+            "curriculum",
+            "curriculum_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "AcademicRecord",
+      "table": "academic_record",
+      "sourceSection": "5.2.10",
+      "columns": [
+        {
+          "name": "record_id",
+          "sourceName": "record_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique academic subject record identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Subject status: completed, exempted, failed or withdrawn.",
+          "implementedRequired": true
+        },
+        {
+          "name": "grade",
+          "sourceName": "grade",
+          "sourceDefinition": "VARCHAR(5); NULL",
+          "sqlType": "varchar(5)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional subject grade.",
+          "implementedRequired": false
+        },
+        {
+          "name": "recognized_credits",
+          "sourceName": "recognized_credits",
+          "sourceDefinition": "INTEGER; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Credits recognized for graduation; may be zero.",
+          "implementedRequired": true
+        },
+        {
+          "name": "remarks",
+          "sourceName": "remarks",
+          "sourceDefinition": "VARCHAR(255); NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional exemption or academic record notes.",
+          "implementedRequired": false
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time this record was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "student_id",
+          "sourceName": "student_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the owning StudentProfile.",
+          "references": [
+            "student_profile",
+            "student_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_id",
+          "sourceName": "subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References Subject.",
+          "references": [
+            "subject",
+            "subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_id",
+          "sourceName": "semester_id",
+          "sourceDefinition": "INTEGER; FK, NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": false,
+          "description": "Optional reference to AcademicSemester.",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "SemesterOffering",
+      "table": "semester_offering",
+      "sourceSection": "5.2.11",
+      "columns": [
+        {
+          "name": "offering_id",
+          "sourceName": "offering_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique semester-offering entry.",
+          "implementedRequired": true
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the reported offering was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "student_id",
+          "sourceName": "student_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Student who reported the offering.",
+          "references": [
+            "student_profile",
+            "student_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_id",
+          "sourceName": "semester_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "AcademicSemester to which the offering applies.",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Offered CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "AcademicPlan",
+      "table": "academic_plan",
+      "sourceSection": "5.2.12",
+      "columns": [
+        {
+          "name": "plan_id",
+          "sourceName": "plan_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique academic plan identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "plan_name",
+          "sourceName": "plan_name",
+          "sourceDefinition": "VARCHAR(100); NULL",
+          "sqlType": "varchar(100)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional name assigned to the plan.",
+          "implementedRequired": false
+        },
+        {
+          "name": "plan_type",
+          "sourceName": "plan_type",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Plan type, such as student-selected or recommended.",
+          "implementedRequired": true
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Current plan state.",
+          "implementedRequired": true
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the plan was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "updated_at",
+          "sourceName": "updated_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the plan was last updated.",
+          "implementedRequired": true
+        },
+        {
+          "name": "student_id",
+          "sourceName": "student_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the owning StudentProfile.",
+          "references": [
+            "student_profile",
+            "student_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "PlanSubject",
+      "table": "plan_subject",
+      "sourceSection": "5.2.13",
+      "columns": [
+        {
+          "name": "plan_subject_id",
+          "sourceName": "plan_subject_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique selected-subject entry.",
+          "implementedRequired": true
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time the plan-subject entry was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "plan_id",
+          "sourceName": "plan_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References AcademicPlan.",
+          "references": [
+            "academic_plan",
+            "plan_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the selected CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_id",
+          "sourceName": "semester_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References AcademicSemester for the planned subject.",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "SimulationScenario",
+      "table": "simulation_scenario",
+      "sourceSection": "5.2.14",
+      "columns": [
+        {
+          "name": "scenario_id",
+          "sourceName": "scenario_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique simulation scenario identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "scenario_name",
+          "sourceName": "scenario_name",
+          "sourceDefinition": "VARCHAR(100); NOT NULL",
+          "sqlType": "varchar(100)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Name of the hypothetical scenario.",
+          "implementedRequired": true
+        },
+        {
+          "name": "description",
+          "sourceName": "description",
+          "sourceDefinition": "VARCHAR(255); NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional scenario description.",
+          "implementedRequired": false
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time scenario was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "student_id",
+          "sourceName": "student_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the owning StudentProfile.",
+          "references": [
+            "student_profile",
+            "student_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "source_plan_id",
+          "sourceName": "source_plan_id",
+          "sourceDefinition": "INTEGER; FK, NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": false,
+          "description": "Optional baseline AcademicPlan used for comparison.",
+          "references": [
+            "academic_plan",
+            "plan_id"
+          ],
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "SimulationSubject",
+      "table": "simulation_subject",
+      "sourceSection": "5.2.15",
+      "columns": [
+        {
+          "name": "simulation_subject_id",
+          "sourceName": "simulation_subject_id",
+          "sourceDefinition": "INTEGER; PK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique simulated subject-change identifier.",
+          "implementedRequired": true
+        },
+        {
+          "name": "change_type",
+          "sourceName": "change_type",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Type of simulated academic change.",
+          "implementedRequired": true
+        },
+        {
+          "name": "hypothetical_status",
+          "sourceName": "hypothetical_status",
+          "sourceDefinition": "VARCHAR(20); NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional assumed academic subject status.",
+          "implementedRequired": false
+        },
+        {
+          "name": "remarks",
+          "sourceName": "remarks",
+          "sourceDefinition": "VARCHAR(255); NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional explanation of the hypothetical change.",
+          "implementedRequired": false
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Date/time simulated change was created.",
+          "implementedRequired": true
+        },
+        {
+          "name": "scenario_id",
+          "sourceName": "scenario_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the owning SimulationScenario.",
+          "references": [
+            "simulation_scenario",
+            "scenario_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_subject_id",
+          "sourceName": "curriculum_subject_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "References the affected CurriculumSubject.",
+          "references": [
+            "curriculum_subject",
+            "curriculum_subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "proposed_semester_id",
+          "sourceName": "proposed_semester_id",
+          "sourceDefinition": "INTEGER; FK, NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": false,
+          "description": "Optional AcademicSemester proposed for the change.",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "LearningCentre",
+      "table": "learning_centre",
+      "sourceSection": "5.2.16",
+      "columns": [
+        {
+          "name": "learning_centre_id",
+          "sourceName": "learning_centre_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique learning centre",
+          "implementedRequired": true
+        },
+        {
+          "name": "centre_code",
+          "sourceName": "centre_code",
+          "sourceDefinition": "VARCHAR(10); U",
+          "sqlType": "varchar(10)",
+          "primaryKey": false,
+          "unique": true,
+          "foreignKey": false,
+          "required": null,
+          "description": "Centre code (KL/JB/PP)",
+          "implementedRequired": true
+        },
+        {
+          "name": "centre_name",
+          "sourceName": "centre_name",
+          "sourceDefinition": "VARCHAR(100)",
+          "sqlType": "varchar(100)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Centre name",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "AcademicImportBatch",
+      "table": "academic_import_batch",
+      "sourceSection": "5.2.17",
+      "columns": [
+        {
+          "name": "import_batch_id",
+          "sourceName": "import_batch_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Provided academic data batch",
+          "implementedRequired": true
+        },
+        {
+          "name": "learning_centre_id",
+          "sourceName": "learning_centre_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Learning centre",
+          "references": [
+            "learning_centre",
+            "learning_centre_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "snapshot_date",
+          "sourceName": "snapshot_date",
+          "sourceDefinition": "DATE",
+          "sqlType": "date",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Date source data was current",
+          "implementedRequired": true
+        },
+        {
+          "name": "provided_by",
+          "sourceName": "provided_by",
+          "sourceDefinition": "VARCHAR(255)",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Clerk coordinator identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "source_label",
+          "sourceName": "source_label",
+          "sourceDefinition": "VARCHAR(255)",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Origin and description of provided academic data",
+          "implementedRequired": true
+        },
+        {
+          "name": "import_status",
+          "sourceName": "import_status",
+          "sourceDefinition": "VARCHAR(20)",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Validation state",
+          "implementedRequired": true
+        },
+        {
+          "name": "provided_at",
+          "sourceName": "provided_at",
+          "sourceDefinition": "TIMESTAMP",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Data provision time",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ImportedStudent",
+      "table": "imported_student",
+      "sourceSection": "5.2.18",
+      "columns": [
+        {
+          "name": "imported_student_id",
+          "sourceName": "imported_student_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Cohort row identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "import_batch_id",
+          "sourceName": "import_batch_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Parent import batch",
+          "references": [
+            "academic_import_batch",
+            "import_batch_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "curriculum_id",
+          "sourceName": "curriculum_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Shared curriculum",
+          "references": [
+            "curriculum",
+            "curriculum_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "external_reference",
+          "sourceName": "external_reference",
+          "sourceDefinition": "VARCHAR(100)",
+          "sqlType": "varchar(100)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Source student reference; protect identifiers",
+          "implementedRequired": true
+        },
+        {
+          "name": "cohort_status",
+          "sourceName": "cohort_status",
+          "sourceDefinition": "VARCHAR(20)",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Continuing/deferred/expected graduate",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ImportedSubjectRecord",
+      "table": "imported_subject_record",
+      "sourceSection": "5.2.19",
+      "columns": [
+        {
+          "name": "import_record_id",
+          "sourceName": "import_record_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Imported subject history row",
+          "implementedRequired": true
+        },
+        {
+          "name": "imported_student_id",
+          "sourceName": "imported_student_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Owning imported student",
+          "references": [
+            "imported_student",
+            "imported_student_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_id",
+          "sourceName": "subject_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Shared subject catalogue",
+          "references": [
+            "subject",
+            "subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_status",
+          "sourceName": "subject_status",
+          "sourceDefinition": "VARCHAR(20)",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Completed/failed/in progress/exempted",
+          "implementedRequired": true
+        },
+        {
+          "name": "semester_id",
+          "sourceName": "semester_id",
+          "sourceDefinition": "INTEGER; FK, NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": false,
+          "description": "Academic period if supplied",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": false
+        },
+        {
+          "name": "is_synthetic",
+          "sourceName": "is_synthetic",
+          "sourceDefinition": "BOOLEAN",
+          "sqlType": "boolean",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Distinguish generated histories from real source records",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ClassCapacityRule",
+      "table": "class_capacity_rule",
+      "sourceSection": "5.2.20",
+      "columns": [
+        {
+          "name": "capacity_rule_id",
+          "sourceName": "capacity_rule_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Capacity rule identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "class_type",
+          "sourceName": "class_type",
+          "sourceDefinition": "VARCHAR(20)",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "LAB or LECTURE",
+          "implementedRequired": true
+        },
+        {
+          "name": "minimum_enrollment",
+          "sourceName": "minimum_enrollment",
+          "sourceDefinition": "INTEGER",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Working minimum (e.g., 15; configurable)",
+          "implementedRequired": true
+        },
+        {
+          "name": "break_even_target",
+          "sourceName": "break_even_target",
+          "sourceDefinition": "INTEGER",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Financial reference (e.g., 25; provisional)",
+          "implementedRequired": true
+        },
+        {
+          "name": "normal_maximum",
+          "sourceName": "normal_maximum",
+          "sourceDefinition": "INTEGER",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Standard capacity (e.g., lab 30, lecture 40)",
+          "implementedRequired": true
+        },
+        {
+          "name": "exception_maximum",
+          "sourceName": "exception_maximum",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Approved exception capacity (e.g., lab 35)",
+          "implementedRequired": false
+        },
+        {
+          "name": "is_active",
+          "sourceName": "is_active",
+          "sourceDefinition": "BOOLEAN",
+          "sqlType": "boolean",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Whether rule is currently in force",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ForecastRun",
+      "table": "forecast_run",
+      "sourceSection": "5.2.21",
+      "columns": [
+        {
+          "name": "forecast_run_id",
+          "sourceName": "forecast_run_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Forecast identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "import_batch_id",
+          "sourceName": "import_batch_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Source academic data snapshot",
+          "references": [
+            "academic_import_batch",
+            "import_batch_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "target_semester_id",
+          "sourceName": "target_semester_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Proposed next semester",
+          "references": [
+            "academic_semester",
+            "semester_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "scenario_assumptions",
+          "sourceName": "scenario_assumptions",
+          "sourceDefinition": "JSONB",
+          "sqlType": "jsonb",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Assumed pass rates and uncertain data handling",
+          "implementedRequired": true
+        },
+        {
+          "name": "generated_by",
+          "sourceName": "generated_by",
+          "sourceDefinition": "VARCHAR(255)",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Coordinator Clerk identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "generated_at",
+          "sourceName": "generated_at",
+          "sourceDefinition": "TIMESTAMP",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Forecast time",
+          "implementedRequired": true
+        },
+        {
+          "name": "status",
+          "sourceName": "status",
+          "sourceDefinition": "VARCHAR(20)",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Draft / Under Review / Finalized / Superseded / Archived",
+          "implementedRequired": true
+        },
+        {
+          "name": "learning_centre_id",
+          "sourceName": "learning_centre_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Centre for version-number uniqueness and filtering",
+          "references": [
+            "learning_centre",
+            "learning_centre_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "version_number",
+          "sourceName": "version_number",
+          "sourceDefinition": "INTEGER; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique with learning_centre_id and target_semester_id",
+          "implementedRequired": true
+        },
+        {
+          "name": "parent_forecast_run_id",
+          "sourceName": "parent_forecast_run_id",
+          "sourceDefinition": "INTEGER; FK, NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": false,
+          "description": "Previous version; nullable for first run",
+          "references": [
+            "forecast_run",
+            "forecast_run_id"
+          ],
+          "implementedRequired": false
+        },
+        {
+          "name": "finalized_by",
+          "sourceName": "finalized_by",
+          "sourceDefinition": "VARCHAR(255); NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Coordinator who finalized this version",
+          "implementedRequired": false
+        },
+        {
+          "name": "finalized_at",
+          "sourceName": "finalized_at",
+          "sourceDefinition": "TIMESTAMP; NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Finalization time; locks stored results and decisions",
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "ForecastSubjectDemand",
+      "table": "forecast_subject_demand",
+      "sourceSection": "5.2.22",
+      "columns": [
+        {
+          "name": "demand_id",
+          "sourceName": "demand_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Subject-level forecast identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "forecast_run_id",
+          "sourceName": "forecast_run_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Parent forecast",
+          "references": [
+            "forecast_run",
+            "forecast_run_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "subject_id",
+          "sourceName": "subject_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Shared Subject",
+          "references": [
+            "subject",
+            "subject_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "eligible_count",
+          "sourceName": "eligible_count",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Verified count if sufficient data exists",
+          "implementedRequired": false
+        },
+        {
+          "name": "forecast_count",
+          "sourceName": "forecast_count",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Estimated next-semester enrollment",
+          "implementedRequired": false
+        },
+        {
+          "name": "graduation_critical_count",
+          "sourceName": "graduation_critical_count",
+          "sourceDefinition": "INTEGER; NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Confirmed/projection-based urgency, nullable",
+          "implementedRequired": false
+        },
+        {
+          "name": "data_quality_status",
+          "sourceName": "data_quality_status",
+          "sourceDefinition": "VARCHAR(30)",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Validated/preliminary/insufficient",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ProposedClassSection",
+      "table": "proposed_class_section",
+      "sourceSection": "5.2.23",
+      "columns": [
+        {
+          "name": "proposed_section_id",
+          "sourceName": "proposed_section_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Proposed section",
+          "implementedRequired": true
+        },
+        {
+          "name": "demand_id",
+          "sourceName": "demand_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Subject demand entry",
+          "references": [
+            "forecast_subject_demand",
+            "demand_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "capacity_rule_id",
+          "sourceName": "capacity_rule_id",
+          "sourceDefinition": "INTEGER; FK",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": null,
+          "description": "Applied capacity policy",
+          "references": [
+            "class_capacity_rule",
+            "capacity_rule_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "section_number",
+          "sourceName": "section_number",
+          "sourceDefinition": "SMALLINT",
+          "sqlType": "smallint",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Section number",
+          "implementedRequired": true
+        },
+        {
+          "name": "expected_students",
+          "sourceName": "expected_students",
+          "sourceDefinition": "INTEGER",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Expected enrollment in section",
+          "implementedRequired": true
+        },
+        {
+          "name": "review_status",
+          "sourceName": "review_status",
+          "sourceDefinition": "VARCHAR(30)",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": null,
+          "description": "Current section review status; all changes are recorded in ForecastDecisionAuditLog",
+          "implementedRequired": true
+        },
+        {
+          "name": "justification",
+          "sourceName": "justification",
+          "sourceDefinition": "TEXT; NULL",
+          "sqlType": "text",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Coordinator review reason",
+          "implementedRequired": false
+        },
+        {
+          "name": "reviewed_by",
+          "sourceName": "reviewed_by",
+          "sourceDefinition": "VARCHAR(255); NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Clerk reviewer",
+          "implementedRequired": false
+        },
+        {
+          "name": "reviewed_at",
+          "sourceName": "reviewed_at",
+          "sourceDefinition": "TIMESTAMP; NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Review time",
+          "implementedRequired": false
+        }
+      ]
+    },
+    {
+      "entity": "UserAccessAssignment",
+      "table": "user_access_assignment",
+      "sourceSection": "5.2.24",
+      "columns": [
+        {
+          "name": "access_assignment_id",
+          "sourceName": "access_assignment_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique application authorization mapping.",
+          "implementedRequired": true
+        },
+        {
+          "name": "clerk_user_id",
+          "sourceName": "clerk_user_id",
+          "sourceDefinition": "VARCHAR(255); U; NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": true,
+          "foreignKey": false,
+          "required": true,
+          "description": "Clerk identity reference; application stores no password.",
+          "implementedRequired": true
+        },
+        {
+          "name": "app_role",
+          "sourceName": "app_role",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "STUDENT, COORDINATOR or SYSTEM_ADMIN.",
+          "implementedRequired": true
+        },
+        {
+          "name": "access_status",
+          "sourceName": "access_status",
+          "sourceDefinition": "VARCHAR(20); NOT NULL",
+          "sqlType": "varchar(20)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "ACTIVE or SUSPENDED.",
+          "implementedRequired": true
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Assignment creation timestamp.",
+          "implementedRequired": true
+        },
+        {
+          "name": "updated_at",
+          "sourceName": "updated_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Last application-access update.",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "UserAccessAuditLog",
+      "table": "user_access_audit_log",
+      "sourceSection": "5.2.25",
+      "columns": [
+        {
+          "name": "access_audit_id",
+          "sourceName": "access_audit_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique immutable audit event.",
+          "implementedRequired": true
+        },
+        {
+          "name": "access_assignment_id",
+          "sourceName": "access_assignment_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Account access record whose role or status changed.",
+          "references": [
+            "user_access_assignment",
+            "access_assignment_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "performed_by_clerk_user_id",
+          "sourceName": "performed_by_clerk_user_id",
+          "sourceDefinition": "VARCHAR(255); NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Clerk identity of authorized administrator.",
+          "implementedRequired": true
+        },
+        {
+          "name": "change_type",
+          "sourceName": "change_type",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "ROLE_CHANGE or ACCESS_STATUS_CHANGE.",
+          "implementedRequired": true
+        },
+        {
+          "name": "old_value",
+          "sourceName": "old_value",
+          "sourceDefinition": "VARCHAR(50); NULL",
+          "sqlType": "varchar(50)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Previous role or status.",
+          "implementedRequired": false
+        },
+        {
+          "name": "new_value",
+          "sourceName": "new_value",
+          "sourceDefinition": "VARCHAR(50); NOT NULL",
+          "sqlType": "varchar(50)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Applied new role or status.",
+          "implementedRequired": true
+        },
+        {
+          "name": "reason",
+          "sourceName": "reason",
+          "sourceDefinition": "TEXT; NULL",
+          "sqlType": "text",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Optional administrative justification.",
+          "implementedRequired": false
+        },
+        {
+          "name": "created_at",
+          "sourceName": "created_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Event timestamp.",
+          "implementedRequired": true
+        }
+      ]
+    },
+    {
+      "entity": "ForecastDecisionAuditLog",
+      "table": "forecast_decision_audit_log",
+      "sourceSection": "5.2.26",
+      "columns": [
+        {
+          "name": "decision_audit_id",
+          "sourceName": "decision_audit_id",
+          "sourceDefinition": "INTEGER; PK",
+          "sqlType": "integer",
+          "primaryKey": true,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Unique, append-only decision event",
+          "implementedRequired": true
+        },
+        {
+          "name": "proposed_section_id",
+          "sourceName": "proposed_section_id",
+          "sourceDefinition": "INTEGER; FK; NOT NULL",
+          "sqlType": "integer",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": true,
+          "required": true,
+          "description": "Proposed section whose decision changed",
+          "references": [
+            "proposed_class_section",
+            "proposed_section_id"
+          ],
+          "implementedRequired": true
+        },
+        {
+          "name": "action_type",
+          "sourceName": "action_type",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "REVIEW / APPROVE / DEFER / REOPEN / FINALIZE",
+          "implementedRequired": true
+        },
+        {
+          "name": "old_status",
+          "sourceName": "old_status",
+          "sourceDefinition": "VARCHAR(30); NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Previous review status, if any",
+          "implementedRequired": false
+        },
+        {
+          "name": "new_status",
+          "sourceName": "new_status",
+          "sourceDefinition": "VARCHAR(30); NOT NULL",
+          "sqlType": "varchar(30)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "New review status",
+          "implementedRequired": true
+        },
+        {
+          "name": "reason",
+          "sourceName": "reason",
+          "sourceDefinition": "TEXT; NULL",
+          "sqlType": "text",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": false,
+          "description": "Coordinator explanation or justification",
+          "implementedRequired": false
+        },
+        {
+          "name": "recorded_by",
+          "sourceName": "recorded_by",
+          "sourceDefinition": "VARCHAR(255); NOT NULL",
+          "sqlType": "varchar(255)",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Authorized Clerk coordinator identifier",
+          "implementedRequired": true
+        },
+        {
+          "name": "recorded_at",
+          "sourceName": "recorded_at",
+          "sourceDefinition": "TIMESTAMP; NOT NULL",
+          "sqlType": "timestamptz",
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": false,
+          "required": true,
+          "description": "Immutable event timestamp",
+          "implementedRequired": true
+        }
+      ]
+    }
+  ]
+}

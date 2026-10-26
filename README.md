@@ -40,9 +40,11 @@ CLERK_SECRET_KEY=<matching development secret key>
 DATABASE_URL=<Neon development database connection URL>
 ```
 
-Obtain development access from the project maintainer. Each developer should use the
-intended development database/branch and apply the P004 migration only if its access
-table is absent. Existing branches may already contain the table.
+Obtain development access from the project maintainer. All developers use the shared
+Neon development branch development (br-shy-cherry-azuzy9v5, database neondb).
+The DATABASE_FOUNDATION baseline now provides
+a single migration workflow: see docs/database/README.md. Do not apply dated feature
+migrations alongside the canonical baseline. Existing app data must be preserved.
 Restart the servers after editing environment files. Credentials remain local and
 are excluded by Git.
 
@@ -78,9 +80,10 @@ against `main`; keep each PR within its selected owner scope.
 - P001 supplies ProfileReader and the academic profile setup form. Missing profile
   integration keeps academic access blocked.
 - Frontend components: apps/web/src/features/auth.
-- tools/auth/local is the runnable auth preview, not the final shared application shell.
-  FOUNDATION should integrate these modules through the documented interfaces.
-- The only implemented migration is P004's user_access_assignment table.
+- tools/auth/local supplies the shared local app and API dispatcher. P001/P002
+  canonical overlays are detected when npm run dev/build/typecheck/test starts.
+- Database foundation: the 26-entity baseline is applied and SQL-validated on the
+  confirmed Neon development branch; see docs/database/README.md for evidence.
 
 ## Checks
 
@@ -105,6 +108,9 @@ passed separately. The user also reported passing signup/domain, logout/sign-in,
 privileged-page denial and account-idempotency checks. Peer review remains pending.
 
 ## Team documentation
+
+- [Database foundation and execution gate](docs/database/README.md)
+- [Paste-in P001/P002 routing integration](docs/integration-copy-paste.md)
 
 - [Sprint 1 ownership and requirements](<docs/sprint1 (1).md>)
 - [Mandatory implementation workflow](docs/implementationguide.md)

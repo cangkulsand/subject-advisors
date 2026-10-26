@@ -1,0 +1,13 @@
+{
+  "kind": "local-disposable",
+  "disposable": true,
+  "approvedForSchemaCreation": false,
+  "approvedBy": "REPLACE_WITH_ACTUAL_APPROVAL",
+  "host": "127.0.0.1",
+  "port": 55432,
+  "database": "utm_db_foundation_001",
+  "connectionStringEnvironmentVariable": "DB_FOUNDATION_URL",
+  "notes": "Copy to an ignored .wrangler/db-foundation/target.json only after explicitly selecting and confirming this empty target. Do not use the existing application database.",
+  "development": true,
+  "allowRollbackOnlyTests": false
+}

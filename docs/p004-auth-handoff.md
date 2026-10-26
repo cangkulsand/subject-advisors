@@ -9,13 +9,19 @@ passed. The remaining FOUNDATION and other programmer integrations are separate 
 - apps/api/src/modules/auth: contracts, Clerk verification, policy, Neon repository and endpoints.
 - apps/api/src/middleware/auth.ts: server-side role/status/profile authorization.
 - apps/web/src/features/auth: React provider/pages/guards/logout and bearer API client.
-- db/migrations/20261024_p004_user_access_assignment.sql: access assignments only.
+- db/migrations/20261024_p004_user_access_assignment.sql: historical UUID schema only.
+  The canonical database is documented in database/README.md; do not mix workflows.
 - tools/auth/local: local browser and Worker adapters.
+- Shared paste-in routing: docs/integration-copy-paste.md. The same P001 ProfileReader
+  is injected into /api/me and P002 offerings when their canonical overlays exist.
 - docs/changes: implementation and operational history, including initial setup limitations
   and the subsequent fixes/verification that superseded them.
 
-The table has UUID primary key, unique Clerk user ID, role/status checks, nonempty identity
-check, and timestamps. Initialization inserts STUDENT/ACTIVE with ON CONFLICT DO NOTHING,
+The canonical table on the shared Neon development branch has an INTEGER primary key,
+unique Clerk user ID, role/status checks, nonempty identity check, and timestamps.
+The old UUID rows/key mapping are preserved privately in migration_meta. The auth
+repository does not expose assignment IDs and retains its existing query contract.
+Initialization inserts STUDENT/ACTIVE with ON CONFLICT DO NOTHING,
 then reads the persisted assignment. It never upgrades an existing role or reactivates
 suspension. No StudentProfile or fake curriculum is created.
 

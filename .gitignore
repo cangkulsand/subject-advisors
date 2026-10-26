@@ -7,4 +7,5 @@ dist-auth/
 .wrangler/
 coverage/
 .npm-auth-cache/
+.generated-integration/
 !.dev.vars.example

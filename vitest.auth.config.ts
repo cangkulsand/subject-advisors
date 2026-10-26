@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
-  test: { include: ['apps/**/*.test.{ts,tsx}'], restoreMocks: true },
+  test: { include: ['apps/**/*.test.{ts,tsx}', 'packages/shared/**/*.test.{ts,tsx}'], restoreMocks: true },
 
 });

@@ -1,0 +1,28 @@
+{
+  "formatVersion": 1,
+  "owner": "DATABASE_FOUNDATION",
+  "metadataSchema": "migration_meta",
+  "migrations": [
+    {
+      "version": "0000",
+      "file": "0000_preserve_legacy_p004.sql",
+      "description": "Preserve a recognized, explicitly approved P004-only UUID table; no-op on an empty DB"
+    },
+    {
+      "version": "0001",
+      "file": "0001_initial_schema.sql",
+      "description": "SRS v2.0 canonical 26-entity integer baseline"
+    },
+    {
+      "version": "0002",
+      "file": "0002_copy_legacy_access.sql",
+      "description": "Preserve roles/status/timestamps and UUID-to-integer history"
+    }
+  ],
+  "historicalExcluded": [
+    {
+      "file": "20261024_p004_user_access_assignment.sql",
+      "reason": "Historical applied UUID feature schema, preserved byte-for-byte; not in canonical execution order"
+    }
+  ]
+}

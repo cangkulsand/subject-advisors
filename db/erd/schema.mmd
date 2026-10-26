@@ -1,0 +1,263 @@
+erDiagram
+  programme {
+    integer programme_id PK
+    varchar programme_code UK
+    varchar programme_name
+    varchar level
+    varchar status
+  }
+  curriculum {
+    integer curriculum_id PK
+    varchar curriculum_version
+    integer total_credit_required
+    integer effective_year
+    varchar status
+    integer programme_id FK
+  }
+  subject {
+    integer subject_id PK
+    varchar subject_code UK
+    varchar subject_name
+    integer credit_hours
+    varchar subject_category
+    varchar status
+    boolean include_in_offering_forecast
+    varchar class_type
+  }
+  curriculum_subject {
+    integer curriculum_subject_id PK
+    smallint is_compulsory
+    varchar subject_category
+    integer curriculum_id FK
+    integer subject_id FK
+  }
+  curriculum_requirement {
+    integer requirement_id PK
+    varchar requirement_type
+    integer required_credits
+    integer required_subjects
+    integer curriculum_id FK
+  }
+  subject_prerequisite {
+    integer prerequisite_id PK
+    varchar requirement_type
+    integer curriculum_subject_id FK
+    integer required_curriculum_subject_id FK
+  }
+  subject_semester_rule {
+    integer rule_id PK
+    varchar semester_type
+    integer curriculum_subject_id FK
+  }
+  academic_semester {
+    integer semester_id PK
+    varchar academic_year
+    smallint semester_no
+    varchar semester_type
+    smallint max_subjects
+    smallint max_credits
+    date start_date
+    date end_date
+  }
+  student_profile {
+    integer student_id PK
+    varchar clerk_user_id UK
+    varchar matric_no
+    varchar student_name
+    integer weekly_working_hours
+    integer available_study_hours
+    timestamptz created_at
+    timestamptz updated_at
+    integer curriculum_id FK
+  }
+  academic_record {
+    integer record_id PK
+    varchar status
+    varchar grade
+    integer recognized_credits
+    varchar remarks
+    timestamptz created_at
+    integer student_id FK
+    integer subject_id FK
+    integer semester_id FK
+  }
+  semester_offering {
+    integer offering_id PK
+    timestamptz created_at
+    integer student_id FK
+    integer semester_id FK
+    integer curriculum_subject_id FK
+  }
+  academic_plan {
+    integer plan_id PK
+    varchar plan_name
+    varchar plan_type
+    varchar status
+    timestamptz created_at
+    timestamptz updated_at
+    integer student_id FK
+  }
+  plan_subject {
+    integer plan_subject_id PK
+    timestamptz created_at
+    integer plan_id FK
+    integer curriculum_subject_id FK
+    integer semester_id FK
+  }
+  simulation_scenario {
+    integer scenario_id PK
+    varchar scenario_name
+    varchar description
+    timestamptz created_at
+    integer student_id FK
+    integer source_plan_id FK
+  }
+  simulation_subject {
+    integer simulation_subject_id PK
+    varchar change_type
+    varchar hypothetical_status
+    varchar remarks
+    timestamptz created_at
+    integer scenario_id FK
+    integer curriculum_subject_id FK
+    integer proposed_semester_id FK
+  }
+  learning_centre {
+    integer learning_centre_id PK
+    varchar centre_code UK
+    varchar centre_name
+  }
+  academic_import_batch {
+    integer import_batch_id PK
+    integer learning_centre_id FK
+    date snapshot_date
+    varchar provided_by
+    varchar source_label
+    varchar import_status
+    timestamptz provided_at
+  }
+  imported_student {
+    integer imported_student_id PK
+    integer import_batch_id FK
+    integer curriculum_id FK
+    varchar external_reference
+    varchar cohort_status
+  }
+  imported_subject_record {
+    integer import_record_id PK
+    integer imported_student_id FK
+    integer subject_id FK
+    varchar subject_status
+    integer semester_id FK
+    boolean is_synthetic
+  }
+  class_capacity_rule {
+    integer capacity_rule_id PK
+    varchar class_type
+    integer minimum_enrollment
+    integer break_even_target
+    integer normal_maximum
+    integer exception_maximum
+    boolean is_active
+  }
+  forecast_run {
+    integer forecast_run_id PK
+    integer import_batch_id FK
+    integer target_semester_id FK
+    jsonb scenario_assumptions
+    varchar generated_by
+    timestamptz generated_at
+    varchar status
+    integer learning_centre_id FK
+    integer version_number
+    integer parent_forecast_run_id FK
+    varchar finalized_by
+    timestamptz finalized_at
+  }
+  forecast_subject_demand {
+    integer demand_id PK
+    integer forecast_run_id FK
+    integer subject_id FK
+    integer eligible_count
+    integer forecast_count
+    integer graduation_critical_count
+    varchar data_quality_status
+  }
+  proposed_class_section {
+    integer proposed_section_id PK
+    integer demand_id FK
+    integer capacity_rule_id FK
+    smallint section_number
+    integer expected_students
+    varchar review_status
+    text justification
+    varchar reviewed_by
+    timestamptz reviewed_at
+  }
+  user_access_assignment {
+    integer access_assignment_id PK
+    varchar clerk_user_id UK
+    varchar app_role
+    varchar access_status
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  user_access_audit_log {
+    integer access_audit_id PK
+    integer access_assignment_id FK
+    varchar performed_by_clerk_user_id
+    varchar change_type
+    varchar old_value
+    varchar new_value
+    text reason
+    timestamptz created_at
+  }
+  forecast_decision_audit_log {
+    integer decision_audit_id PK
+    integer proposed_section_id FK
+    varchar action_type
+    varchar old_status
+    varchar new_status
+    text reason
+    varchar recorded_by
+    timestamptz recorded_at
+  }
+  programme ||--o{ curriculum : "programme_id"
+  curriculum ||--o{ curriculum_subject : "curriculum_id"
+  subject ||--o{ curriculum_subject : "subject_id"
+  curriculum ||--o{ curriculum_requirement : "curriculum_id"
+  curriculum_subject ||--o{ subject_prerequisite : "curriculum_subject_id"
+  curriculum_subject ||--o{ subject_prerequisite : "required_curriculum_subject_id"
+  curriculum_subject ||--o{ subject_semester_rule : "curriculum_subject_id"
+  curriculum ||--o{ student_profile : "curriculum_id"
+  student_profile ||--o{ academic_record : "student_id"
+  subject ||--o{ academic_record : "subject_id"
+  academic_semester |o--o{ academic_record : "semester_id"
+  student_profile ||--o{ semester_offering : "student_id"
+  academic_semester ||--o{ semester_offering : "semester_id"
+  curriculum_subject ||--o{ semester_offering : "curriculum_subject_id"
+  student_profile ||--o{ academic_plan : "student_id"
+  academic_plan ||--o{ plan_subject : "plan_id"
+  curriculum_subject ||--o{ plan_subject : "curriculum_subject_id"
+  academic_semester ||--o{ plan_subject : "semester_id"
+  student_profile ||--o{ simulation_scenario : "student_id"
+  academic_plan |o--o{ simulation_scenario : "source_plan_id"
+  simulation_scenario ||--o{ simulation_subject : "scenario_id"
+  curriculum_subject ||--o{ simulation_subject : "curriculum_subject_id"
+  academic_semester |o--o{ simulation_subject : "proposed_semester_id"
+  learning_centre ||--o{ academic_import_batch : "learning_centre_id"
+  academic_import_batch ||--o{ imported_student : "import_batch_id"
+  curriculum ||--o{ imported_student : "curriculum_id"
+  imported_student ||--o{ imported_subject_record : "imported_student_id"
+  subject ||--o{ imported_subject_record : "subject_id"
+  academic_semester |o--o{ imported_subject_record : "semester_id"
+  academic_import_batch ||--o{ forecast_run : "import_batch_id"
+  academic_semester ||--o{ forecast_run : "target_semester_id"
+  learning_centre ||--o{ forecast_run : "learning_centre_id"
+  forecast_run |o--o{ forecast_run : "parent_forecast_run_id"
+  forecast_run ||--o{ forecast_subject_demand : "forecast_run_id"
+  subject ||--o{ forecast_subject_demand : "subject_id"
+  forecast_subject_demand ||--o{ proposed_class_section : "demand_id"
+  class_capacity_rule ||--o{ proposed_class_section : "capacity_rule_id"
+  user_access_assignment ||--o{ user_access_audit_log : "access_assignment_id"
+  proposed_class_section ||--o{ forecast_decision_audit_log : "proposed_section_id"
