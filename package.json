@@ -25,7 +25,16 @@
     "lint:db": "node node_modules/eslint/bin/eslint.js tools/db --max-warnings 0",
     "prepare:integration": "node tools/integration/prepare.mjs",
     "test:integration": "node tools/integration/prepare.mjs && node --test tools/integration/prepare.test.mjs",
-    "test:ui:integration": "node tools/integration/test-ui.mjs"
+    "test:ui:integration": "node tools/integration/test-ui.mjs",
+    "dev:offerings": "node node_modules/vite/bin/vite.js --config vite.offerings.config.ts --configLoader native",
+    "preview:offerings": "node tools/offerings/serve-preview.mjs",
+    "typecheck:offerings": "node node_modules/typescript/bin/tsc -p tsconfig.offerings.json",
+    "lint:offerings": "node node_modules/eslint/bin/eslint.js apps/api/src/modules/offerings apps/web/src/features/offerings packages/shared/src/offerings tools/offerings/demo vite.offerings.config.ts vitest.offerings.config.ts --max-warnings 0",
+    "test:offerings": "node node_modules/vitest/vitest.mjs run --config vitest.offerings.config.ts --configLoader native",
+    "test:ui:offerings": "node tools/offerings/test-ui.mjs",
+    "test:db:offerings": "node tools/offerings/test-database.mjs",
+    "build:offerings": "node tools/offerings/build.mjs",
+    "acceptance:offerings": "node tools/offerings/acceptance.mjs"
   },
   "dependencies": {
     "@clerk/backend": "3.23.1",

@@ -9,3 +9,7 @@ coverage/
 .npm-auth-cache/
 .generated-integration/
 !.dev.vars.example
+
+# P002 offering checks and compiled fictional preview
+dist-offerings/
+.cache-offerings/

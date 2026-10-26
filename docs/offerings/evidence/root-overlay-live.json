@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-10-26T02:58:14.662Z",
+  "target": {
+    "database": "neondb",
+    "project_id": "still-waterfall-91972583",
+    "branch_id": "br-shy-cherry-azuzy9v5"
+  },
+  "before": {
+    "programme": "0",
+    "curriculum": "0",
+    "subject": "0",
+    "curriculum_subject": "0",
+    "academic_semester": "0",
+    "student_profile": "0",
+    "semester_offering": "0"
+  },
+  "after": {
+    "programme": "0",
+    "curriculum": "0",
+    "subject": "0",
+    "curriculum_subject": "0",
+    "academic_semester": "0",
+    "student_profile": "0",
+    "semester_offering": "0"
+  },
+  "persistentCountsUnchanged": true,
+  "acceptanceExitCode": 0
+}

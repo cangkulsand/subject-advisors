@@ -28,6 +28,20 @@ Record notes use remarks. Profile work/study hours are nullable in the source an
 nonnegative when supplied. Valid profile completion remains an application contract.
 Credit totals and official subject/prerequisite rules must come from approved data.
 
+### SECJ version 1 Industrial Training eligibility
+
+The SECJ version 1 curriculum requires at least 92 recognized credits before
+Industrial Training (SECJ4114 and SECJ4118). Calculate the total from
+`academic_record.recognized_credits` for `COMPLETED` and `EXEMPTED` records, counting
+credit for a subject only once across repeated attempts. The current database stores
+the 92-credit threshold in `curriculum_requirement` as `INDUSTRIAL_TRAINING`.
+
+The source also requires CGPA above 2.00. CGPA is not calculated or enforced yet:
+there is no CGPA field or agreed grade-point scale/repeat policy in the current
+system. Add a student-facing note for this condition when the eligibility UI is
+implemented, and do not report Industrial Training eligibility as fully verified
+until CGPA handling is defined.
+
 ## P002 — semesters, offerings and plans
 
 Consume academic_semester, semester_offering, academic_plan and plan_subject.
