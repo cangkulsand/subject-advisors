@@ -1,5 +1,14 @@
 # Theme Guide — Academic Journey
 
+> **Approved template update — 26 October 2026:** The shared template now uses
+> primary **#521f28**, burgundy/rose accents, warm neutral surfaces and a responsive
+> sidebar/header with optional dark mode. The implemented tokens in
+> `apps/web/src/app/student-shell.css` are the current source of truth, including
+> the readable dark variants. Use the existing CSS implementation; do not install
+> Tailwind or restore the older teal/blue and light-only examples below. Those
+> examples are historical guidance; the accessibility and ownership rules remain.
+> See [UI handoff](ui-handoff.md) for feature integration and scope.
+
 > **Project:** AI-Powered Academic Advisory System for UTMSPACE Part-Time Students  
 > **Design concept:** **Academic Journey Command Center** — calm academic productivity with purposeful, game-inspired pathway exploration  
 > **Default appearance:** **Light mode only for the initial implementation**  

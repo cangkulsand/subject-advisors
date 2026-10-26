@@ -45,6 +45,7 @@ function LocalRoutes() {
   if (path === '/student/profile') return <StudentRoutes area="profile" />;
   if (path === '/student' || path === '/student/records') return <StudentRoutes area="records" />;
   if (path === '/student/offerings') return <StudentRoutes area="offerings" />;
+  if (path === '/student/pathway') return <StudentRoutes area="pathway" />;
   if (path === '/coordinator') return <AuthGate roles={['COORDINATOR']}><AuthDependencyPlaceholder area="coordinator" /></AuthGate>;
   if (path === '/admin') return <AuthGate roles={['SYSTEM_ADMIN']}><AuthDependencyPlaceholder area="admin" /></AuthGate>;
   if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;

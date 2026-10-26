@@ -23,18 +23,29 @@ async function mock(page,state={}){
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
  });
 }
+async function clickStudentLink(page,name){const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});if(page.viewportSize().width<1280){const toggle=page.locator('button[aria-controls="student-sidebar"]');await toggle.waitFor();if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();}await nav.getByRole('link',{name,exact:true}).click();}
 async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 try{
  browser=await chromium.launch({headless:true});
- for(const path of ['/student/profile','/student/records','/student/offerings'])await check('shared route and navigation '+path,async page=>{
-  await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation'});await nav.waitFor();
-  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Semester offerings','/student/offerings']])assert.equal(await nav.getByRole('link',{name,exact:true}).getAttribute('href'),href);
+ for(const path of ['/student/profile','/student/records','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
+  await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
+  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
- await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await page.getByRole('link',{name:'Semester offerings',exact:true}).click();await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation'}).waitFor();});
- for(const path of ['/student/records','/student/offerings'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation'}).waitFor();});
- await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation'}).count(),0);});
- for(const width of [320,1440])await check('shared shell avoids page overflow at '+width,async page=>{await mock(page);await page.goto(base+'/student/offerings');await page.getByRole('navigation',{name:'Student navigation'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));},width);
+ await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
+ for(const path of ['/student/records','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
+ await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
+ for(const width of [320,1440])await check('shared shell avoids page overflow at '+width,async page=>{await mock(page);await page.goto(base+'/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));},width);
+ await check('pathway is an explicit UI placeholder',async page=>{await mock(page);await page.goto(base+'/student/pathway');await page.getByRole('heading',{name:'Academic pathway',exact:true}).waitFor();assert.equal(await page.getByRole('status').innerText(),'Coming soon');});
+ await check('staff cannot open the student pathway',async page=>{await mock(page,{role:'SYSTEM_ADMIN'});await page.goto(base+'/student/pathway');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('heading',{name:'Academic pathway',exact:true}).count(),0);});
+ await check('shared template search, theme, sidebar and mobile layout',async page=>{
+  await mock(page);await page.goto(base+'/student/profile');const toggle=page.getByRole('button',{name:'Toggle sidebar',exact:true});await toggle.waitFor();assert.equal(await page.locator('.student-shell').evaluate(el=>getComputedStyle(el).getPropertyValue('--color-brand').trim()),'#521f28');
+  await toggle.click();await page.waitForFunction(()=>Math.round(document.querySelector('#student-sidebar').getBoundingClientRect().width)===90);await toggle.click();
+  await page.keyboard.press('Control+k');await page.getByRole('searchbox',{name:'Search pages'}).fill('pathway');await page.locator('#student-search-results').getByRole('link',{name:'Academic pathway',exact:true}).click();await page.waitForURL('**/student/pathway');await page.getByRole('heading',{name:'Academic pathway',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Switch to dark mode'}).click();await page.reload();await page.getByRole('button',{name:'Switch to light mode'}).waitFor();assert.equal(await page.locator('.student-shell').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(30, 21, 24)');
+  await page.setViewportSize({width:390,height:844});await clickStudentLink(page,'Academic profile');await page.waitForURL('**/student/profile');assert.equal(await page.locator('#student-sidebar').getAttribute('inert'),'');
+  for(const width of [320,390,768,1024,1279,1280,1440]){await page.setViewportSize({width,height:844});await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth);}
+ },1440);
  console.log(JSON.stringify({passed,installedOwnerPages:installed,clerkAndApi:'MOCKED'}));
 }finally{await browser?.close();await new Promise(r=>server.close(r));}
