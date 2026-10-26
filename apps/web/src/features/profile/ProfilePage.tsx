@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Profile, ProfileOptions } from '../../../../api/src/modules/profile/contracts';
 import { type AcademicClient, errorMessage } from './client';
+import { navigateApp, registerUnsavedChanges } from '../../app/navigation';
 import './profile.css';
 const empty = { studentName: '', matricNo: '', curriculumId: '', weeklyWorkingHours: '', availableStudyHours: '' };
 type Draft = typeof empty;
@@ -9,7 +10,7 @@ function draftOf(p: Profile | null): Draft {
     weeklyWorkingHours: p.weeklyWorkingHours === null ? '' : String(p.weeklyWorkingHours),
     availableStudyHours: p.availableStudyHours === null ? '' : String(p.availableStudyHours) } : { ...empty };
 }
-export function ProfilePage({ api, setup = false, onSetupComplete = () => window.location.assign('/student') }: {
+export function ProfilePage({ api, setup = false, onSetupComplete = () => { navigateApp('/student'); } }: {
   api: AcademicClient; setup?: boolean; onSetupComplete?: () => void;
 }) {
   const [loaded, setLoaded] = useState(false), [attempt, setAttempt] = useState(0);
@@ -33,7 +34,8 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => window
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { if (unsaved.current) { event.preventDefault(); event.returnValue = ''; } };
-    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
+    const release = registerUnsavedChanges(()=>unsaved.current);
+    window.addEventListener('beforeunload', warn); return () => { release(); window.removeEventListener('beforeunload', warn); };
   }, [dirty]);
   useEffect(() => { if (error) alert.current?.focus(); }, [error]);
   function field(key: keyof Draft, value: string) { setDraft(old => ({ ...old, [key]: value })); setSuccess(''); }

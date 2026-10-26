@@ -2,6 +2,7 @@ import { Component, StrictMode, useEffect, useState, type ReactNode } from 'reac
 import { createRoot } from 'react-dom/client';
 import { AuthProvider, AuthPage, AuthGate, AuthDependencyPlaceholder } from '../../../apps/web/src/features/auth';
 import { StudentRoutes } from '../../../apps/web/src/app/StudentRoutes';
+import { useAppPathname } from '../../../apps/web/src/app/navigation';
 import './preview.css';
 
 class ProviderBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -37,7 +38,7 @@ function Setup() {
   </main>;
 }
 function LocalRoutes() {
-  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const path = useAppPathname().replace(/\/$/, '') || '/';
   if (path === '/sign-in' || path.startsWith('/sign-in/')) return <AuthPage mode="sign-in" />;
   if (path === '/sign-up' || path.startsWith('/sign-up/')) return <AuthPage mode="sign-up" />;
   if (path === '/auth/complete') return <AuthGate complete />;
@@ -45,6 +46,7 @@ function LocalRoutes() {
   if (path === '/student/profile') return <StudentRoutes area="profile" />;
   if (path === '/student' || path === '/student/records') return <StudentRoutes area="records" />;
   if (path === '/student/offerings') return <StudentRoutes area="offerings" />;
+  if (path === '/student/pathway') return <StudentRoutes area="pathway" />;
   if (path === '/coordinator') return <AuthGate roles={['COORDINATOR']}><AuthDependencyPlaceholder area="coordinator" /></AuthGate>;
   if (path === '/admin') return <AuthGate roles={['SYSTEM_ADMIN']}><AuthDependencyPlaceholder area="admin" /></AuthGate>;
   if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;

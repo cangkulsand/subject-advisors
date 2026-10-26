@@ -1,4 +1,5 @@
 import type { OfferingsClient } from '../../../../../packages/shared/src/offerings/offerings';
+import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import { readPageData, readSelection } from './response';
 
 export class OfferingApiError extends Error {
@@ -7,12 +8,15 @@ export class OfferingApiError extends Error {
 /** The integration shell supplies Clerk's getToken and wraps the page in AuthGate. */
 export function createOfferingClient(getToken: () => Promise<string | null>, apiBaseUrl = ''): OfferingsClient {
   async function request<T>(path: string, init: RequestInit, decode: (value: unknown) => T): Promise<T> {
+    const sessionStamp = accountSessionStamp();
     const token = await getToken();
-    if (!token) throw new OfferingApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again to continue.');
+    if (sessionStamp && sessionStamp !== accountSessionStamp()) throw new OfferingApiError(401, 'SESSION_CHANGED', 'Your account changed. Please reload before saving.');
+    if (!token) { clearAccountCache(); throw new OfferingApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again to continue.'); }
     const response = await fetch(apiBaseUrl.replace(/\/$/, '') + path, {
       ...init, headers: { ...init.headers, Authorization: 'Bearer ' + token },
       credentials: 'omit', cache: 'no-store',
     });
+    if (response.status === 401 || response.status === 403) clearAccountCache();
     const body: unknown = await response.json();
     if (typeof body !== 'object' || body === null) throw new Error('The offerings response is unavailable. Please retry.');
     if (!response.ok) {

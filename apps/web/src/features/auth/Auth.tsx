@@ -1,15 +1,23 @@
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk } from '@clerk/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AuthRedirect } from './navigation';
-import { AuthApiError, loadAccount } from './client';
+import { AuthApiError } from './client';
+import { ACCOUNT_CACHE_CHANGED, accountSessionStamp, clearAccountCache, keepAccountSession, loadSessionAccount, readAccountCache } from './account-cache';
 import type { AppRole, Me } from './contracts';
 import './auth.css';
 
 export function AuthProvider({ publishableKey, children }: { publishableKey: string; children: ReactNode }) {
   if (!publishableKey) return <section role="alert">Sign-in is unavailable until Clerk is configured.</section>;
   return <ClerkProvider publishableKey={publishableKey} signInUrl="/sign-in" signUpUrl="/sign-up"
+    appearance={{ variables: { colorPrimary: '#521f28', colorForeground: '#49383b', colorMutedForeground: '#786368', colorNeutral: '#49383b', colorBackground: '#ffffff', colorRing: '#9a596b', colorDanger: '#b13b35', colorSuccess: '#34634c', colorWarning: '#825c1a' } }}
     signInForceRedirectUrl="/auth/complete" signUpForceRedirectUrl="/auth/complete"
-    afterSignOutUrl="/sign-in">{children}</ClerkProvider>;
+    afterSignOutUrl="/sign-in"><AccountSessionLifecycle />{children}</ClerkProvider>;
+}
+
+function AccountSessionLifecycle() {
+  const { isLoaded, isSignedIn, userId, sessionId } = useAuth();
+  useEffect(() => { if (isLoaded) keepAccountSession(isSignedIn && userId && sessionId ? { userId, sessionId } : null); }, [isLoaded,isSignedIn,userId,sessionId]);
+  return null;
 }
 
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
@@ -31,6 +39,7 @@ export function LogoutButton() {
   const [failed, setFailed] = useState(false);
   async function logout() {
     setPending(true); setFailed(false);
+    clearAccountCache(false);
     try { await signOut({ redirectUrl: '/sign-in' }); }
     catch { setFailed(true); }
     finally { setPending(false); }
@@ -44,33 +53,40 @@ export function LogoutButton() {
 }
 
 /** Use for auth completion and every private route; API middleware remains authoritative. */
-export function AuthGate({ children, roles, requireProfile = false, complete = false, apiBaseUrl = '', pathname }: {
+export function AuthGate({ children, roles, requireProfile = false, complete = false, apiBaseUrl = '' }: {
   children?: ReactNode; roles?: readonly AppRole[]; requireProfile?: boolean; complete?: boolean; apiBaseUrl?: string; pathname?: string;
 }) {
   const { isLoaded, isSignedIn, userId, sessionId, getToken } = useAuth();
-  const currentPath = pathname ?? window.location.pathname;
   const [attempt, setAttempt] = useState(0);
-  const key = [userId, sessionId, currentPath, complete, apiBaseUrl, attempt].join('|');
+  const session = userId && sessionId ? { userId, sessionId, apiBaseUrl } : undefined;
+  const key = [userId, sessionId, complete, apiBaseUrl, attempt].join('|');
   const [result, setResult] = useState<{ key: string; me?: Me; error?: Error }>();
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    const controller = new AbortController();
+    if (!isLoaded || !isSignedIn || !userId || !sessionId) return;
     let active = true;
-    loadAccount(getToken, apiBaseUrl, complete, controller.signal).then(
+    keepAccountSession({userId,sessionId,apiBaseUrl});
+    loadSessionAccount({userId,sessionId,apiBaseUrl},getToken,complete,attempt>0).then(
       me => { if (active) setResult({ key, me }); },
       error => { if (active) setResult({ key, error: error instanceof Error ? error : new Error('Account access is unavailable.') }); },
     );
-    return () => { active = false; controller.abort(); };
-  }, [isLoaded, isSignedIn, getToken, apiBaseUrl, complete, key]);
+    return () => { active = false; };
+  }, [isLoaded, isSignedIn, userId, sessionId, getToken, apiBaseUrl, complete, key, attempt]);
   useEffect(() => {
-    const refresh = () => setAttempt(n => n + 1);
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
-  }, []);
+    const refresh = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === 'profile-saved' && userId && sessionId) {
+        const me=readAccountCache({userId,sessionId,apiBaseUrl});
+        if(me){setResult({key,me});return;}
+      }
+      setAttempt(n => n + 1);
+    };
+    window.addEventListener(ACCOUNT_CACHE_CHANGED, refresh);
+    return () => window.removeEventListener(ACCOUNT_CACHE_CHANGED, refresh);
+  }, [userId,sessionId,apiBaseUrl,key]);
   if (!isLoaded) return <p role="status">Loading sign-in...</p>;
   if (!isSignedIn) return <AuthRedirect to="/sign-in" />;
-  if (result?.key !== key) return <p role="status">Checking account access...</p>;
-  if (result.error) {
+  const cached = !complete && session ? readAccountCache(session) : undefined;
+  if (result?.key !== key && !cached) return <p role="status">Checking account access...</p>;
+  if (result?.key === key && result.error) {
     const error = result.error;
     if (error instanceof AuthApiError && error.code === 'ACCESS_NOT_ASSIGNED' && !complete) {
       return <AuthRedirect to="/auth/complete" />;
@@ -82,7 +98,7 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
       <LogoutButton />
     </section>;
   }
-  const me = result.me;
+  const me = result?.key === key ? result.me : cached;
   if (!me || me.accessStatus !== 'ACTIVE') return <p role="alert">Account access is unavailable.</p>;
   if (roles && !roles.includes(me.appRole)) return <section className="auth-panel">
     <p role="alert">Your account does not have access to this page.</p><a href={me.landingPath}>Go to your account</a><LogoutButton />
@@ -91,6 +107,7 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
   if (requireProfile && me.appRole === 'STUDENT' && me.profileState !== 'COMPLETE') {
     return <AuthRedirect to="/student/setup" />;
   }
+  if (accountSessionStamp() !== JSON.stringify([userId, sessionId])) return <p role="status">Checking account access...</p>;
   return <>{children}</>;
 }
 

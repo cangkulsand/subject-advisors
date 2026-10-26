@@ -1,4 +1,4 @@
-# Copy-paste integration for P001 and P002
+# Shared integration and copy-paste feature handoffs
 
 Use the updated main repository as the shared starting point. The Git branch and
 Neon branch are different concepts: main is the shared Git baseline; development
@@ -62,6 +62,7 @@ independently; incomplete entry-point copies raise a readable preparation error.
 | /student/profile | Active STUDENT; P001 profile form |
 | /student and /student/records | Active STUDENT with complete profile; P001 records |
 | /student/offerings | Active STUDENT with complete profile; P002 offering page |
+| /student/pathway | Active STUDENT with complete profile; P003 placeholder until UC17 is implemented |
 
 Profile, records and offerings links share the same student navigation. Page state
 is remounted on Clerk user/session change. Authentication and staff routes retain
@@ -77,6 +78,17 @@ The dispatcher forwards the original Request, including queries and body. Owners
 retain validation, role/profile checks and owner-scoped persistence. Missing owned
 APIs still verify real student access before returning 503 FEATURE_NOT_INSTALLED;
 they do not produce fake successful reads/saves.
+
+## P003 pathway skeleton
+
+Academic pathway is already registered in the student sidebar, page search and
+shared route host. Its replaceable entry is
+`apps/web/src/features/pathway/PathwayPage.tsx`, exported by the adjacent `index.ts`.
+The route passes the existing `StudentPageProps` contract and keeps Clerk mounted.
+This skeleton is imported directly; it does not require generated registry edits.
+No graph, graph API handler, React Flow dependency or status calculations have
+been added. See [P003 Sprint 1 handoff](p003-sprint1-handoff.md) for the owned paths,
+read-only API integration still needed and acceptance checklist.
 
 ## Generated adapters and checks
 

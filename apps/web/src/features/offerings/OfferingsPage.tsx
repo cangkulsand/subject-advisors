@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { OFFERING_NOTICE, semesterLabel, semesterType } from '../../../../../packages/shared/src/offerings/offerings';
 import type { OfferingPageData, OfferingsClient } from '../../../../../packages/shared/src/offerings/offerings';
 import { OfferingApiError } from './client';
+import { registerUnsavedChanges } from '../../app/navigation';
 import './offerings.css';
 
 function sameSet(left: string[], right: string[]): boolean {
@@ -50,8 +51,9 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    const release = registerUnsavedChanges(()=>dirty);
     window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
+    return () => { release(); window.removeEventListener('beforeunload', warn); };
   }, [dirty]);
   useEffect(() => { if (mode !== 'select') heading.current?.focus(); }, [mode]);
   useEffect(() => { if (saveError || loadError) errorPanel.current?.focus(); }, [saveError, loadError]);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { AcademicRecord, RecordStatus } from '../../../../api/src/modules/records/contracts';
 import type { ProfileOptions } from '../../../../api/src/modules/profile/contracts';
 import { type AcademicClient, errorMessage } from '../profile/client';
+import { registerUnsavedChanges } from '../../app/navigation';
 import '../profile/profile.css';
 const labels: Record<RecordStatus, string> = { COMPLETED: 'Completed', EXEMPTED: 'Exempted', FAILED: 'Failed', WITHDRAWN: 'Withdrawn' };
 const blank = { subjectId: '', semesterId: '', status: 'COMPLETED' as RecordStatus, grade: '', credits: '', remarks: '' };
@@ -24,7 +25,8 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
+    const release = registerUnsavedChanges(()=>dirty);
+    window.addEventListener('beforeunload', warn); return () => { release(); window.removeEventListener('beforeunload', warn); };
   }, [dirty]);
   const selected = options.subjects.find(s => String(s.subjectId) === draft.subjectId);
   function reset() { setDraft({ ...blank }); setInitial({ ...blank }); setEditing(null); setError(''); }

@@ -7,7 +7,9 @@ pull request back to main.
 
 Read [Sprint 1](<docs/sprint1 (1).md>), [the implementation workflow](docs/implementationguide.md)
 and, for UI work, [the theme guide](docs/themeguide.md). Select exactly one programmer
-or FOUNDATION scope for the task.
+or FOUNDATION scope for the task. For data fetching, saves or session changes, follow
+[the caching guideline](docs/cachingguide.md): retain profile and records for the
+signed-in tab session and invalidate academic snapshots after successful updates.
 
 Create a docs/changes record before implementation, then complete its Plan,
 Implementation, Review and Changelog sections with actual evidence. Self-review is

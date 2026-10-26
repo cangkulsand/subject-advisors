@@ -301,6 +301,11 @@ If no repository/code changes were possible, still document the plan and the blo
 
 ## 11. Change request and merge rules
 
+Changes to data fetching, saves, or authentication lifecycle must follow the
+[project caching guideline](cachingguide.md). Academic profile and records retain
+session-scoped snapshots across navigation and refresh; successful updates and
+authentication changes invalidate them. Curriculum options retain a five-minute TTL.
+
 - **Feature PR:** One owner, reviewable scope, associated change record(s), tests and explanation of cross-module effects.
 - **PR approval:** Human peer review is required by this team process before the integration lead merges; Codex self-review is supporting evidence, not a substitute.
 - **Integration lead:** Resolves shared contracts and merge conflicts with impacted owners; runs end-to-end Sprint 1 tests **after** the four owner PRs and foundation are integrated.
