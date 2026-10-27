@@ -6,6 +6,7 @@
   --color-heading:#2e1b20; --color-body:#49383b; --color-muted:#786368;
   --color-outline:#e8dcdf; --color-subtle:#9b7d85;
   --color-brand:#521f28; --color-brand-hover:#3c151c; --color-accent:#7c3444; --color-focus:#9a596b;
+  --color-action:#2563eb; --color-action-hover:#1d4ed8; --color-cancel:#b91c1c; --color-cancel-hover:#991b1b;
   --color-info-text:#6b2939; --color-info-bg:#f3e5e9;
   --color-success-text:#34634c; --color-success-bg:#edf5ef;
   --color-warning-text:#825c1a; --color-warning-bg:#faf2e3;
@@ -78,7 +79,8 @@
 .student-content :is(.p001,.offerings) :is(input,select,textarea):focus { border-color:var(--color-focus); }
 .student-content :is(.p001,.offerings) :is(input,textarea)::placeholder { color:var(--color-muted); opacity:1; }
 .student-content :is(.p001,.offerings) button { font-weight:500; }
-.student-content .p001 .p001-primary:hover { background:var(--color-brand-hover); border-color:var(--color-brand-hover); }
+.student-content .p001 :is(.p001-primary,.p001-action):hover:not(:disabled) { background:var(--color-action-hover); border-color:var(--color-action-hover); }
+.student-content .p001 .p001-cancel:hover:not(:disabled) { background:var(--color-cancel-hover); border-color:var(--color-cancel-hover); }
 .student-content a { color:var(--color-accent); text-decoration:underline; text-underline-offset:3px; }
 .student-content .offerings-summary { top:101px; }
 .student-content .offerings-error { background:var(--color-danger-bg); border-color:var(--color-danger-text); }

@@ -3,7 +3,7 @@ import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache } from './da
 export class AcademicApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); }
 }
-type RequestOptions = { method?: 'GET' | 'PUT' | 'POST'; body?: unknown; signal?: AbortSignal };
+type RequestOptions = { method?: 'GET' | 'PUT' | 'POST' | 'DELETE'; body?: unknown; signal?: AbortSignal };
 export type AcademicClient = <T>(path: string, options?: RequestOptions) => Promise<T>;
 const cachedPaths = new Set(['/api/profile', '/api/profile/options', '/api/academic-records']);
 export function createAcademicClient(getToken: () => Promise<string | null>, baseUrl = ''): AcademicClient {

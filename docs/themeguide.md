@@ -71,7 +71,17 @@ Use **semantic tokens** rather than scattering hex values and arbitrary Tailwind
 | `accent-hover` | `#1D4ED8` | Links/secondary emphasis hover | `hover:text-accent-hover` |
 | `focus` | `#2563EB` | Visible keyboard focus ring | `focus-visible:ring-focus` |
 
-**Decision:** `brand` (teal) is the default **primary call-to-action** color; `accent` (blue) is for **navigation, links, and informational interactions**. Never alternate teal and blue randomly between two identical Save buttons.
+**Historical default:** `brand` (teal) was previously the default primary call-to-action color; `accent` (blue) was used for navigation, links, and informational interactions. The current user-directed button standard below replaces that action-color decision.
+
+**Current user-directed button standard (2026-10-27):** This later decision
+overrides the teal primary button examples below and any prior burgundy primary
+button override: action buttons use blue `#2563EB` with hover `#1D4ED8`; explicit
+**Cancel** buttons use red `#B91C1C` with hover `#991B1B`. Shared CSS tokens
+`--color-action`, `--color-action-hover`, `--color-cancel`, and
+`--color-cancel-hover` are defined in `apps/web/src/app/student-shell.css`.
+Keep `#521F28` as the shared shell/navigation brand and non-action brand accent.
+Apply this standard to future owners' UI work; it does not authorize unrelated
+feature changes in a task.
 
 ### 3.2 Feedback colors
 
@@ -85,9 +95,29 @@ Use **semantic tokens** rather than scattering hex values and arbitrary Tailwind
 
 Statuses **always** include readable text and, where useful, an icon; color must not be the only signal. Check text-background contrast in real rendered states, including hover/disabled/focus.
 
+**Semantic feedback and notifications:** Use green for success, blue for information,
+amber for warnings, and red for danger/destructive consequences. Keep readable text
+and a matching icon with each color; do not use the brand color to mean success.
+Product-specific brand overrides apply to the shell/navigation and non-action
+brand accents, not to semantic actions or feedback. The current shared app uses
+burgundy `#521f28` for its shell/navigation per
+`docs/changes/S1-INT-010-burgundy-template-palette.md`; semantic action and
+notification colors retain the meanings above.
+
+**Toast standard:** Place notifications in a fixed bottom-right stack. Show at most
+three at once, keep the newest three when another arrives, and give every toast its
+own five-second lifetime including its bounded exit. Animate entry with a 0.4-second
+slide-in from the right and exit with a 0.3-second slide-out to the right. Include a
+manual close button and a timer fallback so removal never depends on `animationend`;
+respect `prefers-reduced-motion` while keeping dismissal reliable. Use concise copy,
+for example “SECJ3104 marked as Taken”. Render message text safely. Use green only
+for a confirmed successful operation, blue for information, amber for warnings and
+red for danger. Toasts supplement the page: never put the only Undo action in a
+toast, and keep save failures in durable, accessible error feedback.
+
 ### 3.3 Colors must mean the same thing everywhere
 
-- **Teal:** primary action, positive academic progression, current active step.
+- **Teal:** brand accent and positive academic progression where locally used; the current action-button standard below uses blue for actions.
 - **Blue:** active link or selection, inspectable information, eligible subject.
 - **Green:** completed item or successful operation.
 - **Amber:** warnings, unverified/incomplete details, conditional states.
@@ -286,9 +316,9 @@ If the shell already owns `<main>`, padding, or background, **do not nest anothe
 
 | Component | Appearance and interaction |
 | --- | --- |
-| `Button` primary | Teal fill, white text, rounded-lg, visible hover/focus, minimum 44px height |
+| `Button` primary/action | Blue `--color-action` fill, white text, `--color-action-hover`, rounded-lg, visible focus, minimum 44px height |
 | `Button` secondary | White background, slate border/text, subtle hover |
-| `Button` destructive | Red foreground/confirm action only when actually destructive |
+| `Button` Cancel/destructive | Red `--color-cancel` fill for explicit Cancel; red foreground/confirm action for destructive consequences |
 | `Card` | White, 1px slate border, rounded-xl, subtle shadow |
 | `Input` / `Select` | Visible label, white fill, slate border, error/help text, focus ring |
 | `Badge` / `StatusChip` | Soft fill, dark readable text, label and optional icon |
@@ -303,7 +333,7 @@ If the shell already owns `<main>`, padding, or background, **do not nest anothe
 ```tsx
 <button
   type="submit"
-  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--color-action)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-action-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
 >
   Save profile
 </button>

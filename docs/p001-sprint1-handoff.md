@@ -1,6 +1,8 @@
-# P001 Sprint 1 manual handoff — UC03 and UC04
+# P001 Sprint 1 manual handoff â€” UC03 and UC04
 
-Status: implemented and self-reviewed; human peer review pending. No commit/push.
+Status: implemented and coordinator-reviewed; human peer review pending. Prepublication
+checkpoint (2026-10-27): the user authorized one local commit and normal push to
+production `main`; neither has occurred. Staging is being prepared for coordinator review.
 The handoff is an additive project overlay, containing only new P001 files.
 No shared P004 files, package manifests, migrations, credentials or other owners'
 modules are replaced. Use the updated main shared router before pasting this version. npm run dev and
@@ -49,7 +51,7 @@ Use your existing ignored configuration, supplied privately:
 
 Neon shared branch name: development, formerly p004-local. Fixed branch ID:
 br-shy-cherry-azuzy9v5; project still-waterfall-91972583; database neondb.
-No migration needs rerunning for the branch rename. The canonical 0000–0002 schema
+No migration needs rerunning for the branch rename. The canonical 0000â€“0002 schema
 is already applied to this target; this package performs no DDL or auto-seeding.
 Database foundation source/tooling is supplied by the updated shared main.
 Do not apply historical P001/P002/P004 DDL.
@@ -67,7 +69,7 @@ Do not treat that empty-data state as an authentication failure.
   historical auth DB skips; totals increase when P002 is installed.
 - `node tools/p001/test-ui.mjs`: 19 PASS, real Chromium with explicitly mocked
   Clerk/API. Covers setup routing, persisted reload, edits/cancel, failure recovery,
-  zero-credit exemption, conflicts, keyboard focus, 320–1440px layouts and 200% zoom.
+  zero-credit exemption, conflicts, keyboard focus, 320â€“1440px layouts and 200% zoom.
 - `node tools/p001/test-db.mjs --target <approved-target.json>`: 15 PASS against
   the confirmed actual Neon development database, with every fixture rolled back.
   Requires the separate foundation tools/db/migrations.mjs and dev dependency pg.
@@ -81,6 +83,51 @@ two-user browser acceptance, full accessibility audit and competing-write concur
 tests remain pending. Official catalogue content and independent peer review remain
 external dependencies. No test changed real profiles or access assignments.
 
+## Current student profile and records behavior (2026-10-27)
+
+The current P001 UI exposes programme selection only. It resolves the internal
+curriculum/configuration ID from the active programme catalogue, retains a valid
+saved configuration while editing, and blocks saving when a new programme has
+multiple applicable configurations. Curriculum versions remain internal.
+
+The Records page presents Core, Computer Science Electives (E1/E2), Elective
+Umum (U1/U2), and conditional Other tabs. The labels and choose counts come from
+configured subject metadata; the client does not hardcode counts, prevent
+truthful recorded outcomes based on a choose rule, or calculate graduation
+eligibility. Unknown/uncoded subjects remain available in Other. Taken saves
+COMPLETED; Exempted saves using full configured subject credits derived by the
+API. Both outcomes autosave without
+opening a modal. Grades and remarks are optional and edited later through the
+per-row eye-icon modal. Saved records update by exact ID. Unticking an undated
+record deletes it and offers inline Undo, which recreates it with a new ID. The
+UI does not create retake/semester versions. Dated legacy rows and legacy partial
+credit exemptions cannot be cleared because current API semantics cannot restore
+their semester/credit data. Existing FAILED/WITHDRAWN records and multiple legacy
+rows remain intact; duplicates are read-only pending reconciliation.
+
+Successful record actions use a React-managed stack of up to three fixed green
+success toasts. Each has an independent five-second lifetime, concise copy,
+manual dismissal and entry/exit animation with a reduced-motion-safe timer
+fallback. Informational notifications are blue; warning/danger colors are
+reserved for those actual meanings. Save failures remain visible in durable
+alerts; the clear Undo control remains available independently of the toast.
+
+The current P001 button standard uses blue `#2563EB` actions with `#1D4ED8` hover
+and red `#B91C1C` explicit Cancel buttons with `#991B1B` hover. Burgundy remains
+the shell/navigation brand. Shared token guidance is in `docs/themeguide.md`.
+
+The shared academic cache keeps profile and record snapshots in the signed-in tab
+session and caches curriculum options for five minutes. Entries are keyed by
+session, normalized API base URL, and endpoint. Successful academic writes clear
+academic snapshots; failed writes do not. See `docs/cachingguide.md`.
+
+Focused mocked UI verification for this behavior is current in
+`docs/changes/S1-P001-005-records-table-integration.md`. Earlier counts elsewhere
+in this handoff describe historical P001 overlay checks; they do not replace the
+focused results recorded with the current implementation. This current full-credit,
+optional-details policy supersedes earlier zero-credit exemption assumptions in
+historical P001 test descriptions.
+
 ## API contract
 
 All endpoints require P004 verified active STUDENT identity. Record routes also
@@ -91,14 +138,21 @@ Responses preserve {data:T} / {error:{code,message}}, no-store and Vary: Authori
 | --- | --- | --- |
 | GET | /api/profile | Own profile, or data:null for setup |
 | PUT | /api/profile | Idempotent own profile save |
-| GET | /api/profile/options | Read-only form curricula, own curriculum subjects and configured semesters |
-| GET | /api/academic-records | Own attempts with subject and semester labels |
-| POST | /api/academic-records | Create a new attempt, 201 |
-| PUT | /api/academic-records/:recordId | Update an owned attempt, 200 |
+| GET | /api/profile/options | Read-only active programme choices, own programme subjects, elective-group rules and optional semesters |
+| GET | /api/academic-records | Own saved subject records with subject and semester labels |
+| POST | /api/academic-records | Create the student's initial undated current subject record, 201 |
+| PUT | /api/academic-records/:recordId | Update that owned record without changing subject/semester identity, 200 |
+| DELETE | /api/academic-records/:recordId | Delete one exact owned record after an undated checkbox is unticked, returns `{recordId, subjectId}` |
 
 GET /api/profile/options is a narrow P001 form dependency, not the shared catalogue
 management API. It reads existing tables, creates no reference rows, and offers only
-curricula/programmes with null or ACTIVE status. Subjects reflect the saved curriculum.
+active programme choices with applicable configurations. The student profile UI
+shows programme choices only; curriculum IDs and versions remain internal. A unique
+applicable configuration is resolved internally. Existing saved configurations are
+retained when valid; ambiguous new programme configurations block saving with a
+student-facing setup message. Subjects reflect the resolved configuration. The API
+also returns configured subject group counts and compulsory flags for the elective
+and core display; the client does not invent choose counts or enforce graduation rules.
 
 Profile input: studentName, optional matricNo, curriculumId, weeklyWorkingHours,
 availableStudyHours. IDs and hours are integers. Profile output adds studentId,
@@ -109,22 +163,29 @@ Optional matric number remains optional. This is an explicit data-entry decision
 legacy nullable hours produce SETUP_REQUIRED, while DB failures produce UNAVAILABLE.
 
 Record input: subjectId, optional semesterId, status, optional grade, recognizedCredits
-and remarks. COMPLETED accepts null/omitted recognizedCredits and derives subject
-credits on the server; a conflicting supplied completed-credit value is rejected.
-FAILED/WITHDRAWN require zero. EXEMPTED requires explicit recognizedCredits (zero
-through configured subject credits) and an explanation in remarks. This explanation
-rule is local data-entry validation, not university approval. All entries are unverified.
+and optional remarks. COMPLETED and EXEMPTED accept null/omitted recognizedCredits
+and derive full subject credits on the server; conflicting supplied values are
+rejected. FAILED/WITHDRAWN require zero. Remarks are optional. All entries are
+student-reported and unverified.
 Lengths follow the dictionary: grade 5, remarks 255; no invented notes/updated_at fields.
 
 Errors: 400 invalid input/reference, 401 invalid session, 403 role/setup/access denial,
 404 unavailable/foreign-owned update, 409 duplicate/data conflict, 413 oversized JSON,
 405 unsupported method and 503 service unavailability. Error text hides DB/SDK details.
 
-Attempts in different semesters are retained. Duplicate subject+semester and duplicate
-undated subject attempts conflict; editing is explicit. Raw attempts are available to
-P003; P001 does not calculate graduation totals or decide a graph projection policy.
-On successful browser saves the page emits p001:records-changed; consumers should
-refetch when returning to their view. There is no persisted duplicate pathway state.
+P001 creates one current undated setup record per student/subject; it does not create
+semester attempts or retake versions. New Taken records use COMPLETED and new
+Exempted records use EXEMPTED. Later edits PUT the same record ID. The API's immutable
+subject and semester fields are retained on update. Legacy dated or otherwise older
+dated records and legacy partial-credit exemptions remain visible with their actual
+status and cannot be cleared here because Undo cannot faithfully restore their
+metadata. Multiple legacy rows for a subject are read-only until reconciled. Taken
+and Exempted checkbox changes autosave without opening a modal. Undated clears delete
+the exact record and offer inline Undo; Undo recreates the same outcome, grade and
+remarks with a new ID. Grade and remarks can be edited optionally in a separate modal.
+Raw records remain available to P003; P001 does not calculate graduation totals or
+decide a graph projection policy. Successful saves/deletes emit
+`p001:records-changed`; consumers should refetch when returning to their view.
 
 ## Shared application integration
 
@@ -147,14 +208,21 @@ remain unavailable. No staff implementation, pathway renderer or auth bypass is 
 Preserve shared package.json/.gitignore/router files when copying older P002 overlays;
 see docs/integration-copy-paste.md.
 
-The Tailwind/shared shell foundation is absent in the inspected base. P001 uses scoped
-semantic CSS fallbacks matching themeguide.md and consumes shared theme variables when
-available. No design-system package or shared global CSS is installed/rewritten.
+Historical note: the original P001 inspection found the shared Tailwind shell absent.
+The current P001 pages use scoped semantic CSS and consume shared theme variables
+where available; they do not install or rewrite a design-system package.
 
 ## Delivery and rollback
 
-All source files are new. Remove only files identified by the manifest to revert the
-overlay in a review copy; do not delete whole apps/tools directories or reset the DB.
-No down migration or destructive cleanup is supplied. Review the change record at
-docs/changes/S1-P001-001-profile-and-records.md before integration.
-No commit, push, PR, deployment or privileged-user provisioning was performed.
+Historical note: the initial P001 overlay added new files. The current follow-up also
+modifies existing pages, contracts, tests and handoff files. Use the per-mini-task
+change records to review/revert only scoped work; do not delete whole apps/tools
+directories, overwrite concurrent owner changes, or reset the database. No down
+migration or destructive cleanup is supplied. Review the current P001-002 through
+P001-007 change records before integration.
+Prepublication checkpoint (2026-10-27): no commit, push, PR, deployment or
+privileged-user provisioning had been performed. The user's authorization applies
+to the production `main` target documented in
+`docs/changes/S1-INT-012-p001-session-publication.md`; human peer review remains
+pending. Fresh remote verification could not authenticate and must happen before
+the normal push.

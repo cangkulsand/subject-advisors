@@ -21,6 +21,10 @@ export async function handleP001Request(request: Request, deps: P001Dependencies
       const input = recordInput(await jsonBody(request));
       return authJson({ data: await deps.records.save(me.clerkUserId, input, id) }, id === undefined ? 201 : 200);
     }
+    if (match && request.method === 'DELETE') {
+      const id = positiveId(/^\d+$/.test(match[1]!) ? Number(match[1]) : NaN, 'Record');
+      return authJson({ data: await deps.records.delete(me.clerkUserId, id) });
+    }
     return authJson({ error: { code: 'METHOD_NOT_ALLOWED', message: 'This method is not supported.' } }, 405);
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);

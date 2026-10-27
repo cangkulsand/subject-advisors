@@ -9,7 +9,9 @@ export interface AcademicRecord extends Omit<RecordInput, 'recognizedCredits'> {
   subjectCode: string; subjectName: string; creditHours: number;
   academicYear: string | null; semesterNo: number | null;
 }
+export interface DeletedRecordIdentity { recordId: number; subjectId: number }
 export interface RecordsRepository {
   list(userId: string): Promise<AcademicRecord[]>;
   save(userId: string, input: RecordInput, recordId?: number): Promise<AcademicRecord>;
+  delete(userId: string, recordId: number): Promise<DeletedRecordIdentity>;
 }

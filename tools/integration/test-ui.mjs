@@ -21,7 +21,7 @@ async function mock(page,state={}){
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
   if(path==='/api/profile'&&route.request().method==='PUT')state.setup=false;
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:state.role??'STUDENT',accessStatus:'ACTIVE',profileState:state.setup?'SETUP_REQUIRED':'COMPLETE',landingPath:state.setup?'/student/setup':'/student'}
-   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1}]}
+   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1}]}
    :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:null}:{};
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
  });
@@ -44,6 +44,12 @@ try{
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  for(const path of ['/student/records','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
+ await check('P001 actions use blue and explicit Cancel uses red in the shared shell',async page=>{
+  await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');
+  const save=page.getByRole('button',{name:'Save profile',exact:true}),cancel=page.getByRole('button',{name:'Cancel changes',exact:true});
+  assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(37, 99, 235)');await save.hover();assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(29, 78, 216)');
+  assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(185, 28, 28)');await cancel.hover();assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(153, 27, 27)');
+ });
  for(const width of [320,1440])await check('shared shell avoids page overflow at '+width,async page=>{await mock(page);await page.goto(base+'/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));},width);
  await check('student links keep the document, Clerk provider and account snapshot alive',async page=>{
   const state=await mock(page);let documents=0;page.on('request',request=>{if(request.isNavigationRequest()&&request.frame()===page.mainFrame())documents++;});
@@ -66,8 +72,8 @@ try{
    const discard=page.waitForEvent('dialog');const proceed=clickStudentLink(page,'Subject records');await(await discard).accept();await proceed;await page.waitForURL('**/student/records');
   });
   await check('record draft can cancel browser back without losing the page or history',async page=>{
-   await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Subject records');await page.getByLabel('Subject',{exact:true}).selectOption('1');
-   const prompt=page.waitForEvent('dialog');const back=page.evaluate(()=>history.back());await(await prompt).dismiss();await back;await page.waitForURL('**/student/records');assert.equal(await page.getByLabel('Subject',{exact:true}).inputValue(),'1');
+   await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).check();
+   const prompt=page.waitForEvent('dialog');const back=page.evaluate(()=>history.back());await(await prompt).dismiss();await back;await page.waitForURL('**/student/records');assert.equal(await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).isChecked(),true);
    await page.getByRole('button',{name:'Cancel changes',exact:true}).click();await page.goBack();await page.waitForURL('**/student/profile');
   });
   await check('offering draft also protects shared navigation',async page=>{
@@ -76,7 +82,7 @@ try{
   });
   await check('saving setup reaches records in the same initialized document',async page=>{
    const state=await mock(page,{setup:true});await page.goto(base+'/student/setup');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();const mounts=await page.evaluate(()=>document.documentElement.dataset.clerkMounts);
-   await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('heading',{name:'Your subject history',exact:true}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
+   await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('heading',{name:'Your subject records',exact:true}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
   });
  }
  await check('theme header search, dark preference, account and responsive sidebar',async page=>{
@@ -125,15 +131,15 @@ try{
  if(installed)await check('academic navigation reuses cached profile, options and records; save invalidates',async page=>{
   await mock(page);const reads={};page.on('request',request=>{const path=new URL(request.url()).pathname;if(request.method()==='GET'&&['/api/profile','/api/profile/options','/api/academic-records'].includes(path))reads[path]=(reads[path]??0)+1;});
   await page.goto(base+'/student/profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
-  await clickStudentLink(page,'Subject records');await page.getByLabel('Subject',{exact:true}).waitFor();
+  await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
-  await clickStudentLink(page,'Subject records');await page.getByLabel('Subject',{exact:true}).waitFor();
+  await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   assert.deepEqual(reads,{'/api/profile':1,'/api/profile/options':1,'/api/academic-records':1});
-  await page.reload();await page.getByLabel('Subject',{exact:true}).waitFor();
+  await page.reload();await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
   assert.deepEqual(reads,{'/api/profile':1,'/api/profile/options':1,'/api/academic-records':1});
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByText('Profile saved.',{exact:true}).waitFor();
-  await clickStudentLink(page,'Subject records');await page.getByLabel('Subject',{exact:true}).waitFor();
+  await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   assert.equal(reads['/api/academic-records'],2);assert.equal(reads['/api/profile/options'],2);
  },1440);
  console.log(JSON.stringify({passed,installedOwnerPages:installed,clerkAndApi:'MOCKED'}));

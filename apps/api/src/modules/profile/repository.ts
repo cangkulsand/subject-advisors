@@ -39,17 +39,35 @@ export function createProfileRepository(query: Query): ProfileRepository {
       } catch (error) { return persistenceError(error); }
     },
     async options(userId: string) {
-      const [curricula, subjects, semesters] = await Promise.all([
+      const [curricula, subjects, semesters, subjectGroups] = await Promise.all([
         query(`SELECT c.curriculum_id AS "curriculumId",c.curriculum_version AS "curriculumVersion",g.programme_id AS "programmeId",
           g.programme_code AS "programmeCode",g.programme_name AS "programmeName" FROM public.curriculum c JOIN public.programme g USING(programme_id)
           WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code,c.curriculum_version`, []),
-        query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours"
+        query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours",
+            cs.subject_category AS "subjectCategory",cs.is_compulsory AS "isCompulsory"
           FROM public.student_profile p JOIN public.curriculum_subject cs USING(curriculum_id) JOIN public.subject s USING(subject_id)
           WHERE p.clerk_user_id=$1 ORDER BY s.subject_code`, [userId]),
         query(`SELECT semester_id AS "semesterId",academic_year AS "academicYear",semester_no AS "semesterNo"
           FROM public.academic_semester ORDER BY academic_year DESC,semester_no DESC`, []),
+        query(`WITH owner_curriculum AS (
+            SELECT curriculum_id FROM public.student_profile WHERE clerk_user_id=$1
+          ), category_counts AS (
+            SELECT cs.curriculum_id,cs.subject_category AS category,count(*)::integer AS "availableSubjects"
+            FROM owner_curriculum oc JOIN public.curriculum_subject cs USING(curriculum_id)
+            GROUP BY cs.curriculum_id,cs.subject_category
+          ), requirement_counts AS (
+            SELECT cr.curriculum_id,cr.requirement_type,
+              CASE WHEN count(*)=count(cr.required_subjects) AND count(DISTINCT cr.required_subjects)=1
+                THEN min(cr.required_subjects)::integer ELSE NULL END AS "requiredSubjects"
+            FROM owner_curriculum oc JOIN public.curriculum_requirement cr USING(curriculum_id)
+            GROUP BY cr.curriculum_id,cr.requirement_type
+          )
+          SELECT cc.category,rc."requiredSubjects",cc."availableSubjects"
+          FROM category_counts cc LEFT JOIN requirement_counts rc ON rc.curriculum_id=cc.curriculum_id
+            AND rc.requirement_type=btrim(regexp_replace(upper(cc.category),'[^A-Z0-9]+','_','g'),'_')
+          ORDER BY cc.category`, [userId]),
       ]);
-      return { curricula, subjects, semesters } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+      return { curricula, subjects, semesters, subjectGroups } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
     },
   };
 }

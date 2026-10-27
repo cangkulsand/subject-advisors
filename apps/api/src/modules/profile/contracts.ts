@@ -19,9 +19,10 @@ export interface CurriculumOption {
   curriculumId: number; curriculumVersion: string; programmeId: number;
   programmeCode: string; programmeName: string;
 }
-export interface SubjectOption { subjectId: number; subjectCode: string; subjectName: string; creditHours: number }
+export interface SubjectOption { subjectId: number; subjectCode: string; subjectName: string; creditHours: number; subjectCategory?: string | null; isCompulsory?: 0 | 1 }
+export interface SubjectGroupOption { category: string; requiredSubjects: number | null; availableSubjects: number }
 export interface SemesterOption { semesterId: number; academicYear: string; semesterNo: number }
-export interface ProfileOptions { curricula: CurriculumOption[]; subjects: SubjectOption[]; semesters: SemesterOption[] }
+export interface ProfileOptions { curricula: CurriculumOption[]; subjects: SubjectOption[]; semesters: SemesterOption[]; subjectGroups?: SubjectGroupOption[] }
 export type Parameter = string | number | boolean | null;
 export type Query = (text: string, parameters: Parameter[]) => Promise<Record<string, unknown>[]>;
 export interface ProfileRepository {
