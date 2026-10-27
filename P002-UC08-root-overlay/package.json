@@ -1,0 +1,49 @@
+{
+  "name": "subject-advisors-p004-auth",
+  "private": true,
+  "type": "module",
+  "description": "P004-only validation harness; merge into FOUNDATION workspace tooling on integration.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.auth.json",
+    "test": "node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts",
+    "lint": "node node_modules/eslint/bin/eslint.js apps tools/auth/local vite.auth.config.ts --max-warnings 0",
+    "build": "node tools/auth/build.mjs",
+    "test:ui": "node tools/auth/test-ui.mjs",
+    "dev": "node tools/auth/dev.mjs",
+    "build:local": "node node_modules/vite/bin/vite.js build --config vite.auth.config.ts",
+    "types:local": "node node_modules/wrangler/bin/wrangler.js types tools/auth/local/worker-env.d.ts --config wrangler.auth.jsonc --env-interface LocalAuthEnv --include-runtime false",
+    "test:init-http": "node tools/auth/test-init-http.mjs",
+    "dev:offerings": "node node_modules/vite/bin/vite.js --config vite.offerings.config.ts --configLoader native",
+    "preview:offerings": "node tools/offerings/serve-preview.mjs",
+    "typecheck:offerings": "node node_modules/typescript/bin/tsc -p tsconfig.offerings.json",
+    "lint:offerings": "node node_modules/eslint/bin/eslint.js apps/api/src/modules/offerings apps/web/src/features/offerings packages/shared/src/offerings tools/offerings/demo vite.offerings.config.ts vitest.offerings.config.ts --max-warnings 0",
+    "test:offerings": "node node_modules/vitest/vitest.mjs run --config vitest.offerings.config.ts --configLoader native",
+    "test:ui:offerings": "node tools/offerings/test-ui.mjs",
+    "test:db:offerings": "node tools/offerings/test-database.mjs",
+    "build:offerings": "node tools/offerings/build.mjs",
+    "acceptance:offerings": "node tools/offerings/acceptance.mjs"
+  },
+  "dependencies": {
+    "@clerk/backend": "3.23.1",
+    "@clerk/react": "6.17.7",
+    "@neondatabase/serverless": "1.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11",
+    "esbuild": "0.28.2",
+    "eslint": "9.39.5",
+    "typescript-eslint": "8.71.1",
+    "playwright": "1.64.0",
+    "vite": "8.3.4",
+    "wrangler": "4.148.0"
+  }
+}

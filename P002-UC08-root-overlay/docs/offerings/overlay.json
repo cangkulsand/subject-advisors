@@ -1,0 +1,21 @@
+{
+  "owner": "P002",
+  "useCase": "UC08",
+  "baselineRevision": "01cee06c3e3dd5b8dbddf4bd9ff1fc350a56fd63",
+  "replacementFiles": [
+    {
+      "path": "package.json",
+      "baselineSha256": "d0845472aca7b1de99a513f8f54fd7db82ac4454f143690bf46292e463a075e5",
+      "reason": "Add offering commands; original scripts/dependencies preserved"
+    },
+    {
+      "path": ".gitignore",
+      "baselineSha256": "2f151db902362dc662370521b629921c5c7ad6b1bea3411756069d64ebe24038",
+      "reason": "Ignore owned build/cache outputs"
+    }
+  ],
+  "canonicalOfferingFixtureSha256": "192f74513b3c3b804f54523da2a4f85db09a4bb968eaea9e331a0123942383dd",
+  "dependenciesChanged": false,
+  "persistentMigrationsIncluded": false,
+  "topLevelPackageWrapper": false
+}

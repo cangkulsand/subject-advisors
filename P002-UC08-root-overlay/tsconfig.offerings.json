@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.auth.json",
+  "include": [
+    "apps/api/src/modules/offerings/**/*.ts",
+    "apps/api/src/modules/offerings/**/*.tsx",
+    "apps/web/src/features/offerings/**/*.ts",
+    "apps/web/src/features/offerings/**/*.tsx",
+    "packages/shared/src/offerings/**/*.ts",
+    "packages/shared/src/offerings/**/*.tsx",
+    "tools/offerings/demo/**/*.ts",
+    "tools/offerings/demo/**/*.tsx",
+    "vite.offerings.config.ts",
+    "vitest.offerings.config.ts"
+  ],
+  "exclude": [
+    "dist-offerings",
+    ".cache-offerings"
+  ]
+}

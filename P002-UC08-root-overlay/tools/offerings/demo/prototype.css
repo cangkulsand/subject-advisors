@@ -1,0 +1,32 @@
+/* Isolated demo shell; never imported by the production feature entry point. */
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #334155; background: #f8fafc; font-synthesis: none; }
+body { margin: 0; }
+.prototype-banner { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; background: #fffbeb; color: #92400e; padding: 10px 20px; font-size: 11px; line-height: 1.5; }
+.prototype-banner strong { letter-spacing: .08em; }
+.prototype-header { display: flex; justify-content: space-between; align-items: center; padding: 22px max(32px, calc((100vw - 1120px) / 2)); background: white; border-bottom: 1px solid #e2e8f0; gap: 16px; }
+.prototype-brand { display: flex; align-items: center; gap: 12px; }
+.prototype-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #0f766e; color: white; font-size: 14px; font-weight: 650; letter-spacing: -.05em; }
+.prototype-brand > div, .prototype-scope { display: grid; gap: 3px; }
+.prototype-brand strong { font-size: 16px; font-weight: 650; color: #0f172a; letter-spacing: -.025em; }
+.prototype-brand > div > span { font-size: 11px; color: #475569; }
+.prototype-scope { text-align: right; }
+.prototype-scope span { font-size: 10px; color: #475569; }
+.prototype-scope strong { font-size: 12px; color: #0f766e; font-weight: 600; }
+.prototype-footer { display: flex; gap: 24px; justify-content: space-between; align-items: start; max-width: 1120px; margin: 0 auto; padding: 24px 32px 40px; border-top: 1px solid #e2e8f0; font-size: 11px; }
+.prototype-footer strong { color: #334155; }
+.prototype-footer p { color: #475569; line-height: 1.6; }
+.prototype-tools { max-width: 500px; }
+.prototype-tools summary { cursor: pointer; min-height: 44px; display: list-item; color: #0f766e; font-weight: 600; }
+.prototype-tools > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.prototype-tools button { font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid #94a3b8; color: #334155; background: white; padding: 10px 12px; cursor: pointer; }
+.prototype-tools :is(button, summary):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.prototype-skip { position: absolute; left: 16px; top: -100px; z-index: 2; background: white; color: #1d4ed8; padding: 12px; border: 2px solid #2563eb; }
+.prototype-skip:focus { top: 10px; }
+@media (max-width: 740px) {
+  .prototype-header { padding: 16px; }
+  .prototype-brand strong { font-size: 14px; }
+  .prototype-brand > div > span { font-size: 10px; }
+  .prototype-scope strong { font-size: 10px; }
+  .prototype-footer { display: grid; padding: 24px 16px; }
+}
+@media (max-width: 360px) { .prototype-scope { display: none; } }

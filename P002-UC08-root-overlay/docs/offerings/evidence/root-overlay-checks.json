@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-10-26T03:01:59.127Z",
+  "baseline": "01cee06c3e3dd5b8dbddf4bd9ff1fc350a56fd63",
+  "environment": "Git baseline extracted, actual delivery ZIP overlaid; installed matching dependencies reused through a node_modules junction; no fresh npm ci performed",
+  "checks": [
+    {
+      "name": "baseline-commands-and-dependencies-preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "baseline-typecheck",
+      "status": "PASS"
+    },
+    {
+      "name": "baseline-lint",
+      "status": "PASS"
+    },
+    {
+      "name": "baseline-tests",
+      "status": "PASS"
+    },
+    {
+      "name": "baseline-build",
+      "status": "PASS"
+    },
+    {
+      "name": "baseline-local-build",
+      "status": "PASS"
+    },
+    {
+      "name": "extracted-preview-http-and-browser-save-reload",
+      "status": "PASS",
+      "note": "Four HTTP checks; actual compiled preview; no external requests or page errors"
+    }
+  ]
+}
