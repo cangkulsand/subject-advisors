@@ -154,11 +154,15 @@ student-facing setup message. Subjects reflect the resolved configuration. The A
 also returns configured subject group counts and compulsory flags for the elective
 and core display; the client does not invent choose counts or enforce graduation rules.
 
-Profile input: studentName, optional matricNo, curriculumId, weeklyWorkingHours,
-availableStudyHours. IDs and hours are integers. Profile output adds studentId,
+Profile input: studentName, optional matricNo, curriculumId, required currentSemesterId,
+weeklyWorkingHours, availableStudyHours. IDs and hours are integers. The semester ID
+must reference a configured academic semester; the profile form requires separate
+academic-year and semester selections. Profile output adds studentId,
 programmeCode/Name, curriculumVersion and timestamps. The schema does not have an
 employment-text field; work commitments use the modeled weekly working hours.
-Setup completion requires valid name/curriculum and both hour values (zero permitted).
+Setup completion requires valid name/curriculum, a configured current semester and both
+hour values (zero permitted). Existing profiles without a selected semester remain in
+SETUP_REQUIRED until the student chooses one; no period is inferred or backfilled.
 Optional matric number remains optional. This is an explicit data-entry decision;
 legacy nullable hours produce SETUP_REQUIRED, while DB failures produce UNAVAILABLE.
 

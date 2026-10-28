@@ -2,11 +2,15 @@ export interface ProfileInput {
   studentName: string;
   matricNo: string | null;
   curriculumId: number;
+  currentSemesterId: number;
   weeklyWorkingHours: number;
   availableStudyHours: number;
 }
-export interface Profile extends Omit<ProfileInput, 'weeklyWorkingHours' | 'availableStudyHours'> {
+export interface Profile extends Omit<ProfileInput, 'currentSemesterId' | 'weeklyWorkingHours' | 'availableStudyHours'> {
   studentId: number;
+  currentSemesterId: number | null;
+  /** Configured curriculum denominator; optional for older profile fixtures/responses. */
+  totalCreditRequired?: number | null;
   weeklyWorkingHours: number | null;
   availableStudyHours: number | null;
   programmeCode: string;
@@ -21,7 +25,7 @@ export interface CurriculumOption {
 }
 export interface SubjectOption { subjectId: number; subjectCode: string; subjectName: string; creditHours: number; subjectCategory?: string | null; isCompulsory?: 0 | 1 }
 export interface SubjectGroupOption { category: string; requiredSubjects: number | null; availableSubjects: number }
-export interface SemesterOption { semesterId: number; academicYear: string; semesterNo: number }
+export interface SemesterOption { semesterId: number; academicYear: string; semesterNo: number; semesterType?: 'NORMAL' | 'SHORT' }
 export interface ProfileOptions { curricula: CurriculumOption[]; subjects: SubjectOption[]; semesters: SemesterOption[]; subjectGroups?: SubjectGroupOption[] }
 export type Parameter = string | number | boolean | null;
 export type Query = (text: string, parameters: Parameter[]) => Promise<Record<string, unknown>[]>;

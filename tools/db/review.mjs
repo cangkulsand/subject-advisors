@@ -36,7 +36,7 @@ export async function reviewSchema(root=process.cwd()){
     }
   }
   const plpgsql=await parsePlPgSQL(sql);
-  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql']){
+  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql','004_profile_current_semester.sql']){
     const checkSql=await readFile(root+'/db/checks/'+name,'utf8');
     await parse(checkSql);await parsePlPgSQL(checkSql);
   }

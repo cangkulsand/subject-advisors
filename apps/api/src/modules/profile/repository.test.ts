@@ -46,3 +46,40 @@ describe('P001 profile options subject metadata', () => {
     expect(query.mock.calls.find(([sql]) => sql.includes('category_counts AS'))?.[1]).toEqual(['verified-student']);
   });
 });
+
+describe('P001 current semester persistence', () => {
+  it('returns only the configured total from the verified student profile curriculum', async () => {
+    const query = vi.fn(async () => [{ studentId: 9, studentName: 'Student', matricNo: null, curriculumId: 4,
+      currentSemesterId: 22, totalCreditRequired: 131, weeklyWorkingHours: 0, availableStudyHours: 8,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' }]) as unknown as Query & ReturnType<typeof vi.fn>;
+    const found = await createProfileRepository(query).find('verified-student');
+    expect(found?.totalCreditRequired).toBe(131);
+    expect(query.mock.calls[0]![0]).toContain('c.total_credit_required AS "totalCreditRequired"');
+    expect(query.mock.calls[0]![0]).toContain('WHERE p.clerk_user_id=$1');
+    expect(query.mock.calls[0]![1]).toEqual(['verified-student']);
+  });
+  it('does not return a malformed configured credit total as profile data', async () => {
+    const query = vi.fn(async () => [{ studentId: 9, studentName: 'Student', curriculumId: 4, totalCreditRequired: 12.5,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' }]) as unknown as Query;
+    await expect(createProfileRepository(query).find('verified-student')).rejects.toThrow('Invalid profile curriculum total');
+  });
+  it('validates configured current semester in the profile upsert and returns it', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('WITH saved AS') ? [{ studentId: 9, studentName: 'Student', matricNo: null,
+      curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' }] : []) as unknown as Query & ReturnType<typeof vi.fn>;
+    const saved = await createProfileRepository(query).save('verified-student', {
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
+    });
+    expect(saved.currentSemesterId).toBe(22);
+    const [sql, parameters] = query.mock.calls[0]!;
+    expect(sql).toContain('current_semester_id'); expect(sql).toContain('JOIN public.academic_semester s ON s.semester_id=$5');
+    expect(sql).toContain('current_semester_id=EXCLUDED.current_semester_id');
+    expect(parameters).toEqual(['verified-student', 'Student', null, 4, 22, 0, 8]);
+  });
+  it('rejects an unconfigured semester without accepting it as a valid profile', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT semester_id FROM public.academic_semester') ? [] : []) as unknown as Query;
+    await expect(createProfileRepository(query).save('verified-student', {
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
+    })).rejects.toMatchObject({ status: 400, code: 'INVALID_SEMESTER' });
+  });
+});

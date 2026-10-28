@@ -52,13 +52,15 @@ try {
   }
   async function review(page) {
     await page.getByRole('button', { name: 'Review offerings' }).click();
-    await page.getByRole('heading', { name: 'Review your offerings' }).waitFor();
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).waitFor();
+    assert.equal(await page.locator('.offerings-review-help').count(), 0);
   }
   const confirmation = page => page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ });
   async function save(page) {
     await review(page); await confirmation(page).check();
     await page.getByRole('button', { name: /^(Confirm and save|Retry save)$/ }).click();
-    await page.getByRole('heading', { name: 'Your offerings are saved' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.equal(await page.locator('.offerings-review-help').count(), 0);
   }
   async function noOverflow(page) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'page must fit viewport');
@@ -67,13 +69,117 @@ try {
     return page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? '{}'), storageKey);
   }
 
-  await check('empty state and provenance are explicit', async page => {
+  await check('empty offerings state remains explicit', async page => {
     await open(page);
-    await page.getByText('Student-reported offerings — not verified by UTMSPACE', { exact: true }).waitFor();
     await page.getByText('No subjects selected yet', { exact: true }).waitFor();
-    assert.equal(await page.getByRole('checkbox', { checked: true }).count(), 0);
+    assert.equal(await page.locator('.offerings-save-state').innerText(), 'No saved offerings for this semester');
+    assert.equal(await subject(page).isChecked(), false);
     await noOverflow(page);
     await page.screenshot({ path: resolve(artifacts, 'desktop.png'), fullPage: true });
+  });
+  await check('academic history, distinct IDs, ambiguity and category metadata are explicit', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.equal(await page.locator('.offerings-save-state').innerText(), '✓ Saved');
+    const normalSummary = await page.locator('.offerings-category-summary').innerText();
+    assert.match(normalSummary, /Core\s+4 \/ 7 · 1 unclear/);
+    assert.match(normalSummary, /E1\s+1 \/ 2/);
+    assert.match(normalSummary, /E2\s+0 \/ 1/);
+    assert.equal(await page.getByRole('columnheader', { name: 'History' }).count(), 0, 'History is not a catalogue table column');
+    assert.equal(await subject(page).count(), 0, 'saved list opens in summary mode');
+    assert.equal(await page.locator('.offerings-selected-list').getByText('DEMO204', { exact: true }).count(), 1);
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await page.getByLabel('Find a subject').waitFor();
+    assert.equal(await page.locator('.offerings-degree-progress').count(), 0);
+    assert.equal(await page.getByRole('progressbar', { name: 'Recorded credit progress' }).count(), 0, 'ambiguous history cannot claim complete progress');
+    assert.equal(await subject(page, 'DEMO101').count(), 0, 'known Taken subject leaves the default remaining list');
+    assert.equal(await subject(page, 'DEMO102').count(), 0, 'known Exempted subject leaves the default remaining list');
+    assert.equal(await subject(page, 'DEMO201').count(), 1, 'Failed remains available');
+    assert.equal(await subject(page, 'DEMO202').count(), 1, 'Withdrawn remains available');
+    assert.equal(await subject(page, 'DEMO204').count(), 0, 'saved Taken selection is hidden from the default list');
+    await page.getByRole('button', { name: 'Remove DEMO204' }).waitFor();
+    assert.equal(await subject(page, 'DEMO206').count(), 1, 'unknown category remains selectable as Other / unknown');
+    assert.match(normalSummary, /Some history is ambiguous and is not included in the recorded counts/);
+    assert.match(await subject(page, 'DEMO206').evaluate(input => input.closest('tr').innerText), /History ambiguous/);
+    assert.equal(await page.locator('.offerings-subject-table th').count(), 4, 'catalogue table has no History column');
+    const categoryRanks = await page.locator('.offerings-subject-table tbody tr').evaluateAll(rows => rows.map(row => {
+      const category = [...row.querySelector('.offerings-category-pill').classList].find(name => name.startsWith('offerings-category-pill-'))?.slice('offerings-category-pill-'.length);
+      const rank = ['core', 'e1', 'e2', 'u1', 'u2'].indexOf(category ?? '');
+      return rank < 0 ? 5 : rank;
+    }));
+    assert.deepEqual(categoryRanks, [...categoryRanks].sort((left, right) => left - right), 'remaining rows are grouped by category before code');
+    const e1Color = await page.locator('.offerings-category-pill-e1').first().evaluate(element => getComputedStyle(element).backgroundColor);
+    const e2Color = await page.locator('.offerings-category-pill-e2').first().evaluate(element => getComputedStyle(element).backgroundColor);
+    assert.notEqual(e1Color, e2Color, 'category pills use distinct colors');
+    await page.screenshot({ path: resolve(artifacts, 'desktop-guided.png'), fullPage: true });
+    await page.getByLabel('Find a subject').fill('unknown category');
+    await subject(page, 'DEMO207').waitFor();
+    assert.equal(await subject(page, 'DEMO204').count(), 0, 'search hides rows without changing saved selection');
+    assert.match(await page.locator('.offerings-category-summary').innerText(), /Core\s+4 \/ 7 · 1 unclear/, 'category summary is independent of search');
+    await page.getByRole('button', { name: 'Review offerings' }).click();
+    await page.getByText(/selected subjects? are hidden by the current search/).waitFor();
+    assert.equal(await page.locator('.offerings-review-list').getByText('DEMO204', { exact: true }).count(), 1);
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).check();
+    await page.getByRole('button', { name: 'Confirm and save' }).click();
+    const calls = await page.evaluate(() => window.__offeringSaveCalls);
+    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] }, 'PUT retains curriculumSubjectId values');
+  });
+  await check('Normal and Short semester predicates preserve SECJ3032 exception', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await page.getByLabel('Find a subject').waitFor();
+    assert.equal(await subject(page, 'SECJ3032').count(), 1);
+    assert.equal(await subject(page, 'DEMO208').count(), 0, 'two-credit subject uses the configured Normal display predicate');
+    assert.equal(await subject(page, 'DEMO209').count(), 0, 'two-credit category-missing subject still follows the definite Normal rule');
+    assert.equal(await page.getByLabel('Academic year').count(), 0, 'period controls are moved to the profile');
+    assert.equal(await page.getByLabel('Semester', { exact: true }).count(), 0, 'offerings uses the saved profile semester');
+    assert.equal(await page.getByRole('link', { name: 'Edit academic profile' }).getAttribute('href'), '/student/profile');
+    await page.goto(base + '/test?scenario=rich-short');
+    await page.getByLabel('Find a subject').waitFor();
+    const shortSummary = await page.locator('.offerings-category-summary').innerText();
+    assert.match(shortSummary, /U1\s+0 \/ 1/);
+    assert.match(shortSummary, /U2\s+1 \/ 1/);
+    assert.doesNotMatch(shortSummary, /Core|E1|E2/);
+    assert.equal(await subject(page, 'SECJ3032').count(), 0, 'SECJ3032 is the explicit Short exception');
+    assert.equal(await subject(page, 'DEMO208').count(), 1);
+    assert.equal(await subject(page, 'DEMO209').count(), 1, 'two-credit category-missing subject follows the definite Short rule');
+    assert.equal(await subject(page, 'DEMO203').count(), 1, 'Elective Umum U1 uses curriculum metadata');
+    assert.equal(await subject(page, 'DEMO101').count(), 0, 'history remains excluded by default in Short');
+  });
+  await check('unavailable history is labeled unknown without suppressing records', async page => {
+    await page.goto(base + '/test?scenario=history-unavailable');
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    assert.match(await page.locator('.offerings-category-summary').innerText(), /Core\s+History unavailable/);
+    assert.doesNotMatch(await page.locator('.offerings-category-summary').innerText(), /Core\s+0 \/ 7/);
+    await page.getByText('Academic history is unavailable. Subjects with a recorded completed or exempted status cannot be identified.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('progressbar', { name: 'Recorded credit progress' }).count(), 0);
+    await subject(page, 'DEMO101').waitFor();
+    assert.equal(await page.getByRole('columnheader', { name: 'History' }).count(), 0);
+    assert.equal(await subject(page, 'DEMO101').count(), 1, 'unavailable history does not hide catalogue rows');
+  });
+  await check('degree progress is displayed on Subject Records, while Offerings keeps history and saved-selection context', async page => {
+    await page.goto(base + '/test?scenario=progress');
+    assert.equal(await page.getByRole('heading', { name: 'Degree Progress' }).count(), 0);
+    assert.equal(await page.locator('.offerings-degree-progress').count(), 0);
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+  });
+  await check('failed rich save preserves hidden saved identifiers in review and retry', async page => {
+    await page.goto(base + '/test?scenario=rich-save-fail');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await page.getByLabel('Find a subject').waitFor();
+    await page.getByLabel('Find a subject').fill('DEMO207');
+    await page.getByRole('button', { name: 'Review offerings' }).click();
+    await page.getByText(/selected subjects? are hidden by the current search/).waitFor();
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).check();
+    await page.getByRole('button', { name: 'Confirm and save' }).click();
+    await page.getByRole('alert').waitFor();
+    assert.equal(await page.getByText('Your draft is still here.', { exact: false }).count(), 1);
+    await page.getByRole('button', { name: 'Retry save' }).click();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    const calls = await page.evaluate(() => window.__offeringSaveCalls);
+    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] });
   });
   await check('search keeps selection; keyboard selects and removes subjects', async page => {
     await open(page);
@@ -93,23 +199,29 @@ try {
   await check('confirmation required, keyboard save and persistence after reload', async page => {
     await open(page); await subject(page).check(); await review(page);
     assert.equal(await page.getByRole('button', { name: 'Confirm and save' }).isDisabled(), true);
-    assert.equal(await page.getByRole('heading', { name: 'Review your offerings' }).evaluate(element => element === document.activeElement), true);
     await confirmation(page).focus(); await page.keyboard.press('Space');
     await page.getByRole('button', { name: 'Confirm and save' }).focus(); await page.keyboard.press('Enter');
     await page.getByText('Saved in this browser for demonstration.', { exact: true }).waitFor();
     assert.equal((await stored(page))[semester1].length, 1);
-    await page.reload(); await subject(page).waitFor();
-    assert.equal(await subject(page).isChecked(), true);
+    await page.reload(); await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.equal(await page.locator('.offerings-save-state').innerText(), '✓ Saved');
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), true);
   });
-  await check('cancel edit preserves the saved set', async page => {
+  await check('cancel edit returns to the saved view and preserves the saved set', async page => {
     await open(page); await subject(page).check(); await save(page);
     await page.getByRole('button', { name: 'Edit offerings' }).click();
     await subject(page, 'DEMO102').check();
     await page.getByRole('button', { name: 'Cancel changes' }).click();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.equal(await page.locator('.offerings-selected-list').getByText('DEMO101', { exact: true }).count(), 1);
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
     assert.equal(await subject(page).isChecked(), true);
     assert.equal(await subject(page, 'DEMO102').isChecked(), false);
     assert.equal((await stored(page))[semester1].length, 1);
-    await page.reload(); await subject(page).waitFor();
+    await page.reload(); await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await subject(page).waitFor();
     assert.equal(await subject(page, 'DEMO102').isChecked(), false);
   });
   await check('failed save retains prior storage and draft, then retry works', async page => {
@@ -130,35 +242,23 @@ try {
     await open(page); await subject(page).check(); await save(page);
     await page.getByRole('button', { name: 'Edit offerings' }).click();
     await page.getByRole('button', { name: 'Clear selection' }).click();
-    await review(page); await page.getByText('You are saving an empty offering list for this semester.', { exact: true }).waitFor();
+    await review(page); await page.getByText('No reported offerings. Future recommendations need subject offerings to work from.', { exact: true }).waitFor();
     await confirmation(page).check(); await page.getByRole('button', { name: 'Confirm and save' }).click();
-    await page.getByRole('heading', { name: 'Your offerings are saved' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.equal(await page.locator('.offerings-save-state').innerText(), '✓ Saved');
+    assert.equal(await page.locator('.offerings-review-help').count(), 0);
     assert.deepEqual((await stored(page))[semester1], []);
     await page.reload(); await subject(page).waitFor();
     assert.equal(await subject(page).isChecked(), false);
   });
-  await check('semesters and years remain separate; short type is correct', async page => {
+  await check('offerings period is pinned to profile and does not expose period selectors', async page => {
     await open(page); await subject(page).check(); await save(page);
-    await page.getByLabel('Semester', { exact: true }).selectOption(semester3);
-    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), false);
-    await page.getByText('Short semester', { exact: true }).waitFor();
-    await subject(page, 'DEMO102').check(); await save(page);
-    await page.getByLabel('Academic year', { exact: true }).selectOption('2027/2028');
-    await subject(page).waitFor(); assert.equal(await subject(page, 'DEMO102').isChecked(), false);
-    await page.getByLabel('Academic year', { exact: true }).selectOption('2026/2027');
-    await subject(page).waitFor(); assert.equal(await subject(page, 'DEMO102').isChecked(), true);
-    await page.getByLabel('Semester', { exact: true }).selectOption(semester1);
-    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), true);
-  });
-  await check('semester switch asks before discarding unsaved selections', async page => {
-    await open(page); await subject(page).check();
-    await page.getByLabel('Semester', { exact: true }).selectOption(semester2);
-    await page.getByRole('button', { name: 'Keep editing' }).click();
-    assert.equal(await subject(page).isChecked(), true);
-    await page.getByLabel('Semester', { exact: true }).selectOption(semester2);
-    await page.getByRole('button', { name: 'Discard changes and switch' }).click();
-    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), false);
-    assert.deepEqual(await stored(page), {});
+    assert.equal(await page.getByLabel('Academic year').count(), 0);
+    assert.equal(await page.getByLabel('Semester', { exact: true }).count(), 0);
+    assert.equal((await stored(page))[semester1].length, 1);
+    const editProfile = page.getByRole('link', { name: 'Edit academic profile' });
+    await editProfile.waitFor();
+    assert.equal((await page.locator('.offerings-current-semester').textContent()).trim(), 'Edit academic profile');
   });
   await check('simulated loading failure has a successful recovery path', async page => {
     await open(page); await page.getByText('Prototype tools', { exact: true }).click();
@@ -184,18 +284,37 @@ try {
     await page.goto(base + '/test?scenario=empty-semesters');
     await page.getByRole('heading', { name: 'No semesters configured' }).waitFor();
   });
-  for (const width of [320, 375, 768, 1024, 1440]) {
+  for (const width of [320, 375, 768, 800, 1024, 1440]) {
     await check('responsive selection and review at ' + width + 'px', async page => {
-      await open(page); await noOverflow(page); await subject(page).check(); await review(page); await noOverflow(page);
+      await open(page); await noOverflow(page);
+      if (width === 800) assert.equal(await page.locator('.offerings-table-scroll').evaluate(element => element.scrollWidth > element.clientWidth), true, 'tablet table scroll stays inside its labeled region');
+      await subject(page).check(); await review(page); await noOverflow(page);
       if (width === 375) await page.screenshot({ path: resolve(artifacts, 'mobile.png'), fullPage: true });
     }, width);
   }
+  await check('category summary and table fit mobile 375px without page overflow', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await page.getByLabel('Find a subject').waitFor();
+    await noOverflow(page);
+    assert.equal(await page.locator('.offerings-category-summary').isVisible(), true);
+    assert.equal(await page.getByRole('columnheader', { name: 'History' }).count(), 0);
+    const tableScroller = page.locator('.offerings-table-scroll');
+    assert.equal(await tableScroller.evaluate(element => element.scrollWidth > element.clientWidth), true, 'table uses a local horizontal scroller');
+    assert.equal(await tableScroller.getAttribute('tabindex'), '0', 'table scroller is keyboard focusable');
+    await page.screenshot({ path: resolve(artifacts, 'mobile-guided-375.png'), fullPage: true });
+    await page.getByLabel('Find a subject').fill('programming');
+    await noOverflow(page);
+    await page.getByRole('button', { name: 'Review offerings' }).click();
+    await noOverflow(page);
+  }, 375);
   await check('200 percent equivalent zoom remains usable', async page => {
     await open(page);
     await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
     await subject(page).check(); await review(page); await noOverflow(page);
   }, 1280);
-  await check('primary actions, provenance and keyboard focus have adequate contrast', async page => {
+  await check('primary actions and keyboard focus have adequate contrast', async page => {
     await open(page);
     const primary = page.getByRole('button', { name: 'Review offerings' });
     async function contrast(locator, foreground = 'color', background = 'backgroundColor') {
@@ -214,13 +333,13 @@ try {
     }
     assert.ok(await contrast(primary) >= 4.5);
     await primary.hover(); assert.ok(await contrast(primary) >= 4.5);
-    assert.ok(await contrast(page.locator('.offerings-provenance')) >= 4.5);
     await primary.focus();
     assert.ok(await contrast(primary, 'outlineColor', 'surrounding') >= 3);
     assert.equal(await primary.evaluate(element => getComputedStyle(element).outlineStyle), 'solid');
   });
   async function authResponses(page, profileState = 'COMPLETE', appRole = 'STUDENT') {
     let offeringRequests = 0;
+    let currentSemester = semester1;
     const values = new Map();
     await page.route('**/api/me', route => {
       const user = route.request().headers().authorization?.includes('test_student_b') ? 'test_student_b' : 'test_student_a';
@@ -237,33 +356,48 @@ try {
         const input = request.postDataJSON(); values.set(user + input.semesterId, input);
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: input }) });
       }
-      const id = new URL(request.url()).searchParams.get('semesterId');
+      const id = new URL(request.url()).searchParams.get('semesterId') ?? currentSemester;
       const context = {
         curriculum: { curriculumId: '401', name: 'Fictional auth integration fixture', programmeName: 'Test programme' },
         subjects: [{ curriculumSubjectId: '101', code: 'DEMO101', name: 'Programming foundations', creditHours: 3 }],
-        semesters: [{ semesterId: semester1, academicYear: '2026/2027', semesterNo: 1 }],
-        selection: id ? values.get(user + id) ?? { semesterId: id, curriculumSubjectIds: [] } : null,
+        currentSemesterId: currentSemester,
+        semesters: [{ semesterId: semester1, academicYear: '2026/2027', semesterNo: 1 }, { semesterId: semester2, academicYear: '2026/2027', semesterNo: 2 }],
+        selection: values.get(user + id) ?? { semesterId: id, curriculumSubjectIds: [] },
       };
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: context }) });
     });
-    return () => offeringRequests;
+    return { count: () => offeringRequests, setSemester: async id => {
+      currentSemester = id;
+      // A successful profile PUT clears these academic snapshots in the real profile client.
+      await page.evaluate(() => { for (let i = sessionStorage.length - 1; i >= 0; i--) { const key = sessionStorage.key(i); if (key?.startsWith('subject-advisors.academic.v1:')) sessionStorage.removeItem(key); } });
+    }, state: () => ({ currentSemester, selections: [...values.entries()] }) };
   }
   await check('production page adapter redirects a signed-out session before offering requests', async page => {
-    const count = await authResponses(page); await page.goto(base + '/auth-test?scenario=signed-out');
-    await page.waitForURL(base + '/sign-in'); assert.equal(count(), 0);
+    const fixture = await authResponses(page); await page.goto(base + '/auth-test?scenario=signed-out');
+    await page.waitForURL(base + '/sign-in'); assert.equal(fixture.count(), 0);
   });
   await check('production page adapter requires completed profile before offering requests', async page => {
-    const count = await authResponses(page, 'SETUP_REQUIRED'); await page.goto(base + '/auth-test?scenario=profile');
-    await page.waitForURL(base + '/student/setup'); assert.equal(count(), 0);
+    const fixture = await authResponses(page, 'SETUP_REQUIRED'); await page.goto(base + '/auth-test?scenario=profile');
+    await page.waitForURL(base + '/student/setup'); assert.equal(fixture.count(), 0);
   });
   await check('production page adapter denies staff roles without loading offerings', async page => {
-    const count = await authResponses(page, 'NOT_APPLICABLE', 'COORDINATOR'); await page.goto(base + '/auth-test?scenario=staff');
-    await page.getByRole('alert').waitFor(); assert.equal(count(), 0); assert.equal(await subject(page).count(), 0);
+    const fixture = await authResponses(page, 'NOT_APPLICABLE', 'COORDINATOR'); await page.goto(base + '/auth-test?scenario=staff');
+    await page.getByRole('alert').waitFor(); assert.equal(fixture.count(), 0); assert.equal(await subject(page).count(), 0);
   });
   await check('production page adapter saves and reloads through authenticated client contract', async page => {
-    await authResponses(page); await page.goto(base + '/auth-test?scenario=allowed');
+    const fixture = await authResponses(page); await page.goto(base + '/auth-test?scenario=allowed');
     await subject(page).check(); await save(page);
-    await page.reload(); await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), true);
+    await page.reload(); await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), true, JSON.stringify(fixture.state()));
+  });
+  await check('production page adapter retains prior semester offerings when the profile period changes', async page => {
+    const fixture = await authResponses(page); await page.goto(base + '/auth-test?scenario=allowed');
+    await subject(page).check(); await save(page);
+    await fixture.setSemester(semester2); await page.reload(); await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), false);
+    await fixture.setSemester(semester1); await page.reload(); await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await subject(page).waitFor(); assert.equal(await subject(page).isChecked(), true, JSON.stringify(fixture.state()));
   });
   await check('production page adapter removes the previous student draft on session change', async page => {
     await authResponses(page); await page.goto(base + '/auth-test?scenario=session-switch');

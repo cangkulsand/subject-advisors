@@ -14,3 +14,11 @@ it('preserves actionable API conflicts', async () => {
   vi.stubGlobal('fetch',vi.fn(async () => Response.json({ error: { code: 'DUPLICATE_RECORD', message: 'Edit the existing attempt.' } },{ status: 409 })));
   await expect(createAcademicClient(async () => 'test')('/api/academic-records')).rejects.toMatchObject({ status: 409, code: 'DUPLICATE_RECORD' });
 });
+it.each([
+  [401, '{}', 'SESSION_REQUIRED'], [401, '[]', 'SESSION_REQUIRED'], [401, 'null', 'SESSION_REQUIRED'],
+  [403, '{}', 'ACCESS_DENIED'], [403, '[]', 'ACCESS_DENIED'], [403, 'null', 'ACCESS_DENIED'],
+  [401, 'not-json', 'SESSION_REQUIRED'], [403, 'not-json', 'ACCESS_DENIED'],
+] as const)('normalizes P001 %s authorization response %s', async (status, body, code) => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status, headers: { 'Content-Type': 'application/json' } })));
+  await expect(createAcademicClient(async () => 'test')('/api/academic-records')).rejects.toMatchObject({ status, code });
+});

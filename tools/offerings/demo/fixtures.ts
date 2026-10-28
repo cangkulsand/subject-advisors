@@ -7,6 +7,7 @@ export const demoContext: OfferingContext = {
     name: 'Fictional Computing · Prototype curriculum',
     programmeName: 'Demonstration programme',
   },
+  currentSemesterId: '201',
   subjects: [
     ['DEMO101', 'Programming foundations', 3],
     ['DEMO102', 'Discrete structures', 3],

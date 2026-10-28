@@ -17,6 +17,11 @@
       "version": "0002",
       "file": "0002_copy_legacy_access.sql",
       "description": "Preserve roles/status/timestamps and UUID-to-integer history"
+    },
+    {
+      "version": "0003",
+      "file": "0003_profile_current_semester.sql",
+      "description": "Add an optional configured current semester to student profiles"
     }
   ],
   "historicalExcluded": [

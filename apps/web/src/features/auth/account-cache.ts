@@ -3,7 +3,8 @@ import { AuthApiError, loadAccount } from './client';
 import { clearAcademicCache, keepAcademicSession } from '../profile/data-cache';
 
 export interface AccountSession { userId: string; sessionId: string; apiBaseUrl?: string }
-const prefix = 'subject-advisors.account.v1:';
+const prefix = 'subject-advisors.account.v2:';
+const legacyPrefix = 'subject-advisors.account.v1:';
 export const ACCOUNT_CACHE_CHANGED = 'subject-advisors:account-cache-changed';
 const memory = new Map<string, Me>();
 const pending = new Map<string, Promise<Me>>();
@@ -37,7 +38,7 @@ function notify(kind = 'invalidated') { if (typeof window !== 'undefined') windo
 export function clearAccountCache(notifyListeners = true) {
   clearAcademicCache();
   generation++; memory.clear(); pending.clear();
-  try { const store = storage(); if (store) for (let i=store.length-1;i>=0;i--) { const id=store.key(i); if(id?.startsWith(prefix))store.removeItem(id); } } catch { /* no credential is stored here */ }
+  try { const store = storage(); if (store) for (let i=store.length-1;i>=0;i--) { const id=store.key(i); if(id?.startsWith(prefix)||id?.startsWith(legacyPrefix))store.removeItem(id); } } catch { /* no credential is stored here */ }
   if (notifyListeners) notify();
 }
 /** Prune only other users/sessions; retain this session across document navigations. */
@@ -47,7 +48,7 @@ export function keepAccountSession(session: AccountSession | null) {
   if(activeSession!==identity){keepAcademicSession(identity);if(activeSession!==undefined){generation++;pending.clear();}activeSession=identity;}
   const belongs = (id: string) => { try { const parts: unknown = JSON.parse(id.slice(prefix.length)); return Array.isArray(parts) && parts[0] === session.userId && parts[1] === session.sessionId; } catch { return false; } };
   for (const id of memory.keys()) if (!belongs(id)) memory.delete(id);
-  try { const store=storage(); if(store)for(let i=store.length-1;i>=0;i--){const id=store.key(i);if(id?.startsWith(prefix)&&!belongs(id))store.removeItem(id);} } catch { /* storage may be disabled */ }
+  try { const store=storage(); if(store)for(let i=store.length-1;i>=0;i--){const id=store.key(i);if(id?.startsWith(legacyPrefix) || id?.startsWith(prefix)&&!belongs(id))store.removeItem(id);} } catch { /* storage may be disabled */ }
 }
 export function loadSessionAccount(session: AccountSession, getToken: () => Promise<string | null>, initialize = false, force = false): Promise<Me> {
   if (!initialize && !force) { const cached=readAccountCache(session); if(cached)return Promise.resolve(cached); }

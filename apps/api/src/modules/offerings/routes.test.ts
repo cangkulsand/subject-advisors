@@ -46,7 +46,8 @@ describe('authenticated UC08 offering routes', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('vary')).toBe('Authorization');
     const body = await response.json();
-    expect(body.data.selection).toBeNull();
+    expect(body.data.selection).toEqual({ semesterId: f.semesterId, curriculumSubjectIds: [] });
+    expect(body.data.currentSemesterId).toBe(f.semesterId);
     expect(body.data.studentId).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('fictional_a');
     expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a');
@@ -67,7 +68,7 @@ describe('authenticated UC08 offering routes', () => {
     expect((await (await f.get(f.request(undefined, '?semesterId=' + f.semesterId))).json()).data.selection.curriculumSubjectIds).toEqual([]);
     f.identity.clerkUserId = 'fictional_a'; f.assignment.clerkUserId = 'fictional_a';
     const second = demoContext.semesters[1]!.semesterId;
-    expect((await (await f.get(f.request(undefined, '?semesterId=' + second))).json()).data.selection.curriculumSubjectIds).toEqual([]);
+    expect((await f.get(f.request(undefined, '?semesterId=' + second))).status).toBe(409);
   });
   it.each(['studentId', 'clerkUserId', 'curriculumId'])('rejects browser ownership field %s', async field => {
     const f = fixture();
@@ -87,6 +88,15 @@ describe('authenticated UC08 offering routes', () => {
     for (const query of ['?studentId=other', '?semesterId=bad', '?semesterId=' + f.semesterId + '&semesterId=' + f.semesterId]) {
       expect((await f.get(f.request(undefined, query))).status).toBe(400);
     }
+  });
+  it('uses only the profile semester for reads and writes', async () => {
+    const f = fixture();
+    const other = demoContext.semesters[1]!.semesterId;
+    expect((await f.get(f.request(undefined, '?semesterId=' + other))).status).toBe(409);
+    expect((await f.get(f.request({ semesterId: other, curriculumSubjectIds: [f.subjectId] }))).status).toBe(409);
+    expect(f.deps.repository.replace).not.toHaveBeenCalled();
+    const incomplete = fixture(); incomplete.context.currentSemesterId = '';
+    expect((await incomplete.get(incomplete.request())).status).toBe(403);
   });
   it.each(['COORDINATOR', 'SYSTEM_ADMIN'] as const)('denies %s access', async role => {
     const f = fixture(); f.assignment.appRole = role;

@@ -6,7 +6,7 @@ import { handleP001Request, type P001Dependencies } from './routes';
 import { AuthError } from '../auth/errors';
 import type { Profile, ProfileRepository } from './contracts';
 
-const input = { studentName: 'Demo student', curriculumId: 1, weeklyWorkingHours: 0, availableStudyHours: 12 };
+const input = { studentName: 'Demo student', curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
 const profile: Profile = { ...input, studentId: 1, matricNo: null, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
 const record = { subjectId: 1, semesterId: null, status: 'EXEMPTED', recognizedCredits: 0, remarks: 'DEMO credit-free exemption' };
 function dependencies(state: 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' = 'COMPLETE'): P001Dependencies {
@@ -27,6 +27,7 @@ describe('P001 strict input validation', () => {
   it('normalizes a valid profile and permits zero working hours', () => expect(profileInput({ ...input, studentName: ' Demo ' })).toMatchObject({ studentName: 'Demo', matricNo: null }));
   it.each([-1, 1.5, NaN, Infinity, '0', null, undefined, 2147483648])('rejects invalid hour value %s', value => expect(() => profileInput({ ...input, weeklyWorkingHours: value })).toThrow(P001Error));
   it.each(['uuid-value', 0, -2, 1.5, 2147483648])('rejects invalid curriculum ID %s', value => expect(() => profileInput({ ...input, curriculumId: value })).toThrow());
+  it.each(['uuid-value', 0, -2, 1.5, 2147483648, undefined, null])('rejects invalid current semester ID %s', value => expect(() => profileInput({ ...input, currentSemesterId: value })).toThrow());
   it.each(['clerkUserId','studentId','appRole','email','accessStatus','employmentText'])('rejects unauthorized/unmodeled field %s', key => expect(() => profileInput({ ...input, [key]: 'spoof' })).toThrow());
   it('requires a nonblank bounded name', () => { expect(() => profileInput({ ...input, studentName: ' ' })).toThrow(); expect(() => profileInput({ ...input, studentName: 'x'.repeat(256) })).toThrow(); });
   it('leaves missing/null EXEMPTED credits unset for full subject-credit derivation', () => {
@@ -63,8 +64,10 @@ describe('P001 strict input validation', () => {
 describe('P001 ProfileReader seam', () => {
   function repository(find: ProfileRepository['find']): ProfileRepository { return { find, save: vi.fn(), options: vi.fn() }; }
   it('reports complete only for the saved valid profile', async () => expect(await createProfileReader(repository(async () => profile)).stateFor('a')).toBe('COMPLETE'));
-  it('reports setup for absent or nullable availability', async () => {
+  it('reports setup for absent, legacy-no-semester or nullable availability', async () => {
     expect(await createProfileReader(repository(async () => null)).stateFor('a')).toBe('SETUP_REQUIRED');
+    expect(await createProfileReader(repository(async () => ({ ...profile, currentSemesterId: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
+    expect(await createProfileReader(repository(async () => ({ ...profile, currentSemesterId: undefined as unknown as number }))).stateFor('a')).toBe('SETUP_REQUIRED');
     expect(await createProfileReader(repository(async () => ({ ...profile, availableStudyHours: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
   });
   it('reports unavailable on a persistence failure', async () => expect(await createProfileReader(repository(async () => { throw new Error('private details'); })).stateFor('a')).toBe('UNAVAILABLE'));

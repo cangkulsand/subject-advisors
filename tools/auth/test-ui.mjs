@@ -78,6 +78,15 @@ try {
     await page.getByRole('button', { name: 'Sign out', exact: true }).waitFor();
     assert.equal(await page.getByText('Private content', { exact: true }).count(), 0);
   });
+  await check('stalled Clerk token acquisition becomes retryable instead of remaining on the spinner', async page => {
+    await page.clock.install();
+    await page.goto(base + '/test?scenario=token-pending');
+    await page.getByText('Checking account access...', { exact: true }).waitFor();
+    await page.clock.fastForward(15_001);
+    await page.getByRole('alert').filter({ hasText: 'Account access is taking too long' }).waitFor();
+    await page.getByRole('button', { name: 'Retry', exact: true }).waitFor();
+    assert.equal(await page.getByText('Private content', { exact: true }).count(), 0);
+  });
   await check('service failure supports retry and keyboard use', async page => {
     await respond(page, { code: 'AUTH_UNAVAILABLE', message: 'Please retry.' }, 503);
     await page.goto(base + '/test?scenario=offline');

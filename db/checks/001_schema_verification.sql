@@ -9,7 +9,10 @@ IF actual_count<>26 THEN RAISE EXCEPTION 'Expected 26 domain tables, found %',ac
 FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
  IF to_regclass('public.'||(t->>'table')) IS NULL THEN RAISE EXCEPTION 'Missing table %',t->>'table'; END IF;
  SELECT count(*) INTO actual_count FROM information_schema.columns WHERE table_schema='public' AND table_name=t->>'table';
- IF actual_count<>jsonb_array_length(t->'columns') THEN RAISE EXCEPTION 'Unexpected columns in %',t->>'table'; END IF;
+ -- The frozen 26-table source contract remains intact. 0003 registers exactly one
+ -- additive student_profile column, verified in 004_profile_current_semester.sql.
+ IF actual_count<>(jsonb_array_length(t->'columns') + CASE WHEN t->>'table'='student_profile' THEN 1 ELSE 0 END)
+   THEN RAISE EXCEPTION 'Unexpected columns in %',t->>'table'; END IF;
  FOR c IN SELECT * FROM jsonb_array_elements(t->'columns') LOOP
    SELECT a.attnum,a.attnotnull,format_type(a.atttypid,a.atttypmod) AS type,a.attidentity
      INTO actual FROM pg_attribute a WHERE a.attrelid=to_regclass('public.'||(t->>'table')) AND a.attname=c->>'name' AND NOT a.attisdropped;
@@ -27,7 +30,8 @@ FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
  END LOOP;
 END LOOP;
 SELECT count(*) INTO actual_count FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f';
-IF actual_count<>39 THEN RAISE EXCEPTION 'Expected exactly 39 source FKs'; END IF;
+-- The one additional 0003 FK is checked by the explicit extension check.
+IF actual_count<>40 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK'; END IF;
 END $verify$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.student_profile'::regclass AND tgname='touch_student_profile' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_student_profile'; END IF; END $v$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.academic_plan'::regclass AND tgname='touch_academic_plan' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_academic_plan'; END IF; END $v$;

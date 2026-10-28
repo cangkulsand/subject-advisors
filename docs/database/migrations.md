@@ -12,12 +12,16 @@ alongside this baseline. The old P004 file is historical evidence only.
    constraints, indexes and integrity triggers.
 3. 0002_copy_legacy_access.sql: copies access by Clerk identity, preserving roles,
    suspension and timestamps; retains original UUID-to-INTEGER mappings.
+4. 0003_profile_current_semester.sql: adds nullable `student_profile.current_semester_id`
+   referencing `academic_semester.semester_id` with `ON DELETE RESTRICT`; no existing
+   profile is backfilled and no default is assigned.
 
 All pending versions and their checksum records commit in one transaction, with a
 transaction advisory lock. Failure rolls back the entire batch, including legacy DDL.
 Repeated runs do not reapply versions. Changed/missing/unknown checksums fail closed.
 Versions 0000–0002 were applied to development on 26 October 2026 and are frozen.
-Add 0003_... for subsequent schema changes; never edit applied migration files.
+Version 0003 is the profile-owned current-semester extension. Never edit applied
+migration files; add a new forward version for subsequent schema changes.
 
 .gitattributes preserves migration bytes across operating systems. Do not normalize
 line endings of applied SQL: that changes its recorded SHA-256 and must be rejected
@@ -73,8 +77,11 @@ No production execution or official data import is authorized by this runbook.
 
 ## SQL checks
 
-001_schema_verification.sql asserts table/field types/nullability/PK/FK/unique structure,
-enabled triggers, valid indexes and absence of PUBLIC table grants.
+001_schema_verification.sql asserts the frozen 26-table/171-column/39-source-FK
+baseline, enabled triggers, valid indexes and absence of PUBLIC grants. It allows only
+the one registered `student_profile` extension; 004_profile_current_semester.sql
+asserts the exact 0003 nullable integer, no-default field and validated FK target and
+delete action. The baseline schema contract and migrations 0000–0002 remain unchanged.
 002_behavior_tests.sql uses synthetic, rollback-only fixtures for valid/invalid writes,
 attempts, curriculum isolation, audit immutability, source snapshots, forecast lineage
 and frozen finalized payloads. Its result rows distinguish PASS from SKIP.

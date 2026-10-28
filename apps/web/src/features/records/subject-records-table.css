@@ -87,6 +87,59 @@
   font-variant-numeric: tabular-nums;
 }
 
+.subject-records-table__status {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.subject-records-table__status--completed { background: #dcfce7; color: #166534; }
+.subject-records-table__status--exempted { background: #e0f2fe; color: #075985; }
+.subject-records-table__status--not_recorded { background: #f1f5f9; color: #64748b; }
+.subject-records-table__status--failed { background: #fee2e2; color: #991b1b; }
+.subject-records-table__status--withdrawn { background: #fef3c7; color: #92400e; }
+.subject-records-table__status--ambiguous { background: #f3e8ff; color: #6b21a8; }
+.subject-records-table__sr-only { position: absolute; left: 0; top: 0; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.p001-degree-progress {
+  margin: 0 0 20px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%);
+  color: #e2e8f0;
+}
+.p001 .p001-degree-heading h2 { margin: 5px 0 2px; color: #fff; font-size: 19px; }
+.p001-degree-eyebrow { color: #cbd5e1; font-size: 10px; line-height: 1.4; font-weight: 700; letter-spacing: .12em; }
+.p001-degree-result { display: flex; align-items: baseline; gap: 10px; margin-top: 23px; }
+.p001-degree-result > strong { color: #fff; font-size: clamp(28px, 4vw, 36px); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.p001-degree-result > strong span { color: #cbd5e1; font-size: .68em; font-weight: 500; }
+.p001-degree-result > span { color: #cbd5e1; font-size: 12px; }
+.p001-degree-meter { position: relative; margin-top: 30px; padding-top: 24px; }
+.p001-degree-bubble { position: absolute; top: 0; z-index: 1; transform: translateX(-50%); min-width: 43px; padding: 3px 8px; border: 1px solid #6ee7b7; border-radius: 7px; background: #ecfdf5; color: #065f46; text-align: center; font-size: 11px; line-height: 1.3; font-weight: 750; font-variant-numeric: tabular-nums; }
+.p001-degree-track { height: 11px; overflow: hidden; border-radius: 999px; background: #475569; }
+.p001-degree-track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #34d399, #2dd4bf); transition: width .25s ease; }
+.p001-degree-caption, .p001-degree-unavailable { margin-top: 10px; color: #e2e8f0; font-size: 11px; line-height: 1.5; }
+.p001-degree-unavailable { border-left: 3px solid #fbbf24; padding: 8px 0 8px 10px; }
+.p001-degree-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 21px; padding-top: 17px; border-top: 1px solid #64748b; }
+.p001-degree-metrics > div { display: grid; align-content: start; gap: 3px; min-width: 0; }
+.p001-degree-metrics strong { color: #fff; font-size: 20px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.p001-degree-metrics span { color: #f1f5f9; font-size: 11px; line-height: 1.35; }
+.p001-degree-metrics small { color: #cbd5e1; font-size: 10px; }
+@media (max-width: 640px) {
+  .p001-degree-progress { padding: 20px; }
+  .p001-degree-metrics { gap: 8px; }
+  .p001-degree-metrics strong { font-size: 18px; }
+  .p001-degree-metrics span { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .p001-degree-track > span { transition: none; } }
+
 .subject-records-table__choice-heading,
 .subject-records-table__choice-cell {
   text-align: center;
@@ -207,89 +260,6 @@
   background: var(--color-surface, #fff);
   color: var(--color-body, #334155);
   box-shadow: 0 24px 70px rgb(15 23 42 / .28);
-}
-
-.p001-record-toast-stack {
-  position: fixed;
-  z-index: 1000;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  width: min(24rem, calc(100vw - 32px));
-  pointer-events: none;
-  clip-path: inset(-12px 0 -12px -20px);
-}
-
-.p001-record-toast {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 44px;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 64px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 12px 14px;
-  color: #fff;
-  box-shadow: 0 10px 26px rgb(15 23 42 / .2);
-  pointer-events: auto;
-  animation: p001-toast-enter .4s ease both;
-}
-
-.p001-record-toast--success { border-color: #14532d; background: #166534; }
-.p001-record-toast--info { border-color: #1e40af; background: #1d4ed8; }
-.p001-record-toast--warning { border-color: #78350f; background: #92400e; }
-.p001-record-toast--danger { border-color: #991b1b; background: #b91c1c; }
-
-.p001-record-toast--closing { animation: p001-toast-exit .3s ease both; pointer-events: none; }
-
-.p001-record-toast > svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.p001-record-toast__message { overflow-wrap: anywhere; }
-
-.p001 .p001-record-toast button {
-  display: grid;
-  width: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  place-items: center;
-  padding: 6px;
-  border: 0;
-  border-radius: 6px;
-  background: rgb(255 255 255 / .13);
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-.p001 .p001-record-toast button:hover { background: rgb(255 255 255 / .24); }
-.p001 .p001-record-toast button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.p001 .p001-record-toast button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-
-@keyframes p001-toast-enter {
-  from { opacity: 0; transform: translateX(18px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes p001-toast-exit {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(18px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .p001-record-toast,
-  .p001-record-toast--closing { animation: none; }
 }
 
 .p001-undo {

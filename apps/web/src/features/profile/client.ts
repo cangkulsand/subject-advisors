@@ -28,7 +28,14 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
       if (response.status === 401 || response.status === 403) clearAccountCache();
       // Invalidate even if the saved response cannot be decoded: the server may have committed it.
       if (response.ok && method !== 'GET') clearAcademicCache();
-      const value: unknown = await response.json();
+      let value: unknown;
+      try { value = await response.json(); }
+      catch {
+        assertSession();
+        if (response.status === 401) throw new AcademicApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Please sign in again.');
+        if (response.status === 403) throw new AcademicApiError(403, 'ACCESS_DENIED', 'You do not have access to this academic data. Check your account access, then retry.');
+        throw new AcademicApiError(response.status, 'INVALID_RESPONSE', 'Academic data could not be loaded. Please retry.');
+      }
       assertSession();
       if (value && typeof value === 'object') {
         if (response.ok && 'data' in value) {
@@ -39,9 +46,15 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
           throw new AcademicApiError(response.status, String(value.error.code), String(value.error.message));
         }
       }
+      if (response.status === 401) throw new AcademicApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Please sign in again.');
+      if (response.status === 403) throw new AcademicApiError(403, 'ACCESS_DENIED', 'You do not have access to this academic data. Check your account access, then retry.');
       throw new AcademicApiError(response.status, 'INVALID_RESPONSE', 'Academic data could not be loaded. Please retry.');
     }
-    return cacheable ? cachedAcademicRead(JSON.stringify([sessionStamp, base, path]), request, options.signal, path === '/api/profile/options' ? ACADEMIC_CACHE_TTL : null) : request();
+    const contractVersions = path === '/api/profile'
+      ? ['current-semester-required-v1', 'configured-credit-total-v1']
+      : path === '/api/profile/options' ? ['current-semester-required-v1'] : [];
+    const cacheKey = JSON.stringify([sessionStamp, base, path, ...contractVersions]);
+    return cacheable ? cachedAcademicRead(cacheKey, request, options.signal, path === '/api/profile/options' ? ACADEMIC_CACHE_TTL : null) : request();
   };
 }
 export function errorMessage(error: unknown): string {

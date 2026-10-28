@@ -10,7 +10,7 @@ function database() {
   const statements: { text: string; parameters: unknown[] }[] = [];
   const query = vi.fn(async (text: string, parameters: unknown[]): Promise<Record<string, unknown>[]> => {
     statements.push({ text, parameters });
-    if (text.includes('SELECT curriculum_id FROM student_profile')) return [{ curriculum_id: scope.curriculumId }];
+    if (text.includes('SELECT curriculum_id, current_semester_id FROM student_profile')) return [{ curriculum_id: scope.curriculumId, current_semester_id: semesterId }];
     if (text.includes('SELECT semester_id FROM academic_semester')) return [{ semester_id: semesterId }];
     if (text.includes('SELECT curriculum_subject_id FROM curriculum_subject')) return (parameters[1] as string[]).map(id => ({ curriculum_subject_id: id }));
     if (text.includes('SELECT o.curriculum_subject_id')) return [{ curriculum_subject_id: subjectId }];
@@ -30,7 +30,7 @@ describe('offering SQL transaction contract', () => {
     expect(f.db.transaction).toHaveBeenCalledOnce();
     expect(f.db.query).not.toHaveBeenCalled();
     expect(f.statements.map(statement => statement.text.replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' '))).toEqual([
-      'SELECT curriculum_id FROM student_profile', 'SELECT semester_id FROM academic_semester',
+      'SELECT curriculum_id, current_semester_id FROM', 'SELECT semester_id FROM academic_semester',
       'SELECT curriculum_subject_id FROM curriculum_subject', 'DELETE FROM semester_offering WHERE',
       'INSERT INTO semester_offering (student_id,', 'SELECT o.curriculum_subject_id FROM semester_offering',
     ]);
@@ -42,25 +42,30 @@ describe('offering SQL transaction contract', () => {
     expect(f.statements[4]!.text).toContain('ON CONFLICT (student_id, semester_id, curriculum_subject_id) DO NOTHING');
   });
   it('rechecks curriculum after acquiring the lock, preserving saved rows on a stale profile', async () => {
-    const f = database(); f.query.mockResolvedValueOnce([{ curriculum_id: 402 }]);
+    const f = database(); f.query.mockResolvedValueOnce([{ curriculum_id: 402, current_semester_id: semesterId }]);
     await expect(f.repository.replace(scope, { semesterId, curriculumSubjectIds: [] })).rejects.toMatchObject({ status: 409 });
     expect(f.query).toHaveBeenCalledTimes(1);
   });
+  it('rejects profile semester changes before any offering rows are touched', async () => {
+    const f = database(); f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId, current_semester_id: '203' }]);
+    await expect(f.repository.replace(scope, { semesterId, curriculumSubjectIds: [] })).rejects.toMatchObject({ code: 'PROFILE_SEMESTER_CHANGED' });
+    expect(f.query).toHaveBeenCalledOnce();
+  });
   it('rejects a changed subject mapping before deleting anything', async () => {
     const f = database();
-    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId }]).mockResolvedValueOnce([{ semester_id: semesterId }]).mockResolvedValueOnce([]);
+    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId, current_semester_id: semesterId }]).mockResolvedValueOnce([{ semester_id: semesterId }]).mockResolvedValueOnce([]);
     await expect(f.repository.replace(scope, { semesterId, curriculumSubjectIds: [subjectId] })).rejects.toMatchObject({ code: 'SUBJECT_OUTSIDE_CURRICULUM' });
     expect(f.query).toHaveBeenCalledTimes(3);
   });
   it('rejects a removed semester before mutation', async () => {
     const f = database();
-    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId }]).mockResolvedValueOnce([]);
+    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId, current_semester_id: semesterId }]).mockResolvedValueOnce([]);
     await expect(f.repository.replace(scope, { semesterId, curriculumSubjectIds: [] })).rejects.toMatchObject({ status: 404 });
     expect(f.query).toHaveBeenCalledTimes(2);
   });
   it('propagates insertion failure to the transaction boundary for rollback', async () => {
     const f = database();
-    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId }]).mockResolvedValueOnce([{ semester_id: semesterId }])
+    f.query.mockResolvedValueOnce([{ curriculum_id: scope.curriculumId, current_semester_id: semesterId }]).mockResolvedValueOnce([{ semester_id: semesterId }])
       .mockResolvedValueOnce([{ curriculum_subject_id: subjectId }]).mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('insert failed'));
     await expect(f.repository.replace(scope, { semesterId, curriculumSubjectIds: [subjectId] })).rejects.toThrow('insert failed');
     expect(f.query).toHaveBeenCalledTimes(5);
@@ -95,7 +100,7 @@ describe('Neon connection lifecycle and rollback', () => {
     mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
     mocks.end.mockResolvedValue(undefined);
     mocks.query.mockImplementation(async (text: string) => ({ rows:
-      text.includes('SELECT curriculum_id FROM student_profile') ? [{ curriculum_id: scope.curriculumId }] :
+      text.includes('SELECT curriculum_id, current_semester_id FROM student_profile') ? [{ curriculum_id: scope.curriculumId, current_semester_id: semesterId }] :
       text.includes('SELECT semester_id FROM academic_semester') ? [{ semester_id: semesterId }] :
       text.includes('SELECT curriculum_subject_id FROM curriculum_subject') || text.includes('SELECT o.curriculum_subject_id') ? [{ curriculum_subject_id: subjectId }] : [],
     }));

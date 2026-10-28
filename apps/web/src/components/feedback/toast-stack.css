@@ -1,0 +1,81 @@
+.p001-record-toast-stack {
+  position: fixed;
+  z-index: 1000;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  width: min(24rem, calc(100vw - 32px));
+  pointer-events: none;
+  clip-path: inset(-12px 0 -12px -20px);
+}
+
+.p001-record-toast {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #fff;
+  box-shadow: 0 10px 26px rgb(15 23 42 / .2);
+  pointer-events: auto;
+  animation: p001-toast-enter .4s ease both;
+}
+
+.p001-record-toast--success { border-color: #14532d; background: #166534; }
+.p001-record-toast--info { border-color: #1e40af; background: #1d4ed8; }
+.p001-record-toast--warning { border-color: #78350f; background: #92400e; }
+.p001-record-toast--danger { border-color: #991b1b; background: #b91c1c; }
+.p001-record-toast--closing { animation: p001-toast-exit .3s ease both; pointer-events: none; }
+
+.p001-record-toast > svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.p001-record-toast__message { overflow-wrap: anywhere; }
+
+.p001-record-toast-stack .p001-record-toast button {
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(255 255 255 / .13);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.p001-record-toast-stack .p001-record-toast button:hover { background: rgb(255 255 255 / .24); }
+.p001-record-toast-stack .p001-record-toast button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.p001-record-toast-stack .p001-record-toast button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+@keyframes p001-toast-enter {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes p001-toast-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(18px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p001-record-toast,
+  .p001-record-toast--closing { animation: none; }
+}

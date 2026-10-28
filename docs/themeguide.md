@@ -114,6 +114,8 @@ for example “SECJ3104 marked as Taken”. Render message text safely. Use gree
 for a confirmed successful operation, blue for information, amber for warnings and
 red for danger. Toasts supplement the page: never put the only Undo action in a
 toast, and keep save failures in durable, accessible error feedback.
+React features should reuse `apps/web/src/components/feedback/useToastNotifications.ts`
+and `ToastStack.tsx` instead of implementing separate toast queues or styles.
 
 ### 3.3 Colors must mean the same thing everywhere
 

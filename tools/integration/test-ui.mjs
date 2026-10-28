@@ -1,4 +1,4 @@
-﻿// Actual shared app, mocked Clerk/API. --installed also exercises pasted owner pages.
+// Actual shared app, mocked Clerk/API. --installed also exercises pasted owner pages.
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -13,7 +13,7 @@ const output=await build({entryPoints:['tools/auth/local/main.tsx'],bundle:true,
 const script=output.outputFiles.find(file=>file.path.endsWith('.js')).text,css=output.outputFiles.find(file=>file.path.endsWith('.css'))?.text??'';
 const server=createServer((req,res)=>{if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(script);}else{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;let browser,passed=0;
-const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:null,curriculumId:1,weeklyWorkingHours:0,availableStudyHours:8,programmeCode:'DEMO',programmeName:'DEMO',curriculumVersion:'DEMO',createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z'};
+const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:null,curriculumId:1,currentSemesterId:1,weeklyWorkingHours:0,availableStudyHours:8,programmeCode:'DEMO',programmeName:'DEMO',curriculumVersion:'DEMO',createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z'};
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
@@ -21,8 +21,8 @@ async function mock(page,state={}){
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
   if(path==='/api/profile'&&route.request().method==='PUT')state.setup=false;
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:state.role??'STUDENT',accessStatus:'ACTIVE',profileState:state.setup?'SETUP_REQUIRED':'COMPLETE',landingPath:state.setup?'/student/setup':'/student'}
-   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1}]}
-   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:null}:{};
+   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
+   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}:{};
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
  });
  return state;
@@ -82,7 +82,8 @@ try{
   });
   await check('saving setup reaches records in the same initialized document',async page=>{
    const state=await mock(page,{setup:true});await page.goto(base+'/student/setup');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();const mounts=await page.evaluate(()=>document.documentElement.dataset.clerkMounts);
-   await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('heading',{name:'Your subject records',exact:true}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
+   await page.getByLabel('Student name',{exact:true}).fill('DEMO new student');await page.getByLabel('Programme',{exact:true}).selectOption('1');await page.getByLabel('Weekly working hours',{exact:true}).fill('0');await page.getByLabel('Available study hours per week').fill('8');await page.getByLabel('Academic year').selectOption('1001/1002');await page.getByLabel('Semester').selectOption('1');
+   await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('table',{name:'Subject records'}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
   });
  }
  await check('theme header search, dark preference, account and responsive sidebar',async page=>{

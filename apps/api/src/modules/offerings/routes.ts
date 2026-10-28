@@ -16,20 +16,19 @@ export async function handleOfferingRequest(request: Request, deps: OfferingDepe
     const account = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
     const context = await deps.contextFor(account.clerkUserId);
     if (!context) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile before entering offerings.');
-    const publicContext = { curriculum: context.curriculum, subjects: context.subjects, semesters: context.semesters };
+    if (!context.currentSemesterId) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Choose a current academic year and semester in your academic profile before entering offerings.');
+    const publicContext = { curriculum: context.curriculum, currentSemesterId: context.currentSemesterId, subjects: context.subjects, semesters: context.semesters };
     const scope: OfferingScope = { clerkUserId: account.clerkUserId, studentId: context.studentId, curriculumId: context.curriculum.curriculumId };
     if ([...url.searchParams.keys()].some(key => key !== 'semesterId') || url.searchParams.getAll('semesterId').length > 1 ||
         (request.method === 'PUT' && url.search)) {
       throw new AuthError(400, 'INVALID_QUERY', 'Use only one semesterId query parameter for GET; PUT uses a JSON body.');
     }
-    if (request.method === 'GET' && !url.searchParams.has('semesterId')) {
-      return authJson({ data: { ...publicContext, selection: null } });
-    }
     const input = request.method === 'PUT' ? await readSave(request) : null;
-    const semesterId = input?.semesterId ?? requireId(url.searchParams.get('semesterId'));
+    const semesterId = input?.semesterId ?? (url.searchParams.has('semesterId') ? requireId(url.searchParams.get('semesterId')) : context.currentSemesterId);
     if (!context.semesters.some(semester => semester.semesterId === semesterId)) {
       throw new AuthError(404, 'SEMESTER_NOT_FOUND', 'This semester is not configured. Choose another semester.');
     }
+    if (semesterId !== context.currentSemesterId) throw new AuthError(409, 'PROFILE_SEMESTER_MISMATCH', 'Offerings are available for the semester selected in your academic profile.');
     if (input) {
       const allowed = new Set(context.subjects.map(subject => subject.curriculumSubjectId));
       if (input.curriculumSubjectIds.some(id => !allowed.has(id))) {

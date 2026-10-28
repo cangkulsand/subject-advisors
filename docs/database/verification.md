@@ -84,3 +84,20 @@ The historical P004 migration is unchanged; untracked P002 code was not modified
 
 The test role is a limited permission probe, not a production grants configuration.
 No production readiness, complete concurrency proof or full security audit is claimed.
+
+## Follow-up: required current academic semester (2026-10-28)
+
+Migration 0003 was later added through the canonical manifest and applied to the
+same development target after coordinator review. Its checksum and the exact
+project/branch/database were independently read back. The column and validated
+RESTRICT foreign key were verified without reading student rows. The frozen
+baseline check 001 and registered extension check 004 both passed in read-only
+transactions.
+
+The local canonical runner's `db:status` connection attempt returned sandbox
+`EACCES` before querying the database. After review, the canonical migration SQL
+and ledger checksums were applied using the Neon transaction tool with advisory
+locking, bounded timeouts and exact target/ledger guards. The transaction applied
+only migration 0003 and its canonical ledger row; no student data was modified.
+The optional live fixture database suite was not run. This follow-up does not
+change the historical 2026-10-26 foundation evidence above.

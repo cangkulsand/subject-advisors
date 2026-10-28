@@ -4,10 +4,12 @@ import { type AcademicClient, errorMessage } from './client';
 import { resolveProgrammeCurriculum } from './programme-resolution';
 import { navigateApp, registerUnsavedChanges } from '../../app/navigation';
 import './profile.css';
-const empty = { studentName: '', matricNo: '', curriculumId: '', weeklyWorkingHours: '', availableStudyHours: '' };
+const empty = { studentName: '', matricNo: '', curriculumId: '', academicYear: '', currentSemesterId: '', weeklyWorkingHours: '', availableStudyHours: '' };
 type Draft = typeof empty;
-function draftOf(p: Profile | null): Draft {
+function draftOf(p: Profile | null, options: ProfileOptions): Draft {
+  const semester = p?.currentSemesterId == null ? undefined : options.semesters.find(item => item.semesterId === p.currentSemesterId);
   return p ? { studentName: p.studentName, matricNo: p.matricNo ?? '', curriculumId: String(p.curriculumId),
+    academicYear: semester?.academicYear ?? '', currentSemesterId: semester ? String(semester.semesterId) : '',
     weeklyWorkingHours: p.weeklyWorkingHours === null ? '' : String(p.weeklyWorkingHours),
     availableStudyHours: p.availableStudyHours === null ? '' : String(p.availableStudyHours) } : { ...empty };
 }
@@ -25,7 +27,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     Promise.all([api<Profile | null>('/api/profile', { signal: controller.signal }), api<ProfileOptions>('/api/profile/options', { signal: controller.signal })])
       .then(([profile, choices]) => {
         if (controller.signal.aborted) return;
-        const value = draftOf(profile); setDraft(value); setInitial(value); setOptions(choices);
+        const value = draftOf(profile, choices); setDraft(value); setInitial(value); setOptions(choices);
         const savedProgramme = String(choices.curricula.find(c => c.curriculumId === profile?.curriculumId)?.programmeId ?? '');
         setProgramme(savedProgramme); setInitialProgramme(savedProgramme); setLoaded(true);
       }).catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); });
@@ -46,9 +48,10 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     try {
       const profile = await api<Profile>('/api/profile', { method: 'PUT', body: {
         studentName: draft.studentName.trim(), matricNo: draft.matricNo.trim() || null, curriculumId: resolvedCurriculumId,
+        currentSemesterId: Number(draft.currentSemesterId),
         weeklyWorkingHours: Number(draft.weeklyWorkingHours), availableStudyHours: Number(draft.availableStudyHours),
       } });
-      const value = draftOf(profile);
+      const value = draftOf(profile, options);
       const savedProgramme = String(options.curricula.find(c => c.curriculumId === profile.curriculumId)?.programmeId ?? '');
       unsaved.current = false; setDraft(value); setInitial(value); setProgramme(savedProgramme); setInitialProgramme(savedProgramme); setSuccess('Profile saved.');
       if (setup) onSetupComplete();
@@ -82,11 +85,26 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
         {programme && !resolvedCurriculumId && <p className="p001-help" role="status">This programme has multiple active configurations. Ask the maintainer to resolve the programme setup before saving.</p>}
         <p className="p001-help">Your institutional email is managed through your account. Changing programmes while academic data is saved may require maintainer assistance.</p>
       </fieldset>
+      <fieldset disabled={saving}><legend>Current academic period</legend><div className="p001-grid">
+        <label>Academic year<select aria-label="Academic year" required value={draft.academicYear} onChange={event => {
+          const academicYear = event.target.value;
+          setDraft(old => ({ ...old, academicYear, currentSemesterId: '' })); setSuccess('');
+        }}>
+          <option value="">Select an academic year</option>
+          {[...new Set(options.semesters.map(item => item.academicYear))].sort((a, b) => b.localeCompare(a)).map(year => <option key={year} value={year}>{year}</option>)}
+        </select></label>
+        <label>Semester<select aria-label="Semester" required value={draft.currentSemesterId} disabled={!draft.academicYear} onChange={event => field('currentSemesterId', event.target.value)}>
+          <option value="">Select a semester</option>
+          {options.semesters.filter(item => item.academicYear === draft.academicYear).map(item => <option key={item.semesterId} value={item.semesterId}>Semester {item.semesterNo} ({item.semesterType === 'SHORT' || item.semesterNo === 3 ? 'Short' : 'Normal'})</option>)}
+        </select></label>
+      </div>
+      {!options.semesters.length && <p className="p001-help" role="alert">No academic semesters are configured. Ask the maintainer to configure an academic year and semester before saving your profile.</p>}
+      <p className="p001-help">This required choice controls the semester shown in Offerings. Changing it keeps other saved semester lists intact.</p></fieldset>
       <fieldset disabled={saving}><legend>Work and study availability</legend><div className="p001-grid">
         <label>Weekly working hours<input type="number" inputMode="numeric" min={0} max={2147483647} step={1} required value={draft.weeklyWorkingHours} onChange={e => field('weeklyWorkingHours', e.target.value)} /></label>
         <label>Available study hours per week<input type="number" inputMode="numeric" min={0} max={2147483647} step={1} required value={draft.availableStudyHours} onChange={e => field('availableStudyHours', e.target.value)} /></label>
       </div><p className="p001-help">Enter whole hours. Use zero when you have no work or study hours available.</p></fieldset>
-      <div className="p001-actions"><button className="p001-primary" type="submit" disabled={saving || !resolvedCurriculumId}>{saving ? 'Saving…' : 'Save profile'}</button>
+      <div className="p001-actions"><button className="p001-primary" type="submit" disabled={saving || !resolvedCurriculumId || !draft.currentSemesterId}>{saving ? 'Saving…' : 'Save profile'}</button>
         <button className="p001-cancel" type="button" disabled={saving || !dirty} onClick={() => { setDraft({ ...initial }); setProgramme(initialProgramme); setError(''); setSuccess('Unsaved changes cancelled.'); }}>Cancel changes</button>
         {dirty && <span className="p001-help">Unsaved changes</span>}</div>
       {success && <p role="status" className="p001-success">{success}</p>}

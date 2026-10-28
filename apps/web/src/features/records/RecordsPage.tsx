@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, type AnimationEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { AcademicRecord, RecordStatus } from '../../../../api/src/modules/records/contracts';
-import type { ProfileOptions } from '../../../../api/src/modules/profile/contracts';
-import { type AcademicClient, errorMessage } from '../profile/client';
+import type { Profile, ProfileOptions } from '../../../../api/src/modules/profile/contracts';
+import { AcademicApiError, type AcademicClient, errorMessage } from '../profile/client';
 import { registerUnsavedChanges } from '../../app/navigation';
+import { useToastNotifications } from '../../components/feedback/useToastNotifications';
 import { SubjectRecordsTable, type SubjectRecordSelection } from './SubjectRecordsTable';
-import { RecordToastStack, type RecordToast, type RecordToastKind } from './RecordToastStack';
+import { RecordedCreditProgress } from './RecordedCreditProgress';
+import { RecordToastStack } from './RecordToastStack';
 import { groupElectiveSubjects, groupSubjectsByCategory, normalizeSubjectCategory } from './subject-groups';
 import '../profile/profile.css';
 
-const labels: Record<RecordStatus, string> = { COMPLETED: 'Completed', EXEMPTED: 'Exempted', FAILED: 'Failed', WITHDRAWN: 'Withdrawn' };
-const toastDuration = 5000, toastExitDuration = 300, maxVisibleToasts = 3;
+const labels: Record<RecordStatus, string> = { COMPLETED: 'Taken', EXEMPTED: 'Exempted', FAILED: 'Failed', WITHDRAWN: 'Withdrawn' };
 type RecordsTab = 'CORE' | 'CS_ELECTIVE' | 'UMUM' | 'OTHER';
 type DetailsDraft = { subjectId: number; recordId: number | null; status: RecordStatus; grade: string; remarks: string };
 const emptyDetails = (subjectId: number, record: AcademicRecord | undefined, status: RecordStatus): DetailsDraft => ({
@@ -32,79 +33,28 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
   const [records, setRecords] = useState<AcademicRecord[]>([]);
   const [undoRecords, setUndoRecords] = useState<AcademicRecord[]>([]);
   const [options, setOptions] = useState<ProfileOptions>({ curricula: [], subjects: [], semesters: [] });
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [selections, setSelections] = useState<Record<string, SubjectRecordSelection>>({});
   const [initialSelections, setInitialSelections] = useState<Record<string, SubjectRecordSelection>>({});
   const [details, setDetails] = useState<DetailsDraft | null>(null), [detailsInitial, setDetailsInitial] = useState<DetailsDraft | null>(null);
   const [activeTab, setActiveTab] = useState<RecordsTab>('CORE');
   const [loaded, setLoaded] = useState(false), [attempt, setAttempt] = useState(0), [saving, setSaving] = useState(false);
-  const [error, setError] = useState(''), [toasts, setToasts] = useState<RecordToast[]>([]);
-  const toastsRef = useRef<RecordToast[]>([]), nextToastId = useRef(1);
-  const toastTimers = useRef(new Map<number, { auto: number | null; exit: number | null }>());
-  const mounted = useRef(false);
+  const [error, setError] = useState('');
+  const { toasts, notify, dismissToast, onToastAnimationEnd } = useToastNotifications();
   const alert = useRef<HTMLParagraphElement>(null), detailHeading = useRef<HTMLHeadingElement>(null);
   const detailDialog = useRef<HTMLDialogElement>(null), detailsOpener = useRef<HTMLElement | null>(null);
   const programmaticClose = useRef(false);
 
-  function updateToasts(updater: (current: RecordToast[]) => RecordToast[]) {
-    const next = updater(toastsRef.current);
-    toastsRef.current = next;
-    setToasts(next);
-  }
-  function clearToastTimers(id: number) {
-    const timers = toastTimers.current.get(id);
-    if (timers?.auto !== null && timers?.auto !== undefined) window.clearTimeout(timers.auto);
-    if (timers?.exit !== null && timers?.exit !== undefined) window.clearTimeout(timers.exit);
-    toastTimers.current.delete(id);
-  }
-  function removeToast(id: number) {
-    if (!mounted.current) return;
-    clearToastTimers(id);
-    updateToasts(current => current.filter(toast => toast.id !== id));
-  }
-  function dismissToast(id: number) {
-    if (!mounted.current) return;
-    const toast = toastsRef.current.find(item => item.id === id);
-    if (!toast || toast.closing) return;
-    const timers = toastTimers.current.get(id);
-    if (timers?.auto !== null && timers?.auto !== undefined) window.clearTimeout(timers.auto);
-    const exit = window.setTimeout(() => removeToast(id), toastExitDuration);
-    toastTimers.current.set(id, { auto: null, exit });
-    updateToasts(current => current.map(item => item.id === id ? { ...item, closing: true } : item));
-  }
-  function notify(message: string, kind: RecordToastKind = 'success') {
-    if (!mounted.current) return;
-    const id = nextToastId.current++;
-    const item: RecordToast = { id, message, kind, closing: false };
-    const current = toastsRef.current;
-    const next = [...current, item].slice(-maxVisibleToasts);
-    const retained = new Set(next.map(toast => toast.id));
-    for (const old of current) if (!retained.has(old.id)) clearToastTimers(old.id);
-    updateToasts(() => next);
-    const auto = window.setTimeout(() => dismissToast(id), toastDuration - toastExitDuration);
-    toastTimers.current.set(id, { auto, exit: null });
-  }
-  function onToastAnimationEnd(id: number, event: AnimationEvent<HTMLDivElement>) {
-    if (event.animationName === 'p001-toast-exit') removeToast(id);
-  }
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      for (const timers of toastTimers.current.values()) {
-        if (timers.auto !== null) window.clearTimeout(timers.auto);
-        if (timers.exit !== null) window.clearTimeout(timers.exit);
-      }
-      toastTimers.current.clear();
-    };
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController(); setError(''); setLoaded(false);
-    Promise.all([api<AcademicRecord[]>('/api/academic-records', { signal: controller.signal }), api<ProfileOptions>('/api/profile/options', { signal: controller.signal })])
-      .then(([saved, choices]) => {
+    Promise.all([api<AcademicRecord[]>('/api/academic-records', { signal: controller.signal }), api<ProfileOptions>('/api/profile/options', { signal: controller.signal }), api<Profile | null>('/api/profile', { signal: controller.signal }).catch(reason => {
+      if (reason instanceof AcademicApiError && (reason.status === 401 || reason.status === 403)) throw reason;
+      if (reason instanceof DOMException && reason.name === 'AbortError') throw reason;
+      return null;
+    })])
+      .then(([saved, choices, ownProfile]) => {
         if (controller.signal.aborted) return;
-        setRecords(saved); setOptions(choices);
+        setRecords(saved); setOptions(choices); setProfile(ownProfile);
         const initial = selectionMap(choices.subjects, saved); setSelections(initial); setInitialSelections(initial); setLoaded(true);
         const groups = groupSubjectsByCategory(choices.subjects);
         const hasE = groups.elective.some(subject => normalizeSubjectCategory(subject.subjectCategory).startsWith('ELECTIVE E'));
@@ -295,7 +245,7 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
       subjectId: subject.subjectId, subjectCode: subject.subjectCode, subjectName: subject.subjectName, credits: subject.creditHours,
       subjectCategory: subject.subjectCategory,
       isCompulsory: subject.isCompulsory,
-      outcomeLabel: duplicate ? 'Multiple saved records' : record ? labels[record.status] : 'Not recorded',
+      savedStatus: duplicate ? 'AMBIGUOUS' as const : record?.status ?? 'NOT_RECORDED' as const,
       notice, selectionDisabled: duplicate || Boolean(details && detailsDirty && details.subjectId === subject.subjectId),
       actionDisabled: duplicate || (!record && choice !== 'EXEMPTED') || (selectionChanged && choice !== 'EXEMPTED'),
     };
@@ -338,13 +288,14 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
   const partialLegacyExemption = detailsRecord?.status === 'EXEMPTED' && detailsRecord.recognizedCredits !== detailsRecord.creditHours;
 
   return <section className="p001" aria-label="Academic subject records">
-    <header><p className="p001-eyebrow">Academic records</p><h1>Your subject records</h1><p>Record one current outcome for each subject in your programme. These records are student-reported and unverified.</p></header>
+
     {error && !details && <p className="p001-alert" role="alert" tabIndex={-1} ref={alert}>{error}</p>}
     <RecordToastStack toasts={toasts} onDismiss={dismissToast} onExitAnimationEnd={onToastAnimationEnd} />
     {!loaded && (error ? <button className="p001-action" type="button" onClick={() => setAttempt(n => n + 1)}>Retry loading records</button> : <p role="status">Loading your records…</p>)}
+    {loaded && <RecordedCreditProgress subjects={options.subjects} records={records} totalCreditRequired={profile?.totalCreditRequired} />}
     {loaded && options.subjects.length === 0 && <div className="p001-card" role="status"><h2>No subjects are configured</h2><p>Ask the maintainer to configure subjects for your selected programme.</p></div>}
     {loaded && options.subjects.length > 0 && <div className="p001-card">
-      <p className="p001-help">Taken and Exempted save immediately. Both use the configured subject credits. You can add a grade or remarks later in View details.</p>
+        <p className="p001-help">Taken and Exempted save immediately. Both use the configured subject credits. You can add a grade or remarks later in View details.</p>
       <div className="p001-record-tabs" role="tablist" aria-label="Subject categories" onKeyDown={moveTab}>
         {tabOrder.map(group => <button key={group} type="button" role="tab" id={tabId(group)} aria-controls={panelId(group)} aria-selected={activeTab === group} tabIndex={activeTab === group ? 0 : -1} onClick={() => setActiveTab(group)}>
           {tabName(group)} ({tabRows(group).length})
@@ -394,7 +345,7 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
         <div className="p001-records-dialog__header"><h2 id="p001-record-detail-heading" ref={detailHeading} tabIndex={-1}>Edit saved record details</h2>
           <button className="p001-action p001-records-dialog__close" type="button" disabled={saving} aria-label="Close details" title="Close details" onClick={requestCloseDetails}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
         {error && <p className="p001-alert" role="alert" tabIndex={-1} ref={alert}>{error}</p>}
-        <p className="p001-help">{`Saved outcome: ${labels[details.status]}. Changing details keeps the saved status and subject.`}</p>
+        <p className="p001-help">{`Status: ${labels[details.status]}. Changing details keeps the saved status and subject.`}</p>
         <fieldset disabled={saving || partialLegacyExemption}><legend>{options.subjects.find(subject => subject.subjectId === details.subjectId)?.subjectCode ?? 'Subject'} details</legend><div className="p001-grid">
           <label>Grade (optional)<input aria-label="Grade (optional)" maxLength={5} value={details.grade} onChange={event => setDetails(old => old ? { ...old, grade: event.target.value } : old)} /></label>
           {details.status === 'EXEMPTED' && <p>Subject credits: {options.subjects.find(subject => subject.subjectId === details.subjectId)?.creditHours ?? 'Unavailable'}{detailsRecord && `; saved recognized credits: ${detailsRecord.recognizedCredits}`}</p>}
@@ -405,6 +356,5 @@ export function RecordsPage({ api }: { api: AcademicClient }) {
         <div className="p001-actions"><button className="p001-primary" type="submit" disabled={saving || partialLegacyExemption}>Save details</button></div>
       </form>}
     </dialog>
-    <p className="p001-help">Failed and withdrawn outcomes remain distinct and earn zero recognized credits. This page does not calculate graduation totals or officially register subjects.</p>
   </section>;
 }

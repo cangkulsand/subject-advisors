@@ -34,10 +34,13 @@ export function createOfferingRepository(db: OfferingDatabase): OfferingReposito
         // Serialize replacements for this student, including empty lists. Recheck
         // profile ownership/curriculum inside the transaction to reject stale context.
         const profiles = await tx.query(`
-          SELECT curriculum_id FROM student_profile
+          SELECT curriculum_id, current_semester_id FROM student_profile
           WHERE student_id = $1 AND clerk_user_id = $2 FOR UPDATE`, [scope.studentId, scope.clerkUserId]);
         if (!profiles[0] || offeringId(profiles[0].curriculum_id) !== scope.curriculumId) {
           throw new AuthError(409, 'CURRICULUM_CHANGED', 'Your academic profile changed. Reload offerings before saving.');
+        }
+        if (profiles[0].current_semester_id === null || offeringId(profiles[0].current_semester_id) !== input.semesterId) {
+          throw new AuthError(409, 'PROFILE_SEMESTER_CHANGED', 'Your selected semester changed. Reload offerings before saving.');
         }
         const semesters = await tx.query('SELECT semester_id FROM academic_semester WHERE semester_id = $1 FOR SHARE', [input.semesterId]);
         if (!semesters.length) throw new AuthError(404, 'SEMESTER_NOT_FOUND', 'This semester is no longer available. Reload offerings.');

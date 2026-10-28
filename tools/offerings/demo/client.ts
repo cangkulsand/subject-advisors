@@ -33,9 +33,10 @@ export function createDemoClient() {
       await pause(signal);
       if (failLoad) { failLoad = false; throw new OfferingApiError(503, 'DEMO_LOAD_FAILURE', 'Simulated loading failure. Retry loading to recover your saved demo offerings.'); }
       const selections = read();
+      const activeSemesterId = semesterId ?? demoContext.currentSemesterId;
       return {
         ...demoContext,
-        selection: semesterId ? { semesterId, curriculumSubjectIds: selections[semesterId] ?? [] } : null,
+        selection: activeSemesterId ? { semesterId: activeSemesterId, curriculumSubjectIds: selections[activeSemesterId] ?? [] } : null,
       };
     },
     async save(input: OfferingSelection) {

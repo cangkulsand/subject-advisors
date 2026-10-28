@@ -29,18 +29,18 @@ describe.skipIf(!databaseUrl)('P002 real PostgreSQL acceptance (temporary fixtur
     // Every prerequisite is a clearly fictional TEMP fixture, not another owner's implementation.
     await client.query(`
       CREATE TEMP TABLE programme (programme_id integer PRIMARY KEY, programme_name text NOT NULL);
-      CREATE TEMP TABLE curriculum (curriculum_id integer PRIMARY KEY, programme_id integer REFERENCES programme, curriculum_version text NOT NULL);
+      CREATE TEMP TABLE curriculum (curriculum_id integer PRIMARY KEY, programme_id integer REFERENCES programme, curriculum_version text NOT NULL, total_credit_required integer NOT NULL CHECK (total_credit_required >= 0));
       CREATE TEMP TABLE subject (subject_id integer PRIMARY KEY, subject_code text, subject_name text, credit_hours integer);
-      CREATE TEMP TABLE curriculum_subject (curriculum_subject_id integer PRIMARY KEY, curriculum_id integer REFERENCES curriculum, subject_id integer REFERENCES subject);
+      CREATE TEMP TABLE curriculum_subject (curriculum_subject_id integer PRIMARY KEY, curriculum_id integer REFERENCES curriculum, subject_id integer REFERENCES subject, subject_category text NOT NULL, is_compulsory smallint NOT NULL CHECK (is_compulsory IN (0,1)));
       CREATE TEMP TABLE academic_semester (semester_id integer PRIMARY KEY, academic_year text, semester_no smallint CHECK (semester_no IN (1,2,3)));
-      CREATE TEMP TABLE student_profile (student_id integer PRIMARY KEY, clerk_user_id text UNIQUE, curriculum_id integer REFERENCES curriculum);
+      CREATE TEMP TABLE student_profile (student_id integer PRIMARY KEY, clerk_user_id text UNIQUE, curriculum_id integer REFERENCES curriculum, current_semester_id integer REFERENCES academic_semester);
       SET search_path = pg_temp;
       INSERT INTO programme VALUES ('501', 'Fictional acceptance programme');
-      INSERT INTO curriculum VALUES ('${ids.curriculum}', '501', 'Fictional test v1'), ('${ids.otherCurriculum}', '501', 'Fictional test v2');
+      INSERT INTO curriculum VALUES ('${ids.curriculum}', '501', 'Fictional test v1', 131), ('${ids.otherCurriculum}', '501', 'Fictional test v2', 131);
       INSERT INTO subject VALUES ('601','FIX101','Fictional subject A',3), ('602','FIX102','Fictional subject B',3), ('603','FIX999','Other curriculum subject',3);
-      INSERT INTO curriculum_subject VALUES ('${ids.subjectA}','${ids.curriculum}','601'), ('${ids.subjectB}','${ids.curriculum}','602'), ('${ids.outside}','${ids.otherCurriculum}','603');
+      INSERT INTO curriculum_subject VALUES ('${ids.subjectA}','${ids.curriculum}','601','Core',1), ('${ids.subjectB}','${ids.curriculum}','602','Elective U1',0), ('${ids.outside}','${ids.otherCurriculum}','603','Core',1);
       INSERT INTO academic_semester VALUES ('${ids.semester}','2026/2027',1), ('${ids.otherSemester}','2026/2027',3);
-      INSERT INTO student_profile VALUES ('${ids.studentA}','fixture_student_a','${ids.curriculum}'), ('${ids.studentB}','fixture_student_b','${ids.curriculum}');
+      INSERT INTO student_profile VALUES ('${ids.studentA}','fixture_student_a','${ids.curriculum}','${ids.semester}'), ('${ids.studentB}','fixture_student_b','${ids.curriculum}','${ids.semester}');
     `);
     const baseline = await readFile(new URL('../../../../../tools/offerings/fixtures/canonical-semester-offering.sql', import.meta.url), 'utf8');
     const offeringDDL = baseline.match(/CREATE TABLE public\.semester_offering \([\s\S]*?\n\);/);
@@ -58,7 +58,7 @@ describe.skipIf(!databaseUrl)('P002 real PostgreSQL acceptance (temporary fixtur
     };
   }, 30_000);
   afterAll(async () => { client?.release(); if (pool) await pool.end(); });
-  beforeEach(async () => { await client.query('DELETE FROM pg_temp.semester_offering'); });
+  beforeEach(async () => { await client.query('DELETE FROM pg_temp.semester_offering'); await client.query('UPDATE pg_temp.student_profile SET current_semester_id=$1', [ids.semester]); });
 
   it('uses canonical offering INTEGER identity defaults, uniqueness and foreign keys', async () => {
     const repository = createOfferingRepository(db);
@@ -109,16 +109,19 @@ describe.skipIf(!databaseUrl)('P002 real PostgreSQL acceptance (temporary fixtur
   it('reconciles a confirmed empty list without affecting other semesters', async () => {
     const repository = createOfferingRepository(db);
     await repository.replace(scope, { semesterId: ids.semester, curriculumSubjectIds: [ids.subjectA] });
+    await expect(repository.replace(scope, { semesterId: ids.otherSemester, curriculumSubjectIds: [ids.subjectB] })).rejects.toMatchObject({ code: 'PROFILE_SEMESTER_CHANGED' });
+    await client.query('UPDATE pg_temp.student_profile SET current_semester_id=$1 WHERE student_id=$2', [ids.otherSemester, ids.studentA]);
     await repository.replace(scope, { semesterId: ids.otherSemester, curriculumSubjectIds: [ids.subjectB] });
-    await repository.replace(scope, { semesterId: ids.semester, curriculumSubjectIds: [] });
-    expect((await repository.read(scope, ids.semester)).curriculumSubjectIds).toEqual([]);
+    expect((await repository.read(scope, ids.semester)).curriculumSubjectIds).toEqual([ids.subjectA]);
     expect((await repository.read(scope, ids.otherSemester)).curriculumSubjectIds).toEqual([ids.subjectB]);
   });
   it('composes context from the real SQL fixture and executes protected GET/PUT', async () => {
     const contextFor = createOfferingContextReader(db.query);
     const context = await contextFor(scope.clerkUserId);
     expect(context?.subjects).toHaveLength(2);
+    expect(context?.curriculum.totalCreditRequired).toBe(131);
     expect(context?.semesters.map(item => item.semesterNo)).toEqual([1, 3]);
+    expect(context?.currentSemesterId).toBe(ids.semester);
     const auth: AuthDependencies = {
       // TEST ONLY provider boundary. Real P004 session verification is not replaced in production.
       verify: async () => ({ clerkUserId: scope.clerkUserId, sessionId: 'fixture_session', primaryEmail: { address: 'fixture@graduate.utm.my', verified: true } }),

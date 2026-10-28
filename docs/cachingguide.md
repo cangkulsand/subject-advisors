@@ -11,6 +11,7 @@ the same reads. Remove cached data when the user successfully updates it.
 | Academic profile | Signed-in tab session; no timed expiry | Successful academic write, sign-out, session/account change, or access denial |
 | Academic records | Signed-in tab session; no timed expiry | Successful academic write, sign-out, session/account change, or access denial |
 | Curriculum options | Five minutes | Expiry or the same invalidation events above |
+| Semester-offering context and saved selection | Five minutes | Expiry, successful offering write, successful academic write, sign-out, session/account change, or access denial |
 
 Profile and record snapshots survive page navigation and refresh through
 `sessionStorage`. Use memory as a fallback when browser storage is unavailable.
@@ -40,6 +41,15 @@ explicit change to the agreed project requirements.
 7. Keep HTTP requests authenticated and `cache: 'no-store'`. Application snapshots
    are not authorization: server-side identity, role and ownership checks remain
    mandatory for all private endpoints and writes.
+8. UC08 caches only the authenticated `/api/semester-offerings` server response for
+   five minutes, keyed by identity, normalized API base, response-contract version
+   and semester query. Keep identity at key index zero. Increment the narrow UC08
+   contract marker when additive context fields are introduced so older five-minute
+   snapshots cannot hide fields without changing other academic cache behavior. Its
+   P001 academic-history read continues to use the session-long academic-records
+   cache; do not put the composed page data or local selection draft into that
+   snapshot. A successful offering PUT clears academic snapshots before response
+   decoding because the server may have committed even if the response is invalid.
 
 ## Scope and limits
 

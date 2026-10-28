@@ -23,11 +23,14 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
  assert.equal(result.domainTables,26);assert.equal(result.columns,171);assert.equal(result.explicitForeignKeys,39);
  assert.equal(result.databaseExecution,'NOT_PERFORMED_BY_STATIC_REVIEW');
 });
-test('ordered canonical manifest excludes superseded dated UUID migration',async()=>{
+test('ordered canonical manifest includes the forward profile semester extension and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
+ assert.match(entries.at(-1).sql,/ADD COLUMN current_semester_id integer NULL/);
+ assert.match(entries.at(-1).sql,/REFERENCES public\.academic_semester \(semester_id\)\s+ON DELETE RESTRICT/);
+ assert.doesNotMatch(entries.at(-1).sql,/UPDATE public\.student_profile|DEFAULT|NOT NULL/i);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));

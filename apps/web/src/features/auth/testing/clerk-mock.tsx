@@ -2,7 +2,7 @@
 import { createContext,useContext,useEffect,useState,type ReactNode } from 'react';
 const scenario = new URLSearchParams(window.location.search).get('scenario');
 const testParams = new URLSearchParams(window.location.search);
-const getToken = async () => scenario === 'expired-token' ? null : 'test-only-token';
+const getToken = async () => scenario === 'expired-token' ? null : scenario === 'token-pending' ? await new Promise<never>(() => undefined) : 'test-only-token';
 const LoadedContext=createContext(true);
 export const useAuth = () => ({
   isLoaded: useContext(LoadedContext) && scenario !== 'loading', isSignedIn: scenario !== 'signed-out',

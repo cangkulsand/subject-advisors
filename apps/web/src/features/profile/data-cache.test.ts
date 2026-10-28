@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { keepAccountSession, clearAccountCache } from '../auth/account-cache';
+import { accountSessionStamp, keepAccountSession, clearAccountCache } from '../auth/account-cache';
 import { createAcademicClient } from './client';
-import { ACADEMIC_CACHE_TTL } from './data-cache';
+import { ACADEMIC_CACHE_TTL, cachedAcademicRead } from './data-cache';
 
 const session = { userId: 'student-a', sessionId: 'session-a' };
 beforeEach(() => { keepAccountSession(session); });
@@ -17,6 +17,12 @@ it('shares session-long profile reads across clients and separates API origins',
   await createAcademicClient(async () => 'token', 'https://other.example')('/api/profile'); expect(fetcher).toHaveBeenCalledTimes(2);
   vi.advanceTimersByTime(24 * 60 * 60 * 1000); await first('/api/profile'); expect(fetcher).toHaveBeenCalledTimes(2);
   await first('/api/profile/options'); vi.advanceTimersByTime(ACADEMIC_CACHE_TTL); await first('/api/profile/options'); expect(fetcher).toHaveBeenCalledTimes(4);
+});
+it('bypasses old profile snapshots when current semester and configured total contracts change', async () => {
+  await cachedAcademicRead(JSON.stringify([accountSessionStamp(), '', '/api/profile']), async () => ({ studentName: 'Legacy snapshot' }));
+  const fetcher = vi.fn(async () => Response.json({ data: { studentName: 'Profile with semester', currentSemesterId: 201, totalCreditRequired: 131 } })); vi.stubGlobal('fetch', fetcher);
+  const profile = await createAcademicClient(async () => 'token')<{studentName:string,currentSemesterId:number,totalCreditRequired:number}>('/api/profile');
+  expect(profile).toEqual({ studentName: 'Profile with semester', currentSemesterId: 201, totalCreditRequired: 131 }); expect(fetcher).toHaveBeenCalledOnce();
 });
 it('refreshes records and curriculum options after a successful save', async () => {
   const fetcher = vi.fn(async () => Response.json({ data: [] })); vi.stubGlobal('fetch', fetcher);

@@ -1,0 +1,51 @@
+import type { OfferingPageData } from '../../../../../../packages/shared/src/offerings/offerings';
+
+/** Test-only data: curriculum IDs deliberately differ from P001 subject IDs. */
+export const richOfferingFixture: OfferingPageData = {
+  curriculum: { curriculumId: '401', name: 'Fictional computing curriculum', programmeName: 'Browser acceptance fixture', totalCreditRequired: 131 },
+  semesters: [
+    { semesterId: '201', academicYear: '2026/2027', semesterNo: 1 },
+    { semesterId: '202', academicYear: '2026/2027', semesterNo: 2 },
+    { semesterId: '203', academicYear: '2026/2027', semesterNo: 3 },
+    { semesterId: '204', academicYear: '2027/2028', semesterNo: 1 },
+  ],
+  subjects: [
+    { curriculumSubjectId: '501', subjectId: '71', code: 'DEMO101', name: 'Programming foundations', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '502', subjectId: '72', code: 'DEMO102', name: 'Discrete structures', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '503', subjectId: '73', code: 'DEMO201', name: 'Data structures', creditHours: 3, subjectCategory: 'Elective', isCompulsory: 0 },
+    { curriculumSubjectId: '504', subjectId: '74', code: 'DEMO202', name: 'Withdrawn lab', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '505', subjectId: '75', code: 'DEMO203', name: 'Community engagement', creditHours: 3, subjectCategory: 'Elective Umum U1', isCompulsory: 0 },
+    { curriculumSubjectId: '506', subjectId: '76', code: 'SECJ3032', name: 'Software engineering studio', creditHours: 3, subjectCategory: null, isCompulsory: 1 },
+    { curriculumSubjectId: '507', subjectId: '77', code: 'DEMO204', name: 'Completed but still selected', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '508', subjectId: '78', code: 'DEMO205', name: 'Exempted zero-credit subject', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '509', subjectId: '79', code: 'DEMO206', name: 'Conflicting legacy record', creditHours: 3, subjectCategory: null, isCompulsory: 0 },
+    { curriculumSubjectId: '510', subjectId: '80', code: 'DEMO207', name: 'Unknown category', creditHours: 3, isCompulsory: 0 },
+    { curriculumSubjectId: '511', subjectId: '81', code: 'DEMO208', name: 'Two-credit lab', creditHours: 2, subjectCategory: 'Core', isCompulsory: 1 },
+    { curriculumSubjectId: '512', subjectId: '82', code: 'DEMO209', name: 'Unclassified two-credit elective', creditHours: 2, isCompulsory: 0 },
+    { curriculumSubjectId: '513', subjectId: '83', code: 'DEMO210', name: 'E1 completed fixture', creditHours: 3, subjectCategory: 'Elective E1', isCompulsory: 0 },
+    { curriculumSubjectId: '514', subjectId: '84', code: 'DEMO211', name: 'E1 failed fixture', creditHours: 3, subjectCategory: 'E1', isCompulsory: 0 },
+    { curriculumSubjectId: '515', subjectId: '85', code: 'DEMO212', name: 'E2 withdrawn fixture', creditHours: 3, subjectCategory: 'Elective E2', isCompulsory: 0 },
+    { curriculumSubjectId: '516', subjectId: '86', code: 'DEMO213', name: 'U2 completed fixture', creditHours: 3, subjectCategory: 'Elective U2', isCompulsory: 0 },
+    { curriculumSubjectId: '517', subjectId: '87', code: 'DEMO214', name: 'Ambiguous Core fixture', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
+  ],
+  selection: { semesterId: '201', curriculumSubjectIds: ['507', '509'] },
+  academicHistory: {
+    status: 'available',
+    records: [
+      { subjectId: '71', code: 'DEMO101', name: 'Programming foundations', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '72', code: 'DEMO102', name: 'Discrete structures', status: 'EXEMPTED', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '73', code: 'DEMO201', name: 'Data structures', status: 'FAILED', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '74', code: 'DEMO202', name: 'Withdrawn lab', status: 'WITHDRAWN', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '77', code: 'DEMO204', name: 'Completed but still selected', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '78', code: 'DEMO205', name: 'Exempted zero-credit subject', status: 'EXEMPTED', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '79', code: 'DEMO206', name: 'Conflicting legacy record', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '79', code: 'DEMO206', name: 'Conflicting legacy record', status: 'FAILED', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '83', code: 'DEMO210', name: 'E1 completed fixture', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '84', code: 'DEMO211', name: 'E1 failed fixture', status: 'FAILED', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '85', code: 'DEMO212', name: 'E2 withdrawn fixture', status: 'WITHDRAWN', recognizedCredits: 0, creditHours: 3 },
+      { subjectId: '86', code: 'DEMO213', name: 'U2 completed fixture', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '87', code: 'DEMO214', name: 'Ambiguous Core fixture', status: 'COMPLETED', recognizedCredits: 3, creditHours: 3 },
+      { subjectId: '87', code: 'DEMO214', name: 'Ambiguous Core fixture', status: 'EXEMPTED', recognizedCredits: 0, creditHours: 3 },
+    ],
+  },
+};

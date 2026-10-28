@@ -25,11 +25,23 @@ export function readSelection(value: unknown): OfferingSelection {
 export function readPageData(value: unknown): OfferingPageData {
   const data = object(value);
   const curriculum = object(data.curriculum);
+  if (curriculum.totalCreditRequired !== undefined &&
+      (typeof curriculum.totalCreditRequired !== 'number' || !Number.isInteger(curriculum.totalCreditRequired) || curriculum.totalCreditRequired < 0 || curriculum.totalCreditRequired > 2147483647)) {
+    throw new Error('Invalid offerings response');
+  }
   if (!Array.isArray(data.subjects) || !Array.isArray(data.semesters)) throw new Error('Invalid offerings response');
   const subjects = data.subjects.map((value): OfferingSubject => {
     const subject = object(value);
     if (typeof subject.creditHours !== 'number' || !Number.isFinite(subject.creditHours) || subject.creditHours < 0) throw new Error('Invalid offerings response');
-    return { curriculumSubjectId: id(subject.curriculumSubjectId), code: text(subject.code), name: text(subject.name), creditHours: subject.creditHours };
+    if (subject.subjectCategory !== undefined && subject.subjectCategory !== null && typeof subject.subjectCategory !== 'string') throw new Error('Invalid offerings response');
+    if (subject.isCompulsory !== undefined && subject.isCompulsory !== 0 && subject.isCompulsory !== 1) throw new Error('Invalid offerings response');
+    return {
+      curriculumSubjectId: id(subject.curriculumSubjectId),
+      ...(subject.subjectId === undefined ? {} : { subjectId: id(subject.subjectId) }),
+      code: text(subject.code), name: text(subject.name), creditHours: subject.creditHours,
+      ...(subject.subjectCategory === undefined ? {} : { subjectCategory: subject.subjectCategory === null || !subject.subjectCategory.trim() ? null : subject.subjectCategory }),
+      ...(subject.isCompulsory === undefined ? {} : { isCompulsory: subject.isCompulsory }),
+    };
   });
   const semesters = data.semesters.map((value): OfferingSemester => {
     const semester = object(value);
@@ -37,12 +49,19 @@ export function readPageData(value: unknown): OfferingPageData {
     return { semesterId: id(semester.semesterId), academicYear: text(semester.academicYear), semesterNo: semester.semesterNo };
   });
   unique(subjects.map(subject => subject.curriculumSubjectId));
+  unique(subjects.flatMap(subject => subject.subjectId ? [subject.subjectId] : []));
   unique(semesters.map(semester => semester.semesterId));
+  const currentSemesterId = data.currentSemesterId === undefined ? undefined : id(data.currentSemesterId);
+  if (currentSemesterId !== undefined && !semesters.some(semester => semester.semesterId === currentSemesterId)) throw new Error('Invalid offerings response');
   const selection = data.selection === null ? null : readSelection(data.selection);
   if (selection && (!semesters.some(semester => semester.semesterId === selection.semesterId) ||
       selection.curriculumSubjectIds.some(id => !subjects.some(subject => subject.curriculumSubjectId === id)))) throw new Error('Invalid offerings response');
   return {
-    curriculum: { curriculumId: id(curriculum.curriculumId), name: text(curriculum.name), programmeName: text(curriculum.programmeName) },
+    curriculum: {
+      curriculumId: id(curriculum.curriculumId), name: text(curriculum.name), programmeName: text(curriculum.programmeName),
+      ...(curriculum.totalCreditRequired === undefined ? {} : { totalCreditRequired: curriculum.totalCreditRequired }),
+    },
+    ...(currentSemesterId === undefined ? {} : { currentSemesterId }),
     subjects, semesters, selection,
   };
 }

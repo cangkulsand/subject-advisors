@@ -41,11 +41,12 @@ export async function jsonBody(request: Request): Promise<unknown> {
   catch { return invalid('The request body must be valid JSON.'); }
 }
 export function profileInput(value: unknown) {
-  const body = fields(value, ['studentName', 'matricNo', 'curriculumId', 'weeklyWorkingHours', 'availableStudyHours']);
+  const body = fields(value, ['studentName', 'matricNo', 'curriculumId', 'currentSemesterId', 'weeklyWorkingHours', 'availableStudyHours']);
   return {
     studentName: text(body.studentName, 'Student name', 255, true)!,
     matricNo: text(body.matricNo, 'Matric number', 30),
     curriculumId: positiveId(body.curriculumId, 'Curriculum'),
+    currentSemesterId: positiveId(body.currentSemesterId, 'Current semester'),
     weeklyWorkingHours: nonnegative(body.weeklyWorkingHours, 'Weekly working hours'),
     availableStudyHours: nonnegative(body.availableStudyHours, 'Available study hours'),
   };

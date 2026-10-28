@@ -23,8 +23,11 @@ it('deduplicates simultaneous gate requests including StrictMode remounts',async
 it('persists only minimal account state across document navigation without a token',async()=>{
  respond();await loadSessionAccount(session,async()=>'SECRET_TEST_TOKEN');expect(store.length).toBe(1);const saved=store.getItem(store.key(0)!);expect(saved).not.toContain('SECRET_TEST_TOKEN');expect(JSON.parse(saved!)).toEqual(me);
 });
-it('reads a tab session snapshot without making another request',async()=>{
- const id='subject-advisors.account.v1:'+JSON.stringify(['user_test','session_a','']);store.setItem(id,JSON.stringify(me));const fetcher=respond();expect(await loadSessionAccount(session,async()=>'TEST_TOKEN')).toEqual(me);expect(fetcher).not.toHaveBeenCalled();
+it('ignores legacy COMPLETE snapshots after current-semester setup becomes required',async()=>{
+ const id='subject-advisors.account.v1:'+JSON.stringify(['user_test','session_a','']);store.setItem(id,JSON.stringify(me));const setup:Me={...me,profileState:'SETUP_REQUIRED',landingPath:'/student/setup'};const fetcher=respond(setup);expect(await loadSessionAccount(session,async()=>'TEST_TOKEN')).toEqual(setup);expect(fetcher).toHaveBeenCalledOnce();
+});
+it('reads the new-version tab snapshot without making another request',async()=>{
+ const id='subject-advisors.account.v2:'+JSON.stringify(['user_test','session_a','']);store.setItem(id,JSON.stringify(me));const fetcher=respond();expect(await loadSessionAccount(session,async()=>'TEST_TOKEN')).toEqual(me);expect(fetcher).not.toHaveBeenCalled();
 });
 it.each([{...session,sessionId:'different_session'},{...session,userId:'different_user'},{...session,apiBaseUrl:'https://different-api.test'}])('isolates the cache from %j',async other=>{
  respond();await loadSessionAccount(session,async()=>'TEST_TOKEN');expect(readAccountCache(other)).toBeUndefined();
@@ -42,7 +45,7 @@ it('does not cache denials or reuse an earlier success after a denial',async()=>
  respond();await loadSessionAccount(session,async()=>'TEST_TOKEN');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({error:{code:'ACCESS_SUSPENDED',message:'Denied'}},{status:403})));await expect(loadSessionAccount(session,async()=>'TEST_TOKEN',false,true)).rejects.toMatchObject({status:403});expect(readAccountCache(session)).toBeUndefined();
 });
 it('rejects malformed, foreign-user and arbitrary redirect snapshots',async()=>{
- const id='subject-advisors.account.v1:'+JSON.stringify(['user_test','session_a','']);for(const data of ['{',JSON.stringify({...me,clerkUserId:'other'}),JSON.stringify({...me,landingPath:'https://outside.test'})]){store.setItem(id,data);expect(readAccountCache(session)).toBeUndefined();}
+ const id='subject-advisors.account.v2:'+JSON.stringify(['user_test','session_a','']);for(const data of ['{',JSON.stringify({...me,clerkUserId:'other'}),JSON.stringify({...me,landingPath:'https://outside.test'})]){store.setItem(id,data);expect(readAccountCache(session)).toBeUndefined();}
 });
 it('uses memory when browser storage is disabled',async()=>{
  vi.stubGlobal('window',{get sessionStorage(){throw new Error('blocked');},dispatchEvent:vi.fn()});const fetcher=respond();await loadSessionAccount(session,async()=>'TEST_TOKEN');await loadSessionAccount(session,async()=>'TEST_TOKEN');expect(fetcher).toHaveBeenCalledTimes(1);
