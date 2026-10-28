@@ -1,0 +1,32 @@
+// Actual account client/cache over HTTP; no production credentials or services.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+const base=process.env.ROLE_SIMULATION_URL;
+if(!base || !['127.0.0.1','localhost'].includes(new URL(base).hostname))throw new Error('Provide the local simulation member URL as ROLE_SIMULATION_URL.');
+const values=new Map(),events=new EventTarget();
+globalThis.window={sessionStorage:{get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},dispatchEvent:event=>events.dispatchEvent(event)};
+const bundle=await build({entryPoints:['apps/web/src/features/auth/account-cache.ts'],bundle:true,write:false,format:'esm',platform:'node'});
+const cache=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const session={userId:'user_fixture',sessionId:'session_fixture',apiBaseUrl:base};
+async function state(mode){const response=await fetch(base+'/_test/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});assert.equal(response.status,200);}
+cache.keepAccountSession(session);
+await state('owner');
+const owner=await cache.loadSessionAccount(session,async()=> 'SYNTHETIC_TEST_TOKEN');
+assert.deepEqual(owner.availableRoles,['STUDENT','COORDINATOR','SYSTEM_ADMIN']);
+console.log('PASS real account client reads three explicitly available roles over HTTP');
+await state('student');
+assert.deepEqual((await cache.refreshAccountRoles(session,async()=> 'SYNTHETIC_TEST_TOKEN')).availableRoles,['STUDENT']);
+console.log('PASS role refresh replaces an older privileged snapshot');
+await state('denied');
+await assert.rejects(cache.refreshAccountRoles(session,async()=> 'SYNTHETIC_TEST_TOKEN'),{status:403,code:'ACCOUNT_SUSPENDED'});
+assert.equal(cache.readAccountCache(session),undefined);
+console.log('PASS HTTP access denial clears the browser account snapshot');
+await state('malformed');
+await assert.rejects(cache.loadSessionAccount(session,async()=> 'SYNTHETIC_TEST_TOKEN',false,true),{code:'INVALID_ACCOUNT_RESPONSE'});
+assert.equal(cache.readAccountCache(session),undefined);
+console.log('PASS inconsistent role contract is rejected without cached privileges');
+await state('owner');
+assert.equal((await cache.loadSessionAccount(session,async()=> 'SYNTHETIC_TEST_TOKEN',true)).roles.length,3);
+console.log('PASS initialization uses the actual client against the contract fixture');
+cache.keepAccountSession(null);
+console.log('PASS five HTTP client/cache checks against Postman; backend/Clerk verification remain separate');

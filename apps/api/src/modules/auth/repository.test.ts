@@ -3,7 +3,7 @@ import { createAccessRepository } from './repository';
 describe('access persistence boundary', () => {
   it('inserts only STUDENT/ACTIVE and returns persisted assignment', async () => {
     const query = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { clerk_user_id: 'user_test', app_role: 'STUDENT', access_status: 'ACTIVE' },
+      { clerk_user_id: 'user_test', app_role: 'STUDENT', roles: ['STUDENT'], access_status: 'ACTIVE' },
     ]);
     const repo = createAccessRepository(query);
     expect(await repo.initializeStudent('user_test')).toMatchObject({ clerkUserId: 'user_test', appRole: 'STUDENT' });
@@ -13,7 +13,7 @@ describe('access persistence boundary', () => {
   });
   it('returns existing suspension/role rather than claiming a new active student', async () => {
     const query = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { clerk_user_id: 'user_test', app_role: 'COORDINATOR', access_status: 'SUSPENDED' },
+      { clerk_user_id: 'user_test', app_role: 'COORDINATOR', roles: ['COORDINATOR'], access_status: 'SUSPENDED' },
     ]);
     expect(await createAccessRepository(query).initializeStudent('user_test')).toMatchObject({ appRole: 'COORDINATOR', accessStatus: 'SUSPENDED' });
   });

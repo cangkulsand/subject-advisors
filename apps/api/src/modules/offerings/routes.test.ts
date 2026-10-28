@@ -8,7 +8,7 @@ import { handleOfferingRequest } from './routes';
 function fixture() {
   const identity: VerifiedIdentity = { clerkUserId: 'fictional_a', sessionId: 'fictional_session',
     primaryEmail: { address: 'fictional@graduate.utm.my', verified: true } };
-  const assignment: AccessAssignment = { clerkUserId: identity.clerkUserId, appRole: 'STUDENT', accessStatus: 'ACTIVE' };
+  const assignment: AccessAssignment = { clerkUserId: identity.clerkUserId, appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'ACTIVE' };
   const values = new Map<string, string[]>();
   const context = { ...structuredClone(demoContext), studentId: '301' };
   const deps: OfferingDependencies = {
@@ -99,7 +99,7 @@ describe('authenticated UC08 offering routes', () => {
     expect((await incomplete.get(incomplete.request())).status).toBe(403);
   });
   it.each(['COORDINATOR', 'SYSTEM_ADMIN'] as const)('denies %s access', async role => {
-    const f = fixture(); f.assignment.appRole = role;
+    const f = fixture(); f.assignment.appRole = role; f.assignment.roles = [role];
     expect((await f.get(f.request())).status).toBe(403);
     expect(f.deps.contextFor).not.toHaveBeenCalled();
   });

@@ -3,6 +3,7 @@ import { LogoutButton } from '../features/auth';
 import { AppLink } from './navigation';
 import type { StudentArea } from './StudentRoutes';
 import './student-shell.css';
+import { RoleSwitcher } from '../features/auth/RoleSwitcher';
 const links = [
   { area: 'profile', href: '/student/profile', label: 'Academic profile', icon: 'user' },
   { area: 'records', href: '/student/records', label: 'Subject records', icon: 'records' },
@@ -95,6 +96,7 @@ export function StudentShell({ area, title, children }: { area: StudentArea; tit
             {searchOpen && <div id="student-search-results" className="student-dropdown student-search-results"><p>GO TO PAGE</p>{results.length ? results.map(link => <AppLink key={link.area} href={link.href} onClick={closeNavigation}><Icon name={link.icon}/>{link.label}</AppLink>) : <p>No matching pages.</p>}</div>}
           </div>
           <div className="student-header-actions">
+            <RoleSwitcher />
             <button className="student-icon-button student-theme-toggle" type="button" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={toggleTheme}><Icon name={dark ? 'sun' : 'moon'}/></button>
             <div className="student-account">
               <button className="student-account-toggle" type="button" aria-label="Student account" aria-expanded={accountOpen} aria-controls="student-account-menu" onClick={() => { setAccountOpen(!accountOpen); setSearchOpen(false); }}><span className="student-avatar"><Icon name="user"/></span><span>Student</span><Icon name="chevron"/></button>

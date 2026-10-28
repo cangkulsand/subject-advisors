@@ -50,7 +50,14 @@ export async function loadAccount(
       throw new Error('Account access is unavailable.');
     }
     if (!('data' in body)) throw new Error('Account access is unavailable.');
-    return body.data;
+    const me = body.data;
+    // Rolling deployment: an old backend can describe only its single legacy role.
+    // Never fall back when any new contract field is present but malformed.
+    if (me && typeof me === 'object' && !Object.hasOwn(me,'roles') && !Object.hasOwn(me,'availableRoles') && !Object.hasOwn(me,'studentProfileState')) {
+      return { ...me, roles: [me.appRole], availableRoles: [me.appRole],
+        studentProfileState: me.appRole === 'STUDENT' ? me.profileState : 'NOT_APPLICABLE' };
+    }
+    return me;
   };
 
   try {

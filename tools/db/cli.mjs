@@ -27,13 +27,13 @@ try{
         if(status.pending.length)throw new GateError('APPLY_CANONICAL_MIGRATIONS_FIRST');
         if(command==='verify'){
           await client.query('BEGIN READ ONLY');
-          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql']){const response=await client.query(await readFile('db/checks/'+file,'utf8'));checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
+          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql']){const response=await client.query(await readFile('db/checks/'+file,'utf8'));checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
           finally{await client.query('ROLLBACK');}
         }else{
           if(target.allowRollbackOnlyTests!==true)throw new GateError('ROLLBACK_ONLY_TEST_APPROVAL_REQUIRED');
           // This file owns BEGIN/ROLLBACK and contains only synthetic fixtures.
           const checks=[];
-          for(const file of ['002_behavior_tests.sql','003_role_boundary_tests.sql']){
+          for(const file of ['002_behavior_tests.sql','003_role_boundary_tests.sql','006_multi_role_behavior_tests.sql']){
             const response=await client.query(await readFile('db/checks/'+file,'utf8'));
             checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows).filter(row=>row.test_name));
           }

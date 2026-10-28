@@ -5,12 +5,18 @@ import {loadMigrations,GateError} from './migrations.mjs';
 const sqlTypes={integer:'int4',smallint:'int2',timestamptz:'timestamptz',boolean:'bool',date:'date',jsonb:'jsonb',text:'text'};
 export async function reviewSchema(root=process.cwd()){
   const contract=JSON.parse(await readFile(root+'/db/schema-contract.json','utf8'));
+  const extensions=JSON.parse(await readFile(root+'/db/engineering-extensions.json','utf8'));
   const migrations=await loadMigrations(root);
   if(contract.tables.length!==26)throw new GateError('EXPECTED_26_DOMAIN_ENTITIES');
   const sql=migrations.map(m=>m.sql).join('\n');const ast=await parse(sql);
   const creates=ast.stmts.flatMap(s=>s.stmt.CreateStmt?[s.stmt.CreateStmt]:[]);
-  const domainCreates=creates.filter(s=>s.relation.schemaname==='public');
-  if(domainCreates.length!==26||creates.some(s=>!['public','migration_meta'].includes(s.relation.schemaname)))throw new GateError('DOMAIN_TABLE_INVENTORY_MISMATCH');
+  const extensionTables=extensions.extensions.flatMap(item=>item.tables);
+  if(new Set(extensionTables).size!==extensionTables.length)throw new GateError('DUPLICATE_ENGINEERING_EXTENSION_TABLE');
+  const publicCreates=creates.filter(s=>s.relation.schemaname==='public');
+  const domainCreates=publicCreates.filter(s=>!extensionTables.includes(s.relation.relname));
+  if(domainCreates.length!==26||publicCreates.length!==26+extensionTables.length||
+     extensionTables.some(name=>!publicCreates.some(s=>s.relation.relname===name))||
+     creates.some(s=>!['public','migration_meta'].includes(s.relation.schemaname)))throw new GateError('DOMAIN_OR_EXTENSION_TABLE_INVENTORY_MISMATCH');
   if(ast.stmts.some(s=>s.stmt.TransactionStmt))throw new GateError('MIGRATION_TRANSACTION_MUST_BE_RUNNER_OWNED');
   let count=0,fks=0;
   for(const table of contract.tables){
@@ -36,7 +42,7 @@ export async function reviewSchema(root=process.cwd()){
     }
   }
   const plpgsql=await parsePlPgSQL(sql);
-  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql','004_profile_current_semester.sql']){
+  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql','004_profile_current_semester.sql','005_multi_role_access.sql','006_multi_role_behavior_tests.sql']){
     const checkSql=await readFile(root+'/db/checks/'+name,'utf8');
     await parse(checkSql);await parsePlPgSQL(checkSql);
   }
@@ -46,5 +52,5 @@ export async function reviewSchema(root=process.cwd()){
     if(createHash('sha256').update(bytes).digest('hex')!==contract.source.sha256)throw new GateError('AUTHORITATIVE_SOURCE_CHANGED_REVIEW_MAPPING');
     sourceStatus='SOURCE_HASH_MATCHES';
   }catch(error){if(error.code!=='ENOENT')throw error;}
-  return {staticReview:'PASS',domainTables:26,columns:count,explicitForeignKeys:fks,plpgsqlFunctions:plpgsql.plpgsql_funcs.length,source:sourceStatus,migrations:migrations.map(({version,file,sha256})=>({version,file,sha256})),databaseExecution:'NOT_PERFORMED_BY_STATIC_REVIEW'};
+  return {staticReview:'PASS',domainTables:26,engineeringExtensionTables:extensionTables,columns:count,explicitForeignKeys:fks,plpgsqlFunctions:plpgsql.plpgsql_funcs.length,source:sourceStatus,migrations:migrations.map(({version,file,sha256})=>({version,file,sha256})),databaseExecution:'NOT_PERFORMED_BY_STATIC_REVIEW'};
 }

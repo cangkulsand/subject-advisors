@@ -125,7 +125,7 @@ describe.skipIf(!databaseUrl)('P002 real PostgreSQL acceptance (temporary fixtur
     const auth: AuthDependencies = {
       // TEST ONLY provider boundary. Real P004 session verification is not replaced in production.
       verify: async () => ({ clerkUserId: scope.clerkUserId, sessionId: 'fixture_session', primaryEmail: { address: 'fixture@graduate.utm.my', verified: true } }),
-      access: { find: async () => ({ clerkUserId: scope.clerkUserId, appRole: 'STUDENT', accessStatus: 'ACTIVE' }), initializeStudent: async () => { throw new Error('Not used'); } },
+      access: { find: async () => ({ clerkUserId: scope.clerkUserId, appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'ACTIVE' }), initializeStudent: async () => { throw new Error('Not used'); } },
       profiles: { stateFor: async () => 'COMPLETE' },
     };
     const deps = { auth, contextFor, repository: createOfferingRepository(db) };

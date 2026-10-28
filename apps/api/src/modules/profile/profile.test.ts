@@ -13,7 +13,7 @@ function dependencies(state: 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' = 'CO
   return {
     auth: {
       verify: vi.fn(async () => ({ clerkUserId: 'verified_student_a', sessionId: 'test', primaryEmail: { address: 'demo@graduate.utm.my', verified: true } })),
-      access: { find: vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'STUDENT' as const, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
+      access: { find: vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'STUDENT' as const, roles: ['STUDENT' as const], accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
       profiles: { stateFor: vi.fn(async () => state) },
     },
     profiles: { find: vi.fn(async () => profile), save: vi.fn(async () => profile), options: vi.fn(async () => ({ curricula: [], subjects: [], semesters: [] })) },
@@ -120,7 +120,7 @@ describe('P001 authenticated route boundary', () => {
     const expired = dependencies(); expired.auth.verify = vi.fn(async () => { throw new AuthError(401,'SESSION_INVALID','Session expired.'); });
     expect((await handleP001Request(request('/api/academic-records/7','DELETE'),expired))?.status).toBe(401);
     expect(expired.records.delete).not.toHaveBeenCalled();
-    const wrongRole = dependencies(); wrongRole.auth.access.find = vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'COORDINATOR' as const, accessStatus: 'ACTIVE' as const }));
+    const wrongRole = dependencies(); wrongRole.auth.access.find = vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'COORDINATOR' as const, roles: ['COORDINATOR' as const], accessStatus: 'ACTIVE' as const }));
     expect((await handleP001Request(request('/api/academic-records/7','DELETE'),wrongRole))?.status).toBe(403);
     expect(wrongRole.records.delete).not.toHaveBeenCalled();
     const incomplete = dependencies('SETUP_REQUIRED');
@@ -138,7 +138,7 @@ describe('P001 authenticated route boundary', () => {
   });
   it('denies suspended students and staff without running feature queries', async () => {
     for (const assignment of [{ appRole: 'STUDENT' as const, accessStatus: 'SUSPENDED' as const },{ appRole: 'COORDINATOR' as const, accessStatus: 'ACTIVE' as const }]) {
-      const deps = dependencies(); deps.auth.access.find = vi.fn(async () => ({ clerkUserId: 'verified_student_a', ...assignment }));
+      const deps = dependencies(); deps.auth.access.find = vi.fn(async () => ({ clerkUserId: 'verified_student_a', ...assignment, roles: [assignment.appRole] }));
       expect((await handleP001Request(request('/api/profile'),deps))?.status).toBe(403); expect(deps.profiles.find).not.toHaveBeenCalled();
     }
   });

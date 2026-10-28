@@ -23,14 +23,23 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
  assert.equal(result.domainTables,26);assert.equal(result.columns,171);assert.equal(result.explicitForeignKeys,39);
  assert.equal(result.databaseExecution,'NOT_PERFORMED_BY_STATIC_REVIEW');
 });
-test('ordered canonical manifest includes the forward profile semester extension and excludes superseded UUID migration',async()=>{
+test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
- assert.match(entries.at(-1).sql,/ADD COLUMN current_semester_id integer NULL/);
- assert.match(entries.at(-1).sql,/REFERENCES public\.academic_semester \(semester_id\)\s+ON DELETE RESTRICT/);
- assert.doesNotMatch(entries.at(-1).sql,/UPDATE public\.student_profile|DEFAULT|NOT NULL/i);
+ assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
+ assert.match(entries[3].sql,/REFERENCES public\.academic_semester \(semester_id\)\s+ON DELETE RESTRICT/);
+ assert.doesNotMatch(entries[3].sql,/UPDATE public\.student_profile|DEFAULT|NOT NULL/i);
+ assert.match(entries[4].sql,/CREATE TABLE public\.user_role_assignment/);
+ assert.match(entries[4].sql,/CREATE TABLE public\.user_role_audit_log/);
+ assert.match(entries[4].sql,/email_policy IN \('ROLE_DOMAIN','OWNER_STUDENT_COORDINATOR'\)/);
+ assert.match(entries[4].sql,/grant_source IN \('MIGRATION_COMPAT','LEGACY_INIT','OPERATOR'\)/);
+ assert.match(entries[4].sql,/DROP TRIGGER preserve_last_admin/);
+ assert.match(entries[4].sql,/Cannot remove the last active System Administrator/);
+ assert.match(entries[4].sql,/Protected owner administrator membership cannot be removed/);
+ assert.match(entries[4].sql,/REVOKE ALL ON public\.user_role_assignment FROM PUBLIC/);
+ assert.doesNotMatch(entries[4].sql,/UPDATE public\.user_access_assignment\s+SET app_role/i);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));

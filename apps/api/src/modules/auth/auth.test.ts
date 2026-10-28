@@ -14,7 +14,7 @@ function fixture() {
     access: {
       find: vi.fn(async id => records.get(id) ?? null),
       initializeStudent: vi.fn(async id => {
-        if (!records.has(id)) records.set(id, { clerkUserId: id, appRole: 'STUDENT', accessStatus: 'ACTIVE' });
+        if (!records.has(id)) records.set(id, { clerkUserId: id, appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'ACTIVE' });
         return records.get(id)!;
       }),
     },
@@ -78,14 +78,14 @@ describe('P004 authorization and endpoints', () => {
   });
   it('does not reactivate a suspended assignment', async () => {
     const f = fixture();
-    f.records.set(f.identity.clerkUserId, { clerkUserId: f.identity.clerkUserId, appRole: 'STUDENT', accessStatus: 'SUSPENDED' });
+    f.records.set(f.identity.clerkUserId, { clerkUserId: f.identity.clerkUserId, appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'SUSPENDED' });
     for (let i = 0; i < 2; i++) expect((await handleAuthRequest(f.request(), f.deps))?.status).toBe(403);
     expect(f.deps.access.initializeStudent).not.toHaveBeenCalled();
     expect(f.records.get(f.identity.clerkUserId)?.accessStatus).toBe('SUSPENDED');
   });
   it.each([['COORDINATOR', '/coordinator'], ['SYSTEM_ADMIN', '/admin']] as const)('preserves approved %s assignments', async (role, path) => {
-    const f = fixture(); f.identity.primaryEmail = null;
-    f.records.set(f.identity.clerkUserId, { clerkUserId: f.identity.clerkUserId, appRole: role, accessStatus: 'ACTIVE' });
+    const f = fixture(); f.identity.primaryEmail = { address: 'approved@utm.my', verified: true };
+    f.records.set(f.identity.clerkUserId, { clerkUserId: f.identity.clerkUserId, appRole: role, roles: [role], accessStatus: 'ACTIVE' });
     const res = await handleAuthRequest(f.request(), f.deps);
     expect(await res?.json()).toMatchObject({ data: { appRole: role, landingPath: path } });
     expect(f.deps.access.initializeStudent).not.toHaveBeenCalled();
