@@ -25,6 +25,7 @@
                     "apps/**/*.tsx",
                     "packages/shared/**/*.ts",
                     "vitest.auth.config.ts",
+                    "vite.cloudflare.config.ts",
                     "tools/auth/local/**/*.ts",
                     "tools/auth/local/**/*.tsx",
                     "vite.auth.config.ts"

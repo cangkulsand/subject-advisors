@@ -1,8 +1,7 @@
 import { Component, StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AuthProvider, AuthPage, AuthGate, AuthDependencyPlaceholder } from '../../../apps/web/src/features/auth';
-import { StudentRoutes } from '../../../apps/web/src/app/StudentRoutes';
-import { useAppPathname } from '../../../apps/web/src/app/navigation';
+import { AuthProvider } from '../../../apps/web/src/features/auth';
+import { AppRoutes } from '../../../apps/web/src/app/AppRoutes';
 import './preview.css';
 
 class ProviderBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -37,27 +36,7 @@ function Setup() {
     <p role="status">{status}</p><p>Instructions: <code>docs/p004-local.md</code></p>
   </main>;
 }
-function LocalRoutes() {
-  const path = useAppPathname().replace(/\/$/, '') || '/';
-  if (path === '/sign-in' || path.startsWith('/sign-in/')) return <AuthPage mode="sign-in" />;
-  if (path === '/sign-up' || path.startsWith('/sign-up/')) return <AuthPage mode="sign-up" />;
-  if (path === '/auth/complete') return <AuthGate complete />;
-  if (path === '/student/setup') return <StudentRoutes area="setup" />;
-  if (path === '/student/profile') return <StudentRoutes area="profile" />;
-  if (path === '/student' || path === '/student/records') return <StudentRoutes area="records" />;
-  if (path === '/student/offerings') return <StudentRoutes area="offerings" />;
-  if (path === '/student/pathway') return <StudentRoutes area="pathway" />;
-  if (path === '/coordinator') return <AuthGate roles={['COORDINATOR']}><AuthDependencyPlaceholder area="coordinator" /></AuthGate>;
-  if (path === '/admin') return <AuthGate roles={['SYSTEM_ADMIN']}><AuthDependencyPlaceholder area="admin" /></AuthGate>;
-  if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;
-  return <main className="local-card">
-    <p className="eyebrow">Programmer 4 / Sprint 1</p><h1>Subject Advisors</h1>
-    <p>Register with your verified institutional email or sign in to your existing account.</p>
-    <nav aria-label="Account"><a className="primary-link" href="/sign-in">Sign in</a><a href="/sign-up">Create student account</a><a href="/auth/complete">Continue to my account</a></nav>
-    <p className="note">Academic services become available as the team enables them.</p>
-  </main>;
-}
 const key = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
 createRoot(document.getElementById('root')!).render(<StrictMode><ProviderBoundary>
-  {key ? <AuthProvider publishableKey={key}><LocalRoutes /></AuthProvider> : <Setup />}
+  {key ? <AuthProvider publishableKey={key}><AppRoutes /></AuthProvider> : <Setup />}
 </ProviderBoundary></StrictMode>);
