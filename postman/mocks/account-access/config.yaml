@@ -1,0 +1,11 @@
+version: 1
+id: 8766b250-e036-4f16-a105-ba82ce122f34
+name: account-access
+slug: account-access
+protocol: http
+interceptRequests: true
+port: 4500
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

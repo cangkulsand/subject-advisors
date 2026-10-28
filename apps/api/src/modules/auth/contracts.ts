@@ -5,8 +5,14 @@ export interface AccessAssignment {
   clerkUserId: string;
   appRole: AppRole;
   accessStatus: AccessStatus;
+  /** Authoritative explicit grants; appRole is only the legacy/default view. */
+  roles: AppRole[];
+  coordinatorStudentException?: boolean;
+  protectedOwner?: boolean;
 }
 export interface Me extends AccessAssignment {
+  availableRoles: AppRole[];
+  studentProfileState: ProfileState;
   profileState: ProfileState;
   landingPath: '/student/setup' | '/student' | '/coordinator' | '/admin';
 }

@@ -22,6 +22,11 @@
       "version": "0003",
       "file": "0003_profile_current_semester.sql",
       "description": "Add an optional configured current semester to student profiles"
+    },
+    {
+      "version": "0004",
+      "file": "0004_multi_role_access.sql",
+      "description": "Add explicit role memberships and immutable role audit while preserving account IDs and global suspension"
     }
   ],
   "historicalExcluded": [

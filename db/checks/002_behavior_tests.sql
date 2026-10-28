@@ -74,7 +74,12 @@ INSERT INTO public.subject_prerequisite(curriculum_subject_id,required_curriculu
 
 INSERT INTO public.user_access_assignment(access_assignment_id,clerk_user_id,app_role,access_status) VALUES
  (-2000000101,'__DB_TEST_ACCESS_STUDENT','STUDENT','ACTIVE'),
- (-2000000102,'__DB_TEST_ADMIN_A','SYSTEM_ADMIN','ACTIVE'),(-2000000103,'__DB_TEST_ADMIN_B','SYSTEM_ADMIN','ACTIVE');
+ (-2000000102,'__DB_TEST_ADMIN_A','STUDENT','ACTIVE'),(-2000000103,'__DB_TEST_ADMIN_B','STUDENT','ACTIVE');
+SELECT set_config('app.access_actor','__DB_TEST_OPERATOR__',true);
+SELECT set_config('app.access_reason','Synthetic baseline administrator fixtures.',true);
+INSERT INTO public.user_role_assignment(access_assignment_id,app_role,email_policy,grant_source,granted_by_clerk_user_id,grant_reason) VALUES
+ (-2000000102,'SYSTEM_ADMIN','ROLE_DOMAIN','OPERATOR','__DB_TEST_OPERATOR__','Synthetic baseline administrator A.'),
+ (-2000000103,'SYSTEM_ADMIN','ROLE_DOMAIN','OPERATOR','__DB_TEST_OPERATOR__','Synthetic baseline administrator B.');
 SELECT pg_temp.assert_rejected('invalid app role',$q$UPDATE public.user_access_assignment SET app_role='OWNER' WHERE access_assignment_id=-2000000101$q$);
 SELECT pg_temp.assert_rejected('invalid access status',$q$UPDATE public.user_access_assignment SET access_status='ENABLED' WHERE access_assignment_id=-2000000101$q$);
 INSERT INTO public.user_access_audit_log(access_audit_id,access_assignment_id,performed_by_clerk_user_id,change_type,new_value) VALUES
@@ -84,7 +89,7 @@ SELECT pg_temp.assert_rejected('access audit delete',$q$DELETE FROM public.user_
 SELECT pg_temp.assert_rejected('access audit truncate',$q$TRUNCATE public.user_access_audit_log$q$);
 UPDATE public.user_access_assignment SET access_status='SUSPENDED' WHERE access_assignment_id=-2000000102;
 DO $test$ BEGIN
- IF NOT EXISTS(SELECT 1 FROM public.user_access_assignment WHERE app_role='SYSTEM_ADMIN' AND access_status='ACTIVE' AND access_assignment_id<>-2000000103) THEN
+ IF NOT EXISTS(SELECT 1 FROM public.user_role_assignment r JOIN public.user_access_assignment a USING(access_assignment_id) WHERE r.app_role='SYSTEM_ADMIN' AND a.access_status='ACTIVE' AND a.access_assignment_id<>-2000000103) THEN
   PERFORM pg_temp.assert_rejected('last active admin preservation',$q$UPDATE public.user_access_assignment SET access_status='SUSPENDED' WHERE access_assignment_id=-2000000103$q$);
  ELSE INSERT INTO db_foundation_results VALUES('last active admin preservation','SKIP: existing administrator preserved');
  END IF;

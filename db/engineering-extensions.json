@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "extensions": [
+    {
+      "migration": "0004",
+      "tables": ["user_role_assignment", "user_role_audit_log"],
+      "purpose": "P004 explicit role memberships and immutable role grant history; excluded from the frozen 26-entity SRS baseline"
+    }
+  ]
+}

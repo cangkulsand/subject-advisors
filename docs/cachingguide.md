@@ -74,3 +74,13 @@ Implementation: `apps/web/src/features/profile/data-cache.ts`,
 `apps/web/src/features/profile/client.ts`, and
 `apps/web/src/features/auth/account-cache.ts`.
 See [the implementation record](changes/S1-INT-009-academic-session-cache.md).
+
+## Multi-role account snapshots
+
+Account access uses the v3 snapshot contract: explicit `roles`, email-eligible
+`availableRoles`, and independent `studentProfileState`. Old stored v1/v2 account
+snapshots are discarded. A workspace switch forces a current account read before
+navigation and rejects results from a previous Clerk session. Profile saves update
+student setup state even when the default view is staff. Role switching does not
+change the academic profile/record retention policy above. Cached roles never
+authorize backend calls; each API request checks current memberships and suspension.

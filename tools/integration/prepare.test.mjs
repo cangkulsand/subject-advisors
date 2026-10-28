@@ -6,7 +6,7 @@ import { join,dirname } from 'node:path';
 import { prepareIntegration } from './prepare.mjs';
 async function fixture(features=[]){
   const root=await mkdtemp(join(tmpdir(),'subject-advisors-integration-'));
-  const entries={p001Api:['apps/api/src/modules/profile/index.ts'],p001Web:['apps/web/src/features/profile/ProfilePage.tsx','apps/web/src/features/profile/client.ts','apps/web/src/features/records/RecordsPage.tsx'],p002Api:['apps/api/src/modules/offerings/index.ts'],p002Web:['apps/web/src/features/offerings/index.ts']};
+  const entries={p001Api:['apps/api/src/modules/profile/index.ts'],p001Web:['apps/web/src/features/profile/ProfilePage.tsx','apps/web/src/features/profile/client.ts','apps/web/src/features/records/RecordsPage.tsx'],p002Api:['apps/api/src/modules/offerings/index.ts'],p002Web:['apps/web/src/features/offerings/index.ts'],adminApi:['apps/api/src/modules/admin/index.ts']};
   for(const key of features)for(const file of entries[key]){await mkdir(dirname(join(root,file)),{recursive:true});await writeFile(join(root,file),'// TEST FIXTURE ONLY\n');}
   return root;
 }
@@ -15,10 +15,11 @@ test('no pasted modules generates compiling empty registries, ignoring private p
   const result=await prepareIntegration(root,true);assert.ok(Object.values(result).every(value=>value===false));
   const api=await readFile(join(root,'.generated-integration/api.ts'),'utf8');assert.ok(!api.includes('createOfferingHandler'));assert.ok(api.includes('createAuthDependencies(env)'));
 });
-for(const features of [['p001Api','p001Web'],['p002Api','p002Web'],['p001Api','p001Web','p002Api','p002Web']])test('discovers only pasted canonical modules: '+features.join(','),async()=>{
+for(const features of [['p001Api','p001Web'],['p002Api','p002Web'],['p001Api','p001Web','p002Api','p002Web'],['adminApi']])test('discovers only pasted canonical modules: '+features.join(','),async()=>{
   const root=await fixture(features);const result=await prepareIntegration(root,true);for(const name of Object.keys(result))assert.equal(result[name],features.includes(name));
   const api=await readFile(join(root,'.generated-integration/api.ts'),'utf8'),web=await readFile(join(root,'.generated-integration/web.tsx'),'utf8');
   assert.equal(api.includes('handleP001Request(request, p001)'),features.includes('p001Api'));assert.equal(api.includes('createOfferingHandler(env,'),features.includes('p002Api'));
+  assert.equal(api.includes('admin: createAdminHandler(env, auth)'),features.includes('adminApi'));
   assert.equal(web.includes('createAcademicClient(getToken)'),features.includes('p001Web'));assert.equal(web.includes('createOfferingClient(getToken)'),features.includes('p002Web'));
   if(features.includes('p002Api'))assert.ok(api.includes("stateFor: async () => 'UNAVAILABLE'"));
 });

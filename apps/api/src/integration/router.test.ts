@@ -4,7 +4,7 @@ import { AuthError } from '../modules/auth/errors';
 function services(): IntegratedServices {
   return { auth: {
     verify: vi.fn(async () => ({ clerkUserId: 'test_student', sessionId: 'test', primaryEmail: { address: 'test@graduate.utm.my', verified: true } })),
-    access: { find: vi.fn(async () => ({ clerkUserId: 'test_student', appRole: 'STUDENT' as const, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
+    access: { find: vi.fn(async () => ({ clerkUserId: 'test_student', appRole: 'STUDENT' as const, roles: ['STUDENT' as const], accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
     profiles: { stateFor: vi.fn(async () => 'COMPLETE' as const) },
   } };
 }
@@ -32,7 +32,7 @@ it('does not bypass real auth when a feature is absent',async()=>{
 });
 it('denies staff and suspended access before absent-feature responses',async()=>{
   for(const assignment of [{appRole:'COORDINATOR' as const,accessStatus:'ACTIVE' as const},{appRole:'STUDENT' as const,accessStatus:'SUSPENDED' as const}]){
-    const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',...assignment}));
+    const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',...assignment,roles:[assignment.appRole]}));
     await expect(dispatchIntegratedRequest(new Request('https://example.test/api/academic-records'),deps)).rejects.toMatchObject({status:403});
   }
 });

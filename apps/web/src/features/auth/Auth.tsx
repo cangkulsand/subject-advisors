@@ -5,6 +5,8 @@ import { AuthApiError } from './client';
 import { ACCOUNT_CACHE_CHANGED, accountSessionStamp, clearAccountCache, keepAccountSession, loadSessionAccount, readAccountCache } from './account-cache';
 import type { AppRole, Me } from './contracts';
 import './auth.css';
+import { AccountContext, AccountApiBaseContext } from './account-context';
+import { RoleSwitcher } from './RoleSwitcher';
 
 export function AuthProvider({ publishableKey, children }: { publishableKey: string; children: ReactNode }) {
   if (!publishableKey) return <section role="alert">Sign-in is unavailable until Clerk is configured.</section>;
@@ -26,7 +28,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   if (isSignedIn) return <AuthRedirect to="/auth/complete" />;
   return <main className="auth-panel">
     <h1>{mode === 'sign-up' ? 'Create your student account' : 'Sign in'}</h1>
-    <p>Student access requires a verified @graduate.utm.my primary email.</p>
+    <p>Students use a verified @graduate.utm.my email. Approved staff sign in with their assigned account.</p>
     {mode === 'sign-up'
       ? <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl="/auth/complete" />
       : <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl="/auth/complete" />}
@@ -73,7 +75,7 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
   }, [isLoaded, isSignedIn, userId, sessionId, getToken, apiBaseUrl, complete, key, attempt]);
   useEffect(() => {
     const refresh = (event: Event) => {
-      if ((event as CustomEvent<string>).detail === 'profile-saved' && userId && sessionId) {
+      if (['profile-saved','access-refreshed'].includes((event as CustomEvent<string>).detail) && userId && sessionId) {
         const me=readAccountCache({userId,sessionId,apiBaseUrl});
         if(me){setResult({key,me});return;}
       }
@@ -100,19 +102,20 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
   }
   const me = result?.key === key ? result.me : cached;
   if (!me || me.accessStatus !== 'ACTIVE') return <p role="alert">Account access is unavailable.</p>;
-  if (roles && !roles.includes(me.appRole)) return <section className="auth-panel">
+  if (roles && !roles.some(role => me.availableRoles.includes(role))) return <section className="auth-panel">
     <p role="alert">Your account does not have access to this page.</p><a href={me.landingPath}>Go to your account</a><LogoutButton />
   </section>;
   if (complete) return <AuthRedirect to={me.landingPath} />;
-  if (requireProfile && me.appRole === 'STUDENT' && me.profileState !== 'COMPLETE') {
+  if (requireProfile && roles?.includes('STUDENT') && me.studentProfileState !== 'COMPLETE') {
     return <AuthRedirect to="/student/setup" />;
   }
   if (accountSessionStamp() !== JSON.stringify([userId, sessionId])) return <p role="status">Checking account access...</p>;
-  return <>{children}</>;
+  return <AccountApiBaseContext.Provider value={apiBaseUrl}><AccountContext.Provider value={me}>{children}</AccountContext.Provider></AccountApiBaseContext.Provider>;
 }
 
 export function AuthDependencyPlaceholder({ area }: { area: 'setup' | 'student' | 'coordinator' | 'admin' }) {
   return <main className="auth-panel">
+    <RoleSwitcher />
     <h1>{area === 'setup' ? 'Academic profile setup' : 'Account access confirmed'}</h1>
     <p>{area === 'setup'
       ? 'Profile setup is not available yet. Academic features remain blocked until a valid profile and curriculum are saved.'

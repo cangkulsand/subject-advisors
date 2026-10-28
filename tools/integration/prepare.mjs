@@ -13,6 +13,7 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     p001Web:await entry('apps/web/src/features/profile','apps/web/src/features/profile/ProfilePage.tsx'),
     p002Api:await entry('apps/api/src/modules/offerings','apps/api/src/modules/offerings/index.ts'),
     p002Web:await entry('apps/web/src/features/offerings','apps/web/src/features/offerings/index.ts'),
+    adminApi:await entry('apps/api/src/modules/admin','apps/api/src/modules/admin/index.ts'),
   };
   if(features.p001Web)for(const file of ['apps/web/src/features/profile/client.ts','apps/web/src/features/records/RecordsPage.tsx'])if(!await exists(file))throw new Error('Incomplete P001 web overlay; missing '+file);
   const api=[
@@ -20,9 +21,11 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     "import type { IntegratedServices } from '../apps/api/src/integration/router';",
     ...(features.p001Api?["import { createP001Dependencies, handleP001Request } from '../apps/api/src/modules/profile';"]:[]),
     ...(features.p002Api?["import { createOfferingHandler } from '../apps/api/src/modules/offerings';"]:[]),
+    ...(features.adminApi?["import { createAdminHandler } from '../apps/api/src/modules/admin';"]:[]),
     'export function createIntegratedServices(env: AuthBindings): IntegratedServices {',
     ...(features.p001Api?['  const p001 = createP001Dependencies(env);','  const auth = p001.auth;']:['  const auth = createAuthDependencies(env);']),
     '  return { auth,',
+    ...(features.adminApi?['    admin: createAdminHandler(env, auth),']:[]),
     ...(features.p001Api?['    profile: request => handleP001Request(request, p001),']:[]),
     ...(features.p002Api?["    offerings: createOfferingHandler(env, { profiles: auth.profiles ?? { stateFor: async () => 'UNAVAILABLE' as const } }),"]:[]),
     '  };','}',

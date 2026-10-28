@@ -6,9 +6,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { prepareIntegration } from './prepare.mjs';
+import { fixtureResponse as adminFixtureResponse } from '../admin/fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
 const features=await prepareIntegration();const installed=process.argv.includes('--installed');
-if(installed&&!Object.values(features).every(Boolean))throw new Error('--installed requires both real owner overlays');
+if(installed&&!['p001Api','p001Web','p002Api','p002Web'].every(name=>features[name]))throw new Error('--installed requires both real owner overlays');
 const output=await build({entryPoints:['tools/auth/local/main.tsx'],bundle:true,write:false,outdir:'.wrangler/integration-ui',jsx:'automatic',alias:{'@clerk/react':resolve('apps/web/src/features/auth/testing/clerk-mock.tsx')},define:{'process.env.NODE_ENV':'"development"','import.meta.env.VITE_CLERK_PUBLISHABLE_KEY':'"TEST_ONLY_PUBLIC_KEY"'}});
 const script=output.outputFiles.find(file=>file.path.endsWith('.js')).text,css=output.outputFiles.find(file=>file.path.endsWith('.css'))?.text??'';
 const server=createServer((req,res)=>{if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(script);}else{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');}});
@@ -17,10 +18,13 @@ const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:null,curricu
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
+  if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
   (state.requests??=[]).push({path,method:route.request().method()});
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
-  if(path==='/api/profile'&&route.request().method==='PUT')state.setup=false;
-  const data=path==='/api/me'?{clerkUserId:'user_test',appRole:state.role??'STUDENT',accessStatus:'ACTIVE',profileState:state.setup?'SETUP_REQUIRED':'COMPLETE',landingPath:state.setup?'/student/setup':'/student'}
+  if(path==='/api/profile'&&route.request().method()==='PUT')state.setup=false;
+  const role=state.role??'STUDENT',roles=state.roles??[role],availableRoles=state.availableRoles??roles;
+  const studentProfileState=availableRoles.includes('STUDENT')?(state.setup?'SETUP_REQUIRED':'COMPLETE'):'NOT_APPLICABLE';
+  const data=path==='/api/me'?{clerkUserId:'user_test',appRole:role,roles,availableRoles,studentProfileState,accessStatus:'ACTIVE',profileState:role==='STUDENT'?studentProfileState:'NOT_APPLICABLE',landingPath:role==='SYSTEM_ADMIN'?'/admin':role==='COORDINATOR'?'/coordinator':state.setup?'/student/setup':'/student'}
    :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
    :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}:{};
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
@@ -35,6 +39,56 @@ async function clickStudentLink(page,name){
 async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 try{
  browser=await chromium.launch({headless:true});
+ await check('a student-only account has no staff view selector',async page=>{
+  await mock(page);await page.goto(base+'/student/profile');await page.getByLabel('Student name',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
+ },1440);
+ await check('an explicitly multi-role owner switches all views with one Clerk session and fresh access checks',async page=>{
+  const state=await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']});await page.goto(base+'/student/profile');
+  const views=page.getByRole('combobox',{name:'Workspace view'});await views.waitFor();
+  assert.deepEqual(await views.locator('option').allTextContents(),['Student','Academic Coordinator','System Admin']);
+  const mounts=await page.evaluate(()=>document.documentElement.dataset.clerkMounts);
+  for(const [role,path]of [['SYSTEM_ADMIN','/admin'],['COORDINATOR','/coordinator'],['STUDENT','/student']]){
+   await page.getByRole('combobox',{name:'Workspace view'}).selectOption(role);await page.waitForURL('**'+path);
+  }
+  await page.getByRole('table',{name:'Subject records'}).waitFor();assert.equal(state.accountReads,4);
+  assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
+ },1440);
+ await check('an owner can open staff views before completing their student profile',async page=>{
+  await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN'],setup:true});await page.goto(base+'/admin');
+  const views=page.getByRole('combobox',{name:'Workspace view'});await views.waitFor();await views.selectOption('STUDENT');await page.waitForURL('**/student/setup');
+  await page.getByRole('combobox',{name:'Workspace view'}).selectOption('SYSTEM_ADMIN');await page.waitForURL('**/admin');
+  await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
+ },1440);
+ await check('a coordinator-only account has no student or admin choices',async page=>{
+  const coordinator=await mock(page,{role:'COORDINATOR'});await page.goto(base+'/coordinator');await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Data Imports',exact:true}).click();await page.getByRole('heading',{name:'Data Imports',exact:true}).waitFor();
+  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me']);
+  assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
+ },1440);
+ await check('a revoked role cannot be selected using an older account snapshot',async page=>{
+  const state=await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']});await page.goto(base+'/student/profile');
+  const views=page.getByRole('combobox',{name:'Workspace view'});await views.waitFor();state.roles=['STUDENT'];
+  await views.selectOption('SYSTEM_ADMIN');await page.getByRole('alert').filter({hasText:'no longer available'}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/student/profile');assert.equal(state.accountReads,2);
+ },1440);
+ for(const width of [320,390])await check('multi-role workspace control remains usable on mobile '+width,async page=>{
+  await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']});await page.goto(base+'/student/profile');
+  await page.getByRole('button',{name:'Toggle header controls'}).click();const views=page.getByRole('combobox',{name:'Workspace view'});await views.waitFor();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await views.selectOption('SYSTEM_ADMIN');await page.waitForURL('**/admin');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ },width);
+ await check('role switching preserves a student draft when navigation is declined',async page=>{
+  await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']});await page.goto(base+'/student/profile');
+  await page.getByLabel('Student name',{exact:true}).fill('DEMO keep this draft');
+  page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('combobox',{name:'Workspace view'}).selectOption('SYSTEM_ADMIN');
+  assert.equal(new URL(page.url()).pathname,'/student/profile');assert.equal(await page.getByLabel('Student name',{exact:true}).inputValue(),'DEMO keep this draft');
+ },1440);
+ await check('a student cannot reach the admin view by typing its URL',async page=>{
+  await mock(page);await page.goto(base+'/admin');await page.getByRole('alert').filter({hasText:'does not have access'}).waitFor();
+  assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
+ },1440);
  for(const path of ['/student/profile','/student/records','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
   await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
   for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
