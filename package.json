@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "node tools/integration/prepare.mjs && node node_modules/typescript/bin/tsc -p tsconfig.auth.json",
     "test": "node tools/integration/prepare.mjs && node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts",
-    "lint": "node node_modules/eslint/bin/eslint.js apps tools/auth/local tools/integration tools/cloudflare vite.auth.config.ts vite.cloudflare.config.ts --max-warnings 0",
+    "lint": "node node_modules/eslint/bin/eslint.js apps tools/auth/local tools/integration tools/cloudflare tools/admin vite.auth.config.ts vite.cloudflare.config.ts --max-warnings 0",
     "build": "node tools/auth/build.mjs",
     "test:ui": "node tools/auth/test-ui.mjs",
     "dev": "node tools/auth/dev.mjs",
@@ -29,6 +29,8 @@
     "prepare:integration": "node tools/integration/prepare.mjs",
     "test:integration": "node tools/integration/prepare.mjs && node --test tools/integration/prepare.test.mjs",
     "test:ui:integration": "node tools/integration/test-ui.mjs",
+    "test:ui:admin": "node tools/admin/test-ui.mjs",
+    "preview:admin": "node tools/admin/test-ui.mjs --serve",
     "dev:offerings": "node node_modules/vite/bin/vite.js --config vite.offerings.config.ts --configLoader native",
     "preview:offerings": "node tools/offerings/serve-preview.mjs",
     "typecheck:offerings": "node node_modules/typescript/bin/tsc -p tsconfig.offerings.json",

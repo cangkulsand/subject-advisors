@@ -6,9 +6,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { prepareIntegration } from './prepare.mjs';
+import { fixtureResponse as adminFixtureResponse } from '../admin/fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
 const features=await prepareIntegration();const installed=process.argv.includes('--installed');
-if(installed&&!Object.values(features).every(Boolean))throw new Error('--installed requires both real owner overlays');
+if(installed&&!['p001Api','p001Web','p002Api','p002Web'].every(name=>features[name]))throw new Error('--installed requires both real owner overlays');
 const output=await build({entryPoints:['tools/auth/local/main.tsx'],bundle:true,write:false,outdir:'.wrangler/integration-ui',jsx:'automatic',alias:{'@clerk/react':resolve('apps/web/src/features/auth/testing/clerk-mock.tsx')},define:{'process.env.NODE_ENV':'"development"','import.meta.env.VITE_CLERK_PUBLISHABLE_KEY':'"TEST_ONLY_PUBLIC_KEY"'}});
 const script=output.outputFiles.find(file=>file.path.endsWith('.js')).text,css=output.outputFiles.find(file=>file.path.endsWith('.css'))?.text??'';
 const server=createServer((req,res)=>{if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(script);}else{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');}});
@@ -17,6 +18,7 @@ const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:null,curricu
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
+  if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
   (state.requests??=[]).push({path,method:route.request().method()});
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
   if(path==='/api/profile'&&route.request().method()==='PUT')state.setup=false;
@@ -56,10 +58,12 @@ try{
   await mock(page,{roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN'],setup:true});await page.goto(base+'/admin');
   const views=page.getByRole('combobox',{name:'Workspace view'});await views.waitFor();await views.selectOption('STUDENT');await page.waitForURL('**/student/setup');
   await page.getByRole('combobox',{name:'Workspace view'}).selectOption('SYSTEM_ADMIN');await page.waitForURL('**/admin');
-  await page.getByRole('heading',{name:'Account access confirmed'}).waitFor();
+  await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
  },1440);
  await check('a coordinator-only account has no student or admin choices',async page=>{
-  await mock(page,{role:'COORDINATOR'});await page.goto(base+'/coordinator');await page.getByRole('heading',{name:'Account access confirmed'}).waitFor();
+  const coordinator=await mock(page,{role:'COORDINATOR'});await page.goto(base+'/coordinator');await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Data Imports',exact:true}).click();await page.getByRole('heading',{name:'Data Imports',exact:true}).waitFor();
+  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me']);
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
  await check('a revoked role cannot be selected using an older account snapshot',async page=>{

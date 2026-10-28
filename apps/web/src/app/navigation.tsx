@@ -36,6 +36,8 @@ function subscribe(listener: () => void) {
   return ()=>{listeners.delete(listener);if(!listeners.size)window.removeEventListener('popstate',onPopState);};
 }
 export function useAppPathname() { return useSyncExternalStore(subscribe,()=>currentPath,()=>'/'); }
+/** Includes query changes for screens with URL-initialized filters. */
+export function useAppLocation() { return useSyncExternalStore(subscribe,()=>currentUrl,()=>'/'); }
 export function registerUnsavedChanges(check: () => boolean) { unsavedChecks.add(check); return ()=>{unsavedChecks.delete(check);}; }
 
 /** Standalone feature consumers retain normal navigation when this router is absent. */

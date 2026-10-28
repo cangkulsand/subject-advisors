@@ -1,6 +1,8 @@
-import { AuthDependencyPlaceholder, AuthGate, AuthPage } from '../features/auth';
+import { AuthGate, AuthPage } from '../features/auth';
 import { StudentRoutes } from './StudentRoutes';
 import { useAppPathname } from './navigation';
+import { AdminRoutes } from '../features/admin/AdminRoutes';
+import { CoordinatorRoutes } from '../features/coordinator/CoordinatorRoutes';
 
 /** Shared integrated route table used by local and deployed application shells. */
 export function AppRoutes() {
@@ -13,8 +15,8 @@ export function AppRoutes() {
   if (path === '/student' || path === '/student/records') return <StudentRoutes area="records" />;
   if (path === '/student/offerings') return <StudentRoutes area="offerings" />;
   if (path === '/student/pathway') return <StudentRoutes area="pathway" />;
-  if (path === '/coordinator') return <AuthGate roles={['COORDINATOR']}><AuthDependencyPlaceholder area="coordinator" /></AuthGate>;
-  if (path === '/admin') return <AuthGate roles={['SYSTEM_ADMIN']}><AuthDependencyPlaceholder area="admin" /></AuthGate>;
+  if (path === '/coordinator' || path.startsWith('/coordinator/')) return <CoordinatorRoutes/>;
+  if (path === '/admin' || path.startsWith('/admin/')) return <AdminRoutes/>;
   if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;
   return <main className="local-card">
     <h1>Subject Advisors</h1>

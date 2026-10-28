@@ -14,12 +14,17 @@ export function verifyGrantIdentity(user, request) {
   return { ...request, coordinatorPolicy: request.owner ? 'OWNER_STUDENT_COORDINATOR' : 'ROLE_DOMAIN' };
 }
 export async function inspectGrant(client, request) {
-  const { rows: accounts } = await client.query('SELECT access_assignment_id,access_status FROM user_access_assignment WHERE clerk_user_id=$1', [request.userId]);
+  const accountLock = request.requireExistingStudent ? ' FOR UPDATE' : '';
+  const { rows: accounts } = await client.query(`SELECT access_assignment_id,access_status FROM user_access_assignment WHERE clerk_user_id=$1${accountLock}`, [request.userId]);
   const account = accounts[0];
+  if (request.requireExistingStudent && !account) throw new ProvisionError('The existing active student account is required; provisioning will not create an account.');
   if (account && account.access_status !== 'ACTIVE') throw new ProvisionError('Suspended accounts must not be reactivated by role provisioning.');
   const { rows: owners } = await client.query('SELECT a.clerk_user_id FROM user_role_assignment r JOIN user_access_assignment a USING(access_assignment_id) WHERE r.protected_owner');
   if (request.owner && owners.some(owner => owner.clerk_user_id !== request.userId)) throw new ProvisionError('Another protected owner already exists; owner rotation is not supported.');
-  const memberships = account ? (await client.query('SELECT app_role,email_policy,protected_owner FROM user_role_assignment WHERE access_assignment_id=$1 ORDER BY app_role', [account.access_assignment_id])).rows : [];
+  const membershipLock = request.requireExistingStudent || request.requireExistingSystemAdmin ? ' FOR UPDATE' : '';
+  const memberships = account ? (await client.query(`SELECT app_role,email_policy,protected_owner FROM user_role_assignment WHERE access_assignment_id=$1 ORDER BY app_role${membershipLock}`, [account.access_assignment_id])).rows : [];
+  if (request.requireExistingStudent && !memberships.some(member => member.app_role === 'STUDENT')) throw new ProvisionError('The existing STUDENT membership is required; provisioning will not remove or replace it.');
+  if (request.requireExistingSystemAdmin && !memberships.some(member => member.app_role === 'SYSTEM_ADMIN')) throw new ProvisionError('The existing SYSTEM_ADMIN membership is required; owner bootstrap will not recreate it.');
   return { account, memberships, proposedRoles: request.roles, protectOwner: Boolean(request.owner), coordinatorPolicy: request.coordinatorPolicy };
 }
 /** Caller must already verify the Clerk identity. A dry-run only reads. */

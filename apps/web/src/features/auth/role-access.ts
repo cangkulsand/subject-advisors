@@ -6,6 +6,8 @@ export function roleLandingPath(me: Me, role: AppRole): Me['landingPath'] {
     : me.studentProfileState === 'COMPLETE' ? '/student' : '/student/setup';
 }
 export function roleForPath(path: string, fallback: AppRole): AppRole {
-  return path === '/admin' ? 'SYSTEM_ADMIN' : path === '/coordinator' ? 'COORDINATOR'
-    : path === '/student' || path.startsWith('/student/') ? 'STUDENT' : fallback;
+  const normalized = path.replace(/\/$/, '') || '/';
+  const within = (base: string) => normalized === base || normalized.startsWith(`${base}/`);
+  return within('/admin') ? 'SYSTEM_ADMIN' : within('/coordinator') ? 'COORDINATOR'
+    : within('/student') ? 'STUDENT' : fallback;
 }
