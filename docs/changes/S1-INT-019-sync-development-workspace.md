@@ -1,83 +1,83 @@
 ﻿# S1-INT-019 — Synchronize Development Workspace
 
-- **Status:** PLANNED — coordinator-authorized local integration
+- **Status:** READY_FOR_REVIEW
 - **Date:** 2026-10-29
 - **Sprint:** Sprint 1 integration
 - **Owner:** INT / Integration
-- **Related UC / FR:** N/A — repository history synchronization
-- **Branch / PR:** `main` / local only, no PR or push
-- **Reviewer:** Coordinator review pending after execution
+- **Related UC / FR:** N/A — repository synchronization
+- **Branch / PR:** `main` / local only; no push or PR
+- **Reviewer:** Coordinator review pending
 
 ## 1. Plan
 
 ### Objective / problem
-Advance DEV (`D:\sharhan\development\subject advisors`) to the explicitly reviewed SOURCE application tree (`D:\sharhan\development\production\subject advisors`) while preserving both DEV local history and its fetched `origin/main` history. Keep the SOURCE application tree byte-for-byte identical to reviewed local commit `a7b01f09cf4dd270833d145a72027ea5a402392b`.
+Prepare DEV (`D:\sharhan\development\subject advisors`) as the active local workspace using reviewed SOURCE (`D:\sharhan\development\production\subject advisors`) application code, while preserving DEV history, credentials, data, and local files.
 
 ### Scope and requirements
-- In scope: create a local two-parent history integration commit on SOURCE `main` using SOURCE's reviewed tree as the merge result; fast-forward DEV `main` to that exact commit using a local-path fetch.
-- Keep the DEV template commit `67113cdae8dab0965c7bd65b643a6734d3e4b15d` in the second-parent history, but do not copy its stale UI template tree over reviewed SOURCE files. Coordinator reviewed that this commit changes 14 UI/template files and authorized preserving its history while retaining SOURCE files.
-- Out of scope: push/fetch remote changes during execution, alter remotes or tracking config, reset/rebase/force-update branches, overwrite/delete/stash local paths, install dependencies, stop/start runtimes, deploy, or write to the database/schema.
+- In scope: preserve DEV commit `67113cdae8dab0965c7bd65b643a6734d3e4b15d` as integration history while making reviewed SOURCE commit `a7b01f09cf4dd270833d145a72027ea5a402392b` the application-tree authority; fast-forward DEV; validate the DEV checkout and safely switch local development listeners to DEV.
+- The retained DEV commit is a 14-file UI/template change reviewed by the coordinator. Its history is retained as second parent; its old template tree is not copied over SOURCE application files.
+- Out of scope: pushes, remote configuration changes, resets, rebases, force updates, database/schema writes, migrations, deployments, dependency installs, provisioning, or auth impersonation.
 
-### Proposed implementation
-- Record this plan before creating backup refs or changing branches.
-- Reconfirm SOURCE `main=a7b01f09cf4dd270833d145a72027ea5a402392b`, DEV `main=0ccac62c14e563fd5ba461a5002f48e71d99069c`, and DEV `origin/main=67113cdae8dab0965c7bd65b643a6734d3e4b15d`.
-- Create named recoverable refs to those three commits. Check for Git processes/index locks; do not remove a lock file.
-- On SOURCE `main`, create a no-fast-forward merge commit using strategy `ours` with DEV `origin/main` as second parent; stage only this record and commit the resulting history integration. The result tree must differ from reviewed SOURCE commit only by this record.
-- Fetch SOURCE's local `main` path into DEV without changing remotes/config, verify the fetched commit, then `git merge --ff-only FETCH_HEAD` on DEV.
-- Preserve DEV `.dev.zip`, `p002/`, `.env.local`, `.dev.vars`, ignored caches and `node_modules`; preserve both repositories' remotes and all remote refs.
-
-### APIs / database / dependencies
-No API, schema, migration, or data change. Coordinator independently verified the shared Neon project/branch/database, migration hashes 0–4, role/audit tables, and protected owner state. Both workspaces already have matching locked dependency versions; no install is planned.
+### Proposed approach
+- Create named backup refs for original SOURCE, DEV local, and DEV `origin/main` commits.
+- On SOURCE `main`, create a no-fast-forward merge using strategy `ours`, with reviewed SOURCE as first parent/tree and DEV `67113cd` as second parent. Stage only this record. Then fetch SOURCE `main` from its local path and fast-forward DEV `main`.
+- Run the approved local typecheck, lint, unit tests, local build, admin UI checks, installed integration UI checks, and static migration review from DEV. Omit only explicit DB-test URLs from test child environments; never use shared Neon as a fixture database.
+- Prove the current SOURCE runtime process tree before stopping it. Start the existing `tools/auth/dev.mjs` runner hidden with DEV as working directory, then verify served files and non-mutating API responses.
+- Finalize this record in a new docs-only SOURCE commit; fast-forward DEV to that commit so both `main` heads remain identical.
 
 ### Acceptance criteria
-- [ ] Named backup refs point to original SOURCE, DEV local, and DEV origin commits.
-- [ ] SOURCE integration commit has parents `a7b01f0` and `67113cd` in that order, with only this plan record changed relative to `a7b01f0`.
-- [ ] DEV `main` fast-forwards to the exact SOURCE integration commit, with both original DEV commits ancestors.
-- [ ] SOURCE and DEV tracked trees match except for this record's progress/status text; no application file from the old template tree replaces SOURCE content.
-- [ ] DEV `.dev.zip`, non-generated `p002/` files, env files, ignored caches and `node_modules` remain unchanged; DEV's two preexisting untracked entries remain.
-- [ ] No push, deployment, database write, install, or runtime switch occurs.
+- [x] Named recovery refs preserve the original SOURCE/DEV commit tips.
+- [x] SOURCE integration preserves reviewed SOURCE files and retains DEV history.
+- [x] DEV `main` is fast-forwarded and both original DEV commits remain ancestors.
+- [x] Required validations pass; database-backed test suites are skipped with test URLs omitted.
+- [x] Migration files 0000–0004 match SOURCE and the approved 0004 checksum; no migration is applied.
+- [x] DEV environment settings and frontend/runtime Clerk key compatibility are confirmed without recording secret values.
+- [x] DEV local runtime serves from the DEV workspace; API health and unauthenticated access boundaries respond as expected.
+- [x] `.dev.zip`, `p002/`, environment files, and installed dependencies remain unchanged.
+- [x] No push, deployment, package install, DB write, or provisioning action occurs.
 
 ### Verification plan
-Use `git status`, `git rev-parse`, `git show -s --format=%P`, `git merge-base --is-ancestor`, `git diff-tree`, and `git diff` to confirm commit identities, parents, fast-forward ancestry, and tracked-tree difference. Compare protected file hashes and environment-file hashes privately; report only match booleans and counts, never secret values/fingerprints.
+- Git refs, commit parents, ancestry, tree comparisons, remotes, and worktree status.
+- `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd test`, `npm.cmd run build:local`, `npm.cmd run test:ui:admin`, and `npm.cmd run test:ui:integration -- --installed` from DEV.
+- `loadMigrations` comparison for versions 0000–0004 and read-only `npm.cmd run db:review`.
+- Secret-safe environment-key/authorized-party comparisons, protected-path checks, listener process-chain inspection, served HTML/module/CSS checks, and unauthenticated API status checks.
 
-### Risks / rollback
-The `ours` merge intentionally retains the old template commit only as ancestry, not as the resulting application files. Named backup refs keep original local commit tips reachable. If the actual merge result or post-commit tree differs from this plan, stop before DEV update and report it; no reset/rebase is authorized. The SOURCE remote tip is outside scope and will not be fetched or changed.
+### Risks / assumptions / rollback
+- DEV has untracked `.dev.zip` and `p002/`; leave them untouched. Preserve `.env.local`, `.dev.vars`, ignored state, and ordinary `node_modules`.
+- Local DB configuration is shared with the reviewed Neon development branch. It is not a test fixture; no DB tests receive explicit connection URLs and no migration is applied.
+- Named backup refs keep original branch tips reachable. If history/tree checks had failed, stop before DEV fast-forward; no reset or rebase is authorized.
+- Runtime stop is restricted to the proven SOURCE `tools/auth/dev.mjs` process tree. If listener ownership is ambiguous, do not stop it.
 
 ## 2. Implementation
 
-- **Status:** NOT STARTED
-- **Files actually changed:** This record only (plan revision)
-- **Summary:** Plan revised before Git ref/branch mutations per coordinator decision.
-- **Decisions / deviations from plan:** Preserve reviewed SOURCE local application tree while recording DEV `67113cd` as second parent; no remote-state reconciliation.
-- **Migrations / env / shared contracts:** None.
+- **Status:** COMPLETE — awaiting coordinator review
+- **Files changed:** This record only; no application code changed.
+- **History integration:** SOURCE commit `4ed95494aa2418e3dca8c2e2ebed6b2fdb92f5a5`; parents `a7b01f09cf4dd270833d145a72027ea5a402392b` and `67113cdae8dab0965c7bd65b643a6734d3e4b15d`. Its only path change relative to reviewed SOURCE is this record.
+- **DEV fast-forward:** DEV advanced from `0ccac62c14e563fd5ba461a5002f48e71d99069c` to the exact SOURCE integration commit. The final record is being committed as a new documentation-only SOURCE commit, then DEV is fast-forwarded to it; no existing commit is amended or rewritten.
+- **Recovery refs:** `refs/backup/s1-int-019/source-a7b01f0`, `refs/backup/s1-int-019/dev-main-0ccac62`, and `refs/backup/s1-int-019/dev-origin-main-67113cd` preserve the pre-integration commits.
+- **Validation:** Typecheck PASS; lint PASS; unit tests PASS (400 passed, 13 skipped; 32 files passed, 2 skipped); local build PASS; admin browser checks PASS (24); installed integration browser checks PASS (34, mocked Clerk/API).
+- **Database review:** Static review PASS (26 domain tables, 2 engineering extension tables, 171 columns, 39 explicit foreign keys, 19 functions). Migration versions 0000–0004 load and their file hashes match across SOURCE and DEV; version 0004 matches the approved checksum. Database execution was not performed and no migration was applied.
+- **Environment compatibility:** Runtime publishable key, runtime secret key, and frontend publishable key are present; frontend/runtime publishable keys match. Effective authorized parties permit both `http://127.0.0.1:5173` and `http://localhost:5173`. Environment files were not copied or edited.
+- **Runtime handoff:** Fresh process inspection proved both existing listeners belonged to the SOURCE project launcher. Stopped only that launcher tree (PID 24596). Started the same tracked local runner hidden from DEV working directory (launcher PID 5404), using DEV-scoped `.wrangler/logs` files. DEV Vite HTML/main module and Student, Admin, Coordinator modules plus student-shell/admin styles returned HTTP 200 without resolution errors; module responses referenced DEV and not SOURCE. Direct and proxied local-status endpoints returned 200/configured, while direct and proxied `/api/me` returned 401.
+- **Preservation:** `.dev.zip`, all 62 meaningful non-generated `p002/` files, `.env.local`, `.dev.vars`, and checked installed package versions were unchanged. DEV `node_modules` remains an ordinary directory. DEV retains exactly its two preexisting untracked entries.
+- **Migrations / env / shared contracts:** No source application change, API change, database write, migration, deployment, secret change, or provisioning occurred.
 
 ## 3. Review
 
-- **Self-review checklist:** Pending execution
-- **Test evidence:** Not run; repository history operation only, no tests requested at this stage
-- **Manual checks:** Current refs and worktree state confirmed before mutation; details to record after execution
-- **Defects found and fixes:** None
-- **Review outcome:** PENDING COORDINATOR REVIEW
-- **Human reviewer / approval:** Coordinator authorized the history policy; post-execution review pending
+- **Self-review checklist:** PASS — only this record changes beyond reviewed application commit; SOURCE tree comparison and DEV fast-forward ancestry confirmed; protected local files and environment settings preserved; runtime process ownership verified before stop/start.
+- **Test evidence:** The six specified checks passed. The 13 tests requiring explicit real database test URLs were intentionally skipped; those URLs were removed only from each test child environment. No fixture DML ran against the shared database.
+- **Manual checks:** Migration files and approved 0004 checksum; key presence/equality and local authorized parties; direct/proxy health and `/api/me`; served DEV HTML/modules/styles; ports 5173 and 8787 served through DEV runner.
+- **Defects found and fixes:** None. No code fix was required.
+- **Review outcome:** PASS — SELF-REVIEW; coordinator review pending for this final record/workspace state.
+- **Human reviewer / approval:** Coordinator approved Stage 2 history integration; final Stage 3 evidence is submitted for review.
 
 ## 4. Changelog
 
 - **Date:** 2026-10-29
 - **Type:** Chore
-- **Added / Changed / Fixed / Removed:** Revised plan for local history integration and DEV fast-forward; no code change planned.
-- **Affected routes / tables / consumers:** None
-- **Breaking changes / migration steps:** None
-- **Verification summary:** Preflight confirmed ancestry, preserved target untracked paths, same DB identity, and matching dependency locks. DEV origin's 14-file UI-only template commit is retained as history while SOURCE's reviewed app tree remains authoritative.
-- **Outstanding blockers / follow-up:** Execution and post-execution coordinator review.
-- **Final status:** PLANNED
-
-## Preflight evidence
-
-- SOURCE local `main`: `a7b01f09cf4dd270833d145a72027ea5a402392b`.
-- DEV local `main`: `0ccac62c14e563fd5ba461a5002f48e71d99069c`.
-- DEV `origin/main`: `67113cdae8dab0965c7bd65b643a6734d3e4b15d` (14-file UI-only template change, coordinator reviewed).
-- DEV untracked paths are `.dev.zip` and `p002/`; exact tracked-path collision count with SOURCE tree is zero. These paths must remain untouched.
-- Source and DEV `.dev.vars` database URLs compared equal; both use Clerk test-mode publishable keys. No connection values or fingerprints are recorded.
-- Both package lockfiles have 323 packages and zero version-entry differences; checked installed versions match.
-- Existing process on 8787 references SOURCE; 5173 owner workspace was indeterminate. Runtime state will not be changed.
-- The earlier SOURCE remote fetch stalled; SOURCE origin is outside this local-only plan and will not be consulted or updated.
+- **Added / Changed / Fixed / Removed:** Preserved reviewed SOURCE application tree and DEV history in a local merge commit; fast-forwarded DEV; validated the DEV checkout and switched local development listeners to DEV; documented the work.
+- **Affected routes / tables / consumers:** No code or route changes. No database table or consumer changes.
+- **Breaking changes / migration steps:** None.
+- **Verification summary:** All requested local checks passed. Thirteen explicit-DB tests were skipped. Static schema review and migration checksum comparison passed. Runtime module/API checks passed from DEV. Protected local files and environment settings remained unchanged.
+- **Outstanding blockers / follow-up:** No implementation blocker. No push or deployment was requested. Coordinator review of final evidence remains pending.
+- **Final status:** READY_FOR_REVIEW
