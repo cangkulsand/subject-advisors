@@ -1,11 +1,11 @@
 # S1-FOUNDATION-005 — Curriculum-scoped reference cache
 
-- **Status:** IN_PROGRESS — user-authorized publication in progress
+- **Status:** MERGED — published to development and production `main`
 - **Date:** 2026-10-29
 - **Sprint:** Sprint 1 follow-up
 - **Owner:** FOUNDATION / integration
 - **Related UC / FR:** Supports P001 UC03/UC04 reference reads; no new SRS requirement
-- **Branch / PR:** `feature-redis-caching` / not created
+- **Branch / PR:** `main` in development and production; no PR created
 - **Reviewer:** Coordinator AI review PASS (A/B/C); human peer review pending
 
 ## 1. Plan
@@ -85,7 +85,7 @@ These are mocked query-count targets, not latency guarantees. Redis outage can a
 
 ## 2. Implementation
 
-- **Status:** IN_PROGRESS — user-authorized publication in progress
+- **Status:** MERGED — published as `6cfe9d0b1367501a74c18f1fb4365b07f4fed60c`
 - **Files actually changed:** `.dev.vars.example`, `apps/api/src/cache/redis.ts`, `apps/api/src/cache/redis.test.ts`, `apps/api/src/modules/profile/repository.ts`, `apps/api/src/modules/profile/repository.test.ts`, `apps/api/src/modules/profile/index.ts`, `apps/api/src/modules/profile/index.test.ts`, `apps/api/src/modules/profile/profile.test.ts`, `docs/cachingguide.md`, and this record. Existing browser-guide prefix remains unchanged.
 - **Summary:** Mini-task A added the typed curriculum scope, scoped key/envelope/source guards, capability predicate, adapter dual-flag enforcement, and runtime kind/scope checks. Mini-task B wired the capability through composition and implemented the opt-in live-association/captured-ID loaders with exact validation, public response projection, failure behavior, and focused tests. Mini-task C added the second default-off example flag and updated the server-cache guide for rollout, query counts, TTL, privacy, race behavior, budget, telemetry, and rollback.
 - **Decisions / deviations from plan:** Retained existing 200 ms shared Redis-only budget, retry settings, SDK/client lifecycle, global v1 keys, observation fields, and owner query path when the new capability is off. Loader identity mismatch preserves the loader return value but reports `invalid-source` and skips SET. No records repository implementation, DB schema, frontend, provider, actual environment, or deployment changes.
@@ -95,9 +95,9 @@ These are mocked query-count targets, not latency guarantees. Redis outage can a
 
 - **Self-review checklist:** Pass on plan, scope, captured-ID loaders, exact data validation, global compatibility, default-off flag/config matrix, response projection, auth-before-cache, live record validation, privacy, failure handling, browser-guide preservation, and diff quality. Coordinator AI review passed for minis A, B, and C. Human peer review remains pending.
 - **Test evidence:** `npm.cmd run typecheck` — PASS. `npm.cmd run lint` — PASS. `npm.cmd test` with only `AUTH_TEST_DATABASE_URL` and `OFFERINGS_TEST_DATABASE_URL` omitted from the child process — PASS, 34 test files passed, 2 skipped; 459 tests passed, 13 skipped (472 total). `npm.cmd run test:integration` — PASS, 7/7. `npm.cmd run build:local` — PASS, 132 modules. `npm.cmd run build` — PASS. `npm.cmd run check:cloudflare` — PASS, Cloudflare assets build and Wrangler 4.148.0 dry-run exited without deployment. Focused adapter/profile/route/composition/record suite — PASS, 141 tests; coordinator independently reran the five-file focused suite, also 141 passed. P001 TypeScript check, targeted ESLint, and `git diff --check` — PASS. Coordinator's optional local unauthenticated `GET /api/profile/options` sanity check returned 401. No live provider or DB fixture run.
-- **Manual checks:** Reviewed implementation guide, Sprint 1 FOUNDATION/P001 scope, adapter, repository SQL, route authorization order, current records write query, schema contract, Workers best-practices/runtime-patterns, and guide changes. Coordinator parsed all eight static SELECT/WITH templates with installed `libpg-query`; syntax passed without a DB connection. Four local Markdown links pass; no control bytes; original browser-cache guide prefix is unchanged. Coordinator confirmed the final diff is within the approved 10-file scope. `HEAD` and `main` remain `40e3e2d406fd661a3d8987f8211426806c5ee2d5`.
+- **Manual checks:** Reviewed implementation guide, Sprint 1 FOUNDATION/P001 scope, adapter, repository SQL, route authorization order, current records write query, schema contract, Workers best-practices/runtime-patterns, and guide changes. Coordinator parsed all eight static SELECT/WITH templates with installed `libpg-query`; syntax passed without a DB connection. Four local Markdown links pass; no control bytes; original browser-cache guide prefix is unchanged. Coordinator confirmed the implementation diff is within the approved scope. At implementation publication, commit `d40dbfb9ec645d3470c4291efded344f48e9224e` was incorporated into merge `6cfe9d0b1367501a74c18f1fb4365b07f4fed60c`, whose tree was identical to the reviewed implementation tree; both repositories' local and remote `main` refs and GitHub remote tips were verified at that merge commit. A separate two-file documentation closeout follows the verified code merge.
 - **Defects found and fixes:** A review corrections added adapter-boundary feature gating, source curriculum identity validation, and runtime kind whitelist. B review requested stronger warmed-route denial coverage and a mocked real-SDK composition test with live association; both were added. C added an explicit oversized curriculum-envelope regression after acceptance audit. No runtime defect remains known.
-- **Review outcome:** PASS — SELF-REVIEW; coordinator AI review PASS for A, B, and C. Publication commit/sync review pending. Human peer review pending.
+- **Review outcome:** PASS — SELF-REVIEW; coordinator AI review PASS for A, B, C, and publication. Human peer review pending.
 - **Human reviewer / approval:** Pending; implementation was authorized by the user. No human peer review is claimed.
 
 ## 4. Changelog
@@ -108,5 +108,5 @@ These are mocked query-count targets, not latency guarantees. Redis outage can a
 - **Affected routes / tables / consumers:** Internal `GET /api/profile/options` repository/cache behavior and configuration documentation. No database table, migration, record repository, or public API schema change.
 - **Breaking changes / migration steps:** None.
 - **Verification summary:** Full required test, typecheck, lint, integration, local build, build, Cloudflare dry-run, focused tests, SQL parse, local documentation links, guide-prefix comparison, control-byte and diff checks passed. Verification used mocks; no provider or shared Neon fixture database was contacted.
-- **Outstanding blockers / follow-up:** User authorized commit/merge/sync. Local feature commit and coordinator review are in progress; no merge or push has occurred. Human peer review remains pending.
-- **Final status:** IN_PROGRESS
+- **Outstanding blockers / follow-up:** Human peer review remains pending. User authorized implementation and publication; no human peer review is claimed. No deployment or cache/provider activation was requested or performed.
+- **Final status:** MERGED
