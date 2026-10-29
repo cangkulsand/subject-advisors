@@ -4,6 +4,7 @@ import { OfferingApiError } from './client';
 import { offeringHistoryState } from './academic-history';
 import { matchesOfferingSemesterDisplay, offeringCategoryLabel } from './display-filter';
 import { offeringCategoryGroup, offeringCategoryPillLabel, sortOfferingSubjectsByCategory, summarizeOfferingCategories } from './category-history-summary';
+import { PrerequisiteDisplay } from './PrerequisiteDisplay';
 import { ToastStack } from '../../components/feedback/ToastStack';
 import { useToastNotifications } from '../../components/feedback/useToastNotifications';
 import { registerUnsavedChanges } from '../../app/navigation';
@@ -160,12 +161,16 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
               {data.subjects.length > 0 && !remaining.length && <div className="offerings-empty"><h3>No matching subjects</h3><p>Adjust your search. Selected subjects remain available in the summary when search hides them.</p></div>}
               <p className="offerings-table-hint">Scroll the subject table to see category and credits.</p>
               <div className="offerings-table-scroll" role="region" aria-label="Subject catalogue table; scroll horizontally" tabIndex={0}>
-              <table className="offerings-subject-table"><thead><tr><th scope="col">Select</th><th scope="col">Subject</th><th scope="col">Category</th><th scope="col">Credits</th></tr></thead><tbody>{remaining.map(subject => {
+              <table className="offerings-subject-table"><thead><tr><th scope="col">Select</th><th scope="col">Subject</th><th className="offerings-prerequisites-column" scope="col">Prerequisites</th><th scope="col">Category</th><th scope="col">Credits</th></tr></thead><tbody>{remaining.map(subject => {
                 const checked = draft.includes(subject.curriculumSubjectId);
                 const state = offeringHistoryState(subject, data.academicHistory);
                 return <tr key={subject.curriculumSubjectId} className={(checked ? 'is-selected ' : '') + (state === 'ambiguous' ? 'is-ambiguous' : '')}>
                   <td><input type="checkbox" checked={checked} disabled={saving} onChange={() => toggle(subject.curriculumSubjectId)} aria-label={`${subject.code} ${subject.name}`} /></td>
-                  <td><strong>{subject.code}</strong><span>{subject.name}</span>{state === 'ambiguous' && <small>History ambiguous</small>}</td>
+                  <td><div className="offerings-subject-copy"><strong>{subject.code}</strong><span>{subject.name}</span>
+                    {state === 'ambiguous' && <small>History ambiguous</small>}
+                    <div className="offerings-prerequisite-inline"><PrerequisiteDisplay subject={subject} catalogue={data.subjects} /></div>
+                  </div></td>
+                  <td className="offerings-prerequisites-column"><PrerequisiteDisplay subject={subject} catalogue={data.subjects} /></td>
                   <td><span className={`offerings-category-pill offerings-category-pill-${offeringCategoryGroup(subject).toLowerCase()}`}>{offeringCategoryPillLabel(subject)}</span>{!subject.subjectCategory?.trim() && <small>Not recorded</small>}</td>
                   <td>{subject.creditHours}</td>
                 </tr>;
@@ -174,7 +179,7 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
             </> : <>
               {mode === 'review' && hiddenSelected.length > 0 && <div className="offerings-hidden-selection" role="status">{hiddenSelected.length} selected {hiddenSelected.length === 1 ? 'subject is' : 'subjects are'} hidden by the current search or semester/history display rule. They remain in this review and will be included in the save.</div>}
               <ul className="offerings-review-list">{selected.map(subject => <li key={subject.curriculumSubjectId}>
-                <div><strong>{subject.code}</strong><span>{subject.name}</span><small>{offeringCategoryLabel(subject)} · {historyLabel(subject, data)}</small></div><span>{subject.creditHours} credits</span></li>)}</ul>
+                <div><strong>{subject.code}</strong><span>{subject.name}</span><small>{offeringCategoryLabel(subject)} · {historyLabel(subject, data)}</small><PrerequisiteDisplay subject={subject} catalogue={data.subjects} /></div><span>{subject.creditHours} credits</span></li>)}</ul>
               {!selected.length && <p className="offerings-empty">No reported offerings. Future recommendations need subject offerings to work from.</p>}
               {mode === 'review' && <label className="offerings-confirm"><input type="checkbox" checked={confirmed} disabled={saving}
                 onChange={event => setConfirmed(event.target.checked)} />

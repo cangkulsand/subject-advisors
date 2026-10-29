@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { fixtureResponse } from './fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
-const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
+const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', loader: { '.png': 'dataurl' }, alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
 const css = output.outputFiles.find(file => file.path.endsWith('.css'))?.text ?? '';
 const serve = process.argv.includes('--serve');

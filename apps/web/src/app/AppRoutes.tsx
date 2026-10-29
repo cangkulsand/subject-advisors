@@ -3,6 +3,7 @@ import { StudentRoutes } from './StudentRoutes';
 import { useAppPathname } from './navigation';
 import { AdminRoutes } from '../features/admin/AdminRoutes';
 import { CoordinatorRoutes } from '../features/coordinator/CoordinatorRoutes';
+import { LandingPage } from '../features/landing/LandingPage';
 
 /** Shared integrated route table used by local and deployed application shells. */
 export function AppRoutes() {
@@ -18,10 +19,5 @@ export function AppRoutes() {
   if (path === '/coordinator' || path.startsWith('/coordinator/')) return <CoordinatorRoutes/>;
   if (path === '/admin' || path.startsWith('/admin/')) return <AdminRoutes/>;
   if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;
-  return <main className="local-card">
-    <h1>Subject Advisors</h1>
-    <p>Register with your verified institutional email or sign in to your existing account.</p>
-    <nav aria-label="Account"><a className="primary-link" href="/sign-in">Sign in</a><a href="/sign-up">Create student account</a><a href="/auth/complete">Continue to my account</a></nav>
-    <p className="note">Academic services become available as the team enables them.</p>
-  </main>;
+  return <LandingPage />;
 }

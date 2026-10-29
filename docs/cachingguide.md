@@ -46,6 +46,8 @@ explicit change to the agreed project requirements.
    and semester query. Keep identity at key index zero. Increment the narrow UC08
    contract marker when additive context fields are introduced so older five-minute
    snapshots cannot hide fields without changing other academic cache behavior. Its
+   current marker is `p002-context-v4-prerequisites`; prerequisite metadata keeps
+   known-empty (`available` with no items) distinct from unavailable or legacy data.
    P001 academic-history read continues to use the session-long academic-records
    cache; do not put the composed page data or local selection draft into that
    snapshot. A successful offering PUT clears academic snapshots before response

@@ -9,7 +9,13 @@ export interface OfferingSubject {
   /** Curriculum-specific classification. Missing means unknown, not another category. */
   subjectCategory?: string | null;
   isCompulsory?: 0 | 1;
+  /** Optional direct catalogue metadata. Available with [] is known-empty; unavailable is unknown. */
+  prerequisites?: OfferingPrerequisites;
 }
+export type OfferingRequirementType = 'MANDATORY' | 'RECOMMENDED' | 'COREQUISITE';
+export type OfferingPrerequisites =
+  | { status: 'available'; items: Array<{ requiredCurriculumSubjectId: string; requirementType: OfferingRequirementType }> }
+  | { status: 'unavailable' };
 export type OfferingAcademicRecordStatus = 'COMPLETED' | 'EXEMPTED' | 'FAILED' | 'WITHDRAWN';
 export interface OfferingAcademicRecord {
   subjectId: string;

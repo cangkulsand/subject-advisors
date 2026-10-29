@@ -6,7 +6,7 @@ const root = createRoot(document.getElementById('root')!);
 root.render(scenario === 'missing-key'
   ? <AuthProvider publishableKey=""><p>Private content</p></AuthProvider>
   : scenario?.startsWith('logout')
-    ? <LogoutButton />
+    ? <AuthProvider publishableKey="TEST_ONLY_PUBLIC_KEY"><LogoutButton /></AuthProvider>
     : <AuthGate roles={scenario === 'wrong-role' ? ['SYSTEM_ADMIN'] : ['STUDENT']}
         requireProfile complete={scenario === 'complete'}>
         <p>Private content</p><LogoutButton />

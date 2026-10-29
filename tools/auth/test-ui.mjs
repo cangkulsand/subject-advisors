@@ -98,14 +98,27 @@ try {
   });
   await check('logout failure is visible and retryable', async page => {
     await page.goto(base + '/test?scenario=logout-failure');
+    await page.waitForFunction(() => document.documentElement.dataset.clerkAfterSignOutUrl === '/');
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await page.getByRole('alert').waitFor();
     assert.equal(await page.getByRole('button', { name: 'Sign out', exact: true }).isEnabled(), true);
+    assert.equal(await page.evaluate(() => document.body.dataset.signOutRedirectUrl), '/');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.waitForFunction(() => document.body.dataset.signOutCalls === '2');
+    assert.equal(await page.getByRole('alert').count(), 1);
   });
   await check('logout calls Clerk signOut', async page => {
     await page.goto(base + '/test?scenario=logout-success');
+    await page.waitForFunction(() => document.documentElement.dataset.clerkAfterSignOutUrl === '/');
+    await page.evaluate(() => {
+      sessionStorage.setItem('subject-advisors.account.v3:logout-test', 'test account cache');
+      sessionStorage.setItem('subject-advisors.academic.v1:logout-test', 'test academic cache');
+    });
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await page.waitForFunction(() => document.body.dataset.signedOut === 'true');
+    assert.equal(await page.evaluate(() => document.body.dataset.signOutRedirectUrl), '/');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('subject-advisors.account.v3:logout-test')), null);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('subject-advisors.academic.v1:logout-test')), null);
   });
   console.log(passed + ' UI checks passed (mock Clerk/API).');
 } finally {

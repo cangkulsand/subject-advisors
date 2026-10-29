@@ -89,12 +89,23 @@
 .offerings-subject-table th { padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--off-muted); border-bottom: 1px solid var(--off-outline); }
 .offerings-subject-table th:first-child { width: 64px; text-align: center; }
 .offerings-subject-table th:nth-child(2) { width: 37%; }
-.offerings-subject-table th:nth-child(4) { width: 68px; }
+.offerings-subject-table th:nth-child(5) { width: 68px; }
+.offerings-prerequisites-column { display: none; }
+.offerings-prerequisite-inline { display: block; min-width: 0; }
 .offerings-subject-table td { padding: 12px 8px; vertical-align: middle; border-bottom: 1px solid var(--off-outline); font-size: 11px; overflow-wrap: anywhere; }
 .offerings-subject-table td:first-child { text-align: center; }
-.offerings-subject-table td:nth-child(2) strong, .offerings-subject-table td:nth-child(2) span, .offerings-subject-table td small { display: block; }
-.offerings-subject-table td:nth-child(2) span { margin-top: 3px; font-size: 12px; }
-.offerings-subject-table small { color: var(--off-muted); font-size: 10px; }
+.offerings-subject-copy { display: grid; gap: 3px; min-width: 0; }
+.offerings-subject-copy > strong { display: block; }
+.offerings-subject-copy > span { display: block; margin-top: 0; font-size: 12px; }
+.offerings-subject-copy > small { color: var(--off-muted); font-size: 10px; }
+.offerings-subject-table td > small { display: block; color: var(--off-muted); font-size: 10px; }
+.offerings-prerequisites { display: grid; gap: 6px; min-width: 0; margin-top: 5px; color: var(--off-muted); font-size: 10px; line-height: 1.4; text-align: left; white-space: normal; }
+.offerings-prerequisites-note { margin: 0; overflow-wrap: anywhere; }
+.offerings-prerequisite-group { display: grid; gap: 2px; min-width: 0; }
+.offerings-prerequisite-label { color: var(--off-heading); font-size: 10px; font-weight: 650; overflow-wrap: anywhere; }
+.offerings-prerequisite-group > ul { display: grid; gap: 2px; list-style: none; min-width: 0; padding: 0; margin: 0; }
+.offerings-prerequisite-group > ul > li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.offerings-prerequisite-code { font-weight: 650; overflow-wrap: anywhere; }
 .offerings-subject-table tr.is-selected { background: var(--off-info-bg); }
 .offerings-subject-table tr.is-ambiguous td:nth-child(2) { color: var(--off-warning-text); }
 .offerings-table-scroll { min-width: 0; }
@@ -137,10 +148,10 @@
 .offerings-empty p { margin-top: 8px; }
 .offerings-summary .offerings-empty { background: var(--off-bg); border-radius: 8px; padding: 20px 16px; margin-top: 20px; text-align: left; font-size: 12px; }
 .offerings-review-list { list-style: none; padding: 0 24px; margin: 0; }
-.offerings-review-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--off-outline); font-size: 12px; }
-.offerings-review-list li > div { display: grid; gap: 4px; }
-.offerings-review-list small { color: var(--off-muted); }
-.offerings-review-list li > span { white-space: nowrap; }
+.offerings-review-list > li { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--off-outline); font-size: 12px; }
+.offerings-review-list > li > div { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.offerings-review-list > li > div > small { color: var(--off-muted); }
+.offerings-review-list > li > span { white-space: nowrap; }
 .offerings-confirm { display: flex; align-items: flex-start; gap: 12px; background: var(--off-bg); padding: 20px; margin: 24px; font-size: 12px; border-radius: 8px; cursor: pointer; }
 .offerings-confirm input { margin-top: 3px !important; }
 .offerings-error { padding: 20px; margin: 24px; border: 1px solid var(--off-danger-text); border-radius: 8px; background: var(--off-danger-bg); color: var(--off-danger-text); }
@@ -160,6 +171,16 @@
 .offerings-history li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--off-outline); font-size: 11px; }
 .offerings-history li span { color: var(--off-muted); text-align: right; }
 .offerings-history li span small { display: block; margin-top: 3px; }
+@media (min-width: 901px) {
+  .offerings-subject-table th:first-child { width: 52px; }
+  .offerings-subject-table th:nth-child(2) { width: 21%; }
+  .offerings-subject-table th:nth-child(3) { width: 34%; }
+  .offerings-subject-table th:nth-child(4) { width: 21%; }
+  .offerings-subject-table th:nth-child(5) { width: 64px; }
+  .offerings-prerequisites-column { display: table-cell; }
+  .offerings-subject-table td.offerings-prerequisites-column { vertical-align: top; }
+  .offerings-prerequisite-inline { display: none; }
+}
 @media (max-width: 900px) {
   .offerings-grid { grid-template-columns: 280px minmax(0, 1fr); gap: 16px; }
   .offerings-semester { grid-template-columns: 1fr 1fr; gap: 16px; }

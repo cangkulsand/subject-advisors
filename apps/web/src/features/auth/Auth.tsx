@@ -13,7 +13,7 @@ export function AuthProvider({ publishableKey, children }: { publishableKey: str
   return <ClerkProvider publishableKey={publishableKey} signInUrl="/sign-in" signUpUrl="/sign-up"
     appearance={{ variables: { colorPrimary: '#521f28', colorForeground: '#49383b', colorMutedForeground: '#786368', colorNeutral: '#49383b', colorBackground: '#ffffff', colorRing: '#9a596b', colorDanger: '#b13b35', colorSuccess: '#34634c', colorWarning: '#825c1a' } }}
     signInForceRedirectUrl="/auth/complete" signUpForceRedirectUrl="/auth/complete"
-    afterSignOutUrl="/sign-in"><AccountSessionLifecycle />{children}</ClerkProvider>;
+    afterSignOutUrl="/"><AccountSessionLifecycle />{children}</ClerkProvider>;
 }
 
 function AccountSessionLifecycle() {
@@ -42,7 +42,7 @@ export function LogoutButton() {
   async function logout() {
     setPending(true); setFailed(false);
     clearAccountCache(false);
-    try { await signOut({ redirectUrl: '/sign-in' }); }
+    try { await signOut({ redirectUrl: '/' }); }
     catch { setFailed(true); }
     finally { setPending(false); }
   }

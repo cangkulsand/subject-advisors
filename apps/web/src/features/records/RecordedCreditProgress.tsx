@@ -24,7 +24,7 @@ export function RecordedCreditProgress({ subjects, records, totalCreditRequired 
 
   return <section className="p001-degree-progress" aria-labelledby="p001-degree-progress-title">
     <div className="p001-degree-heading">
-      <div><p className="p001-degree-eyebrow">ACADEMIC SUMMARY</p><h2 id="p001-degree-progress-title">Degree Progress</h2></div>
+      <div><p className="p001-degree-eyebrow">SUMMARY</p><h2 id="p001-degree-progress-title">Academic Progress</h2></div>
     </div>
     {ready ? <>
       <div className="p001-degree-result"><strong>{recordedCredits}<span> / {configuredTotal}</span></strong><span>credits recorded</span></div>
