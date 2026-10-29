@@ -1,12 +1,12 @@
 # S1-FOUNDATION-004 — Optional Redis reference cache for profile options
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED
 - **Date:** 2026-10-29
 - **Sprint:** Sprint 1
 - **Owner:** FOUNDATION / integration infrastructure
 - **Related UC / FR:** Supports P001 UC03/UC04; no new SRS requirement
-- **Branch / PR:** `feature-redis-caching` / direct main publication requested by user; local commit pending coordinator review
-- **Reviewer:** Pending
+- **Branch / PR:** `main` / direct publication requested by user; commit `bca1f91264c4b99f507e27f986fbc623bcab90e8` pushed and verified
+- **Reviewer:** Coordinator AI review passed; no human peer review performed
 
 ## 1. Plan
 
@@ -74,7 +74,7 @@ No endpoint, response schema, database schema, or migration change is planned. `
 
 ## 2. Implementation
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED (direct publication explicitly requested by user)
 - **Files actually changed:** `.dev.vars.example`, `apps/api/src/cache/redis.ts`, `apps/api/src/cache/redis.test.ts`, `apps/api/src/modules/profile/index.ts`, `apps/api/src/modules/profile/index.test.ts`, `apps/api/src/modules/profile/repository.ts`, `apps/api/src/modules/profile/repository.test.ts`, `apps/api/src/modules/profile/profile.test.ts`, `package.json`, `package-lock.json`, `docs/cachingguide.md`, and this record.
 - **Summary:** Added the optional Redis adapter and wired only the global curriculum (300-second) and academic semester (60-second) lookups in `profile.options`. Existing `createProfileRepository(query)` callers remain cache-free. P001 dependencies accept optional `CacheBindings` and construct the adapter without network I/O; the generated integration caller still typechecks without generator edits. Exact typed row validators reject extra keys, nonpositive/out-of-range IDs, malformed values, and semester number/type pairs that violate the existing database constraint. The subject and subject-group owner-scoped SQL remains unchanged and live. `save` validation remains unchanged and database-backed. Tests cover cross-student owner query separation, warm reference hits, empty references, invalid cached rows, write validation, fresh auth before warm-cache access, route `no-store`, and real SDK serialization over mocked fetch.
 - **Decisions / deviations from plan:** `P001Bindings` is `AuthBindings & Partial<CacheBindings>`; the shared auth binding contract and auth verification behavior are unchanged. No integration generator changes were needed. No plan deviation.
@@ -85,8 +85,8 @@ No endpoint, response schema, database schema, or migration change is planned. `
 - **Test evidence:** Full `npm.cmd test` — PASS, 34 files/429 tests passed; 2 files/13 tests skipped with the explicit DB test environment variables omitted in the child process. `npm.cmd run typecheck` — PASS. `npm.cmd run lint` — PASS. `npm.cmd run test:integration` — PASS, 7 tests. `npm.cmd run build:local` — PASS. `npm.cmd run build` — PASS. `npm.cmd run check:cloudflare` — PASS; Wrangler `deploy --dry-run` exited without deployment. The mocked profile-options query count is four for a cold request and six total after a warm second request (two owner-scoped queries per request, with one total curricula and semester SELECT). Mocked SDK HTTP verifies numeric `lookupDurationMs` and `redisDurationMs`; no representative real latency benchmark was recorded. No live provider smoke run.
 - **Manual checks:** Only the two global reference SQL statements are cached; subject and subject-group query text and save-time SQL remain live. `tools/integration/prepare.mjs` was not edited. Existing scripts regenerated ignored outputs. Coordinator independently verified the focused four-file suite (102 passed), all 13 expected source/doc files, the original browser-guide prefix against HEAD, all three local Markdown links, and `git diff --check`. A local unauthenticated `GET /api/profile/options` returned 401. No live Upstash/Neon calls or browser tests were run.
 - **Defects found and fixes:** Repaired malformed Markdown in this record. Split invalid curriculum ID and extra-field cases so each fails independently. The save regression now warms semester 30 and confirms Neon rejects that cached UI choice. Added a repository-level clock test proving the 60-second semester list reloads independently while curricula remain cached through 61 seconds, then both refresh after 301 seconds. Semester validation follows `db/migrations/0001_initial_schema.sql` constraints without imposing a year-format policy. No remaining known phase B defect in self-review.
-- **Review outcome:** PASS — SELF-REVIEW; PASS — COORDINATOR AI REVIEW for phases A, B, and C. User explicitly requested direct main publication; no human peer review is claimed or required for that instruction.
-- **Human reviewer / approval:** Pending human peer review; coordinator review is AI review, not human approval.
+- **Review outcome:** PASS — SELF-REVIEW; PASS — COORDINATOR AI REVIEW for phases A, B, and C. Direct main publication was explicitly requested by the user.
+- **Human reviewer / approval:** No human peer review was performed; publication followed the user's explicit direct-main instruction. Coordinator AI review is not represented as human approval.
 ## 4. Changelog
 
 - **Date:** 2026-10-29
@@ -94,6 +94,6 @@ No endpoint, response schema, database schema, or migration change is planned. `
 - **Added / Changed / Fixed / Removed:** Added the optional Redis adapter/tests and wired only the two global reference lookups into profile options. Added safe enabled-only aggregate telemetry and disabled-by-default example configuration. Updated the caching guide to distinguish implemented scope from proposed extensions. The remaining per-user data, authorization and writes stay live.
 - **Affected routes / tables / consumers:** Affected route: authenticated `GET /api/profile/options`; its path and response contract are unchanged. No database tables changed.
 - **Breaking changes / migration steps:** None.
-- **Verification summary:** Full suite 429 passed/13 skipped with DB test environment variables omitted; typecheck, lint, 7 integration tests, local build, API build, Wrangler dry-run, and diff check passed. Mocked query count confirms cold four queries and warm two owner queries; mocked observer emits timing fields. No live provider smoke run.
-- **Outstanding blockers / follow-up:** Local feature commit is pending coordinator review before any push/merge. The implementation is complete for the user's direct-publication request, with Redis disabled by default. Optional isolated live development smoke verification requires provider-supplied credentials and is not required for mocked/code-only implementation.
-- **Final status:** READY_FOR_REVIEW
+- **Verification summary:** Full suite 429 passed/13 skipped with DB test environment variables omitted; typecheck, lint, 7 integration tests, local build, API build, and Wrangler dry-run passed. Mocked query count confirms cold four queries and warm two owner queries; mocked observer emits timing fields. Coordinator additionally verified 102 focused tests, 13-path code scope, guide prefix, links, diff check, and local unauthenticated GET 401. No live provider smoke run. Commit `bca1f91264c4b99f507e27f986fbc623bcab90e8` is verified at local `main`, `origin/main`, `feature-redis-caching`, and remote `refs/heads/main`.
+- **Outstanding blockers / follow-up:** No implementation blocker. Optional isolated live development smoke verification requires provider-supplied credentials and is not required for mocked/code-only implementation. No human peer review was performed; publication followed the user's explicit direct-main instruction.
+- **Final status:** MERGED

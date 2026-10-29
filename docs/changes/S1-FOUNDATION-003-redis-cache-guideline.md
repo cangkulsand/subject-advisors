@@ -1,12 +1,12 @@
 # S1-FOUNDATION-003 — Redis cache guideline
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED
 - **Date:** 2026-10-29
 - **Sprint:** Sprint 1
 - **Owner:** FOUNDATION
 - **Related UC / FR:** UC03, UC04, UC08; supports P001 and P002 reference reads
-- **Branch / PR:** `feature-redis-caching` / not created (documentation work was initially made on `main` and carried forward when the implementation branch was created)
-- **Reviewer:** Pending
+- **Branch / PR:** `main` / direct main publication explicitly requested by user; documentation work was initially made on `main` and carried forward when the implementation branch was created
+- **Reviewer:** Coordinator AI feedback incorporated; no human peer review performed
 
 ## 1. Plan
 
@@ -26,7 +26,7 @@ Document a proposed optional server-side Redis cache policy that complements the
 - [x] Existing session-long profile/record behavior, five-minute browser options/offerings behavior, role v3 snapshot rules, and per-tab boundaries remain intact.
 - [x] New server Redis policy is explicitly PROPOSED / NOT IMPLEMENTED and covers allowed/excluded data, authorization, TTLs, fallback/timeouts, validation/namespaces, invalidation/staleness, flags/configuration, observability, and implementation verification.
 - [x] No cached auth decision or business rule becomes authoritative; failures do not mask Neon errors; freshness limits and existing HTTP `no-store` contract are explicit.
-- [x] This record contains Plan, Implementation, Review, and Changelog with truthful evidence and review pending.
+- [x] This record contains Plan, Implementation, Review, and Changelog with truthful evidence and publication/reviewer status accurately stated.
 
 ### Verification plan
 - `git diff --check`
@@ -52,7 +52,7 @@ Document a proposed optional server-side Redis cache policy that complements the
 - **Manual checks:** Inspected diff and verified the existing local implementation-record link resolves to `docs/changes/S1-INT-009-academic-session-cache.md`; new references are external links supplied in the task brief.
 - **Defects found and fixes:** Coordinator review identified five documentation corrections, all incorporated: replaced a mojibake heading separator with ASCII; clarified the Redis budget covers lookup/retries/fill while preserving Neon fallback and existing Neon timeout/error handling; corrected direct-DB freshness language to account for browser retention and avoid an end-to-end guarantee; added spacing after References; and recorded coordinator corrections separately from pending human peer review. Coordinator independently verified the existing guide prefix exactly matches HEAD.
 - **Review outcome:** PASS — SELF-REVIEW
-- **Human reviewer / approval:** Pending human peer review; coordinator review requested documentation corrections, which were incorporated. The coordinator is not treated as a human peer reviewer.
+- **Human reviewer / approval:** No human peer review was performed; direct main publication was explicitly requested by the user. Coordinator feedback on the documentation corrections was incorporated and is not represented as human approval.
 
 ## 4. Changelog
 
@@ -62,5 +62,5 @@ Document a proposed optional server-side Redis cache policy that complements the
 - **Affected routes / tables / consumers:** Future P001/P002 reference-read implementation guidance; no runtime routes or tables changed.
 - **Breaking changes / migration steps:** None.
 - **Verification summary:** `git diff --check` passed; local implementation-record link checked; runtime tests not applicable and not run.
-- **Outstanding blockers / follow-up:** User requested direct main publication of the later implementation. The proposed policy documented here remains distinct from the implementation recorded in `docs/changes/S1-FOUNDATION-004-redis-reference-cache.md`; the local feature commit is awaiting coordinator review before remote publication. No human peer review is claimed.
-- **Final status:** READY_FOR_REVIEW
+- **Outstanding blockers / follow-up:** The policy documented here remains distinct from the implemented, disabled-by-default two-query cache recorded in `docs/changes/S1-FOUNDATION-004-redis-reference-cache.md`. This docs record and the later implementation were published in commit `bca1f91264c4b99f507e27f986fbc623bcab90e8` under the user's direct-main instruction. No human peer review is claimed.
+- **Final status:** MERGED
