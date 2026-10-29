@@ -1,14 +1,30 @@
 import { describe, it, expect, vi } from 'vitest';
 import { profileInput, P001Error, jsonBody } from './validation';
 import { recordInput } from '../records/validation';
-import { createProfileReader } from './repository';
+import { createProfileReader, createProfileRepository } from './repository';
+import { createReferenceCache, type CacheBindings } from '../../cache/redis';
 import { handleP001Request, type P001Dependencies } from './routes';
 import { AuthError } from '../auth/errors';
 import type { Profile, ProfileRepository } from './contracts';
+import type { AccessAssignment } from '../auth/contracts';
 
 const input = { studentName: 'Demo student', curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
 const profile: Profile = { ...input, studentId: 1, matricNo: null, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
 const record = { subjectId: 1, semesterId: null, status: 'EXEMPTED', recognizedCredits: 0, remarks: 'DEMO credit-free exemption' };
+const cacheBindings: CacheBindings = {
+  REDIS_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
+  UPSTASH_REDIS_REST_TOKEN: 'test-secret', REDIS_CACHE_NAMESPACE: 'test', REDIS_CACHE_DATASET: 'profile',
+};
+function referenceCacheHarness() {
+  const store = new Map<string, unknown>();
+  const get = vi.fn(async <T>(key: string): Promise<T | null> => (store.get(key) as T | undefined) ?? null);
+  const set = vi.fn(async (key: string, value: unknown) => { store.set(key, value); return 'OK'; });
+  const createClient = vi.fn((_config: { url: string; token: string }, _signal: AbortSignal) => {
+    void _config; void _signal;
+    return { get: <T>(key: string) => get(key) as Promise<T | null>, set };
+  });
+  return { cache: createReferenceCache(cacheBindings, { createClient }), get, set, createClient };
+}
 function dependencies(state: 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' = 'COMPLETE'): P001Dependencies {
   return {
     auth: {
@@ -73,6 +89,48 @@ describe('P001 ProfileReader seam', () => {
   it('reports unavailable on a persistence failure', async () => expect(await createProfileReader(repository(async () => { throw new Error('private details'); })).stateFor('a')).toBe('UNAVAILABLE'));
 });
 describe('P001 authenticated route boundary', () => {
+  it('keeps auth fresh and ahead of a warm profile-options cache, with no-store responses', async () => {
+    const cache = referenceCacheHarness();
+    const query = vi.fn(async () => [] as Record<string, unknown>[]);
+    const profiles = createProfileRepository(query, cache.cache);
+    const options = vi.spyOn(profiles, 'options');
+    const deps = dependencies();
+    deps.profiles = profiles;
+    let assignment: AccessAssignment = { clerkUserId: 'verified_student_a', appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'ACTIVE' };
+    let invalidSession = false;
+    const verified = { clerkUserId: 'verified_student_a', sessionId: 'new-session', primaryEmail: { address: 'demo@graduate.utm.my', verified: true } };
+    const verify = vi.fn(async () => { if (invalidSession) throw new AuthError(401, 'SESSION_INVALID', 'Session expired.'); return verified; });
+    const accessFind = vi.fn(async () => assignment);
+    deps.auth.verify = verify;
+    deps.auth.access.find = accessFind;
+
+    const first = await handleP001Request(request('/api/profile/options'), deps);
+    const second = await handleP001Request(request('/api/profile/options'), deps);
+    expect(first?.headers.get('Cache-Control')).toBe('no-store');
+    expect(second?.headers.get('Cache-Control')).toBe('no-store');
+    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [] } });
+    expect(options).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(6);
+    expect(cache.get).toHaveBeenCalledTimes(4);
+    expect(cache.set).toHaveBeenCalledTimes(2);
+
+    const dbCallsBeforeDenied = query.mock.calls.length;
+    const cacheCallsBeforeDenied = cache.get.mock.calls.length;
+    invalidSession = true;
+    expect((await handleP001Request(request('/api/profile/options'), deps))?.status).toBe(401);
+    invalidSession = false;
+    assignment = { ...assignment, accessStatus: 'SUSPENDED' };
+    expect((await handleP001Request(request('/api/profile/options'), deps))?.status).toBe(403);
+    assignment = { clerkUserId: 'verified_student_a', appRole: 'COORDINATOR', roles: ['COORDINATOR'], accessStatus: 'ACTIVE' };
+    expect((await handleP001Request(request('/api/profile/options'), deps))?.status).toBe(403);
+
+    expect(verify).toHaveBeenCalledTimes(5);
+    expect(accessFind).toHaveBeenCalledTimes(4);
+    expect(options).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(dbCallsBeforeDenied);
+    expect(cache.get).toHaveBeenCalledTimes(cacheCallsBeforeDenied);
+  });
+
   it('allows setup/profile writes before completion using verified identity only', async () => {
     const deps = dependencies('SETUP_REQUIRED'); const response = await handleP001Request(request('/api/profile','PUT',input),deps);
     expect(response?.status).toBe(200); expect(deps.profiles.save).toHaveBeenCalledWith('verified_student_a', { ...input, matricNo: null });

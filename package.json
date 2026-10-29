@@ -45,6 +45,7 @@
     "@clerk/backend": "3.23.1",
     "@clerk/react": "6.17.7",
     "@neondatabase/serverless": "1.2.0",
+    "@upstash/redis": "1.40.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

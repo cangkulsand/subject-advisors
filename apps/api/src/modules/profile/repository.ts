@@ -1,6 +1,27 @@
 import type { Profile, ProfileInput, ProfileRepository, Query } from './contracts';
 import type { ProfileReader } from '../auth/contracts';
+import type { ReferenceCache } from '../../cache/redis';
 import { P001Error, persistenceError } from './validation';
+
+const curriculumOptionKeys = ['curriculumId', 'curriculumVersion', 'programmeId', 'programmeCode', 'programmeName'];
+const semesterOptionKeys = ['semesterId', 'academicYear', 'semesterNo', 'semesterType'];
+const isDatabaseId = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 2147483647;
+function hasExactKeys(value: unknown, expected: readonly string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === expected.length && expected.every(key => Object.prototype.hasOwnProperty.call(value, key));
+}
+function isCurriculumOptionRows(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(row => hasExactKeys(row, curriculumOptionKeys) &&
+    isDatabaseId(row.curriculumId) && typeof row.curriculumVersion === 'string' && isDatabaseId(row.programmeId) &&
+    typeof row.programmeCode === 'string' && typeof row.programmeName === 'string');
+}
+function isSemesterOptionRows(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(row => hasExactKeys(row, semesterOptionKeys) &&
+    isDatabaseId(row.semesterId) && typeof row.academicYear === 'string' &&
+    typeof row.semesterNo === 'number' && Number.isInteger(row.semesterNo) && [1, 2, 3].includes(row.semesterNo) &&
+    (row.semesterType === 'NORMAL' && row.semesterNo !== 3 || row.semesterType === 'SHORT' && row.semesterNo === 3));
+}
 
 const select = `SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",
  p.curriculum_id AS "curriculumId",p.current_semester_id AS "currentSemesterId",p.weekly_working_hours AS "weeklyWorkingHours",p.available_study_hours AS "availableStudyHours",
@@ -14,7 +35,7 @@ function mapped(row: Record<string, unknown>): Profile {
       (!Number.isInteger(value.totalCreditRequired) || value.totalCreditRequired < 0 || value.totalCreditRequired > 2147483647)) throw new Error('Invalid profile curriculum total');
   return { ...value, createdAt: new Date(value.createdAt).toISOString(), updatedAt: new Date(value.updatedAt).toISOString() };
 }
-export function createProfileRepository(query: Query): ProfileRepository {
+export function createProfileRepository(query: Query, referenceCache?: ReferenceCache): ProfileRepository {
   const find = async (userId: string) => {
     const rows = await query(select + ' WHERE p.clerk_user_id=$1', [userId]);
     return rows[0] ? mapped(rows[0]) : null;
@@ -47,16 +68,22 @@ export function createProfileRepository(query: Query): ProfileRepository {
       } catch (error) { return persistenceError(error); }
     },
     async options(userId: string) {
-      const [curricula, subjects, semesters, subjectGroups] = await Promise.all([
-        query(`SELECT c.curriculum_id AS "curriculumId",c.curriculum_version AS "curriculumVersion",g.programme_id AS "programmeId",
+      const loadCurricula = () => query(`SELECT c.curriculum_id AS "curriculumId",c.curriculum_version AS "curriculumVersion",g.programme_id AS "programmeId",
           g.programme_code AS "programmeCode",g.programme_name AS "programmeName" FROM public.curriculum c JOIN public.programme g USING(programme_id)
-          WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code,c.curriculum_version`, []),
+          WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code,c.curriculum_version`, []);
+      const loadSemesters = () => query(`SELECT semester_id AS "semesterId",academic_year AS "academicYear",semester_no AS "semesterNo",semester_type AS "semesterType"
+          FROM public.academic_semester ORDER BY academic_year DESC,semester_no DESC`, []);
+      const [curricula, subjects, semesters, subjectGroups] = await Promise.all([
+        referenceCache
+          ? referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows })
+          : loadCurricula(),
         query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours",
             cs.subject_category AS "subjectCategory",cs.is_compulsory AS "isCompulsory"
           FROM public.student_profile p JOIN public.curriculum_subject cs USING(curriculum_id) JOIN public.subject s USING(subject_id)
           WHERE p.clerk_user_id=$1 ORDER BY s.subject_code`, [userId]),
-        query(`SELECT semester_id AS "semesterId",academic_year AS "academicYear",semester_no AS "semesterNo",semester_type AS "semesterType"
-          FROM public.academic_semester ORDER BY academic_year DESC,semester_no DESC`, []),
+        referenceCache
+          ? referenceCache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isSemesterOptionRows })
+          : loadSemesters(),
         query(`WITH owner_curriculum AS (
             SELECT curriculum_id FROM public.student_profile WHERE clerk_user_id=$1
           ), category_counts AS (

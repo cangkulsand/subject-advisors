@@ -84,3 +84,49 @@ navigation and rejects results from a previous Clerk session. Profile saves upda
 student setup state even when the default view is staff. Role switching does not
 change the academic profile/record retention policy above. Cached roles never
 authorize backend calls; each API request checks current memberships and suspension.
+
+## Server-side Redis reference cache - IMPLEMENTED, DISABLED BY DEFAULT
+
+The adapter and P001 integration are implemented for only the global active programme/curriculum list and academic semester list returned by `profile.options`. `REDIS_CACHE_ENABLED` defaults to false; these reads use Neon unless Redis is explicitly enabled and fully configured. The current application cache described above remains the browser behavior. Subject catalogue and category-requirement caching is a proposed later extension. Redis must never become an authority for identity, authorization, curriculum rules, or business decisions. Neon PostgreSQL remains authoritative. This change has not provisioned or enabled a provider; verification uses mocked SDK HTTP only and no live provider smoke run was performed.
+
+### Rollout and authorization boundary
+
+- Keep the feature flag off by default. Workers may use optional `@upstash/redis` over HTTP when enabled and configured; disabled, missing, or unavailable Redis behaves as a cache miss.
+- Resolve a fresh Clerk session and current account state for each protected request. Check current role/membership, suspension, and protected-owner authorization before any cached reference read. A cache hit never grants access.
+- Cache only internal, read-only reference lookups needed by private endpoints. Do not cache whole private endpoint responses.
+- Never cache authentication or authorization decisions, tokens, errors, unsaved drafts, personal profiles, academic records, saved offerings, or administrator Users/Audit data in the first rollout.
+- Resolve the student's curriculum from the live database. Keep all business write validation live against Neon. Never trust cached data for semester availability, limits, or academic rules.
+
+### Reference TTLs and failure behavior
+
+| Internal reference lookup | Server TTL | Status / notes |
+| --- | ---: | --- |
+| Global active programmes and curricula | 300 seconds | Implemented for the `profile.options` reference list; disabled by default |
+| Subject catalogue and category requirements, scoped to curriculum | 300 seconds | Proposed later extension; not implemented |
+| Global semester reference list | 60 seconds | Implemented for `profile.options`; not semester availability or business validation |
+
+On a miss, invalid/expired payload, disabled cache, or Redis outage, read from Neon. Bound total Redis overhead (lookup, retries, and cache fill) with a request-level timeout; per-attempt timeouts alone are insufficient. A cache timeout must still allow the Neon fallback, without changing existing Neon timeout or error handling. Distinguish Redis/cache failures from Neon/database failures. Do not swallow database failures or turn them into successful-looking cache responses. Upstash eventual consistency is acceptable only for these bounded-staleness reference reads.
+
+Validate cached payload shape and schema/contract version before use; invalid data is a miss and is replaced from Neon where possible. Namespaces must include deployment, non-secret dataset identity, cache contract version, and curriculum identity when applicable. Never put secrets or PII in keys or logs. Use separate deployment credentials and namespaces. The current two workspaces share Neon, so workspace namespace separation does not provide immediate cross-workspace invalidation: explicitly document the expiry-bounded staleness this creates.
+
+### Invalidation and freshness limits
+
+This tranche has no reference-data mutation route or immediate post-write invalidation guarantee. Any later successful reference-data mutation must invalidate affected namespace entries only after the PostgreSQL transaction commits. Direct database edits bypass application invalidation. After a server entry expires, the next server cache miss is eligible to reload current PostgreSQL data; existing browser retention still applies, so this gives no instant or hard end-to-end freshness guarantee. Do not claim immediate cross-app freshness. Before adding admin editing that requires immediate freshness, introduce database-backed revisions and reliable retry/outbox delivery. Use generation/revision keys so an in-flight stale refill cannot repopulate an invalidated generation; delete-only invalidation is insufficient.
+
+Server-side TTLs do not override browser snapshot lifetimes documented above, and do not by themselves define end-to-end freshness. For `profile.options`, the existing five-minute browser options cache adds its own retention after the server response. Redis does not synchronize already-open browser tabs or invalidate their session-long profile/record snapshots. Preserve the existing HTTP `cache: 'no-store'` contract; server-side reference caching is an internal implementation detail.
+
+### Configuration, telemetry, and implementation checks
+
+Optional server configuration uses `REDIS_CACHE_ENABLED`, `REDIS_CACHE_NAMESPACE`, `REDIS_CACHE_DATASET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN`. The checked-in [.dev.vars.example](../.dev.vars.example) leaves Redis disabled and the URL/token blank; supply real credentials only through ignored local variables or a server-side secret store. Never use a `VITE_` variable for Redis values.
+
+When enabled, P001 emits one structured `reference_cache` event per lookup with only `kind`, `outcome`, `lookupDurationMs`, `redisDurationMs`, and `dbLoads`. `lookupDurationMs` includes the Neon loader when called; `redisDurationMs` counts Redis command time and excludes Neon work and queue wait. Disabled mode emits no cache events. These aggregates contain no PII, keys, namespace/dataset values, URLs, tokens, payloads, or raw errors. Verification covers cache hits/misses, non-sliding expiry and slow-fill age limits, invalid payload and failure fallback, namespace isolation, authorization on hits, live write validation, and the existing browser cache policy. Current runtime verification is mocked; no live provider smoke run was performed.
+
+No migration is needed for the first cache rollout. Reliable database-backed revisions/outbox support is a future additive migration if required. Coordinator immutable aggregate forecasts are future work only after a backend exists; raw imported identities are excluded, and PostgreSQL decisions/run data remain durable. Rate limits and jobs are outside phase one.
+
+References:
+
+- [Upstash Redis quickstart for Cloudflare Workers](https://upstash.com/docs/redis/quickstarts/cloudflareworkers)
+- [Upstash Redis consistency](https://upstash.com/docs/redis/features/consistency)
+- [Upstash Redis TypeScript SDK deployment](https://upstash.com/docs/redis/sdks/ts/deployment)
+
+Implementation plan: [S1-FOUNDATION-004 - Optional Redis reference cache for profile options](changes/S1-FOUNDATION-004-redis-reference-cache.md).

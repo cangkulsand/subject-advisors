@@ -4,3 +4,10 @@ CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 # Use a Neon DEVELOPMENT/TEST branch with the P004 migration applied.
 DATABASE_URL=
+
+# Optional server-side reference cache. Disabled until an isolated Redis service is configured.
+REDIS_CACHE_ENABLED=false
+REDIS_CACHE_NAMESPACE=local-development
+REDIS_CACHE_DATASET=example-dataset
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
