@@ -7,6 +7,8 @@ DATABASE_URL=
 
 # Optional server-side reference cache. Disabled until an isolated Redis service is configured.
 REDIS_CACHE_ENABLED=false
+# Curriculum-scoped subject and requirement cache; requires REDIS_CACHE_ENABLED=true too.
+REDIS_CURRICULUM_CACHE_ENABLED=false
 REDIS_CACHE_NAMESPACE=local-development
 REDIS_CACHE_DATASET=example-dataset
 UPSTASH_REDIS_REST_URL=

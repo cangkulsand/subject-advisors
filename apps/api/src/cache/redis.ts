@@ -1,9 +1,11 @@
 import { Redis } from '@upstash/redis/cloudflare';
 
-export type ReferenceCacheKind = 'curricula' | 'semesters';
+export type ReferenceCacheKind = 'curricula' | 'semesters' | 'curriculum-options';
+type GlobalReferenceCacheKind = Exclude<ReferenceCacheKind, 'curriculum-options'>;
 
 export interface CacheBindings {
   REDIS_CACHE_ENABLED?: string;
+  REDIS_CURRICULUM_CACHE_ENABLED?: string;
   UPSTASH_REDIS_REST_URL?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
   REDIS_CACHE_NAMESPACE?: string;
@@ -60,9 +62,24 @@ export interface ReferenceCacheOptions {
   monotonicNow?: () => number;
 }
 
+type ReferenceCacheRequest<T> = {
+  kind: GlobalReferenceCacheKind;
+  ttlSeconds: number;
+  load: () => Promise<T>;
+  validate: (data: unknown) => data is T;
+  curriculumId?: never;
+} | {
+  kind: 'curriculum-options';
+  curriculumId: number;
+  ttlSeconds: number;
+  load: () => Promise<T>;
+  validate: (data: unknown) => data is T;
+};
+
 interface CacheEnvelope {
   version: 1;
   kind: ReferenceCacheKind;
+  curriculumId?: number;
   namespace: string;
   dataset: string;
   loadedAt: number;
@@ -105,6 +122,17 @@ function redisConfig(bindings: CacheBindings): RedisConfig | null {
   return { url, token, namespace, dataset };
 }
 
+const isGlobalReferenceKind = (value: unknown): value is GlobalReferenceCacheKind =>
+  value === 'curricula' || value === 'semesters';
+
+const validCurriculumId = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) > 0 && (value as number) <= 2_147_483_647;
+
+/** Pure capability check for selecting the optional curriculum-cache path. */
+export function isCurriculumCacheEnabled(bindings: CacheBindings): boolean {
+  return bindings.REDIS_CURRICULUM_CACHE_ENABLED === 'true' && redisConfig(bindings) !== null;
+}
+
 function defaultClient(config: Pick<RedisConfig, 'url' | 'token'>, signal: AbortSignal): RedisCommands {
   const client = new Redis({
     url: config.url,
@@ -121,13 +149,18 @@ function defaultClient(config: Pick<RedisConfig, 'url' | 'token'>, signal: Abort
 }
 
 function validEnvelope(value: unknown, expected: {
-  kind: ReferenceCacheKind; namespace: string; dataset: string; now: number; ttlMs: number;
+  kind: ReferenceCacheKind; curriculumId?: number; namespace: string; dataset: string; now: number; ttlMs: number;
   validate: (data: unknown) => boolean;
 }): value is CacheEnvelope {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const envelope = value as Partial<CacheEnvelope>;
   if (envelope.version !== 1 || envelope.kind !== expected.kind || envelope.namespace !== expected.namespace ||
       envelope.dataset !== expected.dataset || !Number.isFinite(envelope.loadedAt) || !Number.isFinite(envelope.expiresAt)) return false;
+  if (expected.kind === 'curriculum-options') {
+    if (envelope.curriculumId !== expected.curriculumId || !validCurriculumId(expected.curriculumId) ||
+        !envelope.data || typeof envelope.data !== 'object' || Array.isArray(envelope.data) ||
+        (envelope.data as { curriculumId?: unknown }).curriculumId !== expected.curriculumId) return false;
+  } else if (envelope.curriculumId !== undefined) return false;
   const loadedAt = envelope.loadedAt as number;
   const expiresAt = envelope.expiresAt as number;
   if (loadedAt > expected.now || expiresAt <= expected.now || expiresAt <= loadedAt ||
@@ -185,12 +218,7 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
   }
 
   return {
-    async getOrLoad<T>(input: {
-      kind: ReferenceCacheKind;
-      ttlSeconds: number;
-      load: () => Promise<T>;
-      validate: (data: unknown) => data is T;
-    }): Promise<T> {
+    async getOrLoad<T>(input: ReferenceCacheRequest<T>): Promise<T> {
       const startedAt = monotonicNow();
       let dbLoads: 0 | 1 = 0;
       let redisDurationMs = 0;
@@ -202,8 +230,25 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
           dbLoads = 1;
           return await input.load();
         }
+        const scoped = input.kind === 'curriculum-options';
+        if (!scoped && !isGlobalReferenceKind(input.kind)) {
+          finish('invalid-request');
+          dbLoads = 1;
+          return await input.load();
+        }
+        if (scoped && bindings.REDIS_CURRICULUM_CACHE_ENABLED !== 'true') {
+          finish('disabled');
+          dbLoads = 1;
+          return await input.load();
+        }
         if (!config) {
           finish('unconfigured');
+          dbLoads = 1;
+          return await input.load();
+        }
+        if ((scoped && !validCurriculumId((input as { curriculumId?: unknown }).curriculumId)) ||
+            (!scoped && (input as { curriculumId?: unknown }).curriculumId !== undefined)) {
+          finish('invalid-request');
           dbLoads = 1;
           return await input.load();
         }
@@ -213,7 +258,9 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
           dbLoads = 1;
           return await input.load();
         }
-        const key = `sa:${config.namespace}:${config.dataset}:v1:reference:${input.kind}`;
+        const key = scoped
+          ? `sa:${config.namespace}:${config.dataset}:v1:reference:curriculum-options:${input.curriculumId}`
+          : `sa:${config.namespace}:${config.dataset}:v1:reference:${input.kind}`;
         const read = await command(client => client.get<unknown>(key));
         redisDurationMs += read.durationMs;
         if (!read.ok) {
@@ -225,7 +272,7 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
           const currentTime = now();
           const cachedSize = byteSize(read.value);
           if (cachedSize !== null && cachedSize <= MAX_PAYLOAD_BYTES && validEnvelope(read.value, {
-            kind: input.kind, namespace: config.namespace, dataset: config.dataset,
+            kind: input.kind, ...(scoped ? { curriculumId: input.curriculumId } : {}), namespace: config.namespace, dataset: config.dataset,
             now: currentTime, ttlMs, validate: input.validate,
           })) {
             finish('hit');
@@ -241,7 +288,8 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
         const data = await input.load();
         let validData = false;
         try { validData = input.validate(data); } catch { validData = false; }
-        if (!validData) {
+        if (!validData || (scoped && (!data || typeof data !== 'object' || Array.isArray(data) ||
+            (data as { curriculumId?: unknown }).curriculumId !== input.curriculumId))) {
           finish('invalid-source');
           return data;
         }
@@ -253,6 +301,7 @@ export function createReferenceCache(bindings: CacheBindings, options: Reference
         }
         const envelope: CacheEnvelope = {
           version: 1, kind: input.kind, namespace: config.namespace, dataset: config.dataset,
+          ...(scoped ? { curriculumId: input.curriculumId } : {}),
           loadedAt, expiresAt, data,
         };
         const size = byteSize(envelope);

@@ -87,7 +87,7 @@ authorize backend calls; each API request checks current memberships and suspens
 
 ## Server-side Redis reference cache - IMPLEMENTED, DISABLED BY DEFAULT
 
-The adapter and P001 integration are implemented for only the global active programme/curriculum list and academic semester list returned by `profile.options`. `REDIS_CACHE_ENABLED` defaults to false; these reads use Neon unless Redis is explicitly enabled and fully configured. The current application cache described above remains the browser behavior. Subject catalogue and category-requirement caching is a proposed later extension. Redis must never become an authority for identity, authorization, curriculum rules, or business decisions. Neon PostgreSQL remains authoritative. This change has not provisioned or enabled a provider; verification uses mocked SDK HTTP only and no live provider smoke run was performed.
+The adapter and P001 integration are implemented for the global active programme/curriculum list, academic semester list, and curriculum-scoped subject and category-requirement bundle returned by `profile.options`. Both cache stages are individually disabled by default. `REDIS_CACHE_ENABLED=false` is the master gate; `REDIS_CURRICULUM_CACHE_ENABLED=false` is an additional gate for the curriculum-scoped bundle. The new scope is available only when both are `true` and the existing Redis URL, token, namespace, and dataset are fully configured. With the curriculum gate off, the existing phase-one owner-scoped subject queries remain in use. The current application cache described above remains the browser behavior. Redis must never become an authority for identity, authorization, curriculum rules, or business decisions. Neon PostgreSQL remains authoritative. Verification uses mocked SDK HTTP only; no live provider smoke run was performed.
 
 ### Rollout and authorization boundary
 
@@ -102,8 +102,45 @@ The adapter and P001 integration are implemented for only the global active prog
 | Internal reference lookup | Server TTL | Status / notes |
 | --- | ---: | --- |
 | Global active programmes and curricula | 300 seconds | Implemented for the `profile.options` reference list; disabled by default |
-| Subject catalogue and category requirements, scoped to curriculum | 300 seconds | Proposed later extension; not implemented |
+| Subject catalogue and category requirements, scoped to curriculum | 300 seconds | Implemented; additional `REDIS_CURRICULUM_CACHE_ENABLED` gate defaults off. See [S1-FOUNDATION-005](changes/S1-FOUNDATION-005-curriculum-reference-cache.md). |
 | Global semester reference list | 60 seconds | Implemented for `profile.options`; not semester availability or business validation |
+
+### Curriculum-scoped profile options
+
+When both flags and complete Redis configuration are present, each authorized
+`profile.options` request first resolves the student's current curriculum through
+a live `student_profile` lookup using the verified Clerk identity. This association
+is resolved on every enabled request, including a warm cache hit. A missing profile
+returns empty `subjects` and `subjectGroups` while keeping the global options. The
+association and student identity are never stored in Redis. The cache contains one
+combined internal bundle `{ curriculumId, subjects, subjectGroups }`; only the two
+arrays are returned in the existing API response.
+
+The bundle key adds the resolved curriculum ID to the existing namespace, dataset,
+contract version, and distinct `curriculum-options` kind. Existing global v1 keys
+and envelopes remain unchanged. Both miss loaders use the ID captured by the live
+association lookup directly. If the profile association changes while a C1 load is
+in flight, that load can only populate C1's key; the next request resolves C2 and
+uses C2's key. The two PostgreSQL loader queries are not an atomic snapshot, and
+this design does not add immediate invalidation for direct database changes.
+
+For `profile.options` repository SQL only (excluding authorization and any existing
+profile-reader queries), a full cold miss performs five queries: one live association
+lookup, two global-reference loads, and two curriculum-bundle loads. A fully warm
+request performs one live association query. The previous phase-one warm path used
+two owner-scoped subject/category queries. These are mocked query counts, not a
+latency guarantee or a claim of a measured speedup.
+
+All Redis lookups and fills share the existing 200 ms request budget, including the
+global and curriculum entries. On Redis failure or budget exhaustion, loaders run
+once and PostgreSQL remains authoritative; a failed fill returns the already-loaded
+data without running a loader twice. Database errors still propagate. The `dbLoads`
+observation counts loader-function calls: the combined curriculum loader executes
+two SQL queries. Existing timing fields do not provide a dedicated Neon latency;
+the difference between lookup and Redis duration also includes queue wait. Turning
+`REDIS_CURRICULUM_CACHE_ENABLED` off rolls back only the new scope to the phase-one
+owner-query path. Turning the master `REDIS_CACHE_ENABLED` off disables both server
+cache stages.
 
 On a miss, invalid/expired payload, disabled cache, or Redis outage, read from Neon. Bound total Redis overhead (lookup, retries, and cache fill) with a request-level timeout; per-attempt timeouts alone are insufficient. A cache timeout must still allow the Neon fallback, without changing existing Neon timeout or error handling. Distinguish Redis/cache failures from Neon/database failures. Do not swallow database failures or turn them into successful-looking cache responses. Upstash eventual consistency is acceptable only for these bounded-staleness reference reads.
 
@@ -117,9 +154,9 @@ Server-side TTLs do not override browser snapshot lifetimes documented above, an
 
 ### Configuration, telemetry, and implementation checks
 
-Optional server configuration uses `REDIS_CACHE_ENABLED`, `REDIS_CACHE_NAMESPACE`, `REDIS_CACHE_DATASET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN`. The checked-in [.dev.vars.example](../.dev.vars.example) leaves Redis disabled and the URL/token blank; supply real credentials only through ignored local variables or a server-side secret store. Never use a `VITE_` variable for Redis values.
+Optional server configuration uses `REDIS_CACHE_ENABLED`, `REDIS_CURRICULUM_CACHE_ENABLED`, `REDIS_CACHE_NAMESPACE`, `REDIS_CACHE_DATASET`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN`. The checked-in [.dev.vars.example](../.dev.vars.example) leaves both flags off and the URL/token blank; supply real credentials only through ignored local variables or a server-side secret store. Never use a `VITE_` variable for Redis values.
 
-When enabled, P001 emits one structured `reference_cache` event per lookup with only `kind`, `outcome`, `lookupDurationMs`, `redisDurationMs`, and `dbLoads`. `lookupDurationMs` includes the Neon loader when called; `redisDurationMs` counts Redis command time and excludes Neon work and queue wait. Disabled mode emits no cache events. These aggregates contain no PII, keys, namespace/dataset values, URLs, tokens, payloads, or raw errors. Verification covers cache hits/misses, non-sliding expiry and slow-fill age limits, invalid payload and failure fallback, namespace isolation, authorization on hits, live write validation, and the existing browser cache policy. Current runtime verification is mocked; no live provider smoke run was performed.
+When enabled, P001 emits one structured `reference_cache` event per lookup with only `kind`, `outcome`, `lookupDurationMs`, `redisDurationMs`, and `dbLoads`. `lookupDurationMs` includes the Neon loader when called; `redisDurationMs` counts Redis command time and excludes Neon work and queue wait. Disabled cache lookups emit no cache events. These aggregates contain no PII, keys, namespace/dataset values, URLs, tokens, payloads, or raw errors. Verification covers cache hits/misses, non-sliding expiry and slow-fill age limits, invalid payload and failure fallback, namespace isolation, authorization on hits, live write validation, and the existing browser cache policy. Current runtime verification is mocked; no live provider smoke run was performed.
 
 No migration is needed for the first cache rollout. Reliable database-backed revisions/outbox support is a future additive migration if required. Coordinator immutable aggregate forecasts are future work only after a backend exists; raw imported identities are excluded, and PostgreSQL decisions/run data remain durable. Rate limits and jobs are outside phase one.
 

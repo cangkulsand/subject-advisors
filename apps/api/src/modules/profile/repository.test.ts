@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Parameter, Query } from './contracts';
 import { createProfileRepository } from './repository';
 import { createReferenceCache, type CacheBindings } from '../../cache/redis';
+import { createRecordsRepository } from '../records/repository';
 
 const cacheBindings: CacheBindings = {
-  REDIS_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
+  REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
   UPSTASH_REDIS_REST_TOKEN: 'test-secret', REDIS_CACHE_NAMESPACE: 'test', REDIS_CACHE_DATASET: 'profile',
 };
 function referenceCacheHarness(seed = new Map<string, unknown>(), now: () => number = Date.now) {
@@ -197,6 +198,181 @@ describe('P001 profile options subject metadata', () => {
     expect(query.mock.calls.some(([sql]) => sql.includes('JOIN public.academic_semester s ON s.semester_id=$5'))).toBe(true);
     expect(query.mock.calls.some(([sql, parameters]) => sql.includes('SELECT semester_id FROM public.academic_semester WHERE semester_id=$1') && parameters[0] === 30)).toBe(true);
     expect(cache.gets).toHaveLength(cacheReadsBeforeSave);
+  });
+});
+
+describe('P001 curriculum-scoped options cache', () => {
+  const bundleFor = (curriculumId: number) => ({
+    subjects: [{ subjectId: curriculumId * 10, subjectCode: `S${curriculumId}`, subjectName: 'Subject', creditHours: 0,
+      subjectCategory: 'Unmodeled category', isCompulsory: 0 }],
+    groups: [{ category: 'Unmodeled category', requiredSubjects: null, availableSubjects: 1 }],
+  });
+  function setup(current: Record<string, number>, now: () => number = Date.now) {
+    const cache = referenceCacheHarness(new Map(), now);
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) {
+        const id = current[String(parameters[0])]; return id ? [{ curriculumId: id }] : [];
+      }
+      if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+      ];
+      if (sql.includes('SELECT semester_id AS "semesterId"')) return [
+        { semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' },
+      ];
+      if (sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')) return bundleFor(Number(parameters[0])).subjects;
+      if (sql.includes('WITH category_counts AS')) return bundleFor(Number(parameters[0])).groups;
+      return [];
+    }) as Query & ReturnType<typeof vi.fn>;
+    return { cache, query, profiles: createProfileRepository(query, cache.cache, { curriculumCacheEnabled: true }) };
+  }
+
+  it('shares a curriculum bundle across students while resolving each association and preserves cold/warm query counts', async () => {
+    const setupResult = setup({ 'student-a': 12, 'student-b': 12 });
+    const first = await setupResult.profiles.options('student-a');
+    const second = await setupResult.profiles.options('student-b');
+    expect(first.subjects).toEqual(second.subjects);
+    expect(first.subjectGroups).toEqual(second.subjectGroups);
+    expect(setupResult.query).toHaveBeenCalledTimes(6); // cold 5; second request association only
+    expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile'))).toHaveLength(2);
+    expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))).toHaveLength(1);
+    expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('WITH category_counts AS'))).toHaveLength(1);
+    expect(setupResult.cache.gets).toContain('sa:test:profile:v1:reference:curriculum-options:12');
+    const cached = setupResult.cache.seed.get('sa:test:profile:v1:reference:curriculum-options:12') as { data: Record<string, unknown> };
+    expect(Object.keys(cached.data).sort()).toEqual(['curriculumId', 'subjectGroups', 'subjects']);
+    expect(JSON.stringify(cached.data)).not.toContain('student-a');
+    expect(JSON.stringify(cached.data)).not.toContain('student-b');
+    expect(first).not.toHaveProperty('curriculumId');
+    expect(Object.keys(first)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups']);
+  });
+
+  it('isolates different curricula and uses the captured ID for both loaders after an association change during a delayed load', async () => {
+    let currentId = 12;
+    let releaseSubject!: () => void;
+    let startedSubject!: () => void;
+    const subjectStarted = new Promise<void>(resolve => { startedSubject = resolve; });
+    const subjectRelease = new Promise<void>(resolve => { releaseSubject = resolve; });
+    const cache = referenceCacheHarness();
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return [{ curriculumId: currentId }];
+      if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [];
+      if (sql.includes('SELECT semester_id AS "semesterId"')) return [];
+      if (sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')) {
+        const capturedId = Number(parameters[0]);
+        if (capturedId === 12 && !releaseSubjectCalled) {
+          releaseSubjectCalled = true; startedSubject(); await subjectRelease;
+        }
+        return bundleFor(capturedId).subjects;
+      }
+      if (sql.includes('WITH category_counts AS')) return bundleFor(Number(parameters[0])).groups;
+      return [];
+    }) as Query & ReturnType<typeof vi.fn>;
+    let releaseSubjectCalled = false;
+    const profiles = createProfileRepository(query, cache.cache, { curriculumCacheEnabled: true });
+    const inFlight = profiles.options('student-a');
+    await subjectStarted;
+    currentId = 34;
+    releaseSubject();
+    const c1 = await inFlight;
+    const c2 = await profiles.options('student-a');
+    expect(c1.subjects[0]?.subjectId).toBe(120);
+    expect(c2.subjects[0]?.subjectId).toBe(340);
+    expect(cache.gets).toContain('sa:test:profile:v1:reference:curriculum-options:12');
+    expect(cache.gets).toContain('sa:test:profile:v1:reference:curriculum-options:34');
+    const scopedSubjectCalls = query.mock.calls.filter(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'));
+    const scopedGroupCalls = query.mock.calls.filter(([sql]) => sql.includes('WITH category_counts AS'));
+    expect(scopedSubjectCalls.map(([, params]) => params)).toEqual([[12], [34]]);
+    expect(scopedGroupCalls.map(([, params]) => params)).toEqual([[12], [34]]);
+    expect(scopedSubjectCalls[0]?.[0]).toContain('WHERE cs.curriculum_id=$1 ORDER BY s.subject_code');
+    expect(scopedSubjectCalls[0]?.[0]).not.toContain('student_profile');
+  });
+
+  it('returns empty curriculum arrays for a missing profile and still returns global options', async () => {
+    const { profiles, query } = setup({});
+    const result = await profiles.options('new-student');
+    expect(result.subjects).toEqual([]);
+    expect(result.subjectGroups).toEqual([]);
+    expect(result.curricula).toHaveLength(1);
+    expect(result.semesters).toHaveLength(1);
+    expect(query).toHaveBeenCalledTimes(3); // live association + two global cache loads
+    expect(query.mock.calls.some(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => sql.includes('WITH category_counts AS'))).toBe(false);
+  });
+
+  it.each(['extra-field', 'bad-id', 'bad-credit', 'bad-compulsory', 'bad-category', 'bad-required-count'])
+  ('reloads a curriculum bundle with invalid %s data', async defect => {
+    const cacheKey = 'sa:test:profile:v1:reference:curriculum-options:12';
+    const now = Date.now();
+    const badSubject = { subjectId: 120, subjectCode: 'S12', subjectName: 'Subject', creditHours: 0, subjectCategory: 'Core', isCompulsory: 0,
+      ...(defect === 'extra-field' ? { studentId: 9 } : {}), ...(defect === 'bad-id' ? { subjectId: 0 } : {}),
+      ...(defect === 'bad-credit' ? { creditHours: -1 } : {}), ...(defect === 'bad-compulsory' ? { isCompulsory: 2 } : {}),
+      ...(defect === 'bad-category' ? { subjectCategory: null } : {}) };
+    const badGroup = { category: 'Core', requiredSubjects: defect === 'bad-required-count' ? -1 : null, availableSubjects: 1 };
+    const cache = referenceCacheHarness(new Map([[cacheKey, { version: 1, kind: 'curriculum-options', curriculumId: 12,
+      namespace: 'test', dataset: 'profile', loadedAt: now - 1000, expiresAt: now + 100_000,
+      data: { curriculumId: 12, subjects: [badSubject], subjectGroups: [badGroup] } }]]));
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return [{ curriculumId: 12 }];
+      if (sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')) return bundleFor(Number(parameters[0])).subjects;
+      if (sql.includes('WITH category_counts AS')) return bundleFor(Number(parameters[0])).groups;
+      if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [];
+      if (sql.includes('SELECT semester_id AS "semesterId"')) return [];
+      return [];
+    }) as Query & ReturnType<typeof vi.fn>;
+    const result = await createProfileRepository(query, cache.cache, { curriculumCacheEnabled: true }).options('student-a');
+    expect(result.subjects).toEqual(bundleFor(12).subjects);
+    expect(query.mock.calls.filter(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))).toHaveLength(1);
+    expect(cache.sets.some(({ key }) => key === cacheKey)).toBe(true);
+  });
+
+  it('expires the combined curriculum bundle after five minutes without sliding the deadline', async () => {
+    let clock = 1_800_000_000_000;
+    const setupResult = setup({ 'student-a': 12 }, () => clock);
+    const countLoads = () => setupResult.query.mock.calls.filter(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')).length;
+    await setupResult.profiles.options('student-a');
+    expect(countLoads()).toBe(1);
+    const key = 'sa:test:profile:v1:reference:curriculum-options:12';
+    const firstExpiry = (setupResult.cache.seed.get(key) as { expiresAt: number }).expiresAt;
+    clock += 299_000;
+    await setupResult.profiles.options('student-a');
+    expect(countLoads()).toBe(1);
+    expect((setupResult.cache.seed.get(key) as { expiresAt: number }).expiresAt).toBe(firstExpiry);
+    clock = firstExpiry + 1;
+    await setupResult.profiles.options('student-a');
+    expect(countLoads()).toBe(2);
+  });
+});
+
+describe('P001 live record eligibility after curriculum cache changes', () => {
+  it('rejects a C1-only subject after C1 options were warm and the current database association is C2', async () => {
+    let currentCurriculumId = 12;
+    const cache = referenceCacheHarness();
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return [{ curriculumId: currentCurriculumId }];
+      if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [];
+      if (sql.includes('SELECT semester_id AS "semesterId"')) return [];
+      if (sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')) {
+        return parameters[0] === 12
+          ? [{ subjectId: 1201, subjectCode: 'C1ONLY', subjectName: 'C1 subject', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 }]
+          : [];
+      }
+      if (sql.includes('WITH category_counts AS')) return [];
+      if (sql.includes('WITH eligible AS')) return []; // No C1 subject is eligible under the live C2 association.
+      return [];
+    }) as Query & ReturnType<typeof vi.fn>;
+    const profiles = createProfileRepository(query, cache.cache, { curriculumCacheEnabled: true });
+    const warmedC1 = await profiles.options('student-a');
+    expect(warmedC1.subjects[0]?.subjectCode).toBe('C1ONLY');
+    currentCurriculumId = 34;
+    expect((await profiles.options('student-a')).subjects).toEqual([]);
+
+    const records = createRecordsRepository(query);
+    await expect(records.save('student-a', {
+      subjectId: 1201, semesterId: null, status: 'COMPLETED', grade: null, recognizedCredits: null, remarks: null,
+    })).rejects.toMatchObject({ status: 400, code: 'INVALID_SUBJECT_OR_CREDITS' });
+    const eligibility = query.mock.calls.find(([sql]) => sql.includes('WITH eligible AS'))?.[0] ?? '';
+    expect(eligibility).toContain('JOIN public.curriculum_subject cs USING(curriculum_id)');
+    expect(eligibility).toContain('WHERE p.clerk_user_id=$1 AND s.subject_id=$2');
+    expect(query.mock.calls.find(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))?.[1]).toEqual([12]);
   });
 });
 

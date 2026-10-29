@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { createAuthDependencies, type AuthBindings } from '../auth';
-import { createReferenceCache, type CacheBindings } from '../../cache/redis';
+import { createReferenceCache, isCurriculumCacheEnabled, type CacheBindings } from '../../cache/redis';
 import { createProfileRepository, createProfileReader } from './repository';
 import { createRecordsRepository } from '../records/repository';
 import type { Query } from './contracts';
@@ -24,6 +24,8 @@ export function createP001Dependencies(env: P001Bindings) {
       }));
     },
   });
-  const profiles = createProfileRepository(query, referenceCache);
+  const profiles = createProfileRepository(query, referenceCache, {
+    curriculumCacheEnabled: isCurriculumCacheEnabled(env),
+  });
   return { auth: createAuthDependencies(env, createProfileReader(profiles)), profiles, records: createRecordsRepository(query) };
 }

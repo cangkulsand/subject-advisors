@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createReferenceCache, type CacheBindings, type CacheObservation } from './redis';
+import { createReferenceCache, isCurriculumCacheEnabled, type CacheBindings, type CacheObservation } from './redis';
 
 const enabled: CacheBindings = {
   REDIS_CACHE_ENABLED: 'true',
@@ -8,7 +8,12 @@ const enabled: CacheBindings = {
   REDIS_CACHE_NAMESPACE: 'dev',
   REDIS_CACHE_DATASET: 'academic-test',
 };
+const curriculumEnabled: CacheBindings = { ...enabled, REDIS_CURRICULUM_CACHE_ENABLED: 'true' };
 const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
+type CurriculumBundle = { curriculumId: number; subjects: string[]; subjectGroups: string[] };
+const isCurriculumBundle = (value: unknown): value is CurriculumBundle => !!value && typeof value === 'object' &&
+  !Array.isArray(value) && Number.isInteger((value as CurriculumBundle).curriculumId) &&
+  Array.isArray((value as CurriculumBundle).subjects) && Array.isArray((value as CurriculumBundle).subjectGroups);
 
 type FakeClient = {
   get<T = unknown>(key: string): Promise<T | null>;
@@ -33,6 +38,187 @@ function memoryRedis(seed = new Map<string, unknown>()) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('optional Redis reference cache adapter', () => {
+  it('enables curriculum capability only when both flags and full valid config are present', () => {
+    expect(isCurriculumCacheEnabled({ ...enabled, REDIS_CURRICULUM_CACHE_ENABLED: 'true' })).toBe(true);
+    for (const bindings of [
+      enabled,
+      { ...enabled, REDIS_CURRICULUM_CACHE_ENABLED: 'false' },
+      { ...enabled, REDIS_CACHE_ENABLED: 'false', REDIS_CURRICULUM_CACHE_ENABLED: 'true' },
+      { ...enabled, UPSTASH_REDIS_REST_TOKEN: undefined, REDIS_CURRICULUM_CACHE_ENABLED: 'true' },
+      { ...enabled, REDIS_CACHE_NAMESPACE: 'unsafe value', REDIS_CURRICULUM_CACHE_ENABLED: 'true' },
+    ]) expect(isCurriculumCacheEnabled(bindings)).toBe(false);
+  });
+
+  it('isolates curriculum options by ID and preserves the original global key and envelope contract', async () => {
+    const client = memoryRedis();
+    const cache = createReferenceCache(curriculumEnabled, { createClient: client.createClient });
+    const load = vi.fn(async (curriculumId: number): Promise<CurriculumBundle> => ({ curriculumId, subjects: [`S${curriculumId}`], subjectGroups: [] }));
+    const options = (curriculumId: number) => ({ kind: 'curriculum-options' as const, curriculumId, ttlSeconds: 300,
+      load: () => load(curriculumId), validate: isCurriculumBundle });
+    await cache.getOrLoad(options(12));
+    await cache.getOrLoad(options(34));
+    await cache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: async () => ['global'], validate: isStringList });
+    expect(client.keys).toEqual([
+      'sa:dev:academic-test:v1:reference:curriculum-options:12',
+      'sa:dev:academic-test:v1:reference:curriculum-options:34',
+      'sa:dev:academic-test:v1:reference:curricula',
+    ]);
+    expect(client.writes[0]?.value).toMatchObject({ kind: 'curriculum-options', curriculumId: 12, data: { curriculumId: 12 } });
+    expect(client.writes[2]?.value).toMatchObject({ kind: 'curricula', data: ['global'] });
+    expect(client.writes[2]?.value).not.toHaveProperty('curriculumId');
+  });
+
+  it.each(['envelope-id', 'data-id'])('reloads curriculum options when cached %s does not match the requested scope', async defect => {
+    const key = 'sa:dev:academic-test:v1:reference:curriculum-options:12';
+    const now = Date.now();
+    const dataId = defect === 'data-id' ? 34 : 12;
+    const envelopeId = defect === 'envelope-id' ? 34 : 12;
+    const client = memoryRedis(new Map([[key, {
+      version: 1, kind: 'curriculum-options', curriculumId: envelopeId, namespace: 'dev', dataset: 'academic-test',
+      loadedAt: now - 1000, expiresAt: now + 10_000,
+      data: { curriculumId: dataId, subjects: ['wrong-scope'], subjectGroups: [] },
+    }]]));
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: ['fresh'], subjectGroups: [] }));
+    const result = await createReferenceCache(curriculumEnabled, { createClient: client.createClient }).getOrLoad({
+      kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle,
+    });
+    expect(result).toEqual({ curriculumId: 12, subjects: ['fresh'], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an oversized scoped curriculum entry and refreshes it from the loader', async () => {
+    const key = 'sa:dev:academic-test:v1:reference:curriculum-options:12';
+    const now = Date.now();
+    const client = memoryRedis(new Map([[key, {
+      version: 1, kind: 'curriculum-options', curriculumId: 12, namespace: 'dev', dataset: 'academic-test',
+      loadedAt: now - 1000, expiresAt: now + 10_000,
+      data: { curriculumId: 12, subjects: ['x'.repeat(70 * 1024)], subjectGroups: [] },
+    }]]));
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: ['bounded'], subjectGroups: [] }));
+    const result = await createReferenceCache(curriculumEnabled, { createClient: client.createClient }).getOrLoad({
+      kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle,
+    });
+    expect(result).toEqual({ curriculumId: 12, subjects: ['bounded'], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.set).toHaveBeenCalledTimes(1);
+    expect(client.seed.get(key)).toMatchObject({ kind: 'curriculum-options', curriculumId: 12, data: { subjects: ['bounded'] } });
+  });
+
+  it.each([undefined, 0, -1, 2_147_483_648, 1.5])('bypasses Redis for invalid runtime curriculum ID %s', async curriculumId => {
+    const client = memoryRedis();
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 1, subjects: [], subjectGroups: [] }));
+    const request = { kind: 'curriculum-options' as const, curriculumId, ttlSeconds: 300, load, validate: isCurriculumBundle };
+    const result = await createReferenceCache(curriculumEnabled, { createClient: client.createClient })
+      .getOrLoad(request as Parameters<ReturnType<typeof createReferenceCache>['getOrLoad']>[0]);
+    expect(result).toEqual({ curriculumId: 1, subjects: [], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.createClient).not.toHaveBeenCalled();
+  });
+
+  it('shares the same Redis-only budget across global and curriculum lookups', async () => {
+    const clientCalls: number[] = [];
+    const createClient = vi.fn((_config: { url: string; token: string }, signal: AbortSignal): FakeClient => {
+      clientCalls.push(1);
+      return {
+        get: async <T>() => new Promise<T | null>((_resolve, reject) => {
+          if (signal.aborted) reject(new DOMException('aborted', 'AbortError'));
+          else signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+        }),
+        set: async () => 'OK',
+      };
+    });
+    const cache = createReferenceCache(curriculumEnabled, { createClient, budgetMs: 20 });
+    const loadCurricula = vi.fn(async () => ['c']);
+    const loadSemesters = vi.fn(async () => ['s']);
+    const loadBundle = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: [], subjectGroups: [] }));
+    const [curricula, semesters, bundle] = await Promise.all([
+      cache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isStringList }),
+      cache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isStringList }),
+      cache.getOrLoad({ kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load: loadBundle, validate: isCurriculumBundle }),
+    ]);
+    expect(curricula).toEqual(['c']);
+    expect(semesters).toEqual(['s']);
+    expect(bundle).toEqual({ curriculumId: 12, subjects: [], subjectGroups: [] });
+    expect(clientCalls).toHaveLength(1);
+    expect(loadCurricula).toHaveBeenCalledTimes(1);
+    expect(loadSemesters).toHaveBeenCalledTimes(1);
+    expect(loadBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects accidental curriculum scope on a global kind without Redis I/O', async () => {
+    const client = memoryRedis();
+    const load = vi.fn(async () => ['from-db']);
+    const request = { kind: 'curricula' as const, curriculumId: 12, ttlSeconds: 300, load, validate: isStringList };
+    await createReferenceCache(enabled, { createClient: client.createClient })
+      .getOrLoad(request as unknown as Parameters<ReturnType<typeof createReferenceCache>['getOrLoad']>[0]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.createClient).not.toHaveBeenCalled();
+  });
+
+  it('bypasses Redis at the adapter boundary when the curriculum flag is off or missing', async () => {
+    for (const bindings of [enabled, { ...curriculumEnabled, REDIS_CURRICULUM_CACHE_ENABLED: 'false' }]) {
+      const client = memoryRedis();
+      const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: [], subjectGroups: [] }));
+      const result = await createReferenceCache(bindings, { createClient: client.createClient }).getOrLoad({
+        kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle,
+      });
+      expect(result.curriculumId).toBe(12);
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(client.createClient).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not cache loader data whose curriculum identity differs from the requested scope', async () => {
+    const client = memoryRedis();
+    const events: CacheObservation[] = [];
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 34, subjects: ['other'], subjectGroups: [] }));
+    const result = await createReferenceCache(curriculumEnabled, { createClient: client.createClient, observe: event => events.push(event) })
+      .getOrLoad({ kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle });
+    expect(result).toEqual({ curriculumId: 34, subjects: ['other'], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.set).not.toHaveBeenCalled();
+    expect(events[0]?.outcome).toBe('invalid-source');
+  });
+
+  it('rejects unknown runtime cache kinds without Redis I/O', async () => {
+    const client = memoryRedis();
+    const load = vi.fn(async () => ['from-db']);
+    const request = { kind: 'other' as const, ttlSeconds: 300, load, validate: isStringList };
+    await createReferenceCache(enabled, { createClient: client.createClient })
+      .getOrLoad(request as unknown as Parameters<ReturnType<typeof createReferenceCache>['getOrLoad']>[0]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.createClient).not.toHaveBeenCalled();
+  });
+
+  it('falls back once when a curriculum cache GET fails and propagates curriculum loader errors unchanged', async () => {
+    const client = memoryRedis();
+    client.get.mockRejectedValueOnce(new Error('private Redis detail'));
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: [], subjectGroups: [] }));
+    const cache = createReferenceCache(curriculumEnabled, { createClient: client.createClient });
+    await expect(cache.getOrLoad({ kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle }))
+      .resolves.toEqual({ curriculumId: 12, subjects: [], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.set).not.toHaveBeenCalled();
+
+    const databaseError = new Error('database unavailable');
+    const failedLoad = vi.fn(async (): Promise<CurriculumBundle> => { throw databaseError; });
+    await expect(cache.getOrLoad({ kind: 'curriculum-options', curriculumId: 34, ttlSeconds: 300, load: failedLoad, validate: isCurriculumBundle }))
+      .rejects.toBe(databaseError);
+    expect(failedLoad).toHaveBeenCalledTimes(1);
+    expect(client.set).not.toHaveBeenCalled();
+  });
+
+  it('returns the loaded curriculum bundle once when the Redis fill fails', async () => {
+    const client = memoryRedis();
+    client.set.mockRejectedValueOnce(new Error('private Redis detail'));
+    const load = vi.fn(async (): Promise<CurriculumBundle> => ({ curriculumId: 12, subjects: [], subjectGroups: [] }));
+    const result = await createReferenceCache(curriculumEnabled, { createClient: client.createClient })
+      .getOrLoad({ kind: 'curriculum-options', curriculumId: 12, ttlSeconds: 300, load, validate: isCurriculumBundle });
+    expect(result).toEqual({ curriculumId: 12, subjects: [], subjectGroups: [] });
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(client.set).toHaveBeenCalledTimes(1);
+  });
   it('bypasses Redis with disabled or incomplete configuration and loads once', async () => {
     for (const bindings of [
       { ...enabled, REDIS_CACHE_ENABLED: 'false' },

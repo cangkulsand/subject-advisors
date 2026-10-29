@@ -11,8 +11,8 @@ const baseEnv = {
   DATABASE_URL: 'postgres://unused.test/profile',
 };
 
-function configureQuery() {
-  const query = vi.fn(async () => [] as Record<string, unknown>[]);
+function configureQuery(resolve: (sql: string, parameters: unknown[]) => Record<string, unknown>[] = () => []) {
+  const query = vi.fn(async (sql: string, parameters: unknown[]) => resolve(sql, parameters));
   vi.mocked(neon).mockReturnValue({ query } as unknown as ReturnType<typeof neon>);
   return query;
 }
@@ -35,8 +35,42 @@ describe('P001 optional Redis composition', () => {
     expect(info).not.toHaveBeenCalled();
   });
 
+  it('selects the curriculum path only with both flags and complete configuration', async () => {
+    const scenarios = [
+      { name: 'feature flag missing', env: { REDIS_CACHE_ENABLED: 'true' }, expectedAssociation: false, expectedRedis: true },
+      { name: 'feature flag false', env: { REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'false' }, expectedAssociation: false, expectedRedis: true },
+      { name: 'master flag false', env: { REDIS_CACHE_ENABLED: 'false', REDIS_CURRICULUM_CACHE_ENABLED: 'true' }, expectedAssociation: false, expectedRedis: false },
+      { name: 'incomplete config', env: { REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_TOKEN: undefined }, expectedAssociation: false, expectedRedis: false },
+      { name: 'both flags and complete config', env: { REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true' }, expectedAssociation: true, expectedRedis: true },
+    ];
+    for (const scenario of scenarios) {
+      const query = configureQuery();
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const command = JSON.parse(String(init?.body)) as unknown[];
+        return command[0] === 'get' ? Response.json({ result: null }) : Response.json({ result: 'OK' });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const dependencies = createP001Dependencies({
+        ...baseEnv,
+        UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
+        UPSTASH_REDIS_REST_TOKEN: 'test-token',
+        REDIS_CACHE_NAMESPACE: 'local',
+        REDIS_CACHE_DATASET: 'profile',
+        ...scenario.env,
+      });
+      await dependencies.profiles.options('student-a');
+      expect(query.mock.calls.some(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')),
+        scenario.name).toBe(scenario.expectedAssociation);
+      expect(query).toHaveBeenCalledTimes(scenario.expectedAssociation ? 3 : 4);
+      expect(fetchMock).toHaveBeenCalledTimes(scenario.expectedRedis ? 4 : 0);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('logs only whitelisted aggregate cache observations when enabled', async () => {
-    configureQuery();
+    const query = configureQuery(sql => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')
+      ? [{ curriculumId: 12 }]
+      : []);
     const values = new Map<string, unknown>();
     const requests: unknown[][] = [];
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -60,21 +94,38 @@ describe('P001 optional Redis composition', () => {
     const dependencies = createP001Dependencies({
       ...baseEnv,
       REDIS_CACHE_ENABLED: 'true',
+      REDIS_CURRICULUM_CACHE_ENABLED: 'true',
       REDIS_CACHE_NAMESPACE: 'local',
       REDIS_CACHE_DATASET: 'test-data',
       UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
       UPSTASH_REDIS_REST_TOKEN: 'test-upstash-secret',
     });
     expect(fetchMock).not.toHaveBeenCalled();
-    await dependencies.profiles.options('student-a');
+    const cold = await dependencies.profiles.options('student-a');
+    const warm = await dependencies.profiles.options('student-a');
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(requests.map(command => command[0])).toEqual(['get', 'get', 'set', 'set']);
-    expect(info).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
+    expect(requests.filter(command => command[0] === 'get')).toHaveLength(6);
+    expect(requests.filter(command => command[0] === 'set')).toHaveLength(3);
+    expect(query).toHaveBeenCalledTimes(6); // cold 5, warm 1 live association read
+    expect(query.mock.calls.filter(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile'))).toHaveLength(2);
+    const optionsKey = 'sa:local:test-data:v1:reference:curriculum-options:12';
+    expect(requests.some(command => command[0] === 'set' && command[1] === optionsKey)).toBe(true);
+    expect(values.get(optionsKey)).toMatchObject({ kind: 'curriculum-options', curriculumId: 12,
+      data: { curriculumId: 12, subjects: [], subjectGroups: [] } });
+    expect(Object.keys(cold)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups']);
+    expect(Object.keys(warm)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups']);
+    expect(cold).not.toHaveProperty('curriculumId');
+    expect(warm).not.toHaveProperty('curriculumId');
+    expect(info).toHaveBeenCalledTimes(6);
     const events = info.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+    expect(events.some(event => event.kind === 'curriculum-options' && event.outcome === 'miss')).toBe(true);
+    expect(events.some(event => event.kind === 'curriculum-options' && event.outcome === 'hit')).toBe(true);
     for (const event of events) {
       expect(Object.keys(event).sort()).toEqual(['dbLoads', 'event', 'kind', 'lookupDurationMs', 'outcome', 'redisDurationMs'].sort());
-      expect(event).toMatchObject({ event: 'reference_cache', outcome: 'miss', dbLoads: 1 });
+      expect(event.event).toBe('reference_cache');
+      expect(['miss', 'hit']).toContain(event.outcome);
+      expect(event.dbLoads).toBeGreaterThanOrEqual(0);
       expect(typeof event.lookupDurationMs).toBe('number');
       expect(typeof event.redisDurationMs).toBe('number');
       expect(JSON.stringify(event)).not.toContain('test-upstash-secret');
