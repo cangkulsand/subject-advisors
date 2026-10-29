@@ -70,7 +70,7 @@ export function createOfferingClient(getToken: () => Promise<string | null>, api
     async load(semesterId, signal) {
       const sessionStamp = accountSessionStamp();
       const path = '/api/semester-offerings' + (semesterId ? '?semesterId=' + encodeURIComponent(semesterId) : '');
-      const key = JSON.stringify([sessionStamp, base, 'p002-context-v3-profile-semester', path]);
+      const key = JSON.stringify([sessionStamp, base, 'p002-context-v4-prerequisites', path]);
       const loadOfferings = () => request(path, { method: 'GET' }, readPageData, sessionStamp);
       const page = sessionStamp
         ? await cachedAcademicRead(key, loadOfferings, signal, ACADEMIC_CACHE_TTL)

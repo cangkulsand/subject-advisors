@@ -14,7 +14,7 @@ export async function handleOfferingRequest(request: Request, deps: OfferingDepe
       return response;
     }
     const account = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
-    const context = await deps.contextFor(account.clerkUserId);
+    const context = await deps.contextFor(account.clerkUserId, { includePrerequisites: request.method === 'GET' });
     if (!context) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile before entering offerings.');
     if (!context.currentSemesterId) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Choose a current academic year and semester in your academic profile before entering offerings.');
     const publicContext = { curriculum: context.curriculum, currentSemesterId: context.currentSemesterId, subjects: context.subjects, semesters: context.semesters };

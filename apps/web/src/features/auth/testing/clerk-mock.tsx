@@ -9,14 +9,16 @@ export const useAuth = () => ({
   userId: testParams.get('test-user') ?? 'user_test', sessionId: testParams.get('test-session') ?? 'sess_test', getToken,
 });
 export const useClerk = () => ({
-  signOut: async () => {
+  signOut: async (options?: { redirectUrl?: string }) => {
+    document.body.dataset.signOutRedirectUrl = options?.redirectUrl ?? '';
+    document.body.dataset.signOutCalls = String(Number(document.body.dataset.signOutCalls ?? 0) + 1);
     if (scenario === 'logout-failure') throw new Error('test-only failure');
     document.body.dataset.signedOut = 'true';
   },
 });
-export function ClerkProvider({ children }: { children: ReactNode }) {
+export function ClerkProvider({ children, afterSignOutUrl }: { children: ReactNode; afterSignOutUrl?: string }) {
   const [loaded,setLoaded]=useState(scenario!=='sdk-boot');
-  useEffect(()=>{document.documentElement.dataset.clerkMounts=String(Number(document.documentElement.dataset.clerkMounts??0)+1);const timer=setTimeout(()=>setLoaded(true),30);return()=>clearTimeout(timer);},[]);
+  useEffect(()=>{document.documentElement.dataset.clerkMounts=String(Number(document.documentElement.dataset.clerkMounts??0)+1);document.documentElement.dataset.clerkAfterSignOutUrl=afterSignOutUrl??'';const timer=setTimeout(()=>setLoaded(true),30);return()=>clearTimeout(timer);},[afterSignOutUrl]);
   return <LoadedContext.Provider value={loaded}>{children}</LoadedContext.Provider>;
 }
 export function SignIn() { return <p>Test sign-in widget</p>; }

@@ -1,5 +1,5 @@
 import { AuthError } from '../auth/errors';
-import type { OfferingContext, OfferingSemester } from '../../../../../packages/shared/src/offerings/offerings';
+import type { OfferingContext, OfferingRequirementType, OfferingSemester, OfferingSubject } from '../../../../../packages/shared/src/offerings/offerings';
 import type { OfferingSql } from './repository';
 import type { StudentOfferingContext } from './contracts';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
@@ -17,7 +17,7 @@ function requiredCredits(value: unknown): number {
 
 /** Read-only consumer of the agreed FOUNDATION/P001 tables; creates no profile or reference data. */
 export function createOfferingContextReader(query: OfferingSql['query']) {
-  return async (clerkUserId: string): Promise<StudentOfferingContext | null> => {
+  return async (clerkUserId: string, options: { includePrerequisites?: boolean } = {}): Promise<StudentOfferingContext | null> => {
     const profiles = await query(`
       SELECT p.student_id, p.curriculum_id, p.current_semester_id, c.curriculum_version, c.total_credit_required, g.programme_name
       FROM student_profile p
@@ -40,7 +40,7 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
         WHERE cs.curriculum_id = $1 ORDER BY s.subject_code`, [curriculumId]),
       query('SELECT semester_id, academic_year, semester_no FROM academic_semester ORDER BY academic_year, semester_no', []),
     ]);
-    const subjects: OfferingContext['subjects'] = subjectRows.map(row => {
+    let subjects: OfferingContext['subjects'] = subjectRows.map(row => {
       const creditHours = typeof row.credit_hours === 'number' ? row.credit_hours :
         typeof row.credit_hours === 'string' && row.credit_hours.trim() ? Number(row.credit_hours) : NaN;
       if (!Number.isFinite(creditHours) || creditHours < 0) throw new Error('Invalid configured subject credits');
@@ -60,6 +60,47 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
       if (row.semester_no !== 1 && row.semester_no !== 2 && row.semester_no !== 3) throw new Error('Invalid configured semester number');
       return { semesterId: offeringId(row.semester_id), academicYear: text(row.academic_year), semesterNo: row.semester_no };
     });
+    if (options.includePrerequisites) {
+      const unavailable: OfferingSubject['prerequisites'] = { status: 'unavailable' };
+      try {
+        const rows = await query(`SELECT sp.curriculum_subject_id, sp.required_curriculum_subject_id,
+            sp.requirement_type, src.curriculum_id AS source_curriculum_id,
+            required.curriculum_id AS required_curriculum_id
+          FROM subject_prerequisite sp
+          JOIN curriculum_subject src ON src.curriculum_subject_id = sp.curriculum_subject_id
+          LEFT JOIN curriculum_subject required ON required.curriculum_subject_id = sp.required_curriculum_subject_id
+          WHERE src.curriculum_id = $1`, [curriculumId]);
+        const subjectsById = new Map(subjects.map(subject => [subject.curriculumSubjectId, subject]));
+        const allowedTypes = new Set<OfferingRequirementType>(['MANDATORY', 'RECOMMENDED', 'COREQUISITE']);
+        const seen = new Set<string>();
+        const bySource = new Map<string, Array<{ requiredCurriculumSubjectId: string; requirementType: OfferingRequirementType }>>();
+        for (const row of rows) {
+          const sourceId = offeringId(row.curriculum_subject_id);
+          const requiredId = offeringId(row.required_curriculum_subject_id);
+          if (row.source_curriculum_id === null || offeringId(row.source_curriculum_id) !== curriculumId ||
+              row.required_curriculum_id === null || offeringId(row.required_curriculum_id) !== curriculumId ||
+              !subjectsById.has(sourceId) || !subjectsById.has(requiredId) || sourceId === requiredId ||
+              typeof row.requirement_type !== 'string' || !allowedTypes.has(row.requirement_type as OfferingRequirementType)) {
+            throw new Error('Invalid configured prerequisite metadata');
+          }
+          const requirementType = row.requirement_type as OfferingRequirementType;
+          const key = `${sourceId}:${requiredId}:${requirementType}`;
+          if (seen.has(key)) throw new Error('Duplicate configured prerequisite metadata');
+          seen.add(key);
+          const items = bySource.get(sourceId) ?? [];
+          items.push({ requiredCurriculumSubjectId: requiredId, requirementType });
+          bySource.set(sourceId, items);
+        }
+        subjects = subjects.map(subject => ({
+          ...subject,
+          prerequisites: { status: 'available', items: bySource.get(subject.curriculumSubjectId) ?? [] },
+        }));
+      } catch (error) {
+        if (error instanceof AuthError && (error.status === 401 || error.status === 403)) throw error;
+        // Optional catalogue metadata must never make a valid core context unavailable.
+        subjects = subjects.map(subject => ({ ...subject, prerequisites: unavailable }));
+      }
+    }
     // Reject a concurrent curriculum change instead of returning a stale mixed context.
     if (!semesters.some(semester => semester.semesterId === currentSemesterId)) throw new AuthError(409, 'PROFILE_SEMESTER_UNAVAILABLE', 'Your selected semester is no longer configured. Update your academic profile.');
     const current = await query('SELECT curriculum_id, current_semester_id FROM student_profile WHERE student_id = $1 AND clerk_user_id = $2', [studentId, clerkUserId]);

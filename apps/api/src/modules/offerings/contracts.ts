@@ -18,6 +18,6 @@ export interface OfferingRepository {
 export interface OfferingDependencies {
   auth: AuthDependencies;
   /** FOUNDATION/P001 supply this reader; null means profile setup is required. */
-  contextFor(clerkUserId: string): Promise<StudentOfferingContext | null>;
+  contextFor(clerkUserId: string, options?: { includePrerequisites?: boolean }): Promise<StudentOfferingContext | null>;
   repository: OfferingRepository;
 }

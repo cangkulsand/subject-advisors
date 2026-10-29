@@ -101,7 +101,7 @@ try {
     assert.equal(await subject(page, 'DEMO206').count(), 1, 'unknown category remains selectable as Other / unknown');
     assert.match(normalSummary, /Some history is ambiguous and is not included in the recorded counts/);
     assert.match(await subject(page, 'DEMO206').evaluate(input => input.closest('tr').innerText), /History ambiguous/);
-    assert.equal(await page.locator('.offerings-subject-table th').count(), 4, 'catalogue table has no History column');
+    assert.deepEqual(await page.locator('.offerings-subject-table th:visible').allTextContents(), ['Select', 'Subject', 'Prerequisites', 'Category', 'Credits'], 'desktop catalogue adds a dedicated prerequisite column and no History column');
     const categoryRanks = await page.locator('.offerings-subject-table tbody tr').evaluateAll(rows => rows.map(row => {
       const category = [...row.querySelector('.offerings-category-pill').classList].find(name => name.startsWith('offerings-category-pill-'))?.slice('offerings-category-pill-'.length);
       const rank = ['core', 'e1', 'e2', 'u1', 'u2'].indexOf(category ?? '');
@@ -123,6 +123,92 @@ try {
     await page.getByRole('button', { name: 'Confirm and save' }).click();
     const calls = await page.evaluate(() => window.__offeringSaveCalls);
     assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] }, 'PUT retains curriculumSubjectId values');
+  });
+  await check('configured prerequisite metadata uses the full catalogue in selection and review', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    const source = page.locator('.offerings-subject-table tbody tr').filter({ has: subject(page, 'DEMO201') });
+    assert.deepEqual(await page.locator('.offerings-subject-table th:visible').allTextContents(), ['Select', 'Subject', 'Prerequisites', 'Category', 'Credits']);
+    const desktopMetadata = source.locator('td.offerings-prerequisites-column:visible .offerings-prerequisites');
+    assert.deepEqual(await desktopMetadata.locator('.offerings-prerequisite-label').allTextContents(), ['Prerequisites', 'Corequisites', 'Recommended preparation']);
+    assert.equal(await source.locator('.offerings-prerequisite-inline:visible').count(), 0, 'inline duplicate is removed from desktop layout and accessibility tree');
+    assert.deepEqual((await desktopMetadata.locator('.offerings-prerequisite-group').first().locator('li').allTextContents()).map(text => text.trim()), [
+      'DEMO207Unknown category', 'DEMO209Unclassified two-credit elective',
+    ], 'hidden semester target resolves from the full catalogue and targets sort by subject code');
+    const checkbox = subject(page, 'DEMO201');
+    await checkbox.focus(); await checkbox.press('Space');
+    assert.equal(await checkbox.isChecked(), true, 'the original keyboard checkbox control remains usable');
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'prerequisites-desktop.png'), fullPage: true });
+    await page.getByLabel('Find a subject').fill('data structures');
+    assert.equal(await subject(page, 'DEMO207').count(), 0, 'search hides unrelated prerequisite target rows');
+    assert.equal(await subject(page, 'DEMO209').count(), 0, 'semester filter target stays hidden from selectable catalogue');
+    assert.match(await desktopMetadata.innerText(), /DEMO207[\s\S]*DEMO209/, 'full-catalogue relationship labels remain available when target rows are filtered');
+    await page.getByRole('button', { name: 'Clear search' }).click();
+    await review(page);
+    const selected = page.locator('.offerings-review-list > li').filter({ hasText: 'DEMO204' });
+    assert.match(await selected.locator('.offerings-prerequisites').innerText(), /Prerequisites[\s\S]*DEMO102[\s\S]*Corequisites[\s\S]*DEMO209[\s\S]*Recommended preparation[\s\S]*DEMO201/);
+    const unavailable = page.locator('.offerings-review-list > li').filter({ has: page.locator('strong').filter({ hasText: 'DEMO206' }) });
+    assert.match(await unavailable.locator('.offerings-prerequisites').innerText(), /Prerequisite information unavailable/);
+    await confirmation(page).check();
+    await page.getByRole('button', { name: 'Confirm and save' }).click();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    assert.match(await page.locator('.offerings-save-state').innerText(), /Saved$/, 'unavailable metadata does not block save');
+    await page.reload();
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    const reloadedSavedSource = page.locator('.offerings-review-list > li').filter({ has: page.locator('strong').filter({ hasText: 'DEMO204' }) });
+    assert.match(await reloadedSavedSource.locator('.offerings-prerequisites').innerText(), /DEMO102[\s\S]*DEMO209[\s\S]*DEMO201/, 'saved selection revisit retains the source subject metadata');
+  });
+  await check('known-empty metadata is distinct from unavailable in narrow catalogue layout', async page => {
+    await page.goto(base + '/test?scenario=rich-short');
+    await page.getByLabel('Find a subject').waitFor();
+    const row = page.locator('.offerings-subject-table tbody tr').filter({ has: subject(page, 'DEMO209') });
+    await row.locator('.offerings-prerequisite-inline:visible').getByText('No prerequisites configured.', { exact: true }).waitFor();
+    assert.equal(await subject(page, 'DEMO209').getAttribute('aria-label'), 'DEMO209 Unclassified two-credit elective');
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'prerequisites-mobile.png'), fullPage: true });
+  }, 360);
+  await check('saved mobile review displays configured metadata and keeps edit controls', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    const saved = page.locator('.offerings-review-list > li').filter({ hasText: 'DEMO204' });
+    await saved.locator('.offerings-prerequisite-label').first().waitFor();
+    assert.match(await saved.locator('.offerings-prerequisites').innerText(), /Recommended preparation[\s\S]*DEMO201/);
+    assert.equal(await page.getByRole('button', { name: 'Edit offerings' }).isVisible(), true);
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'prerequisites-saved-mobile.png'), fullPage: true });
+  }, 360);
+  await check('nonempty prerequisite groups wrap in a 320px saved view', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    const saved = page.locator('.offerings-review-list > li').filter({ has: page.locator('strong').filter({ hasText: 'DEMO204' }) });
+    assert.match(await saved.locator('.offerings-prerequisites').innerText(), /Prerequisites[\s\S]*Recommended preparation/);
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'prerequisites-saved-mobile-320.png'), fullPage: true });
+  }, 320);
+  await check('responsive prerequisite column switches at 900px with one visible rendering', async page => {
+    await page.goto(base + '/test?scenario=rich');
+    await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    const source = page.locator('.offerings-subject-table tbody tr').filter({ has: subject(page, 'DEMO201') });
+    for (const width of [1280, 1024, 901, 900, 360, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const headers = page.locator('.offerings-subject-table th:visible');
+      if (width > 900) {
+        assert.deepEqual(await headers.allTextContents(), ['Select', 'Subject', 'Prerequisites', 'Category', 'Credits'], `${width}px uses five table columns`);
+        assert.equal(await source.locator('td.offerings-prerequisites-column:visible .offerings-prerequisites').count(), 1, `${width}px shows prerequisites in the dedicated column`);
+        assert.equal(await source.locator('.offerings-prerequisite-inline:visible').count(), 0, `${width}px hides the inline duplicate accessibly`);
+      } else {
+        assert.deepEqual(await headers.allTextContents(), ['Select', 'Subject', 'Category', 'Credits'], `${width}px keeps four visible table columns`);
+        assert.equal(await source.locator('td.offerings-prerequisites-column:visible').count(), 0, `${width}px hides the dedicated column accessibly`);
+        assert.equal(await source.locator('.offerings-prerequisite-inline:visible .offerings-prerequisites').count(), 1, `${width}px shows prerequisites beneath the name`);
+      }
+      await noOverflow(page);
+      if (width === 1280) await page.screenshot({ path: resolve(artifacts, 'prerequisites-column-desktop.png'), fullPage: true });
+      if (width === 1024) await page.screenshot({ path: resolve(artifacts, 'prerequisites-column-1024.png'), fullPage: true });
+      if (width === 360) await page.screenshot({ path: resolve(artifacts, 'prerequisites-column-mobile.png'), fullPage: true });
+    }
   });
   await check('Normal and Short semester predicates preserve SECJ3032 exception', async page => {
     await page.goto(base + '/test?scenario=rich');

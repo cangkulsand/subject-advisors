@@ -58,6 +58,24 @@ describe('offerings browser API transport', () => {
     const page = await createOfferingClient(async () => 'fixture-token', base).load('201');
     expect(page.curriculum.totalCreditRequired).toBe(131);
   });
+  it('bypasses prerequisite-unaware v3 snapshots and fetches the new relationship metadata', async () => {
+    const base = 'https://api.invalid';
+    const path = '/api/semester-offerings?semesterId=201';
+    const v3Key = JSON.stringify([accountSessionStamp(), base, 'p002-context-v3-profile-semester', path]);
+    await cachedAcademicRead(v3Key, async () => ({ ...demoContext, selection: null }), undefined, ACADEMIC_CACHE_TTL);
+    const source = { ...demoContext.subjects[0]!, prerequisites: { status: 'available' as const, items: [
+      { requiredCurriculumSubjectId: demoContext.subjects[1]!.curriculumSubjectId, requirementType: 'MANDATORY' as const },
+    ] } };
+    const fetcher = vi.fn(async (url: string) => url.endsWith('/api/academic-records')
+      ? Response.json({ data: [] })
+      : Response.json({ data: { ...demoContext, subjects: [source, ...demoContext.subjects.slice(1)], selection: null } }));
+    vi.stubGlobal('fetch', fetcher);
+    const page = await createOfferingClient(async () => 'fixture-token', base).load('201');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(page.subjects[0]?.prerequisites).toEqual({ status: 'available', items: [
+      { requiredCurriculumSubjectId: demoContext.subjects[1]!.curriculumSubjectId, requirementType: 'MANDATORY' },
+    ] });
+  });
   it('retains offering and records snapshots after failed save, invalidates before decoding successful save', async () => {
     const fetcher = vi.fn(async (path: string, init: RequestInit) => successfulResponse(path, init)); vi.stubGlobal('fetch', fetcher);
     const client = createOfferingClient(async () => 'fixture-token');

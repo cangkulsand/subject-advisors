@@ -50,7 +50,7 @@ describe('authenticated UC08 offering routes', () => {
     expect(body.data.currentSemesterId).toBe(f.semesterId);
     expect(body.data.studentId).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('fictional_a');
-    expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a');
+    expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a', { includePrerequisites: true });
   });
   it('saves and reloads idempotently for a configured semester', async () => {
     const f = fixture(); const input = { semesterId: f.semesterId, curriculumSubjectIds: [f.subjectId] };
@@ -60,6 +60,7 @@ describe('authenticated UC08 offering routes', () => {
     expect(result.data.selection).toEqual(input);
     expect(f.values.size).toBe(1);
     expect(f.deps.repository.replace).toHaveBeenCalledWith({ clerkUserId: 'fictional_a', studentId: f.context.studentId, curriculumId: f.context.curriculum.curriculumId }, input);
+    expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a', { includePrerequisites: false });
   });
   it('isolates students and semesters using verified identity', async () => {
     const f = fixture();
