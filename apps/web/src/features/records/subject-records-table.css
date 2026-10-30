@@ -1,11 +1,11 @@
 .subject-records-table {
   --srt-surface: var(--color-surface, #fff);
-  --srt-subtle: var(--color-surface-subtle, #f1f5f9);
-  --srt-heading: var(--color-heading, #0f172a);
-  --srt-body: var(--color-body, #334155);
-  --srt-muted: var(--color-muted, #475569);
-  --srt-outline: var(--color-outline, #e2e8f0);
-  --srt-focus: var(--color-focus, #9a596b);
+  --srt-subtle: var(--color-surface-subtle, #f0e9da);
+  --srt-heading: var(--color-heading, #1a1a1a);
+  --srt-body: var(--color-body, #555555);
+  --srt-muted: var(--color-muted, #555555);
+  --srt-outline: var(--color-outline, #ddd3c3);
+  --srt-focus: var(--color-focus, #6b1d2f);
   --srt-danger: var(--color-danger-text, #b91c1c);
   --srt-danger-bg: var(--color-danger-bg, #fef2f2);
   color: var(--srt-body);
@@ -117,7 +117,7 @@
   overflow: hidden;
   border: 1px solid #334155;
   border-radius: 14px;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%);
+  background: var(--color-progress-surface, linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%));
   color: #e2e8f0;
 }
 .p001 .p001-degree-heading { grid-column: 1; }
@@ -184,16 +184,16 @@
   max-width: 18px;
   margin: 0;
   padding: 0;
-  accent-color: var(--color-brand, #521f28);
+  accent-color: var(--color-brand, #6b1d2f);
   flex: 0 0 auto;
 }
 
 .p001 .subject-records-table button {
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid var(--color-action, #2563eb);
+  border: 1px solid var(--color-action, #6b1d2f);
   border-radius: 8px;
-  background: var(--color-action, #2563eb);
+  background: var(--color-action, #6b1d2f);
   color: #fff;
   font: inherit;
   cursor: pointer;
@@ -223,7 +223,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 18px 0 0;
-  border-bottom: 1px solid var(--color-outline, #e2e8f0);
+  border-bottom: 1px solid var(--color-outline, #ddd3c3);
 }
 
 .p001-record-tabs [role='tab'] {
@@ -233,17 +233,17 @@
   border-radius: 8px 8px 0 0;
   padding: 8px 14px;
   background: transparent;
-  color: var(--color-body, #334155);
+  color: var(--color-body, #555555);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
 
 .p001-record-tabs [role='tab'][aria-selected='true'] {
-  border-color: var(--color-outline, #e2e8f0);
-  border-bottom-color: var(--color-brand, #521f28);
+  border-color: var(--color-outline, #ddd3c3);
+  border-bottom-color: var(--color-brand, #6b1d2f);
   background: var(--color-surface, #fff);
-  color: var(--color-heading, #0f172a);
+  color: var(--color-heading, #1a1a1a);
 }
 
 .p001-record-tabpanel {
@@ -256,7 +256,7 @@
 
 .p001-elective-group h2 {
   margin: 8px 0 10px;
-  color: var(--color-heading, #0f172a);
+  color: var(--color-heading, #1a1a1a);
   font-size: 1rem;
 }
 
@@ -265,11 +265,11 @@
   max-width: 42rem;
   max-height: min(88vh, 52rem);
   overflow: auto;
-  border: 1px solid var(--color-outline, #e2e8f0);
+  border: 1px solid var(--color-outline, #ddd3c3);
   border-radius: 14px;
   padding: 0;
   background: var(--color-surface, #fff);
-  color: var(--color-body, #334155);
+  color: var(--color-body, #555555);
   box-shadow: 0 24px 70px rgb(15 23 42 / .28);
 }
 
@@ -279,7 +279,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 12px 0 0;
-  border-left: 3px solid #521f28;
+  border-left: 3px solid #6b1d2f;
   padding: 8px 12px;
   background: #f8f1f2;
   color: #35151b;
@@ -329,8 +329,8 @@
 }
 
 .p001 .subject-records-table button:hover:not(:disabled) {
-  background: var(--color-action-hover, #1d4ed8);
-  border-color: var(--color-action-hover, #1d4ed8);
+  background: var(--color-action-hover, #521624);
+  border-color: var(--color-action-hover, #521624);
 }
 
 .subject-records-table :is(input, button):disabled {

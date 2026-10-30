@@ -31,7 +31,7 @@ function Workspace() {
   const path = new URL(useAppLocation(), window.location.origin).pathname.replace(/\/$/, '') || '/coordinator';
   const page = pages[path];
   const title = page?.title ?? (path === '/coordinator' ? 'Overview' : 'Page not found');
-  return <StaffNavigationShell path={path} title={title} workspace="Coordinator" roleLabel="Academic coordinator" home="/coordinator" navLabel="Coordinator navigation" groups={groups}>
+  return <StaffNavigationShell path={path} title={title} workspace="Coordinator" roleLabel="Academic coordinator" home="/coordinator" navLabel="Coordinator navigation" groups={groups} variant="coordinator">
     {path === '/coordinator' ? <Overview/> : page ? <StaffPlannedPage {...page}/> : <section className="admin-card"><h1>Page not found</h1><p>Choose a page from the coordinator menu.</p></section>}
   </StaffNavigationShell>;
 }

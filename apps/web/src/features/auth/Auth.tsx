@@ -11,7 +11,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 export function AuthProvider({ publishableKey, children }: { publishableKey: string; children: ReactNode }) {
   if (!publishableKey) return <section role="alert">Sign-in is unavailable until Clerk is configured.</section>;
   return <ClerkProvider publishableKey={publishableKey} signInUrl="/sign-in" signUpUrl="/sign-up"
-    appearance={{ variables: { colorPrimary: '#521f28', colorForeground: '#49383b', colorMutedForeground: '#786368', colorNeutral: '#49383b', colorBackground: '#ffffff', colorRing: '#9a596b', colorDanger: '#b13b35', colorSuccess: '#34634c', colorWarning: '#825c1a' } }}
+    appearance={{ variables: { colorPrimary: '#6b1d2f', colorForeground: '#1a1a1a', colorMutedForeground: '#555555', colorNeutral: '#555555', colorBackground: '#ffffff', colorRing: '#6b1d2f', colorDanger: '#b13b35', colorSuccess: '#34634c', colorWarning: '#825c1a' } }}
     signInForceRedirectUrl="/auth/complete" signUpForceRedirectUrl="/auth/complete"
     afterSignOutUrl="/"><AccountSessionLifecycle />{children}</ClerkProvider>;
 }

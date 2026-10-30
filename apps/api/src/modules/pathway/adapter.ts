@@ -10,12 +10,26 @@ const PREREQUISITE_TYPES = new Set(['MANDATORY', 'RECOMMENDED', 'COREQUISITE']);
  * No hypothetical placement, scheduling or eligibility engine is applied here.
  */
 export function buildPathwayGraph(raw: RawPathwayData): PathwayGraph {
-  const recordBySubject = new Map<number, RawPathwayData['records'][number]>();
-  for (const record of raw.records) recordBySubject.set(record.subjectId, record);
-
-  const satisfied = new Set<number>();
+  const recordsBySubject = new Map<number, RawPathwayData['records']>();
   for (const record of raw.records) {
-    if (SATISFIED.has(record.status)) satisfied.add(record.subjectId);
+    const attempts = recordsBySubject.get(record.subjectId) ?? [];
+    attempts.push(record);
+    recordsBySubject.set(record.subjectId, attempts);
+  }
+
+  // P001 treats duplicate saved attempts as unresolved until a user reconciles them.
+  // Do not pick an arbitrary row or let any one attempt unlock dependent subjects.
+  const recordBySubject = new Map<number, RawPathwayData['records'][number]>();
+  const ambiguousSubjects = new Set<number>();
+  const satisfied = new Set<number>();
+  for (const [subjectId, attempts] of recordsBySubject) {
+    if (attempts.length !== 1) {
+      ambiguousSubjects.add(subjectId);
+      continue;
+    }
+    const record = attempts[0]!;
+    recordBySubject.set(subjectId, record);
+    if (SATISFIED.has(record.status)) satisfied.add(subjectId);
   }
 
   // Prerequisites reference curriculum_subject_id; records reference subject_id.
@@ -33,9 +47,11 @@ export function buildPathwayGraph(raw: RawPathwayData): PathwayGraph {
       creditHours: subject.creditHours,
       isCompulsory: subject.isCompulsory === 1,
       subjectCategory: subject.subjectCategory,
-      status: statusFor(subject.curriculumSubjectId, record?.status, satisfied, raw, subjectIdByCurriculumSubjectId),
-      grade: record?.grade ?? null,
-      recognizedCredits: record ? record.recognizedCredits : null,
+      status: ambiguousSubjects.has(subject.subjectId)
+        ? 'UNKNOWN'
+        : statusFor(subject.curriculumSubjectId, record?.status, satisfied, raw, subjectIdByCurriculumSubjectId),
+      grade: ambiguousSubjects.has(subject.subjectId) ? null : record?.grade ?? null,
+      recognizedCredits: ambiguousSubjects.has(subject.subjectId) ? null : record ? record.recognizedCredits : null,
     };
   });
 

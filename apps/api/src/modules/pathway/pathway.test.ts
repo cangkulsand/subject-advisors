@@ -63,6 +63,25 @@ describe('UC17 pathway graph adapter', () => {
     expect(byCode.get('SECJ1023')?.status).toBe('LOCKED');
   });
 
+  it.each([
+    ['COMPLETED', 'FAILED'],
+    ['FAILED', 'COMPLETED'],
+    ['EXEMPTED', 'WITHDRAWN'],
+    ['WITHDRAWN', 'EXEMPTED'],
+    ['COMPLETED', 'EXEMPTED'],
+    ['EXEMPTED', 'COMPLETED'],
+  ])('marks duplicate attempts %s + %s unresolved and does not unlock prerequisites', (first, second) => {
+    const graph = buildPathwayGraph(raw({
+      records: [first, second].map(status => ({
+        subjectId: 100, status, grade: status === 'COMPLETED' ? 'A' : null,
+        recognizedCredits: status === 'COMPLETED' ? 3 : 0,
+      })),
+    }));
+    const byCode = new Map(graph.nodes.map(node => [node.subjectCode, node]));
+    expect(byCode.get('SECJ1013')).toMatchObject({ status: 'UNKNOWN', grade: null, recognizedCredits: null });
+    expect(byCode.get('SECJ1023')?.status).toBe('LOCKED');
+  });
+
   it('emits directed edges for prerequisites and distinguishes mandatory from recommended', () => {
     const graph = buildPathwayGraph(raw());
     expect(graph.edges).toHaveLength(2);

@@ -57,31 +57,27 @@ Use **semantic tokens** rather than scattering hex values and arbitrary Tailwind
 
 | Token | Hex | Purpose | Tailwind example |
 | --- | --- | --- | --- |
-| `app-bg` | `#F8FAFC` | Overall page background; calm cool white | `bg-app-bg` |
+| `app-bg` | `#FAF6EE` | Overall page background; warm cream | `bg-app-bg` |
 | `surface` | `#FFFFFF` | Cards, forms, panels, navbar | `bg-surface` |
-| `surface-subtle` | `#F1F5F9` | Hover zones, side panels, neutral badges | `bg-surface-subtle` |
-| `heading` | `#0F172A` | Headings, high-emphasis text | `text-heading` |
-| `body` | `#334155` | General content | `text-body` |
-| `muted` | `#475569` | Secondary descriptions and form help | `text-muted` |
-| `subtle` | `#64748B` | Low-emphasis metadata **only when contrast is adequate** | `text-subtle` |
-| `outline` | `#E2E8F0` | Card borders, input borders, dividers | `border-outline` |
-| `brand` | `#0F766E` | Primary actions, active progress, key highlights | `bg-brand`, `text-brand` |
-| `brand-hover` | `#115E59` | Primary action hover/pressed state | `hover:bg-brand-hover` |
-| `accent` | `#2563EB` | Links, selected states, pathway focus, informational emphasis | `text-accent` |
-| `accent-hover` | `#1D4ED8` | Links/secondary emphasis hover | `hover:text-accent-hover` |
-| `focus` | `#2563EB` | Visible keyboard focus ring | `focus-visible:ring-focus` |
+| `surface-subtle` | `#F0E9DA` | Hover zones, side panels, neutral badges | `bg-surface-subtle` |
+| `heading` | `#1A1A1A` | Headings, high-emphasis text | `text-heading` |
+| `body` | `#555555` | General content and secondary descriptions | `text-body` |
+| `muted` | `#555555` | Secondary descriptions and form help | `text-muted` |
+| `subtle` | `#70645E` | Low-emphasis metadata **only when contrast is adequate** | `text-subtle` |
+| `outline` | `#DDD3C3` | Card borders, input borders, dividers | `border-outline` |
+| `brand` | `#6B1D2F` | Shared navigation and primary actions | `bg-brand`, `text-brand` |
+| `brand-hover` | `#521624` | Primary action hover/pressed state | `hover:bg-brand-hover` |
+| `accent` | `#6B1D2F` | Links and brand emphasis | `text-accent` |
+| `accent-hover` | `#521624` | Links and secondary emphasis hover | `hover:text-accent-hover` |
+| `focus` | `#6B1D2F` | Visible keyboard focus ring on light surfaces | `focus-visible:ring-focus` |
 
-**Historical default:** `brand` (teal) was previously the default primary call-to-action color; `accent` (blue) was used for navigation, links, and informational interactions. The current user-directed button standard below replaces that action-color decision.
-
-**Current user-directed button standard (2026-10-27):** This later decision
-overrides the teal primary button examples below and any prior burgundy primary
-button override: action buttons use blue `#2563EB` with hover `#1D4ED8`; explicit
-**Cancel** buttons use red `#B91C1C` with hover `#991B1B`. Shared CSS tokens
-`--color-action`, `--color-action-hover`, `--color-cancel`, and
-`--color-cancel-hover` are defined in `apps/web/src/app/student-shell.css`.
-Keep `#521F28` as the shared shell/navigation brand and non-action brand accent.
-Apply this standard to future owners' UI work; it does not authorize unrelated
-feature changes in a task.
+**Current user-directed palette (2026-10-30):** Primary actions use burgundy
+`#6B1D2F` with hover `#521624`, white text, and secondary actions use a
+transparent/cream surface with a 1.5px burgundy border and burgundy text; hover
+uses cream `#F0E9DA`. This supersedes the previous blue-action standard.
+Explicit **Cancel** and destructive actions retain semantic red tokens
+`--color-cancel` / `--color-cancel-hover`. Shared semantic tokens live in
+`apps/web/src/app/student-shell.css`.
 
 ### 3.2 Feedback colors
 
@@ -98,11 +94,8 @@ Statuses **always** include readable text and, where useful, an icon; color must
 **Semantic feedback and notifications:** Use green for success, blue for information,
 amber for warnings, and red for danger/destructive consequences. Keep readable text
 and a matching icon with each color; do not use the brand color to mean success.
-Product-specific brand overrides apply to the shell/navigation and non-action
-brand accents, not to semantic actions or feedback. The current shared app uses
-burgundy `#521f28` for its shell/navigation per
-`docs/changes/S1-INT-010-burgundy-template-palette.md`; semantic action and
-notification colors retain the meanings above.
+The current user-directed burgundy brand applies to navigation, links, and primary
+actions; semantic status colors retain their meanings above.
 
 **Toast standard:** Place notifications in a fixed bottom-right stack. Show at most
 three at once, keep the newest three when another arrives, and give every toast its
@@ -119,8 +112,8 @@ and `ToastStack.tsx` instead of implementing separate toast queues or styles.
 
 ### 3.3 Colors must mean the same thing everywhere
 
-- **Teal:** brand accent and positive academic progression where locally used; the current action-button standard below uses blue for actions.
-- **Blue:** active link or selection, inspectable information, eligible subject.
+- **Burgundy:** shared navigation, links, selected navigation state, and primary actions.
+- **Blue:** inspectable informational emphasis where a feature semantically requires it; it is not the current default action color.
 - **Green:** completed item or successful operation.
 - **Amber:** warnings, unverified/incomplete details, conditional states.
 - **Red:** validation errors and destructive consequences; never decorative.
@@ -167,19 +160,25 @@ Create one web-app global CSS entry (for example `apps/web/src/styles/global.css
 @import "tailwindcss";
 
 @theme {
-  --color-app-bg: #f8fafc;
+  --color-app-bg: #faf6ee;
   --color-surface: #ffffff;
-  --color-surface-subtle: #f1f5f9;
-  --color-heading: #0f172a;
-  --color-body: #334155;
-  --color-muted: #475569;
-  --color-subtle: #64748b;
-  --color-outline: #e2e8f0;
-  --color-brand: #0f766e;
-  --color-brand-hover: #115e59;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --color-focus: #2563eb;
+  --color-surface-subtle: #f0e9da;
+  --color-heading: #1a1a1a;
+  --color-body: #555555;
+  --color-muted: #555555;
+  --color-subtle: #70645e;
+  --color-outline: #ddd3c3;
+  --color-brand: #6b1d2f;
+  --color-brand-hover: #521624;
+  --color-accent: #6b1d2f;
+  --color-accent-hover: #521624;
+  --color-focus: #6b1d2f;
+  --color-action: #6b1d2f;
+  --color-action-hover: #521624;
+  --color-nav-background: #6b1d2f;
+  --color-nav-divider: #521624;
+  --color-nav-inactive: #b88b96;
+  --color-nav-active-indicator: #faf6ee;
 
   --color-success-text: #166534;
   --color-success-bg: #f0fdf4;
@@ -190,8 +189,11 @@ Create one web-app global CSS entry (for example `apps/web/src/styles/global.css
   --color-info-text: #1d4ed8;
   --color-info-bg: #eff6ff;
 
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: Outfit, ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --color-progress-surface: linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #334155 100%);
 }
 
 @layer base {
@@ -207,7 +209,7 @@ Create one web-app global CSS entry (for example `apps/web/src/styles/global.css
 
 **Resulting utilities** include `bg-app-bg`, `bg-surface`, `text-heading`, `text-muted`, `border-outline`, `bg-brand`, `hover:bg-brand-hover`, `text-accent`, `ring-focus`, `bg-warning-bg`, and `text-warning-text`.
 
-**Font availability:** `Inter` is a preference, not a mandatory remote font. Use the system font fallback unless the repository already has an approved way to load it. Avoid adding an unsolicited runtime dependency or external font request.
+**Font availability:** The existing web application uses `Outfit` with system fallbacks. Reuse the installed app font; avoid adding an unsolicited runtime dependency or external font request.
 
 **Tailwind v3 note:** the CSS `@theme` block is a v4 example, not something to paste into v3. With v3, map the same token names/values in `tailwind.config` and keep the existing `@tailwind` directives.
 
@@ -284,6 +286,23 @@ Avoid heavy drop shadows, gradients, glassmorphism, glowing text, and decorative
 
 **Coordinator/admin navigation:** professional, functional titles. Do not apply game UI metaphors to validation workflows, role management, audit data, or class forecast decisions.
 
+**Current role navigation palette (user-directed 2026-10-30):** The student
+sidebar and mobile navigation header use solid burgundy `#6B1D2F`, white brand and
+active text, inactive labels/icons `#B88B96`, cream active indicators `#FAF6EE`,
+and divider `#521624`. The requested inactive color has approximately **3.89:1**
+contrast against the burgundy base, below the 4.5:1 normal-text target; retain the
+specified color and document this known limitation rather than silently changing
+it. Administrator navigation uses the existing Degree Progress card's dark slate
+gradient with cream active item/indicator. Coordinator navigation uses an inverse
+cream surface with burgundy active text/indicator and dark readable inactive text;
+this applies to navigation only and does not invert page/card surfaces. Do not use
+the student inactive pink on the light coordinator navigation.
+
+Primary actions across these roles use burgundy `#6B1D2F`, white text, and hover
+`#521624`. Secondary actions are transparent or cream with a 1.5px burgundy
+border/text and hover surface `#F0E9DA`. Keep actual action labels specific to the
+workflow; examples like “BUY NOW” or “Learn More” only illustrate button roles.
+
 ### 7.2 Typical page skeleton
 
 ```tsx
@@ -318,11 +337,11 @@ If the shell already owns `<main>`, padding, or background, **do not nest anothe
 
 | Component | Appearance and interaction |
 | --- | --- |
-| `Button` primary/action | Blue `--color-action` fill, white text, `--color-action-hover`, rounded-lg, visible focus, minimum 44px height |
-| `Button` secondary | White background, slate border/text, subtle hover |
+| `Button` primary/action | Burgundy `--color-action` fill, white text, `--color-action-hover`, rounded-lg, visible focus, minimum 44px height |
+| `Button` secondary | Transparent or white/cream background, 1.5px brand border and text, cream hover, visible focus |
 | `Button` Cancel/destructive | Red `--color-cancel` fill for explicit Cancel; red foreground/confirm action for destructive consequences |
-| `Card` | White, 1px slate border, rounded-xl, subtle shadow |
-| `Input` / `Select` | Visible label, white fill, slate border, error/help text, focus ring |
+| `Card` | White, 1px neutral outline, rounded-xl, subtle shadow |
+| `Input` / `Select` | Visible label, white fill, neutral outline, error/help text, focus ring |
 | `Badge` / `StatusChip` | Soft fill, dark readable text, label and optional icon |
 | `Alert` | Soft colored background, icon/heading/message, next-step guidance |
 | `Modal` / `Drawer` | Keyboard-accessible, correctly labeled, focus-managed; use established primitives |

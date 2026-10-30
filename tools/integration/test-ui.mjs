@@ -26,7 +26,11 @@ async function mock(page,state={}){
   const studentProfileState=availableRoles.includes('STUDENT')?(state.setup?'SETUP_REQUIRED':'COMPLETE'):'NOT_APPLICABLE';
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:role,roles,availableRoles,studentProfileState,accessStatus:'ACTIVE',profileState:role==='STUDENT'?studentProfileState:'NOT_APPLICABLE',landingPath:role==='SYSTEM_ADMIN'?'/admin':role==='COORDINATOR'?'/coordinator':state.setup?'/student/setup':'/student'}
    :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
-   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}:{};
+   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}
+   :path==='/api/pathway/graph'?{curriculumId:1,curriculumVersion:'DEMO',programmeName:'Fictional demo programme',demo:true,nodes:[
+    {id:'10',subjectCode:'DEMO101',subjectName:'Foundations',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'COMPLETED',grade:'A',recognizedCredits:3},
+    {id:'11',subjectCode:'DEMO201',subjectName:'Applied study',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'REMAINING',grade:null,recognizedCredits:null},
+   ],edges:[{id:'1',source:'10',target:'11',requirementType:'MANDATORY'}]}:{};
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data})});
  });
  return state;
@@ -95,13 +99,21 @@ try{
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
+ await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{
+  const state=await mock(page);await page.goto(base+'/student/pathway');
+  const node=page.getByRole('button',{name:'DEMO101 Foundations, 3 credits, Completed'});await node.waitFor();
+  assert.ok(state.requests.some(request=>request.path==='/api/pathway/graph'&&request.method==='GET'));
+  await node.click();await page.getByRole('complementary',{name:'Selected subject details'}).getByText('Completed',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Switch to list view'}).click();
+  await page.getByRole('list',{name:'Curriculum subjects'}).getByText('Applied study').waitFor();
+ });
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  for(const path of ['/student/records','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
- await check('P001 actions use blue and explicit Cancel uses red in the shared shell',async page=>{
+ await check('P001 actions use burgundy and explicit Cancel uses red in the shared shell',async page=>{
   await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');
   const save=page.getByRole('button',{name:'Save profile',exact:true}),cancel=page.getByRole('button',{name:'Cancel changes',exact:true});
-  assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(37, 99, 235)');await save.hover();assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(29, 78, 216)');
+  assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(107, 29, 47)');await save.hover();assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(82, 22, 36)');
   assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(185, 28, 28)');await cancel.hover();assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(153, 27, 27)');
  });
  for(const width of [320,1440])await check('shared shell avoids page overflow at '+width,async page=>{await mock(page);await page.goto(base+'/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));},width);
@@ -166,14 +178,15 @@ try{
   await page.screenshot({path:'.wrangler/theme-mobile.png',fullPage:true});
   for(const width of [320,390,768,1024,1279,1280,1440]){await page.setViewportSize({width,height:844});await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth);}
  },1440);
- await check('pathway skeleton is explicit and makes no graph reads or writes',async page=>{
+ await check('pathway route is explicit and performs read-only graph access',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway');await page.getByRole('heading',{name:'Academic pathway',exact:true}).waitFor();
-  assert.equal(await page.getByRole('status').innerText(),'Coming soon');
   assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).getByRole('link',{name:'Academic pathway',exact:true,includeHidden:true}).getAttribute('aria-current'),'page');
-  assert.deepEqual(state.requests,[{path:'/api/me',method:'GET'}]);
-  await page.getByRole('link',{name:'subject records',exact:true}).click();await page.waitForURL('**/student/records');
+  await page.getByRole('button',{name:'DEMO101 Foundations, 3 credits, Completed'}).waitFor();
+  assert.ok(state.requests.some(request=>request.path==='/api/pathway/graph'&&request.method==='GET'));
+  assert.ok(state.requests.every(request=>request.method==='GET'));
+  await clickStudentLink(page,'Subject records');await page.waitForURL('**/student/records');
  });
- await check('page search opens the pathway skeleton',async page=>{
+ await check('page search opens the pathway page',async page=>{
   await mock(page);await page.goto(base+'/student/profile');await page.getByRole('searchbox',{name:'Search pages'}).waitFor();await page.keyboard.press('Control+k');await page.getByRole('searchbox',{name:'Search pages'}).fill('pathway');
   await page.locator('#student-search-results').getByRole('link',{name:'Academic pathway',exact:true}).click();await page.waitForURL('**/student/pathway');await page.getByRole('heading',{name:'Academic pathway',exact:true}).waitFor();
  },1440);
