@@ -45,16 +45,16 @@ function StaffNavigation({ groups, path, label, onNavigate }: { groups: StaffNav
   </nav>;
 }
 
-export function StaffNavigationShell({ path, title, workspace, roleLabel, home, navLabel, groups, children }: {
+export function StaffNavigationShell({ path, title, workspace, roleLabel, home, navLabel, groups, children, variant = 'admin' }: {
   path: string; title: string; workspace: string; roleLabel: string; home: string; navLabel: string;
-  groups: StaffNavigationGroup[]; children: ReactNode;
+  groups: StaffNavigationGroup[]; children: ReactNode; variant?: 'admin' | 'coordinator';
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   useEffect(() => { dialog.current?.close(); }, [path]);
   const close = () => dialog.current?.close();
   const brand = <AppLink href={home} className="admin-brand" onClick={close}><span className="admin-brand-mark" aria-hidden="true">SA</span><span>Subject Advisors<small>{workspace.toUpperCase()}</small></span></AppLink>;
-  return <div className="admin-shell">
+  return <div className={`admin-shell admin-shell-${variant}`}>
     <a href="#staff-content" className="admin-skip">Skip to content</a>
     <aside className="admin-sidebar" aria-label={`${workspace} workspace`}>{brand}<p className="admin-nav-caption">WORKSPACE</p><StaffNavigation groups={groups} path={path} label={navLabel} onNavigate={close}/><p className="admin-sidebar-foot">Academic advisory system</p></aside>
     <dialog ref={dialog} id="staff-mobile-menu" className="admin-drawer" aria-label={`${workspace} menu`} onClose={() => opener.current?.focus()} onKeyDown={event => {

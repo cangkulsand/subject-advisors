@@ -1,16 +1,16 @@
 .offerings {
-  --off-bg: var(--color-app-bg, #f8fafc);
+  --off-bg: var(--color-app-bg, #faf6ee);
   --off-surface: var(--color-surface, #fff);
-  --off-subtle: var(--color-surface-subtle, #f1f5f9);
-  --off-heading: var(--color-heading, #0f172a);
-  --off-body: var(--color-body, #334155);
-  --off-muted: var(--color-muted, #475569);
-  --off-outline: var(--color-outline, #e2e8f0);
-  --off-brand: var(--color-action, #2563eb);
-  --off-brand-hover: var(--color-action-hover, #1d4ed8);
-  --off-accent: var(--color-accent, #2563eb);
-  --off-focus: var(--color-focus, #2563eb);
-  --off-control-outline: var(--color-subtle, #64748b);
+  --off-subtle: var(--color-surface-subtle, #f0e9da);
+  --off-heading: var(--color-heading, #1a1a1a);
+  --off-body: var(--color-body, #555555);
+  --off-muted: var(--color-muted, #555555);
+  --off-outline: var(--color-outline, #ddd3c3);
+  --off-brand: var(--color-action, #6b1d2f);
+  --off-brand-hover: var(--color-action-hover, #521624);
+  --off-accent: var(--color-accent, #6b1d2f);
+  --off-focus: var(--color-focus, #6b1d2f);
+  --off-control-outline: var(--color-subtle, #70645e);
   --off-success-text: var(--color-success-text, #166534);
   --off-success-bg: var(--color-success-bg, #f0fdf4);
   --off-warning-text: var(--color-warning-text, #92400e);
@@ -19,7 +19,7 @@
   --off-danger-bg: var(--color-danger-bg, #fef2f2);
   --off-info-text: var(--color-info-text, #1d4ed8);
   --off-info-bg: var(--color-info-bg, #eff6ff);
-  color: var(--off-body); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--off-body); font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
   font-size: 14px; line-height: 1.6; max-width: 1184px; margin: auto; padding: 40px 32px 64px;
 }
 .offerings *, .offerings *::before, .offerings *::after { box-sizing: border-box; }
@@ -30,7 +30,7 @@
 .offerings h3 { font-size: 16px; }
 .offerings button, .offerings input, .offerings select { font: inherit; }
 .offerings button, .offerings select, .offerings a { min-height: 44px; }
-.offerings button { cursor: pointer; padding: 10px 16px; border: 1px solid var(--off-outline); border-radius: 8px; background: var(--off-surface); color: var(--off-heading); font-weight: 600; line-height: 1.5; }
+.offerings button { cursor: pointer; padding: 10px 16px; border: 1.5px solid var(--off-accent); border-radius: 8px; background: transparent; color: var(--off-accent); font-weight: 600; line-height: 1.5; }
 .offerings button:hover { background: var(--off-subtle); }
 .offerings button:disabled { opacity: .65; cursor: not-allowed; }
 .offerings :is(button, input, select, a):focus-visible, .offerings [tabindex="-1"]:focus-visible { outline: 3px solid var(--off-focus); outline-offset: 3px; }

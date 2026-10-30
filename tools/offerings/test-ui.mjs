@@ -164,7 +164,7 @@ try {
     await page.goto(base + '/test?scenario=rich-short');
     await page.getByLabel('Find a subject').waitFor();
     const row = page.locator('.offerings-subject-table tbody tr').filter({ has: subject(page, 'DEMO209') });
-    await row.locator('.offerings-prerequisite-inline:visible').getByText('No prerequisites configured.', { exact: true }).waitFor();
+    await row.locator('.offerings-prerequisite-inline:visible').getByText('-', { exact: true }).waitFor();
     assert.equal(await subject(page, 'DEMO209').getAttribute('aria-label'), 'DEMO209 Unclassified two-credit elective');
     await noOverflow(page);
     await page.screenshot({ path: resolve(artifacts, 'prerequisites-mobile.png'), fullPage: true });

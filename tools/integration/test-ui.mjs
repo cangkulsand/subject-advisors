@@ -98,10 +98,10 @@ try{
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  for(const path of ['/student/records','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
- await check('P001 actions use blue and explicit Cancel uses red in the shared shell',async page=>{
+ await check('P001 actions use burgundy and explicit Cancel uses red in the shared shell',async page=>{
   await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');
   const save=page.getByRole('button',{name:'Save profile',exact:true}),cancel=page.getByRole('button',{name:'Cancel changes',exact:true});
-  assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(37, 99, 235)');await save.hover();assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(29, 78, 216)');
+  assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(107, 29, 47)');await save.hover();assert.equal(await save.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(82, 22, 36)');
   assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(185, 28, 28)');await cancel.hover();assert.equal(await cancel.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(153, 27, 27)');
  });
  for(const width of [320,1440])await check('shared shell avoids page overflow at '+width,async page=>{await mock(page);await page.goto(base+'/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));},width);

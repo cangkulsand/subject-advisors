@@ -1,7 +1,8 @@
-.auth-panel { box-sizing: border-box; width: min(100%, 32rem); margin: 2rem auto; padding: 1rem; overflow-wrap: anywhere; font-family: system-ui, sans-serif; line-height: 1.5; }
+.auth-panel { box-sizing: border-box; width: min(100%, 32rem); margin: 2rem auto; padding: 1rem; overflow-wrap: anywhere; color:var(--color-body,#555); font-family: Outfit, ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+.auth-panel h1, .auth-panel h2 { color:var(--color-heading,#1a1a1a); font-family:Outfit,ui-sans-serif,system-ui,sans-serif; }
 .auth-panel button { min-height: 2.75rem; margin: .5rem .5rem .5rem 0; padding: .5rem 1rem; cursor: pointer; }
 .auth-panel button:disabled { cursor: wait; }
-.auth-panel :focus-visible { outline: 3px solid var(--color-focus, #9a596b); outline-offset: 3px; }
+.auth-panel :focus-visible { outline: 3px solid var(--color-focus, #6b1d2f); outline-offset: 3px; }
 .auth-role-switcher { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; min-width:0; max-width:100%; }
 .auth-role-switcher label { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; max-width:100%; }
 .auth-role-switcher select { max-width:100%; min-height:44px; padding:6px 10px; border:1px solid var(--color-outline,#ccc); border-radius:8px; background:var(--color-surface,#fff); color:var(--color-body,#333); font:inherit; }

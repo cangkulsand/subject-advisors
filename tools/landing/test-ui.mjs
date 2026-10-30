@@ -41,6 +41,7 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.url()); });
     await page.goto(base + '/');
+    await page.evaluate(() => document.fonts.ready);
     await page.getByRole('heading', { name: 'Make your next step clear.' }).waitFor();
     await page.locator('.landing-visual img').evaluate(image => image.decode());
     const measurements = await page.evaluate(() => ({
@@ -49,19 +50,26 @@ try {
       naturalImageWidth: document.querySelector('.landing-visual img')?.naturalWidth,
       intrinsicWidth: document.querySelector('.landing-visual img')?.getAttribute('width'),
       imageBottom: document.querySelector('.landing-visual img')?.getBoundingClientRect().bottom,
-      workspaceTop: document.querySelector('.landing-workspace')?.getBoundingClientRect().top,
+      footerTop: document.querySelector('.landing-footer')?.getBoundingClientRect().top,
+      aboutSection: !!document.querySelector('.landing-about'),
+      workspaceSection: !!document.querySelector('.landing-workspace'),
+      footerVisible: document.querySelector('.landing-footer')?.getBoundingClientRect().width,
       anchorTargets: [...document.querySelectorAll('.landing-nav a')].map(link => !!document.querySelector(link.getAttribute('href'))),
     }));
     assert.ok(measurements.scrollWidth <= measurements.clientWidth, `horizontal overflow at ${width}px`);
     assert.ok(measurements.naturalImageWidth > 0, `hero image did not load at ${width}px`);
     assert.equal(measurements.intrinsicWidth, '1452');
-    assert.ok(measurements.imageBottom <= measurements.workspaceTop, `hero image overlaps workspace at ${width}px`);
-    assert.deepEqual(measurements.anchorTargets, [true, true, true]);
+    assert.ok(measurements.imageBottom <= measurements.footerTop, `hero image overlaps footer at ${width}px`);
+    assert.ok(measurements.footerVisible > 0, `footer missing at ${width}px`);
+    assert.equal(measurements.workspaceSection, false);
+    assert.equal(measurements.aboutSection, false);
+    assert.deepEqual(measurements.anchorTargets, [true]);
     assert.deepEqual(apiRequests, [], `public landing made API requests at ${width}px`);
     if (width === 300) {
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement?.closest('.landing-page') !== null), true);
       assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid');
+      assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineColor), await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = document.activeElement.closest('.landing-header') ? 'var(--color-nav-active-indicator)' : 'var(--color-focus)'; document.body.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return color; }));
       assert.equal(await page.getByRole('link', { name: 'Create your account' }).getAttribute('href'), '/sign-up');
       assert.equal(await page.getByRole('link', { name: 'Sign in to continue' }).getAttribute('href'), '/sign-in');
       assert.equal(await page.getByRole('link', { name: /Already signed in\?/ }).getAttribute('href'), '/auth/complete');
