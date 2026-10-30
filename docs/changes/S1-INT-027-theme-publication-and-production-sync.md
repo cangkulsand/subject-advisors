@@ -1,11 +1,11 @@
 # S1-INT-027 - Theme publication and production sync
 
-- **Status:** IN_PROGRESS
+- **Status:** READY_FOR_REVIEW
 - **Date:** 2026-10-30
 - **Sprint:** Sprint 1 integration follow-up
 - **Owner:** INT / integration
 - **Related UC / FR:** Publication of reviewed INT025/INT026 presentation work; no new product behavior
-- **Reviewer:** AI source review passed; human review pending
+- **Reviewer:** AI/coordinator review passed; human peer review pending
 
 ## 1. Plan
 
@@ -14,7 +14,7 @@ Publish the reviewed public, student, admin, coordinator, and auth theme changes
 
 ### Scope and requirements
 - Phase A: verify both repository origins and matching `main` baselines, stage only the reviewed INT025/INT026 allowlist plus this receipt, inspect the staged diff, and create one commit on DEV `main`.
-- Phase B, separately authorized after review: fast-forward PROD `main` to that commit, make the approved production assets-only build ready, and push both normal branch refs. Do not force push.
+- Phase B, separately authorized after coordinator review: fast-forward PROD `main` to that commit, run the approved production assets-only build, and push both normal branch refs. Do not force push.
 - Include the intentional prior user edit removing the landing workspace/about sections. Preserve existing change records' READY_FOR_REVIEW and human-pending status; their historical implementation notes that no commit/push had occurred at that time remain unchanged. No human approval is claimed.
 - Explicitly exclude runtime settings, credentials, environment files, dependency changes, database operations, deployment commands, and live config changes.
 
@@ -41,25 +41,28 @@ No API, database, migration, runtime configuration, dependency, or access-contro
 
 ## 2. Implementation
 
-- **Status:** IN_PROGRESS
-- **Files actually changed:** This publication record; reviewed INT025/INT026 source remains untouched.
-- **Remote verification:** DEV `origin` is `https://github.com/cangkulsand/subject-advisors.git`; PROD `origin` is `https://github.com/cangkulsand/subject-advisors-prod.git`. Both local `main`, fetched `FETCH_HEAD`, and `refs/remotes/origin/main` equal `a2080cbbba357d340645fecc5e83eb16472e4210`. `git merge-base --is-ancestor a2080... FETCH_HEAD` returned 0 in both repositories. PROD working tree is clean. DEV is on `main` at the verified baseline with the exact reviewed 16 modified theme/code/test/doc paths and the two INT025/INT026 records; this new record is the only additional path.
-- **Summary:** Remotes and ancestry match the reviewed plan. Fetches were read-only with respect to source branches; no remote branch moved. Exactly the planned 19 paths are staged; commit verification remains next.
+- **Status:** Code published; receipt closeout pending review.
+- **Phase A DEV commit:** `747dba98f2a8cac9ec2e94cb958a358a56c0ed39`; tree `c74a607d4d5697b66bab3400ace064764e5b41ba`; sole parent `a2080cbbba357d340645fecc5e83eb16472e4210`. It contains exactly the 19-path allowlist: 16 reviewed modified paths, INT025/INT026 records, and this INT027 record. The staged path allowlist and cached diff check passed before commit.
+- **Phase B PROD sync:** Fetched DEV `main` through the local repository path and fast-forwarded PROD with `git merge --ff-only` from `a2080cb` to `747dba9`. No reset, rebase, force push, overwrite, or cleanup was used.
+- **Origin pushes:** After confirming both origin tips remained `a2080cbbba357d340645fecc5e83eb16472e4210`, normally pushed DEV `main` to `https://github.com/cangkulsand/subject-advisors.git` and PROD `main` to `https://github.com/cangkulsand/subject-advisors-prod.git`. Both pushes advanced `a2080cb..747dba9`.
+- **Production assets build:** `npm.cmd run build:cloudflare` passed in PROD (137 modules; 74.41 kB CSS, 471.32 kB JS). `DATABASE_URL`, `AUTH_TEST_DATABASE_URL`, and `OFFERINGS_TEST_DATABASE_URL` were omitted from the child environment. No Wrangler deploy/dry-run or runtime settings/configuration command was run.
+- **PROD local environment files:** Two existing `.env*`/`.dev.vars*` candidates were present before and after; presence remained true and file-set/SHA-256 equality was true. Values and hashes were not printed or included here.
+- **Final code snapshot:** Both local `main`, local `origin/main` tracking refs, and remote `refs/heads/main` equal `747dba98f2a8cac9ec2e94cb958a358a56c0ed39`; both repositories have tree `c74a607d4d5697b66bab3400ace064764e5b41ba`; ancestry from `a2080cb` passed. Both worktrees were clean after publication; this receipt update is the only subsequent local change.
 - **Deviations:** None.
 
 ## 3. Review
 
-- **Self-review:** Root's source review passed; human review pending. Remote baselines and ancestry pass. Staged allowlist is exactly 19 expected paths; no environment, credential, key, or secret-named file is staged. Commit parent/object verification remains pending.
-- **Verification:** In DEV and PROD, `git fetch origin main` passed; local `main`, `FETCH_HEAD`, and `refs/remotes/origin/main` equal `a2080cbbba357d340645fecc5e83eb16472e4210`; ancestry checks returned 0; PROD is clean. In DEV, cached path allowlist comparison passed (19 expected, 19 actual, no missing/extra path, no secret/config filename) and `git diff --cached --check` passed.
+- **Self-review:** AI/coordinator source and commit review passed; human peer review pending. Exact 19-path allowlist and staged diff check passed; no secret/config filename was staged. PROD fast-forward, build, and both normal pushes passed.
+- **Verification:** Both remote tips were checked at `a2080cbbba357d340645fecc5e83eb16472e4210` before pushes and at `747dba98f2a8cac9ec2e94cb958a358a56c0ed39` afterward. Local/tracking/remote refs and trees match; base ancestry passes. PROD assets build passed. PROD local environment file presence and hash-equality booleans are unchanged. Published worktrees were clean before this receipt update.
 - **Human reviewer / approval:** Pending; no approval claimed.
 
 ## 4. Changelog
 
 - **Date:** 2026-10-30
 - **Type:** Chore / publication
-- **Added / changed:** Publication record created before Git mutations. Phase A will create a DEV commit for reviewed INT025/INT026 work only.
+- **Added / changed:** Published reviewed INT025/INT026 presentation work as DEV commit `747dba9`; fast-forwarded PROD to the same commit, pushed both normal `main` refs, and completed the production assets build.
 - **Affected routes / tables / consumers:** None; presentation source only.
 - **Breaking changes / migration steps:** None.
-- **Verification summary:** Pending.
-- **Outstanding:** Phase B (PROD fast-forward, assets-only build readiness and normal pushes) is explicitly held for coordinator review/authorization; human peer review remains pending.
-- **Final status:** IN_PROGRESS
+- **Verification summary:** DEV and PROD local/tracking/remote `main` refs match at `747dba98f2a8cac9ec2e94cb958a358a56c0ed39`; trees match, base ancestry is intact, PROD assets build passed, and environment-file presence/hash equality is unchanged.
+- **Outstanding:** After coordinator review of this published snapshot, make a separate documentation-only receipt closeout if needed. Human peer review remains pending; no human approval is claimed.
+- **Final status:** READY_FOR_REVIEW
