@@ -52,7 +52,7 @@ Make the original P001 commit reachable from default-branch history for its veri
 - **Manual checks:** Fetch confirmed exact expected tips. Merge completed without conflicts. Source author is `aisar12897 <96767075+aisar12897@users.noreply.github.com>`.
 - **Defects found and fixes:** None.
 - **Review outcome:** PASS — SELF-REVIEW and coordinator review. Human peer review remains pending.
-- **Human reviewer / approval:** Pending; no peer approval or publication claimed.
+- **Human reviewer / approval:** Pending; no human peer approval claimed.
 
 ## 4. Changelog
 
@@ -61,7 +61,7 @@ Make the original P001 commit reachable from default-branch history for its veri
 - **Added / Changed / Fixed / Removed:** Published attribution-only P001 history merge; application code remains unchanged.
 - **Affected routes / tables / consumers:** None.
 - **Breaking changes / migration steps:** None.
-- **Verification summary:** Exact refs verified; merge completed without conflicts; existing tracked tree/index stayed unchanged; source author metadata preserved. Publication SHA/parents, one-path diff, push result, final remote refs, synced status and clean worktree are verified after the push.
-- **Publication record:** Commit SHA and exact first/second parents are recorded as the merge commit metadata; normal push destination was `origin HEAD:refs/heads/main`. No force push or source branch update.
+- **Verification summary:** Exact refs verified; merge completed without conflicts; existing tracked tree/index stayed unchanged; source author metadata preserved. Published commit `a01c3156561a8411da785c68dc462b413c597703` has first parent `45401864a6e8439ab901a30a4d7324999106d3a7` and second parent `0a65649f6f4ce31c2382328bf5fc4c1519e6fd53`. Its one-path diff adds only this record; source author and ancestry are confirmed on GitHub. After push, fetch showed local and remote `main` synced 0/0 and the worktree clean.
+- **Publication record:** Normal push succeeded to `origin HEAD:refs/heads/main` (`4540186..a01c315 HEAD -> main`). No force push or source branch update. GitHub's contributor listing may take a few hours to refresh from cached data; current listing visibility is not claimed.
 - **Outstanding blockers / follow-up:** Human peer review pending. P001 source branch remains unchanged.
 - **Final status:** PUBLISHED; human peer review pending
