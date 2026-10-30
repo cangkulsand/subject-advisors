@@ -39,7 +39,16 @@ it('denies staff and suspended access before absent-feature responses',async()=>
 it('returns unavailable when a registered adapter does not handle its declared route',async()=>{
   const deps=services();deps.offerings=vi.fn(async()=>null);expect((await dispatchIntegratedRequest(new Request('https://example.test/api/semester-offerings'),deps)).status).toBe(503);
 });
-it('leaves other owners unimplemented and preserves auth body rejection',async()=>{
-  const deps=services();expect((await dispatchIntegratedRequest(new Request('https://example.test/api/pathway/graph'),deps)).status).toBe(404);
+it('dispatches P003 pathway graph with the original request',async()=>{
+  const deps=services();deps.pathway=vi.fn(async req=>Response.json({owner:'P003',path:new URL(req.url).pathname}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test/api/pathway/graph'),deps);
+  expect(await response.json()).toEqual({owner:'P003',path:'/api/pathway/graph'});expect(deps.pathway).toHaveBeenCalled();
+});
+it('fails closed when the pathway feature is absent',async()=>{
+  const response=await dispatchIntegratedRequest(new Request('https://example.test/api/pathway/graph'),services());
+  expect(response.status).toBe(503);expect(await response.json()).toMatchObject({error:{code:'FEATURE_NOT_INSTALLED'}});
+});
+it('leaves unknown routes unimplemented and preserves auth body rejection',async()=>{
+  const deps=services();expect((await dispatchIntegratedRequest(new Request('https://example.test/api/unknown'),deps)).status).toBe(404);
   const response=await dispatchIntegratedRequest(new Request('https://example.test/api/me/initialize',{method:'POST',body:'{}'}),deps);expect(response.status).toBe(400);
 });

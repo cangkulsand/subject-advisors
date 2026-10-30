@@ -1,0 +1,85 @@
+/* UC17 interactive academic pathway. Uses the shared burgundy theme tokens. */
+.pathway-page { max-width: none; }
+.pathway-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.pathway-subtitle { margin: -4px 0 0; color: var(--color-muted); }
+.pathway-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pathway-actions button,
+.pathway-toolbar button,
+.pathway-page > button {
+  min-height: 40px; padding: 8px 14px; border: 1px solid var(--color-outline); border-radius: 8px;
+  background: var(--color-surface); color: var(--color-body); font-weight: 500;
+}
+.pathway-actions button:hover,
+.pathway-toolbar button:hover,
+.pathway-page > button:hover { background: var(--color-surface-subtle); }
+
+.pathway-demo-banner {
+  margin: 0 0 16px; padding: 10px 14px; border-radius: 8px;
+  background: var(--color-warning-bg); color: var(--color-warning-text);
+}
+.pathway-note { margin-top: 16px; color: var(--color-muted); font-size: 13px; }
+.pathway-empty { border: 1px dashed var(--color-outline); border-radius: 16px; padding: 24px; background: var(--color-surface); }
+
+/* Status palette */
+.pathway-status-completed { --status-color: #34634c; --status-bg: #edf5ef; }
+.pathway-status-exempted { --status-color: #2f5d7a; --status-bg: #eaf2f7; }
+.pathway-status-in_progress { --status-color: #825c1a; --status-bg: #faf2e3; }
+.pathway-status-eligible { --status-color: #1f6f6b; --status-bg: #e6f3f2; }
+.pathway-status-locked { --status-color: #786368; --status-bg: #f3ecee; }
+.pathway-status-recommended { --status-color: #7c3444; --status-bg: #f3e5e9; }
+.pathway-status-remaining { --status-color: #49383b; --status-bg: #faf7f5; }
+.pathway-status-unknown { --status-color: #9b7d85; --status-bg: #f3ecee; }
+
+/* Legend */
+.pathway-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; margin: 0 0 16px; padding: 0; }
+.pathway-legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-body); }
+.pathway-legend-swatch { width: 14px; height: 14px; border-radius: 4px; background: var(--status-color); border: 1px solid var(--color-outline); }
+
+/* Toolbar */
+.pathway-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+
+/* Canvas */
+.pathway-canvas {
+  overflow: auto; max-height: 66vh; border: 1px solid var(--color-outline); border-radius: 16px;
+  background: var(--color-surface); padding: 16px;
+}
+.pathway-canvas svg { display: block; }
+
+/* Edges */
+.pathway-edge { fill: none; stroke-width: 2; }
+.pathway-edge-mandatory { stroke: var(--color-subtle); }
+.pathway-edge-recommended { stroke: var(--color-subtle); stroke-dasharray: 6 5; }
+
+/* Nodes */
+.pathway-node { cursor: pointer; }
+.pathway-node-box { fill: var(--status-bg); stroke: var(--status-color); stroke-width: 1.5; }
+.pathway-node.is-selected .pathway-node-box { stroke-width: 3; }
+.pathway-node-code { fill: var(--status-color); font-size: 13px; font-weight: 700; }
+.pathway-node-name { fill: var(--color-heading); font-size: 12px; }
+.pathway-node-credits { fill: var(--color-muted); font-size: 11px; }
+.pathway-node:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+
+/* Selected node details */
+.pathway-node-details { margin-top: 16px; border: 1px solid var(--color-outline); border-radius: 16px; background: var(--color-surface); padding: 16px; }
+.pathway-node-details h3 { margin: 0 0 12px; color: var(--color-heading); font-size: 16px; }
+.pathway-node-details dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 12px; }
+.pathway-node-details dt { color: var(--color-muted); }
+.pathway-node-details dd { margin: 0; color: var(--color-body); }
+.pathway-node-details p { margin: 0; color: var(--color-muted); font-size: 13px; }
+
+/* Accessible list fallback */
+.pathway-list { border: 1px solid var(--color-outline); border-radius: 16px; background: var(--color-surface); padding: 16px; }
+.pathway-list ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pathway-list-item { border-left: 4px solid var(--status-color); border-radius: 8px; background: var(--status-bg); padding: 12px 14px; }
+.pathway-list-item-head { display: flex; justify-content: space-between; gap: 12px; }
+.pathway-list-item-head strong { color: var(--color-heading); }
+.pathway-list-item-head span { color: var(--color-muted); }
+.pathway-list-item-status { margin-top: 4px; color: var(--status-color); font-weight: 600; font-size: 13px; }
+.pathway-list-prereqs { list-style: none; margin: 8px 0 0; padding: 0; color: var(--color-muted); font-size: 13px; }
+.pathway-list-prereqs li { padding: 2px 0; }
+
+@media (max-width: 720px) {
+  .pathway-header { flex-direction: column; }
+  .pathway-actions { width: 100%; }
+  .pathway-actions button { flex: 1; }
+}
