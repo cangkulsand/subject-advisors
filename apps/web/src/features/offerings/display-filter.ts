@@ -12,9 +12,10 @@ export function isElectiveUmumU1OrU2(category: string | null | undefined): boole
 
 /** User-requested UC08 display policy only; it does not determine eligibility or saved IDs. */
 export function matchesOfferingSemesterDisplay(subject: OfferingSubject, semesterNo: OfferingSemester['semesterNo']): boolean {
-  if (semesterNo === 3) return subject.code.trim().toUpperCase() !== 'SECJ3032' &&
+  const projectI = new Set(['SECJ3032', 'SECR3032']).has(subject.code.trim().toUpperCase());
+  if (semesterNo === 3) return !projectI &&
     (subject.creditHours === 2 || isElectiveUmumU1OrU2(subject.subjectCategory));
-  return subject.code.trim().toUpperCase() === 'SECJ3032' ||
+  return projectI ||
     !(subject.creditHours === 2 || isElectiveUmumU1OrU2(subject.subjectCategory));
 }
 

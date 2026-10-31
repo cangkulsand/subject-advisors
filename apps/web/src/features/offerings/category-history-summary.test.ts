@@ -35,6 +35,13 @@ describe('Offerings category history summary', () => {
     expect(offeringCategoryGroup({ ...subject('2', 'Industrial Training'), isCompulsory: 0 })).toBe('OTHER');
   });
 
+  it('recognizes E3 while preserving university compulsory as its own visible category', () => {
+    expect(offeringCategoryGroup(subject('1', 'Elective E3'))).toBe('E3');
+    expect(offeringCategoryPillLabel(subject('1', 'Elective E3'))).toBe('E3');
+    expect(offeringCategoryGroup(subject('2', 'University Compulsory'))).toBe('OTHER');
+    expect(offeringCategoryPillLabel(subject('2', 'University Compulsory'))).toBe('University Compulsory');
+  });
+
   it('reports unavailable history as unavailable rather than zero and flags unknown categories separately', () => {
     const subjects = [subject('1', 'Core'), subject('2', null), subject('3', 'Elective')];
     expect(summarizeOfferingCategories(subjects, { status: 'unavailable' }, 1)).toMatchObject({

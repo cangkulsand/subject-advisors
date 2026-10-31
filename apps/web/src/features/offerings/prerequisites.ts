@@ -27,5 +27,5 @@ export function offeringPrerequisiteDisplay(subject: OfferingSubject, catalogue:
       .sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true, sensitivity: 'base' }) ||
         left.curriculumSubjectId.localeCompare(right.curriculumSubjectId, undefined, { numeric: true })),
   })).filter(group => group.subjects.length > 0);
-  return { status: 'available' as const, groups };
+  return { status: 'available' as const, groups, details: prerequisites.details };
 }

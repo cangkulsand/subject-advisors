@@ -3,6 +3,7 @@ import type { OfferingContext, OfferingRequirementType, OfferingSemester, Offeri
 import type { OfferingSql } from './repository';
 import type { StudentOfferingContext } from './contracts';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
+import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 
 function text(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error('Invalid configured offering context');
@@ -35,11 +36,13 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
     const currentSemesterId = offeringId(profile.current_semester_id);
     const [subjectRows, semesterRows] = await Promise.all([
       query(`SELECT cs.curriculum_subject_id, cs.subject_id, cs.subject_category, cs.is_compulsory,
-          s.subject_code, s.subject_name, s.credit_hours
+          s.subject_code, COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS subject_name, s.credit_hours,
+          to_jsonb(cs)->'prerequisite_details' AS prerequisite_details
         FROM curriculum_subject cs JOIN subject s ON s.subject_id = cs.subject_id
         WHERE cs.curriculum_id = $1 ORDER BY s.subject_code`, [curriculumId]),
       query('SELECT semester_id, academic_year, semester_no FROM academic_semester ORDER BY academic_year, semester_no', []),
     ]);
+    const rawDetailsById = new Map<string, unknown>();
     let subjects: OfferingContext['subjects'] = subjectRows.map(row => {
       const creditHours = typeof row.credit_hours === 'number' ? row.credit_hours :
         typeof row.credit_hours === 'string' && row.credit_hours.trim() ? Number(row.credit_hours) : NaN;
@@ -48,8 +51,10 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
       const isCompulsory = row.is_compulsory;
       if (subjectCategory !== undefined && subjectCategory !== null && typeof subjectCategory !== 'string') throw new Error('Invalid configured subject category');
       if (isCompulsory !== undefined && isCompulsory !== null && isCompulsory !== 0 && isCompulsory !== 1) throw new Error('Invalid configured compulsory flag');
+      const curriculumSubjectId = offeringId(row.curriculum_subject_id);
+      if (row.prerequisite_details !== undefined && row.prerequisite_details !== null) rawDetailsById.set(curriculumSubjectId, row.prerequisite_details);
       return {
-        curriculumSubjectId: offeringId(row.curriculum_subject_id),
+        curriculumSubjectId,
         subjectId: offeringId(row.subject_id),
         code: text(row.subject_code), name: text(row.subject_name), creditHours,
         subjectCategory: subjectCategory as string | null | undefined,
@@ -91,10 +96,22 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
           items.push({ requiredCurriculumSubjectId: requiredId, requirementType });
           bySource.set(sourceId, items);
         }
-        subjects = subjects.map(subject => ({
-          ...subject,
-          prerequisites: { status: 'available', items: bySource.get(subject.curriculumSubjectId) ?? [] },
-        }));
+        const codes = new Set(subjects.map(subject => subject.code));
+        if (codes.size !== subjects.length) throw new Error('Duplicate subject codes make prerequisite details ambiguous');
+        const newDetails = new Map<string, ReturnType<typeof readCurriculumPrerequisiteDetails>>();
+        for (const subject of subjects) {
+          const raw = rawDetailsById.get(subject.curriculumSubjectId);
+          newDetails.set(subject.curriculumSubjectId, raw === undefined || raw === null ? null : readCurriculumPrerequisiteDetails(raw, codes, subject.code));
+        }
+        subjects = subjects.map(subject => {
+          const details = newDetails.get(subject.curriculumSubjectId);
+          if (rawDetailsById.has(subject.curriculumSubjectId) && !details) throw new Error('Invalid configured prerequisite details');
+          return {
+            ...subject,
+            prerequisites: { status: 'available', items: bySource.get(subject.curriculumSubjectId) ?? [],
+              ...(details ? { details: summarizeCurriculumPrerequisiteDetails(details) } : {}) },
+          };
+        });
       } catch (error) {
         if (error instanceof AuthError && (error.status === 401 || error.status === 403)) throw error;
         // Optional catalogue metadata must never make a valid core context unavailable.

@@ -1,5 +1,6 @@
 import type { OfferingPageData, OfferingRequirementType, OfferingSelection, OfferingSemester, OfferingSubject } from '../../../../../packages/shared/src/offerings/offerings';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
+import { readCurriculumPrerequisiteSummary } from '../../../../../packages/shared/src/curriculum-reference';
 
 function id(value: unknown): string {
   try { return offeringId(value); } catch { throw new Error('Invalid offerings response'); }
@@ -68,6 +69,10 @@ export function readPageData(value: unknown): OfferingPageData {
     const seen = new Set<string>();
     const items: Array<{ requiredCurriculumSubjectId: string; requirementType: OfferingRequirementType }> = [];
     try {
+      const details = candidate.details === undefined ? undefined : readCurriculumPrerequisiteSummary(
+        candidate.details, new Set(subjects.map(item => item.code)), subject.code,
+      );
+      if (candidate.details !== undefined && details === null) throw new Error('Invalid prerequisite details');
       for (const value of candidate.items) {
         const item = object(value);
         if (typeof item.requiredCurriculumSubjectId !== 'string' || typeof item.requirementType !== 'string' ||
@@ -81,7 +86,7 @@ export function readPageData(value: unknown): OfferingPageData {
         seen.add(key);
         items.push({ requiredCurriculumSubjectId: requiredId, requirementType });
       }
-      return { ...subject, prerequisites: { status: 'available', items } };
+      return { ...subject, prerequisites: { status: 'available', items, ...(details ? { details } : {}) } };
     } catch {
       return { ...subject, prerequisites: { status: 'unavailable' } };
     }

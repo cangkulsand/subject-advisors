@@ -68,6 +68,7 @@
 .offerings-category-core, .offerings-category-pill-core { color: #1e40af; background: #eff6ff; border-color: #bfdbfe; }
 .offerings-category-e1, .offerings-category-pill-e1 { color: #115e59; background: #f0fdfa; border-color: #99f6e4; }
 .offerings-category-e2, .offerings-category-pill-e2 { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.offerings-category-e3, .offerings-category-pill-e3 { color: #5b21b6; background: #f5f3ff; border-color: #ddd6fe; }
 .offerings-category-u1, .offerings-category-pill-u1 { color: #155e75; background: #ecfeff; border-color: #a5f3fc; }
 .offerings-category-u2, .offerings-category-pill-u2 { color: #9f1239; background: #fff1f2; border-color: #fecdd3; }
 .offerings-category-other, .offerings-category-pill-other { color: var(--off-muted); background: var(--off-subtle); border-color: var(--off-outline); }

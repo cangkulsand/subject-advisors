@@ -1,3 +1,5 @@
+import type { CurriculumPrerequisiteSummary } from '../curriculum-reference';
+
 /** UC08 contract. IDs are positive INTEGER decimal strings, never a Clerk identity. */
 export interface OfferingSubject {
   curriculumSubjectId: string;
@@ -14,7 +16,7 @@ export interface OfferingSubject {
 }
 export type OfferingRequirementType = 'MANDATORY' | 'RECOMMENDED' | 'COREQUISITE';
 export type OfferingPrerequisites =
-  | { status: 'available'; items: Array<{ requiredCurriculumSubjectId: string; requirementType: OfferingRequirementType }> }
+  | { status: 'available'; items: Array<{ requiredCurriculumSubjectId: string; requirementType: OfferingRequirementType }>; details?: CurriculumPrerequisiteSummary }
   | { status: 'unavailable' };
 export type OfferingAcademicRecordStatus = 'COMPLETED' | 'EXEMPTED' | 'FAILED' | 'WITHDRAWN';
 export interface OfferingAcademicRecord {

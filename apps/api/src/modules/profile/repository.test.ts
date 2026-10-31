@@ -53,6 +53,7 @@ describe('P001 profile options subject metadata', () => {
     expect(subjectQuery).toContain('FROM public.student_profile p JOIN public.curriculum_subject cs USING(curriculum_id)');
     expect(subjectQuery).toContain('WHERE p.clerk_user_id=$1 ORDER BY s.subject_code');
     expect(subjectQuery).toContain('cs.is_compulsory AS "isCompulsory"');
+    expect(subjectQuery).toContain("COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS \"subjectName\"");
   });
 
   it('aggregates category membership and requirement rows separately without multiplying counts', async () => {

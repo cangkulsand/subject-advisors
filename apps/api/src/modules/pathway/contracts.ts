@@ -24,6 +24,8 @@ export interface PathwaySubjectNode {
   status: PathwayNodeStatus;
   grade: string | null;
   recognizedCredits: number | null;
+  /** Bounded advisory summary from optional curriculum metadata. */
+  prerequisiteSummary?: string | null;
 }
 
 export interface PathwayPrerequisiteEdge {

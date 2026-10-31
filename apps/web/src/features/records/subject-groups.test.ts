@@ -5,7 +5,7 @@ describe('subject category grouping', () => {
   it.each([
     ['CORE', 'CORE'], [' core ', 'CORE'], ['Programme   Core', 'CORE'], ['TERAS', 'CORE'],
     ['ELECTIVE', 'ELECTIVE'], [' programme elective ', 'ELECTIVE'], ['ELEKTIF', 'ELECTIVE'],
-    ['Elective E1', 'ELECTIVE'], [' ELECTIVE   e2 ', 'ELECTIVE'], ['Elective U1', 'ELECTIVE'], ['Elective U2', 'ELECTIVE'],
+    ['Elective E1', 'ELECTIVE'], [' ELECTIVE   e2 ', 'ELECTIVE'], ['Elective E3', 'ELECTIVE'], ['Elective U1', 'ELECTIVE'], ['Elective U2', 'ELECTIVE'],
     ['Alt Elective', 'ELECTIVE'], ['Generic Elective', 'ELECTIVE'],
     ['', 'OTHER'], [null, 'OTHER'], [undefined, 'OTHER'], ['Major', 'OTHER'], ['COMPULSORY', 'OTHER'],
   ] as const)('maps %s to %s without category inference', (category, group) => expect(subjectGroupForCategory(category)).toBe(group));

@@ -110,7 +110,7 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           return { curricula, subjects: [], semesters, subjectGroups: [] } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
         }
         if (!isDatabaseId(curriculumId)) throw new Error('Invalid curriculum association result');
-        const loadSubjects = () => query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours",
+        const loadSubjects = () => query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS "subjectName",s.credit_hours AS "creditHours",
             cs.subject_category AS "subjectCategory",cs.is_compulsory AS "isCompulsory"
           FROM public.curriculum_subject cs JOIN public.subject s USING(subject_id)
           WHERE cs.curriculum_id=$1 ORDER BY s.subject_code`, [curriculumId]);
@@ -144,7 +144,7 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
         referenceCache
           ? referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows })
           : loadCurricula(),
-        query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours",
+        query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS "subjectName",s.credit_hours AS "creditHours",
             cs.subject_category AS "subjectCategory",cs.is_compulsory AS "isCompulsory"
           FROM public.student_profile p JOIN public.curriculum_subject cs USING(curriculum_id) JOIN public.subject s USING(subject_id)
           WHERE p.clerk_user_id=$1 ORDER BY s.subject_code`, [userId]),

@@ -1,7 +1,7 @@
 import type { OfferingAcademicHistory, OfferingSemester, OfferingSubject } from '../../../../../packages/shared/src/offerings/offerings';
 import { normalizeOfferingCategory } from './display-filter';
 
-export type OfferingCategoryGroup = 'CORE' | 'E1' | 'E2' | 'U1' | 'U2' | 'OTHER';
+export type OfferingCategoryGroup = 'CORE' | 'E1' | 'E2' | 'E3' | 'U1' | 'U2' | 'OTHER';
 export interface OfferingCategoryProgress {
   group: Exclude<OfferingCategoryGroup, 'OTHER'>;
   label: string;
@@ -15,11 +15,12 @@ export interface OfferingCategorySummary {
   unclassifiedCount: number;
 }
 
-const categoryOrder: OfferingCategoryGroup[] = ['CORE', 'E1', 'E2', 'U1', 'U2', 'OTHER'];
+const categoryOrder: OfferingCategoryGroup[] = ['CORE', 'E1', 'E2', 'E3', 'U1', 'U2', 'OTHER'];
 const aliases: Record<string, Exclude<OfferingCategoryGroup, 'OTHER'>> = {
   CORE: 'CORE', 'PROGRAMME CORE': 'CORE', TERAS: 'CORE',
   E1: 'E1', 'ELECTIVE E1': 'E1',
   E2: 'E2', 'ELECTIVE E2': 'E2',
+  E3: 'E3', 'ELECTIVE E3': 'E3',
   U1: 'U1', 'ELECTIVE U1': 'U1', 'ELECTIVE UMUM U1': 'U1',
   U2: 'U2', 'ELECTIVE U2': 'U2', 'ELECTIVE UMUM U2': 'U2',
 };
@@ -58,7 +59,7 @@ export function summarizeOfferingCategories(
   history: OfferingAcademicHistory | undefined,
   semesterNo: OfferingSemester['semesterNo'],
 ): OfferingCategorySummary {
-  const visibleGroups: Exclude<OfferingCategoryGroup, 'OTHER'>[] = semesterNo === 3 ? ['U1', 'U2'] : ['CORE', 'E1', 'E2'];
+  const visibleGroups: Exclude<OfferingCategoryGroup, 'OTHER'>[] = semesterNo === 3 ? ['U1', 'U2'] : ['CORE', 'E1', 'E2', 'E3'];
   const historyAvailable = history?.status === 'available';
   const subjectIdCounts = new Map<string, number>();
   for (const subject of subjects) if (subject.subjectId) subjectIdCounts.set(subject.subjectId, (subjectIdCounts.get(subject.subjectId) ?? 0) + 1);

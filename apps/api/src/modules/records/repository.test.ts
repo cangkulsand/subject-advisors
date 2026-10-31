@@ -4,6 +4,25 @@ import type { Parameter } from '../profile/contracts';
 import { createRecordsRepository } from './repository';
 
 const valid = { subjectId: 12, semesterId: null, status: 'COMPLETED' as const, grade: null, recognizedCredits: null, remarks: null };
+describe('curriculum display-name compatibility', () => {
+  it('uses a curriculum-owned nullable English override with the legacy subject name fallback for list and save results', async () => {
+    const query = vi.fn(async (sql: string) => sql.startsWith('SELECT') ? [] : [{
+      recordId: 41, subjectId: 12, semesterId: null, status: 'COMPLETED', grade: null, recognizedCredits: 3,
+      remarks: null, createdAt: '2026-01-01T00:00:00Z', subjectCode: 'DEMO12', subjectName: 'Demo subject',
+      creditHours: 3, academicYear: null, semesterNo: null,
+    }]);
+    const repository = createRecordsRepository(query as unknown as Parameters<typeof createRecordsRepository>[0]);
+    await repository.list('verified-student');
+    await repository.save('verified-student', valid);
+    const readSql = query.mock.calls[0]![0];
+    const saveSql = query.mock.calls[1]![0];
+    for (const sql of [readSql, saveSql]) {
+      expect(sql).toContain("COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS \"subjectName\"");
+      expect(sql).toContain('JOIN public.curriculum_subject cs ON cs.curriculum_id=p.curriculum_id AND cs.subject_id=r.subject_id');
+      expect(sql).toContain('JOIN public.subject s ON s.subject_id=r.subject_id');
+    }
+  });
+});
 describe('P001 initial subject records repository', () => {
   it('rejects dated creation before querying persistence', async () => {
     const query = vi.fn(); const repository = createRecordsRepository(query);

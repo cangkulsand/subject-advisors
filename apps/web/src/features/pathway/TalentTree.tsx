@@ -151,6 +151,7 @@ function NodeDetails({ node }: { node: PathwaySubjectNode }) {
         {node.recognizedCredits !== null && <><dt>Recognized credits</dt><dd>{node.recognizedCredits}</dd></>}
       </dl>
       <p>{meta.description}</p>
+      {node.prerequisiteSummary && <p><strong>Curriculum prerequisite information:</strong> {node.prerequisiteSummary}</p>}
     </aside>
   );
 }

@@ -21,6 +21,8 @@ describe('read-only offering context adapter', () => {
     expect(f.query).toHaveBeenCalledWith(expect.stringContaining('WHERE cs.curriculum_id = $1'), ['401']);
     const subjectSql = f.query.mock.calls.find(([sql]) => sql.includes('JOIN subject'))?.[0] ?? '';
     expect(subjectSql).toContain('cs.subject_id'); expect(subjectSql).toContain('cs.subject_category'); expect(subjectSql).toContain('cs.is_compulsory');
+    expect(subjectSql).toContain("COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS subject_name");
+    expect(subjectSql).toContain("to_jsonb(cs)->'prerequisite_details' AS prerequisite_details");
     expect(subjectSql).not.toMatch(/\bs\.subject_category\b/);
     expect(f.query.mock.calls.every(([sql]) => !/\b(INSERT|UPDATE|DELETE|CREATE)\b/.test(sql))).toBe(true);
   });
@@ -49,6 +51,38 @@ describe('read-only offering context adapter', () => {
     expect(f.query.mock.calls.find(([sql]) => sql.includes('FROM subject_prerequisite'))).toEqual([
       expect.stringContaining('WHERE src.curriculum_id = $1'), ['401'],
     ]);
+  });
+  it('passes validated full AND/OR curriculum details alongside legacy direct edges', async () => {
+    const f = fixture();
+    const implementation = f.query.getMockImplementation()!;
+    f.query.mockImplementation(async (sql, parameters) => sql.includes('JOIN subject') ? [
+      { curriculum_subject_id: 101, subject_id: 501, subject_category: 'Core', is_compulsory: 1, subject_code: 'SECD2613', subject_name: 'System analysis', credit_hours: 3 },
+      { curriculum_subject_id: 102, subject_id: 502, subject_category: 'Core', is_compulsory: 1, subject_code: 'SECR3104', subject_name: 'Applications development', credit_hours: 4,
+        prerequisite_details: { expression: { operator: 'allOf', operands: [
+          { operator: 'course', code: 'SECD2613' }, { operator: 'anyOf', operands: [
+            { operator: 'course', code: 'SECD2613' }, { operator: 'course', code: 'SECD2523' },
+          ] },
+        ] }, fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4', K: 'K19' },
+          conditions: [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'Alternative code note.' } },
+      { curriculum_subject_id: 103, subject_id: 503, subject_category: 'Core', is_compulsory: 1, subject_code: 'SECD2523', subject_name: 'Database', credit_hours: 3 },
+    ] : implementation(sql, parameters));
+    const result = await f.reader('verified-user-a', { includePrerequisites: true });
+    expect(result?.subjects[1]?.prerequisites).toMatchObject({ status: 'available', details: {
+      expression: { operator: 'allOf', operands: [ { operator: 'course', code: 'SECD2613' }, { operator: 'anyOf' } ] },
+      conditionNote: 'Alternative code note.', conditions: [{ type: 'cgpa', operator: '>=', value: 2 }],
+    } });
+    expect(result?.subjects[1]?.prerequisites?.status === 'available' && result.subjects[1].prerequisites.details)
+      .not.toHaveProperty('sourceCells');
+    expect(result?.subjects[1]?.prerequisites?.status === 'available' && result.subjects[1].prerequisites.details?.conditions[0])
+      .not.toHaveProperty('sourceCell');
+  });
+  it('marks malformed non-null prerequisite details unavailable instead of known-empty', async () => {
+    const f = fixture(); const implementation = f.query.getMockImplementation()!;
+    f.query.mockImplementation(async (sql, parameters) => sql.includes('JOIN subject')
+      ? [{ curriculum_subject_id: 101, subject_id: 501, subject_category: 'Core', is_compulsory: 1, subject_code: 'FIX101', subject_name: 'Legacy name', credit_hours: 3,
+          prerequisite_details: { expression: { operator: 'course', code: 'OUTSIDE999' }, fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E2' }, conditions: [], conditionNote: null } }]
+      : implementation(sql, parameters));
+    expect((await f.reader('verified-user-a', { includePrerequisites: true }))?.subjects[0]?.prerequisites).toEqual({ status: 'unavailable' });
   });
   it('explicitly disabled enrichment performs no prerequisite query', async () => {
     const f = fixture(); const result = await f.reader('verified-user-a', { includePrerequisites: false });

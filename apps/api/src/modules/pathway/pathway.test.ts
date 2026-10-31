@@ -99,6 +99,51 @@ describe('UC17 pathway graph adapter', () => {
     }));
     expect(graph.edges).toHaveLength(0);
   });
+
+  it('uses anyOf details without turning alternatives into mandatory graph edges', () => {
+    const graph = buildPathwayGraph(raw({
+      subjects: [
+        { curriculumSubjectId: 10, isCompulsory: 1, subjectCategory: 'CORE', subjectId: 100, subjectCode: 'SECJ1013', subjectName: 'Programming 1', creditHours: 3 },
+        { curriculumSubjectId: 11, isCompulsory: 1, subjectCategory: 'CORE', subjectId: 101, subjectCode: 'SECJ1023', subjectName: 'Programming 2', creditHours: 3,
+          prerequisiteDetails: { expression: { operator: 'anyOf', operands: [{ operator: 'course', code: 'SECJ1013' }, { operator: 'course', code: 'SECJ2013' }] },
+            fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4' }, conditions: [], conditionNote: null } },
+        { curriculumSubjectId: 12, isCompulsory: 0, subjectCategory: 'ELECTIVE', subjectId: 102, subjectCode: 'SECJ2013', subjectName: 'Elective A', creditHours: 2 },
+      ],
+      records: [{ subjectId: 100, status: 'COMPLETED', grade: 'B', recognizedCredits: 3 }],
+    }));
+    const target = graph.nodes.find(node => node.subjectCode === 'SECJ1023');
+    expect(target).toMatchObject({ status: 'REMAINING', prerequisiteSummary: 'SECJ1013 OR SECJ2013' });
+    expect(graph.edges.some(edge => edge.target === target?.id)).toBe(false);
+  });
+
+  it('keeps direct allOf edges while suppressing the two OR alternatives from the legacy edge table', () => {
+    const base = raw();
+    base.subjects.push({ curriculumSubjectId: 13, isCompulsory: 0, subjectCategory: 'ELECTIVE', subjectId: 103, subjectCode: 'SECJ3013', subjectName: 'Elective B', creditHours: 3 });
+    base.subjects[1]!.prerequisiteDetails = { expression: { operator: 'allOf', operands: [
+      { operator: 'course', code: 'SECJ1013' }, { operator: 'anyOf', operands: [
+        { operator: 'course', code: 'SECJ2013' }, { operator: 'course', code: 'SECJ3013' },
+      ] },
+    ] }, fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4' }, conditions: [], conditionNote: null };
+    base.prerequisites = [
+      { prerequisiteId: 1, requirementType: 'MANDATORY', curriculumSubjectId: 11, requiredCurriculumSubjectId: 10 },
+      { prerequisiteId: 2, requirementType: 'MANDATORY', curriculumSubjectId: 11, requiredCurriculumSubjectId: 12 },
+      { prerequisiteId: 3, requirementType: 'MANDATORY', curriculumSubjectId: 11, requiredCurriculumSubjectId: 13 },
+    ];
+    expect(buildPathwayGraph(base).edges).toEqual([{ id: '1', source: '10', target: '11', requirementType: 'MANDATORY' }]);
+  });
+
+  it('keeps condition-dependent and invalid new details unknown without a completed target record', () => {
+    const subjects = raw().subjects.map(subject => subject.curriculumSubjectId !== 11 ? subject : ({ ...subject,
+      prerequisiteDetails: { expression: null, fixedCourseEdgesShown: false, sourcePrerequisiteStatus: 'Yes', sourceCells: { K: 'K19' },
+        conditions: [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'CGPA requirement.' } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
+    }));
+    expect(buildPathwayGraph(raw({ subjects })).nodes.find(node => node.subjectCode === 'SECJ1023')?.status).toBe('UNKNOWN');
+    const invalid = subjects.map(subject => subject.curriculumSubjectId !== 11 ? subject : ({ ...subject,
+      prerequisiteDetails: { expression: { operator: 'course', code: 'OUTSIDE123' }, fixedCourseEdgesShown: true,
+        sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4' }, conditions: [], conditionNote: null } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
+    }));
+    expect(buildPathwayGraph(raw({ subjects: invalid })).nodes.find(node => node.subjectCode === 'SECJ1023')?.status).toBe('UNKNOWN');
+  });
 });
 
 describe('UC17 pathway endpoint', () => {

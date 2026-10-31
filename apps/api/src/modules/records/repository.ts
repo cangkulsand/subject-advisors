@@ -3,7 +3,7 @@ import { P001Error, persistenceError } from '../profile/validation';
 import type { AcademicRecord, DeletedRecordIdentity, RecordInput, RecordsRepository } from './contracts';
 const columns = `r.record_id AS "recordId",r.subject_id AS "subjectId",r.semester_id AS "semesterId",r.status,
  r.grade,r.recognized_credits AS "recognizedCredits",r.remarks,r.created_at AS "createdAt",
- s.subject_code AS "subjectCode",s.subject_name AS "subjectName",s.credit_hours AS "creditHours",a.academic_year AS "academicYear",a.semester_no AS "semesterNo"`;
+ s.subject_code AS "subjectCode",COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS "subjectName",s.credit_hours AS "creditHours",a.academic_year AS "academicYear",a.semester_no AS "semesterNo"`;
 function mapped(row: Record<string, unknown>): AcademicRecord {
   const value = row as unknown as AcademicRecord;
   if (!Number.isInteger(value.recordId) || !Number.isInteger(value.recognizedCredits)) throw new Error('Invalid academic record result');
@@ -13,7 +13,8 @@ export function createRecordsRepository(query: Query): RecordsRepository {
   return {
     async list(userId) {
       const rows = await query(`SELECT ${columns} FROM public.academic_record r JOIN public.student_profile p USING(student_id)
-        JOIN public.subject s USING(subject_id) LEFT JOIN public.academic_semester a USING(semester_id)
+        JOIN public.curriculum_subject cs ON cs.curriculum_id=p.curriculum_id AND cs.subject_id=r.subject_id
+        JOIN public.subject s ON s.subject_id=r.subject_id LEFT JOIN public.academic_semester a ON a.semester_id=r.semester_id
         WHERE p.clerk_user_id=$1 ORDER BY s.subject_code,a.academic_year DESC NULLS LAST,a.semester_no DESC NULLS LAST,r.record_id`, [userId]);
       return rows.map(mapped);
     },
@@ -34,7 +35,9 @@ export function createRecordsRepository(query: Query): RecordsRepository {
           AND r.subject_id=$2 AND r.semester_id IS NOT DISTINCT FROM $3::integer RETURNING r.*`;
       try {
         const rows = await query(`WITH eligible AS (${eligible}),saved AS (${write}) SELECT ${columns}
-          FROM saved r JOIN public.subject s USING(subject_id) LEFT JOIN public.academic_semester a USING(semester_id)`,
+          FROM saved r JOIN public.student_profile p USING(student_id)
+          JOIN public.curriculum_subject cs ON cs.curriculum_id=p.curriculum_id AND cs.subject_id=r.subject_id
+          JOIN public.subject s ON s.subject_id=r.subject_id LEFT JOIN public.academic_semester a ON a.semester_id=r.semester_id`,
         recordId === undefined ? parameters : [...parameters,recordId]);
         if (!rows[0]) {
           if (recordId === undefined) {

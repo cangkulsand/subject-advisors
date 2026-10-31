@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import type { CurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 
 export type SqlQuery = (text: string, parameters: string[]) => Promise<unknown>;
 
@@ -10,6 +11,7 @@ export interface RawSubjectRow {
   subjectCode: string;
   subjectName: string;
   creditHours: number;
+  prerequisiteDetails?: CurriculumPrerequisiteDetails | null;
 }
 
 export interface RawPrerequisiteRow {
@@ -58,6 +60,7 @@ function subjectFrom(row: unknown): RawSubjectRow {
     subjectCode: r.subject_code,
     subjectName: r.subject_name,
     creditHours: r.credit_hours,
+    prerequisiteDetails: r.prerequisite_details === undefined || r.prerequisite_details === null ? null : r.prerequisite_details as CurriculumPrerequisiteDetails,
   };
 }
 
@@ -107,7 +110,8 @@ export function createPathwayRepository(query: SqlQuery): PathwayRepository {
       const [subjects, prerequisites, records] = await Promise.all([
         query(
           `SELECT cs.curriculum_subject_id, cs.is_compulsory, cs.subject_category,
-                  s.subject_id, s.subject_code, s.subject_name, s.credit_hours
+                  s.subject_id, s.subject_code, COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS subject_name, s.credit_hours,
+                  to_jsonb(cs)->'prerequisite_details' AS prerequisite_details
            FROM curriculum_subject cs
            JOIN subject s ON s.subject_id = cs.subject_id
            WHERE cs.curriculum_id = $1

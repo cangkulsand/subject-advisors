@@ -1,0 +1,3894 @@
+{
+  "formatVersion": 1,
+  "datasetId": "utmspace-network-security-secrh-english",
+  "programme": {
+    "programmeCode": "SECRH",
+    "programmeName": "Bachelor of Computer Science (Computer Networks & Security) with Honours",
+    "curriculumVersion": "English",
+    "totalCreditRequired": 128,
+    "effectiveYear": null,
+    "status": "INACTIVE",
+    "authorityStatus": "student-supplied, not officially verified",
+    "importStatus": "INACTIVE"
+  },
+  "sources": [
+    {
+      "path": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+      "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+      "role": "primary workbook; filename contains Verified but no institutional verification asserted",
+      "sheetsInspected": [
+        {
+          "name": "Kursus Wajib",
+          "worksheetXml": "xl/worksheets/sheet1.xml"
+        },
+        {
+          "name": "Kursus Elektif",
+          "worksheetXml": "xl/worksheets/sheet2.xml"
+        }
+      ],
+      "distinctCourseEntriesReported": 86
+    },
+    {
+      "path": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+      "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+      "role": "historical Markdown, translations and explicit legacy equivalents only"
+    },
+    {
+      "path": "D:\\sharhan\\development\\UTM Course Tracking.xlsx",
+      "sha256": "E526FEA328EDB49AE5E3796DDD903CEEB032396605E57CA0E0EF4ACE1DF68AD2",
+      "role": "corroboration only; Sheet1!I42=128; D67 formula cached value 50, discrepancy caveat"
+    }
+  ],
+  "approvedOverrides": [
+    {
+      "code": "UHIS1022",
+      "field": "englishName",
+      "value": "Philosophy and Current Issues",
+      "basis": "Prepared display translation under user English-language preference; not an official translation. Workbook English-name cell is blank."
+    },
+    {
+      "code": "UKXQ2022",
+      "field": "englishName",
+      "value": "Co-curriculum",
+      "basis": "Prepared display translation under user English-language preference; not an official translation. Workbook English-name cell is blank."
+    },
+    {
+      "code": "UHLB1112",
+      "field": "englishName",
+      "value": "English for Academic Communications",
+      "basis": "workbook English Name column C26; B26 differs and is retained here for review",
+      "reviewNote": "Workbook B26 says ENGLISH COMMUNICATION SKILLS; do not silently replace display name."
+    }
+  ],
+  "exclusions": [
+    {
+      "code": "SECJ2363",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 20,
+        "cell": "A20"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ3303",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 21,
+        "cell": "A21"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ3483",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 22,
+        "cell": "A22"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ3563",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 23,
+        "cell": "A23"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ3603",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 24,
+        "cell": "A24"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ3623",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 25,
+        "cell": "A25"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    },
+    {
+      "code": "SECJ4423",
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sheet": "Kursus Elektif",
+        "row": 26,
+        "cell": "A26"
+      },
+      "reason": "Explicitly excluded from this new curriculum only; retain global subject data."
+    }
+  ],
+  "categoryRequirements": [
+    {
+      "category": "Core",
+      "requiredSubjects": 21,
+      "requiredCredits": 62,
+      "availableSubjects": 21,
+      "availablePoolCredits": 62,
+      "selectionRule": "all"
+    },
+    {
+      "category": "University Compulsory",
+      "requiredSubjects": 10,
+      "requiredCredits": 19,
+      "availableSubjects": 10,
+      "availablePoolCredits": 19,
+      "selectionRule": "all"
+    },
+    {
+      "category": "Elective E1",
+      "requiredSubjects": 7,
+      "requiredCredits": null,
+      "availableSubjects": 8,
+      "availablePoolCredits": 22,
+      "selectionRule": "choose"
+    },
+    {
+      "category": "Elective E2",
+      "requiredSubjects": 5,
+      "requiredCredits": null,
+      "availableSubjects": 7,
+      "availablePoolCredits": 18,
+      "selectionRule": "choose"
+    },
+    {
+      "category": "Elective E3",
+      "requiredSubjects": 2,
+      "requiredCredits": 12,
+      "availableSubjects": 2,
+      "availablePoolCredits": 12,
+      "selectionRule": "all"
+    },
+    {
+      "category": "Elective U1",
+      "requiredSubjects": 1,
+      "requiredCredits": null,
+      "availableSubjects": 24,
+      "availablePoolCredits": 48,
+      "selectionRule": "choose"
+    },
+    {
+      "category": "Elective U2",
+      "requiredSubjects": 1,
+      "requiredCredits": null,
+      "availableSubjects": 7,
+      "availablePoolCredits": 14,
+      "selectionRule": "choose"
+    }
+  ],
+  "subjects": [
+    {
+      "code": "SECD2523",
+      "englishName": "DATABASE",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 2,
+        "codeCell": "A2",
+        "creditCell": "D2"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C2"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E2",
+          "F": "F2",
+          "G": "G2",
+          "H": "H2",
+          "I": "I2",
+          "J": "J2",
+          "K": "K2"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSD2523",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECD2523** | SCSD2523 | Pangkalan Data *(Database)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECD2613",
+      "englishName": "SYSTEM ANALYSIS AND DESIGN",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 3,
+        "codeCell": "A3",
+        "creditCell": "D3"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C3"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E3",
+          "F": "F3",
+          "G": "G3",
+          "H": "H3",
+          "I": "I3",
+          "J": "J3",
+          "K": "K3"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSD2613",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECD2613** | SCSD2613 | Analisa & Rekabentuk Sistem *(System Analysis & Design)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECD3761",
+      "englishName": "IT ENTREPRENEURSHIP SEMINAR",
+      "credits": 1,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 4,
+        "codeCell": "A4",
+        "creditCell": "D4"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C4"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E4",
+          "F": "F4",
+          "G": "G4",
+          "H": "H4",
+          "I": "I4",
+          "J": "J4",
+          "K": "K4"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSD3761",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECD3761** | SCSD3761 | Seminar Keusahawanan IT *(Technopreneurship Seminar)* | 1 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECI1013",
+      "englishName": "DISCRETE STRUCTURE",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 5,
+        "codeCell": "A5",
+        "creditCell": "D5"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C5"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E5",
+          "F": "F5",
+          "G": "G5",
+          "H": "H5",
+          "I": "I5",
+          "J": "J5",
+          "K": "K5"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSI1013",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECI1013** | SCSI1013 | Struktur Diskrit *(Discrete Structure)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECI1113",
+      "englishName": "COMPUTATIONAL MATHEMATICS",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 6,
+        "codeCell": "A6",
+        "creditCell": "D6"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C6"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E6",
+          "F": "F6",
+          "G": "G6",
+          "H": "H6",
+          "I": "I6",
+          "J": "J6",
+          "K": "K6"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSI1113",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECI1113** | SCSI1113 | Matematik Komputan *(Computational Mathematics)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECI2143",
+      "englishName": "PROBABILITY & STATISTICAL DATA ANALYSIS",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 7,
+        "codeCell": "A7",
+        "creditCell": "D7"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C7"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E7",
+          "F": "F7",
+          "G": "G7",
+          "H": "H7",
+          "I": "I7",
+          "J": "J7",
+          "K": "K7"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSI2143",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECI2143** | SCSI2143 | Keberangkalian & Analisa Data Statistik *(Prob. & Stat.)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ1013",
+      "englishName": "PROGRAMMING TECHNIQUE I",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 8,
+        "codeCell": "A8",
+        "creditCell": "D8"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C8"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E8",
+          "F": "F8",
+          "G": "G8",
+          "H": "H8",
+          "I": "I8",
+          "J": "J8",
+          "K": "K8"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ1013",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ1013** | SCSJ1013 | Teknik Pengaturcaraan I *(Programming Technique I)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ1023",
+      "englishName": "PROGRAMMING TECHNIQUE II",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 9,
+        "codeCell": "A9",
+        "creditCell": "D9"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C9"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ1013"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E9",
+          "F": "F9",
+          "G": "G9",
+          "H": "H9",
+          "I": "I9",
+          "J": "J9",
+          "K": "K9"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ1023",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ1023** | SCSJ1023 | Teknik Pengaturcaraan II *(Programming Technique II)* | 3 | `SECJ1013` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ2013",
+      "englishName": "DATA STRUCTURE AND ALGORITHM",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 10,
+        "codeCell": "A10",
+        "creditCell": "D10"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C10"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ1023"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E10",
+          "F": "F10",
+          "G": "G10",
+          "H": "H10",
+          "I": "I10",
+          "J": "J10",
+          "K": "K10"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ2013",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ2013** | SCSJ2013 | Struktur Data & Algoritma *(Data Structures & Algorithms)* | 3 | `SECJ1023` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ2154",
+      "englishName": "OBJECT ORIENTED PROGRAMMING",
+      "credits": 4,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 11,
+        "codeCell": "A11",
+        "creditCell": "D11"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C11"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ1023"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E11",
+          "F": "F11",
+          "G": "G11",
+          "H": "H11",
+          "I": "I11",
+          "J": "J11",
+          "K": "K11"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ2154",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ2154** | SCSJ2154 | Pengaturcaraan Berorientasikan Objek *(OOP)* | 4 | `SECJ1023` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ2203",
+      "englishName": "SOFTWARE ENGINEERING",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 12,
+        "codeCell": "A12",
+        "creditCell": "D12"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C12"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E12",
+          "F": "F12",
+          "G": "G12",
+          "H": "H12",
+          "I": "I12",
+          "J": "J12",
+          "K": "K12"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ2203",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ2203** | SCSJ2203 | Kejuruteraan Perisian *(Software Engineering)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECJ3203",
+      "englishName": "THEORY OF COMPUTER SCIENCE",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 13,
+        "codeCell": "A13",
+        "creditCell": "D13"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C13"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECI1013"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E13",
+          "F": "F13",
+          "G": "G13",
+          "H": "H13",
+          "I": "I13",
+          "J": "J13",
+          "K": "K13"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSJ3203",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ3203** | SCSJ3203 | Teori Sains Komputer *(Theory of Computer Science)* | 3 | `SECI1013` + `SECJ2013` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECP1513",
+      "englishName": "TECHNOLOGY AND INFORMATION SYSTEM",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 14,
+        "codeCell": "A14",
+        "creditCell": "D14"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C14"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E14",
+          "F": "F14",
+          "G": "G14",
+          "H": "H14",
+          "I": "I14",
+          "J": "J14",
+          "K": "K14"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSP1513",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECP1513** | SCSP1513 | Teknologi & Sistem Maklumat *(Tech. & Information System)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR1013",
+      "englishName": "DIGITAL LOGIC",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 15,
+        "codeCell": "A15",
+        "creditCell": "D15"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C15"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E15",
+          "F": "F15",
+          "G": "G15",
+          "H": "H15",
+          "I": "I15",
+          "J": "J15",
+          "K": "K15"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSR1013",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR1013** | SCSR1013 | Logik Digital *(Digital Logic)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR1213",
+      "englishName": "NETWORK COMMUNICATIONS",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 16,
+        "codeCell": "A16",
+        "creditCell": "D16"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C16"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E16",
+          "F": "F16",
+          "G": "G16",
+          "H": "H16",
+          "I": "I16",
+          "J": "J16",
+          "K": "K16"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSR1213",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR1213** | SCSR1213 | Komunikasi Rangkaian *(Network Communications)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR2033",
+      "englishName": "COMPUTER ORGANISATION & ARCHITECTURE",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 17,
+        "codeCell": "A17",
+        "creditCell": "D17"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C17"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR1013"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E17",
+          "F": "F17",
+          "G": "G17",
+          "H": "H17",
+          "I": "I17",
+          "J": "J17",
+          "K": "K17"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSR2033",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR2033** | SCSR2033 | Organisasi & Senibina Komputer *(Computer Org. & Arch.)* | 3 | `SECR1013` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR2043",
+      "englishName": "OPERATING SYSTEMS",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 18,
+        "codeCell": "A18",
+        "creditCell": "D18"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C18"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E18",
+          "F": "F18",
+          "G": "G18",
+          "H": "H18",
+          "I": "I18",
+          "J": "J18",
+          "K": "K18"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSR2043",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR2043** | SCSR2043 | Sistem Pengoperasian *(Operating Systems)* | 3 | `SECR1013` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3032",
+      "englishName": "PROJECT I",
+      "credits": 2,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 19,
+        "codeCell": "A19",
+        "creditCell": "D19"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C19"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR3104"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E19",
+          "F": "F19",
+          "G": "G19",
+          "H": "H19",
+          "I": "I19",
+          "J": "J19",
+          "K": "K19"
+        },
+        "conditions": [
+          {
+            "type": "completedCredits",
+            "operator": ">",
+            "value": 80,
+            "sourceCell": "K19"
+          }
+        ],
+        "conditionNote": "Also requires more than 80 completed credits."
+      },
+      "legacyEquivalent": {
+        "code": "SCSR3032",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3032** | SCSR3032 | Projek I Rangkaian & Keselamatan Komputer *(PSM I)* | 2 | `SECR3104` + Earned $\\ge 80$ Cr | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4134",
+      "englishName": "PROJECT II",
+      "credits": 4,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 20,
+        "codeCell": "A20",
+        "creditCell": "D20"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C20"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR3032"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E20",
+          "F": "F20",
+          "G": "G20",
+          "H": "H20",
+          "I": "I20",
+          "J": "J20",
+          "K": "K20"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSR4134",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4134** | SCSR4134 | Projek II Rangkaian & Keselamatan Komputer *(PSM II)* | 4 | `SECR3032` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECV1223",
+      "englishName": "WEB PROGRAMMING",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 21,
+        "codeCell": "A21",
+        "creditCell": "D21"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C21"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECD2523"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E21",
+          "F": "F21",
+          "G": "G21",
+          "H": "H21",
+          "I": "I21",
+          "J": "J21",
+          "K": "K21"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "legacyEquivalent": {
+        "code": "SCSV1223",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECV1223** | SCSV1223 | Pengaturcaraan Web *(Web Programming)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECV2113",
+      "englishName": "HUMAN COMPUTER INTERACTION",
+      "credits": 3,
+      "category": "Core",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 22,
+        "codeCell": "A22",
+        "creditCell": "D22"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C22"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E22",
+          "F": "F22",
+          "G": "G22",
+          "H": "H22",
+          "I": "I22",
+          "J": "J22",
+          "K": "K22"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "legacyEquivalent": {
+        "code": "SCSV2113",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECV2113** | SCSV2113 | Interaksi Komputer Manusia *(Human-Computer Interaction)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "UBSS1032",
+      "englishName": "FUNDAMENTAL ENTREPRENEURSHIP",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 23,
+        "codeCell": "A23",
+        "creditCell": "D23"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C23"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E23",
+          "F": "F23",
+          "G": "G23",
+          "H": "H23",
+          "I": "I23",
+          "J": "J23",
+          "K": "K23"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UHIS1022",
+      "englishName": "Philosophy and Current Issues",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 24,
+        "codeCell": "A24",
+        "creditCell": "D24"
+      },
+      "nameProvenance": {
+        "source": "displayTranslation",
+        "workbookCell": "C24",
+        "value": "Philosophy and Current Issues",
+        "translationSource": "prepared display translation under user English-language preference; not official"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E24",
+          "F": "F24",
+          "G": "G24",
+          "H": "H24",
+          "I": "I24",
+          "J": "J24",
+          "K": "K24"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UHIT2302",
+      "englishName": "SCIENCE & TECH. THINKING",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 25,
+        "codeCell": "A25",
+        "creditCell": "D25"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C25"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E25",
+          "F": "F25",
+          "G": "G25",
+          "H": "H25",
+          "I": "I25",
+          "J": "J25",
+          "K": "K25"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UHLB1112",
+      "englishName": "English for Academic Communications",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 26,
+        "codeCell": "A26",
+        "creditCell": "D26"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C26",
+        "reviewNote": "Workbook B26 says ENGLISH COMMUNICATION SKILLS; retain C26 English-name value and flag discrepancy."
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E26",
+          "F": "F26",
+          "G": "G26",
+          "H": "H26",
+          "I": "I26",
+          "J": "J26",
+          "K": "K26"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UHLB2122",
+      "englishName": "ACADEMIC COMMUNICATION SKILLS",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 27,
+        "codeCell": "A27",
+        "creditCell": "D27"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C27"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "UHLB1112"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E27",
+          "F": "F27",
+          "G": "G27",
+          "H": "H27",
+          "I": "I27",
+          "J": "J27",
+          "K": "K27"
+        },
+        "conditions": [],
+        "conditionNote": null
+      }
+    },
+    {
+      "code": "UHLB3132",
+      "englishName": "PROFESSIONAL COMMUNICATION SKILLS",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 28,
+        "codeCell": "A28",
+        "creditCell": "D28"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C28"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "UHLB2122"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E28",
+          "F": "F28",
+          "G": "G28",
+          "H": "H28",
+          "I": "I28",
+          "J": "J28",
+          "K": "K28"
+        },
+        "conditions": [],
+        "conditionNote": null
+      }
+    },
+    {
+      "code": "UHMS1182",
+      "englishName": "APPREC. OF ETHICS & CIVILIZATION",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 29,
+        "codeCell": "A29",
+        "creditCell": "D29"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C29"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E29",
+          "F": "F29",
+          "G": "G29",
+          "H": "H29",
+          "I": "I29",
+          "J": "J29",
+          "K": "K29"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UHMT1012",
+      "englishName": "GRADUATE SUCCESS ATTRIBUTES",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 30,
+        "codeCell": "A30",
+        "creditCell": "D30"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C30"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E30",
+          "F": "F30",
+          "G": "G30",
+          "H": "H30",
+          "I": "I30",
+          "J": "J30",
+          "K": "K30"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UKQT3001",
+      "englishName": "EXTRACURRICULAR EXPERIENTIAL LEARN",
+      "credits": 1,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 31,
+        "codeCell": "A31",
+        "creditCell": "D31"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Wajib",
+        "cell": "C31"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E31",
+          "F": "F31",
+          "G": "G31",
+          "H": "H31",
+          "I": "I31",
+          "J": "J31",
+          "K": "K31"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "UKXQ2022",
+      "englishName": "Co-curriculum",
+      "credits": 2,
+      "category": "University Compulsory",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Wajib",
+        "worksheetXml": "xl/worksheets/sheet1.xml",
+        "row": 32,
+        "codeCell": "A32",
+        "creditCell": "D32"
+      },
+      "nameProvenance": {
+        "source": "displayTranslation",
+        "workbookCell": "C32",
+        "value": "Co-curriculum",
+        "translationSource": "prepared display translation under user English-language preference; not official"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E32",
+          "F": "F32",
+          "G": "G32",
+          "H": "H32",
+          "I": "I32",
+          "J": "J32",
+          "K": "K32"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      }
+    },
+    {
+      "code": "SECJ3553",
+      "englishName": "ARTIFICIAL INTELLIGENCE",
+      "credits": 3,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 3,
+        "codeCell": "A3",
+        "creditCell": "D3"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C3"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ2013"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E3",
+          "F": "F3",
+          "G": "G3",
+          "H": "H3",
+          "I": "I3",
+          "J": "J3",
+          "K": "K3"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSJ3553",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECJ3553** | SCSJ3553 | Kepintaran Buatan *(Artificial Intelligence)* | 3 | Tiada | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3104",
+      "englishName": "APPLICATIONS DEVELOPMENT",
+      "credits": 4,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 4,
+        "codeCell": "A4",
+        "creditCell": "D4"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C4"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECD2523"
+            },
+            {
+              "operator": "course",
+              "code": "SECV1223"
+            },
+            {
+              "operator": "course",
+              "code": "SECR3413"
+            },
+            {
+              "operator": "anyOf",
+              "operands": [
+                {
+                  "operator": "course",
+                  "code": "SECD2613"
+                },
+                {
+                  "operator": "course",
+                  "code": "SECJ2203"
+                }
+              ]
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E4",
+          "F": "F4",
+          "G": "G4",
+          "H": "H4",
+          "I": "I4",
+          "J": "J4",
+          "K": "K4"
+        },
+        "conditions": [],
+        "conditionNote": "Prerequisites 4 and 5 are alternatives: SECD2613 OR SECJ2203."
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR3104",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3104** | SCSR3104 | Pembangunan Aplikasi *(Applications Development)* | 4 | `SECJ2203` + `SECD2613` + `SECD2523` + `SECJ2154` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3242",
+      "englishName": "INTERNETWORKING TECHNOLOGY",
+      "credits": 2,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 5,
+        "codeCell": "A5",
+        "creditCell": "D5"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C5"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR2242"
+            },
+            {
+              "operator": "course",
+              "code": "SECR2941"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E5",
+          "F": "F5",
+          "G": "G5",
+          "H": "H5",
+          "I": "I5",
+          "J": "J5",
+          "K": "K5"
+        },
+        "conditions": [],
+        "conditionNote": "The source shows SECR2242 and SECR2941 as a pair."
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR3242",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3242** | SCSR3242 | Teknologi Antara Rangkaian *(Internetworking Tech - ENSA)* | 2 | `SECR2242` + `SECR2941` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3443",
+      "englishName": "CRYPTOGRAPHY",
+      "credits": 3,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 6,
+        "codeCell": "A6",
+        "creditCell": "D6"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C6"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR3413"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E6",
+          "F": "F6",
+          "G": "G6",
+          "H": "H6",
+          "I": "I6",
+          "J": "J6",
+          "K": "K6"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR3443",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3443** | SCSR3443 | Kriptografi *(Introduction to Cryptography)* | 3 | `SECR3413` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3941",
+      "englishName": "INTERNETWORKING TECHNOLOGY (LAB)",
+      "credits": 1,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 7,
+        "codeCell": "A7",
+        "creditCell": "D7"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C7"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR2242"
+            },
+            {
+              "operator": "course",
+              "code": "SECR2941"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E7",
+          "F": "F7",
+          "G": "G7",
+          "H": "H7",
+          "I": "I7",
+          "J": "J7",
+          "K": "K7"
+        },
+        "conditions": [],
+        "conditionNote": "The source shows SECR2242 and SECR2941 as a pair."
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR3941",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3941** | SCSR3941 | Makmal Teknologi Antara Rangkaian *(ENSA Lab)* | 1 | Co-req / `SECR3242` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4473",
+      "englishName": "SECURITY MANAGEMENT",
+      "credits": 3,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 8,
+        "codeCell": "A8",
+        "creditCell": "D8"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C8"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E8",
+          "F": "F8",
+          "G": "G8",
+          "H": "H8",
+          "I": "I8",
+          "J": "J8",
+          "K": "K8"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "E1"
+    },
+    {
+      "code": "SECR4483",
+      "englishName": "SECURITY PROGRAMMING",
+      "credits": 3,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 9,
+        "codeCell": "A9",
+        "creditCell": "D9"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C9"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E9",
+          "F": "F9",
+          "G": "G9",
+          "H": "H9",
+          "I": "I9",
+          "J": "J9",
+          "K": "K9"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR4483",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4483** | SCSR4483 | Pengurusan Keselamatan / Pengaturcaraan Selamat | 3 | `SECR3443` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4493",
+      "englishName": "COMPUTER FORENSICS",
+      "credits": 3,
+      "category": "Elective E1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 10,
+        "codeCell": "A10",
+        "creditCell": "D10"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C10"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E10",
+          "F": "F10",
+          "G": "G10",
+          "H": "H10",
+          "I": "I10",
+          "J": "J10",
+          "K": "K10"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "E1",
+      "legacyEquivalent": {
+        "code": "SCSR4493",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4493** | SCSR4493 | Forensik Komputer *(Computer Forensics)* | 3 | `SECR3413` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR2242",
+      "englishName": "COMPUTER NETWORKS",
+      "credits": 2,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 12,
+        "codeCell": "A12",
+        "creditCell": "D12"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C12"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR1213"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E12",
+          "F": "F12",
+          "G": "G12",
+          "H": "H12",
+          "I": "I12",
+          "J": "J12",
+          "K": "K12"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR2242",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR2242** | SCSR2242 | Rangkaian Komputer *(Computer Networks)* | 2 | `SECR1213` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR2941",
+      "englishName": "COMPUTER NETWORKS LAB",
+      "credits": 1,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 13,
+        "codeCell": "A13",
+        "creditCell": "D13"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C13"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR1213"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E13",
+          "F": "F13",
+          "G": "G13",
+          "H": "H13",
+          "I": "I13",
+          "J": "J13",
+          "K": "K13"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR2941",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR2941** | SCSR2941 | Makmal Rangkaian Komputer *(Computer Networks Lab)* | 1 | Co-req / `SECR2242` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3223",
+      "englishName": "HIGH PERFORMANCE & PARALLEL PROGRAMMING",
+      "credits": 3,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 14,
+        "codeCell": "A14",
+        "creditCell": "D14"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C14"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ1023"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E14",
+          "F": "F14",
+          "G": "G14",
+          "H": "H14",
+          "I": "I14",
+          "J": "J14",
+          "K": "K14"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR3223",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3223** | SCSR3223 | Pengkomputeran Berprestasi Tinggi & Selari *(HPC)* | 3 | `SECJ1023` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3253",
+      "englishName": "NETWORK PROGRAMMING",
+      "credits": 3,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 15,
+        "codeCell": "A15",
+        "creditCell": "D15"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C15"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECJ1023"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E15",
+          "F": "F15",
+          "G": "G15",
+          "H": "H15",
+          "I": "I15",
+          "J": "J15",
+          "K": "K15"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR3253",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3253** | SCSR3253 | Pengaturcaraan Rangkaian *(Network Programming)* | 3 | `SECR1213` + `SECJ1023` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR3413",
+      "englishName": "COMPUTER SECURITY",
+      "credits": 3,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 16,
+        "codeCell": "A16",
+        "creditCell": "D16"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C16"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR2043"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E16",
+          "F": "F16",
+          "G": "G16",
+          "H": "H16",
+          "I": "I16",
+          "J": "J16",
+          "K": "K16"
+        },
+        "conditions": [],
+        "conditionNote": null
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR3413",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR3413** | SCSR3413 | Keselamatan Komputer *(Computer Security)* | 3 | `SECR2043` / `SECJ2203` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4453",
+      "englishName": "NETWORK SECURITY",
+      "credits": 3,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 17,
+        "codeCell": "A17",
+        "creditCell": "D17"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C17"
+      },
+      "prerequisites": {
+        "expression": {
+          "operator": "allOf",
+          "operands": [
+            {
+              "operator": "course",
+              "code": "SECR2242"
+            },
+            {
+              "operator": "course",
+              "code": "SECR2941"
+            }
+          ]
+        },
+        "fixedCourseEdgesShown": true,
+        "sourcePrerequisiteStatus": "Yes",
+        "sourceCells": {
+          "E": "E17",
+          "F": "F17",
+          "G": "G17",
+          "H": "H17",
+          "I": "I17",
+          "J": "J17",
+          "K": "K17"
+        },
+        "conditions": [],
+        "conditionNote": "The source shows SECR2242 and SECR2941 as a pair."
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR4453",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4453** | SCSR4453 | Keselamatan Rangkaian *(Network Security)* | 3 | `SECR3242` + `SECR3941` | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4973",
+      "englishName": "SPECIAL TOPICS COMPUTER NETWORK & SECURITY",
+      "credits": 3,
+      "category": "Elective E2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 18,
+        "codeCell": "A18",
+        "creditCell": "D18"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C18"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "Depends on topic",
+        "sourceCells": {
+          "E": "E18",
+          "F": "F18",
+          "G": "G18",
+          "H": "H18",
+          "I": "I18",
+          "J": "J18",
+          "K": "K18"
+        },
+        "conditions": [],
+        "conditionNote": "Prerequisite depends on special topic; no fixed code is given.",
+        "topicDependent": true
+      },
+      "selectionGroup": "E2",
+      "legacyEquivalent": {
+        "code": "SCSR4973",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4973** | SCSR4973 | Topik Khas Rangkaian & Keselamatan Komputer | 3 | Penyelaras Program | D+ |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4114",
+      "englishName": "INDUSTRIAL TRAINING (REPORT)",
+      "credits": 4,
+      "category": "Elective E3",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 27,
+        "codeCell": "A27",
+        "creditCell": "D27"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C27"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E27",
+          "F": "F27",
+          "G": "G27",
+          "H": "H27",
+          "I": "I27",
+          "J": "J27",
+          "K": "K27"
+        },
+        "conditions": [
+          {
+            "type": "completedCredits",
+            "operator": ">",
+            "value": 92,
+            "sourceCell": "K27"
+          },
+          {
+            "type": "cgpa",
+            "operator": ">=",
+            "value": 2.0,
+            "sourceCell": "K27"
+          }
+        ],
+        "conditionNote": "Industrial training: more than 92 completed credits and CGPA at least 2.0.",
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "E3",
+      "legacyEquivalent": {
+        "code": "SCSR4114",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4114** | SCSR4114 | Laporan Latihan Industri *(Industrial Training Report)* | 4 | $\\ge 92$ Kredit Terkumpul & CGPA $\\ge 2.00$ | Bergred (D+) |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "SECR4118",
+      "englishName": "INDUSTRIAL TRAINING (HW)",
+      "credits": 8,
+      "category": "Elective E3",
+      "isCompulsory": true,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 28,
+        "codeCell": "A28",
+        "creditCell": "D28"
+      },
+      "nameProvenance": {
+        "source": "workbook",
+        "sheet": "Kursus Elektif",
+        "cell": "C28"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E28",
+          "F": "F28",
+          "G": "G28",
+          "H": "H28",
+          "I": "I28",
+          "J": "J28",
+          "K": "K28"
+        },
+        "conditions": [
+          {
+            "type": "completedCredits",
+            "operator": ">",
+            "value": 92,
+            "sourceCell": "K28"
+          },
+          {
+            "type": "cgpa",
+            "operator": ">=",
+            "value": 2.0,
+            "sourceCell": "K28"
+          }
+        ],
+        "conditionNote": "Industrial training: more than 92 completed credits and CGPA at least 2.0.",
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "E3",
+      "legacyEquivalent": {
+        "code": "SCSR4118",
+        "evidence": {
+          "file": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+          "sha256": "0E2A40F4B4256F63737382CE1196064EACC05FD8CAFB0FA25116F39DA8D291DD",
+          "rowText": "| **SECR4118** | SCSR4118 | Latihan Industri *(Industrial Training)* | 8 | $\\ge 92$ Kredit Terkumpul & CGPA $\\ge 2.00$ | HW (Hadir Wajib) |"
+        },
+        "meaning": "Historical Markdown explicit equivalent-code column; import crosswalk only, not runtime alias."
+      }
+    },
+    {
+      "code": "UBSS2072",
+      "englishName": "Fundamentals of Intellectual Property Law",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 30,
+        "codeCell": "A30",
+        "creditCell": "D30"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C30",
+        "markdownCode": "UBSS2072",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Fundamentals of Intellectual Property Law"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E30",
+          "F": "F30",
+          "G": "G30",
+          "H": "H30",
+          "I": "I30",
+          "J": "J30",
+          "K": "K30"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UBSS2082",
+      "englishName": "Law for Entrepreneurs",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 31,
+        "codeCell": "A31",
+        "creditCell": "D31"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C31",
+        "markdownCode": "UBSS2082",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Law for Entrepreneurs"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E31",
+          "F": "F31",
+          "G": "G31",
+          "H": "H31",
+          "I": "I31",
+          "J": "J31",
+          "K": "K31"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UBSS2092",
+      "englishName": "Entrepreneurship & Business Development",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 32,
+        "codeCell": "A32",
+        "creditCell": "D32"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C32",
+        "markdownCode": "UBSS2092",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Entrepreneurship & Business Development"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E32",
+          "F": "F32",
+          "G": "G32",
+          "H": "H32",
+          "I": "I32",
+          "J": "J32",
+          "K": "K32"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UBSS2102",
+      "englishName": "Social Entrepreneurship",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 33,
+        "codeCell": "A33",
+        "creditCell": "D33"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C33",
+        "markdownCode": "UBSS2102",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Social Entrepreneurship"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E33",
+          "F": "F33",
+          "G": "G33",
+          "H": "H33",
+          "I": "I33",
+          "J": "J33",
+          "K": "K33"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHII2012",
+      "englishName": "Al-Quran and Human Civilization",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 34,
+        "codeCell": "A34",
+        "creditCell": "D34"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C34",
+        "markdownCode": "UHII2012",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Al-Quran and Human Civilization"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E34",
+          "F": "F34",
+          "G": "G34",
+          "H": "H34",
+          "I": "I34",
+          "J": "J34",
+          "K": "K34"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHII2092",
+      "englishName": "Philosophy of Islamic Art",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 35,
+        "codeCell": "A35",
+        "creditCell": "D35"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C35",
+        "markdownCode": "UHII2092",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Philosophy of Islamic Art"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E35",
+          "F": "F35",
+          "G": "G35",
+          "H": "H35",
+          "I": "I35",
+          "J": "J35",
+          "K": "K35"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHII2102",
+      "englishName": "Islam and Health",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 36,
+        "codeCell": "A36",
+        "creditCell": "D36"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C36",
+        "markdownCode": "UHII2102",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Islam and Health"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E36",
+          "F": "F36",
+          "G": "G36",
+          "H": "H36",
+          "I": "I36",
+          "J": "J36",
+          "K": "K36"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHII2132",
+      "englishName": "Islamic Entrepreneurship",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 37,
+        "codeCell": "A37",
+        "creditCell": "D37"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C37",
+        "markdownCode": "UHII2132",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Islamic Entrepreneurship"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E37",
+          "F": "F37",
+          "G": "G37",
+          "H": "H37",
+          "I": "I37",
+          "J": "J37",
+          "K": "K37"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIS2072",
+      "englishName": "Sustainable Economy",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 38,
+        "codeCell": "A38",
+        "creditCell": "D38"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C38",
+        "markdownCode": "UHIS2072",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Sustainable Economy"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E38",
+          "F": "F38",
+          "G": "G38",
+          "H": "H38",
+          "I": "I38",
+          "J": "J38",
+          "K": "K38"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIS2082",
+      "englishName": "Practice & Concept of Halal Management",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 39,
+        "codeCell": "A39",
+        "creditCell": "D39"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C39",
+        "markdownCode": "UHIS2082",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Practice & Concept of Halal Management"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E39",
+          "F": "F39",
+          "G": "G39",
+          "H": "H39",
+          "I": "I39",
+          "J": "J39",
+          "K": "K39"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIT2032",
+      "englishName": "Life Institutions & Sustainable Development",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 40,
+        "codeCell": "A40",
+        "creditCell": "D40"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C40",
+        "markdownCode": "UHIT2032",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Life Institutions & Sustainable Development"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E40",
+          "F": "F40",
+          "G": "G40",
+          "H": "H40",
+          "I": "I40",
+          "J": "J40",
+          "K": "K40"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIT2052",
+      "englishName": "Family Law",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 41,
+        "codeCell": "A41",
+        "creditCell": "D41"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C41",
+        "markdownCode": "UHIT2052",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Family Law"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E41",
+          "F": "F41",
+          "G": "G41",
+          "H": "H41",
+          "I": "I41",
+          "J": "J41",
+          "K": "K41"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIZ2042",
+      "englishName": "Future Studies",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 42,
+        "codeCell": "A42",
+        "creditCell": "D42"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C42",
+        "markdownCode": "UHIZ2042",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Future Studies"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E42",
+          "F": "F42",
+          "G": "G42",
+          "H": "H42",
+          "I": "I42",
+          "J": "J42",
+          "K": "K42"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHIZ2062",
+      "englishName": "World Science",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 43,
+        "codeCell": "A43",
+        "creditCell": "D43"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C43",
+        "markdownCode": "UHIZ2062",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "World Science"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E43",
+          "F": "F43",
+          "G": "G43",
+          "H": "H43",
+          "I": "I43",
+          "J": "J43",
+          "K": "K43"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMS2022",
+      "englishName": "Critical and Creative Thinking",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 44,
+        "codeCell": "A44",
+        "creditCell": "D44"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C44",
+        "markdownCode": "UHMS2022",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Critical and Creative Thinking"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E44",
+          "F": "F44",
+          "G": "G44",
+          "H": "H44",
+          "I": "I44",
+          "J": "J44",
+          "K": "K44"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMS2032",
+      "englishName": "Human Side of Knowledge Management",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 45,
+        "codeCell": "A45",
+        "creditCell": "D45"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C45",
+        "markdownCode": "UHMS2032",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Human Side of Knowledge Management"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E45",
+          "F": "F45",
+          "G": "G45",
+          "H": "H45",
+          "I": "I45",
+          "J": "J45",
+          "K": "K45"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMS2042",
+      "englishName": "Development and Global Issues",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 46,
+        "codeCell": "A46",
+        "creditCell": "D46"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C46",
+        "markdownCode": "UHMS2042",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Development and Global Issues"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E46",
+          "F": "F46",
+          "G": "G46",
+          "H": "H46",
+          "I": "I46",
+          "J": "J46",
+          "K": "K46"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMS2112",
+      "englishName": "Engineering Communication",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 47,
+        "codeCell": "A47",
+        "creditCell": "D47"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C47",
+        "markdownCode": "UHMS2112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Engineering Communication"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E47",
+          "F": "F47",
+          "G": "G47",
+          "H": "H47",
+          "I": "I47",
+          "J": "J47",
+          "K": "K47"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMS2122",
+      "englishName": "Interpersonal Communication",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 48,
+        "codeCell": "A48",
+        "creditCell": "D48"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C48",
+        "markdownCode": "UHMS2122",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Interpersonal Communication"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E48",
+          "F": "F48",
+          "G": "G48",
+          "H": "H48",
+          "I": "I48",
+          "J": "J48",
+          "K": "K48"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMT2012",
+      "englishName": "Leadership",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 49,
+        "codeCell": "A49",
+        "creditCell": "D49"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C49",
+        "markdownCode": "UHMT2012",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Leadership"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E49",
+          "F": "F49",
+          "G": "G49",
+          "H": "H49",
+          "I": "I49",
+          "J": "J49",
+          "K": "K49"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMT2052",
+      "englishName": "Guidance and Counselling",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 50,
+        "codeCell": "A50",
+        "creditCell": "D50"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C50",
+        "markdownCode": "UHMT2052",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Guidance and Counselling"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E50",
+          "F": "F50",
+          "G": "G50",
+          "H": "H50",
+          "I": "I50",
+          "J": "J50",
+          "K": "K50"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMT2062",
+      "englishName": "Psychology of Adjustment",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 51,
+        "codeCell": "A51",
+        "creditCell": "D51"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C51",
+        "markdownCode": "UHMT2062",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Psychology of Adjustment"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E51",
+          "F": "F51",
+          "G": "G51",
+          "H": "H51",
+          "I": "I51",
+          "J": "J51",
+          "K": "K51"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHMT2132",
+      "englishName": "Professional Ethics",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 52,
+        "codeCell": "A52",
+        "creditCell": "D52"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C52",
+        "markdownCode": "UHMT2132",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Professional Ethics"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E52",
+          "F": "F52",
+          "G": "G52",
+          "H": "H52",
+          "I": "I52",
+          "J": "J52",
+          "K": "K52"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UMJT2142",
+      "englishName": "Professional Ethics, Safety & Health",
+      "credits": 2,
+      "category": "Elective U1",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 53,
+        "codeCell": "A53",
+        "creditCell": "D53"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C53",
+        "markdownCode": "UMJT2142",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Professional Ethics, Safety & Health"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E53",
+          "F": "F53",
+          "G": "G53",
+          "H": "H53",
+          "I": "I53",
+          "J": "J53",
+          "K": "K53"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U1"
+    },
+    {
+      "code": "UHLA1112",
+      "englishName": "Arabic Language",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 55,
+        "codeCell": "A55",
+        "creditCell": "D55"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C55",
+        "markdownCode": "UHLA1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Arabic Language"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E55",
+          "F": "F55",
+          "G": "G55",
+          "H": "H55",
+          "I": "I55",
+          "J": "J55",
+          "K": "K55"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLC1112",
+      "englishName": "Mandarin Language I",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 56,
+        "codeCell": "A56",
+        "creditCell": "D56"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C56",
+        "markdownCode": "UHLC1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Mandarin Language I"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E56",
+          "F": "F56",
+          "G": "G56",
+          "H": "H56",
+          "I": "I56",
+          "J": "J56",
+          "K": "K56"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLF1112",
+      "englishName": "French Language",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 57,
+        "codeCell": "A57",
+        "creditCell": "D57"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C57",
+        "markdownCode": "UHLF1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "French Language"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E57",
+          "F": "F57",
+          "G": "G57",
+          "H": "H57",
+          "I": "I57",
+          "J": "J57",
+          "K": "K57"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLJ1112",
+      "englishName": "Japanese Language I",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 58,
+        "codeCell": "A58",
+        "creditCell": "D58"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C58",
+        "markdownCode": "UHLJ1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Japanese Language I"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E58",
+          "F": "F58",
+          "G": "G58",
+          "H": "H58",
+          "I": "I58",
+          "J": "J58",
+          "K": "K58"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLJ1122",
+      "englishName": "Japanese Communication Language I",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 59,
+        "codeCell": "A59",
+        "creditCell": "D59"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C59",
+        "markdownCode": "UHLJ1122",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Japanese Communication Language I"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E59",
+          "F": "F59",
+          "G": "G59",
+          "H": "H59",
+          "I": "I59",
+          "J": "J59",
+          "K": "K59"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLK1112",
+      "englishName": "Korean Language",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 60,
+        "codeCell": "A60",
+        "creditCell": "D60"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C60",
+        "markdownCode": "UHLK1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Korean Language"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E60",
+          "F": "F60",
+          "G": "G60",
+          "H": "H60",
+          "I": "I60",
+          "J": "J60",
+          "K": "K60"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    },
+    {
+      "code": "UHLN1112",
+      "englishName": "Persian Language",
+      "credits": 2,
+      "category": "Elective U2",
+      "isCompulsory": false,
+      "sourceLocation": {
+        "file": "D:\\sharhan\\development\\subject advisors\\reference\\Codes_Malay_English_Verified.xlsx",
+        "sha256": "023BCCDD2BFD128A9CC67F0F302B6DE44EEDD58DFCCB4164CC7738542FBA40CC",
+        "sheet": "Kursus Elektif",
+        "worksheetXml": "xl/worksheets/sheet2.xml",
+        "row": 61,
+        "codeCell": "A61",
+        "creditCell": "D61"
+      },
+      "nameProvenance": {
+        "source": "historicalMarkdownTranslation",
+        "workbookCell": "C61",
+        "markdownCode": "UHLN1112",
+        "markdownPath": "D:\\sharhan\\development\\bachelor_of_computer_science_computer_networks_security_curriculum.md",
+        "translation": "Persian Language"
+      },
+      "prerequisites": {
+        "expression": null,
+        "fixedCourseEdgesShown": false,
+        "sourcePrerequisiteStatus": "No",
+        "sourceCells": {
+          "E": "E61",
+          "F": "F61",
+          "G": "G61",
+          "H": "H61",
+          "I": "I61",
+          "J": "J61",
+          "K": "K61"
+        },
+        "conditions": [],
+        "conditionNote": null,
+        "interpretation": "No fixed course edge shown; other notes/policy may still apply."
+      },
+      "selectionGroup": "U2"
+    }
+  ],
+  "computedSummary": {
+    "distinctSubjects": 79,
+    "poolCredits": 195,
+    "categories": {
+      "Core": {
+        "subjects": 21,
+        "credits": 62
+      },
+      "University Compulsory": {
+        "subjects": 10,
+        "credits": 19
+      },
+      "Elective E1": {
+        "subjects": 8,
+        "credits": 22
+      },
+      "Elective E2": {
+        "subjects": 7,
+        "credits": 18
+      },
+      "Elective E3": {
+        "subjects": 2,
+        "credits": 12
+      },
+      "Elective U1": {
+        "subjects": 24,
+        "credits": 48
+      },
+      "Elective U2": {
+        "subjects": 7,
+        "credits": 14
+      }
+    },
+    "categoryRequirementInterpretation": "Pool totals describe available source options; not a degree credit sum or graduation eligibility calculation."
+  },
+  "semesterAvailability": null,
+  "forecastClassifications": null,
+  "dataAuthority": "Student-supplied source material; display translations prepared under the user English-language preference are not official translations. No official verification is claimed."
+}

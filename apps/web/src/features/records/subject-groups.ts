@@ -14,7 +14,7 @@ export interface SubjectGroups<T> {
 const coreLabels = new Set(['CORE', 'PROGRAMME CORE', 'TERAS']);
 const electiveLabels = new Set([
   'ELECTIVE', 'PROGRAMME ELECTIVE', 'ELEKTIF',
-  'ELECTIVE E1', 'ELECTIVE E2', 'ELECTIVE U1', 'ELECTIVE U2',
+  'ELECTIVE E1', 'ELECTIVE E2', 'ELECTIVE E3', 'ELECTIVE U1', 'ELECTIVE U2',
   'ALT ELECTIVE', 'GENERIC ELECTIVE',
 ]);
 

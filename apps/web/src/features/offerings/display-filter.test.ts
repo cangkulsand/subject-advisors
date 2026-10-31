@@ -12,6 +12,7 @@ describe('UC08 semester display policy', () => {
     expect(matchesOfferingSemesterDisplay(subject('FIX102', 3, 'elective_umum-u1'), 3)).toBe(true);
     expect(matchesOfferingSemesterDisplay(subject('FIX103', 3, 'Elective U2'), 3)).toBe(true);
     expect(matchesOfferingSemesterDisplay(subject('SECJ3032', 2), 3)).toBe(false);
+    expect(matchesOfferingSemesterDisplay(subject('SECR3032', 2), 3)).toBe(false);
     expect(matchesOfferingSemesterDisplay(subject('FIX104', 3, 'Unknown'), 3)).toBe(false);
   });
   it('shows the complement plus SECJ3032 for Normal semesters', () => {
@@ -19,6 +20,7 @@ describe('UC08 semester display policy', () => {
     expect(matchesOfferingSemesterDisplay(subject('FIX102', 3, 'Elective U1'), 2)).toBe(false);
     expect(matchesOfferingSemesterDisplay(subject('FIX103', 3, 'Core'), 1)).toBe(true);
     expect(matchesOfferingSemesterDisplay(subject('SECJ3032', 2), 2)).toBe(true);
+    expect(matchesOfferingSemesterDisplay(subject('SECR3032', 2), 2)).toBe(true);
   });
   it('recognizes category metadata without guessing from course code', () => {
     expect(isElectiveUmumU1OrU2('Elective Umum U1')).toBe(true);

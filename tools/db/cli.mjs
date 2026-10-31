@@ -27,7 +27,7 @@ try{
         if(status.pending.length)throw new GateError('APPLY_CANONICAL_MIGRATIONS_FIRST');
         if(command==='verify'){
           await client.query('BEGIN READ ONLY');
-          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql']){const response=await client.query(await readFile('db/checks/'+file,'utf8'));checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
+          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql','007_network_security_reference.sql']){const response=await client.query(await readFile('db/checks/'+file,'utf8'));checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
           finally{await client.query('ROLLBACK');}
         }else{
           if(target.allowRollbackOnlyTests!==true)throw new GateError('ROLLBACK_ONLY_TEST_APPROVAL_REQUIRED');

@@ -110,6 +110,7 @@ function PathwayList({ graph }: { graph: PathwayGraph }) {
             </div>
             <div>{node.subjectName}</div>
             <div className="pathway-list-item-status">{statusLabel(node)}</div>
+            {node.prerequisiteSummary && <p><strong>Curriculum prerequisite information:</strong> {node.prerequisiteSummary}</p>}
             <PrerequisiteSummary node={node} graph={graph} byId={byId} />
           </li>
         ))}

@@ -5,6 +5,27 @@
       "migration": "0004",
       "tables": ["user_role_assignment", "user_role_audit_log"],
       "purpose": "P004 explicit role memberships and immutable role grant history; excluded from the frozen 26-entity SRS baseline"
+    },
+    {
+      "migration": "0005",
+      "tables": [],
+      "columns": [
+        {
+          "table": "curriculum_subject",
+          "name": "display_name",
+          "sqlType": "varchar(255)",
+          "nullable": true,
+          "purpose": "Curriculum-specific display label; preserves shared subject catalogue names"
+        },
+        {
+          "table": "curriculum_subject",
+          "name": "prerequisite_details",
+          "sqlType": "jsonb",
+          "nullable": true,
+          "purpose": "Complete source prerequisite expression, conditions, topic-dependence, and source status metadata"
+        }
+      ],
+      "purpose": "Additive curriculum reference metadata and private technical import receipt; does not add an SRS domain entity"
     }
   ]
 }

@@ -16,6 +16,18 @@ describe('UC08 offering response compatibility', () => {
     });
     expect(page.subjects[0]).toMatchObject({ subjectId: '501', subjectCategory: 'Elective Umum U1', isCompulsory: 0 });
   });
+  it('preserves validated logical conditions and notes from optional curriculum details', () => {
+    const [first, second] = demoContext.subjects;
+    const detail = { expression: { operator: 'anyOf', operands: [
+      { operator: 'course', code: 'FIX101' }, { operator: 'course', code: 'FIX102' },
+    ] }, conditions: [], conditionNote: 'Either subject satisfies this requirement.' };
+    const page = readPageData({ ...demoContext, subjects: [
+      { ...first!, curriculumSubjectId: '501', subjectId: '701', code: 'FIX103', prerequisites: { status: 'available', items: [], details: detail } },
+      { ...second!, curriculumSubjectId: '502', subjectId: '702', code: 'FIX101' },
+      { ...second!, curriculumSubjectId: '503', subjectId: '703', code: 'FIX102' },
+    ], selection: null });
+    expect(page.subjects[0]?.prerequisites).toMatchObject({ status: 'available', details: { conditionNote: detail.conditionNote } });
+  });
   it('normalizes absent, null and unknown optional metadata to unavailable while preserving known-empty', () => {
     const catalogue = [{ ...demoContext.subjects[0], curriculumSubjectId: '501', subjectId: '701' }];
     for (const metadata of [undefined, null, { status: 'future' }, { status: 'available' }]) {

@@ -25,7 +25,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -40,6 +40,22 @@ test('ordered canonical manifest includes registered forward extensions and excl
  assert.match(entries[4].sql,/Protected owner administrator membership cannot be removed/);
  assert.match(entries[4].sql,/REVOKE ALL ON public\.user_role_assignment FROM PUBLIC/);
  assert.doesNotMatch(entries[4].sql,/UPDATE public\.user_access_assignment\s+SET app_role/i);
+});
+test('0005 is additive only and registers the approved nullable curriculum metadata',async()=>{
+ const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0005');
+ assert.ok(migration);assert.equal(migration.file,'0005_network_security_reference_support.sql');
+ assert.match(migration.sql,/ADD COLUMN display_name varchar\(255\)/i);
+ assert.match(migration.sql,/ADD COLUMN prerequisite_details jsonb/i);
+ assert.match(migration.sql,/prerequisite_details \?& ARRAY\['expression','conditions','fixedCourseEdgesShown','sourcePrerequisiteStatus'\]/i);
+ assert.match(migration.sql,/jsonb_typeof\(prerequisite_details->'conditions'\) = 'array'/i);
+ assert.match(migration.sql,/CREATE TABLE migration_meta\.reference_data_imports/i);
+ assert.match(migration.sql,/manifest_sha256 ~ '\^\[0-9a-f\]\{64\}\$'/i);
+ assert.match(migration.sql,/REFERENCES public\.curriculum\(curriculum_id\) ON DELETE RESTRICT/i);
+ assert.match(migration.sql,/REVOKE ALL ON SCHEMA migration_meta FROM PUBLIC/i);
+ assert.match(migration.sql,/REVOKE ALL ON migration_meta\.reference_data_imports FROM PUBLIC/i);
+ assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
+ assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
+ const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,2);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));
