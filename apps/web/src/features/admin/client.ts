@@ -1,5 +1,5 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
-import type { AdminAccount, AdminAccountDetail, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminAuditEvent, AdminAuditQuery, AdminIdentity, AdminOverview, AdminPage, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -52,37 +52,20 @@ function detail(value: unknown): AdminAccountDetail {
   for (const membership of data.memberships) { const item = object(membership); role(item.role); text(item.emailPolicy); text(item.source); text(item.reason); text(item.grantedAt); if (typeof item.protectedOwner !== 'boolean') throw new Error('Invalid administration response'); }
   return data as unknown as AdminAccountDetail;
 }
-function invitation(value: unknown): AdminInvitation {
-  const item = object(value);
-  text(item.id); text(item.email); text(item.invitedBy); text(item.reason); text(item.createdAt); text(item.expiresAt);
-  if (!Array.isArray(item.roles) || !['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'].includes(String(item.status))) throw new Error('Invalid administration response');
-  item.roles.forEach(role);
-  if (item.acceptedAt !== null) text(item.acceptedAt);
-  return item as unknown as AdminInvitation;
-}
 function query(values: object) {
   const parameters = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) if (value !== undefined && value !== '') parameters.set(key, String(value));
   return '?' + parameters.toString();
 }
-export interface AdminInvitationsQuery { page: number; status: AdminInvitationStatus | '' }
 export interface AdminClient {
   overview(signal?: AbortSignal): Promise<AdminOverview>;
   users(filters: AdminUsersQuery, signal?: AbortSignal): Promise<AdminPage<AdminAccount>>;
   account(id: number, signal?: AbortSignal): Promise<AdminAccountDetail>;
   audit(filters: AdminAuditQuery, signal?: AbortSignal): Promise<AdminPage<AdminAuditEvent>>;
-  createAccount(input: AdminCreateAccountRequest): Promise<AdminAccountDetail>;
-  grantRole(id: number, input: AdminGrantRoleRequest): Promise<AdminAccountDetail>;
-  revokeRole(id: number, role: AdminRole, input: AdminRevokeRoleRequest): Promise<AdminAccountDetail>;
-  setAccess(id: number, input: AdminChangeAccessRequest): Promise<AdminAccountDetail>;
-  listInvitations(filters: AdminInvitationsQuery, signal?: AbortSignal): Promise<AdminPage<AdminInvitation>>;
-  createInvitation(input: AdminCreateInvitationRequest): Promise<AdminInvitation>;
-  revokeInvitation(id: string, input: AdminRevokeRoleRequest): Promise<AdminInvitation>;
 }
-interface RequestInput { method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; body?: unknown }
 export function createAdminClient(getToken: () => Promise<string | null>, baseUrl = ''): AdminClient {
   const base = baseUrl.replace(/\/+$/, '');
-  async function request<T>(path: string, decode: (value: unknown) => T, signal?: AbortSignal, init: RequestInput = { method: 'GET' }): Promise<T> {
+  async function request<T>(path: string, decode: (value: unknown) => T, signal?: AbortSignal): Promise<T> {
     const expected = accountSessionStamp(), controller = new AbortController();
     const assertSession = () => { if (expected !== accountSessionStamp()) throw new AdminApiError(401, 'SESSION_CHANGED', 'Your account changed. Reload this page.'); };
     const cancel = () => controller.abort(signal?.reason ?? new DOMException('Cancelled', 'AbortError'));
@@ -96,7 +79,7 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
       const token = await getToken(); assertSession();
       if (controller.signal.aborted) throw controller.signal.reason;
       if (!token) { clearAccountCache(); throw new AdminApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again.'); }
-      const response = await fetch(base + path, { method: init.method, headers: init.body === undefined ? { Authorization: 'Bearer ' + token } : { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: init.body === undefined ? undefined : JSON.stringify(init.body), credentials: 'omit', cache: 'no-store', signal: controller.signal });
+      const response = await fetch(base + path, { method: 'GET', headers: { Authorization: 'Bearer ' + token }, credentials: 'omit', cache: 'no-store', signal: controller.signal });
       assertSession();
       if ([401, 403].includes(response.status)) clearAccountCache();
       let body: Record<string, unknown>;
@@ -117,12 +100,5 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     users: (filters, signal) => request('/api/admin/users' + query(filters), value => paged(value, account), signal),
     account: (id, signal) => request('/api/admin/users/' + id, detail, signal),
     audit: (filters, signal) => request('/api/admin/audit' + query(filters), value => paged(value, audit), signal),
-    createAccount: input => request('/api/admin/users', detail, undefined, { method: 'POST', body: input }),
-    grantRole: (id, input) => request('/api/admin/users/' + id + '/roles', detail, undefined, { method: 'POST', body: input }),
-    revokeRole: (id, roleName, input) => request('/api/admin/users/' + id + '/roles/' + encodeURIComponent(roleName), detail, undefined, { method: 'DELETE', body: input }),
-    setAccess: (id, input) => request('/api/admin/users/' + id + '/access', detail, undefined, { method: 'PATCH', body: input }),
-    listInvitations: (filters, signal) => request('/api/admin/invitations' + query(filters), value => paged(value, invitation), signal),
-    createInvitation: input => request('/api/admin/invitations', invitation, undefined, { method: 'POST', body: input }),
-    revokeInvitation: (id, input) => request('/api/admin/invitations/' + encodeURIComponent(id), invitation, undefined, { method: 'DELETE', body: input }),
   };
 }

@@ -1,9 +1,7 @@
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
-import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest } from '../../../../../packages/shared/src/admin/admin';
-import type { AdminIdentity, AdminInvitationStatus, AdminUsersQuery, AdminAuditQuery, AdminValidation } from '../../../../../packages/shared/src/admin/admin';
-import type { AccountDetailRow, AccountRow, AdminDependencies } from './contracts';
-import { AdminMutationError } from './errors';
-import { checkRoleEligibility } from './eligibility';
+import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminIdentity, AdminUsersQuery, AdminAuditQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AccountRow, AdminDependencies } from './contracts';
 
 function invalid(message: string): never { throw new AuthError(400, 'INVALID_ADMIN_QUERY', message); }
 function positive(value: string, label: string) {
@@ -30,149 +28,15 @@ async function enrich(rows: AccountRow[], deps: AdminDependencies) {
   return rows.map(row => ({ ...row, identity: identities.get(row.clerkUserId) ?? { state: 'not_found' as const, name: null, email: null, emailVerified: false } }));
 }
 
-const BODY_LIMIT_BYTES = 16 * 1024;
-const INVITATION_DAYS = 7;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const INVITATION_STATUSES: readonly string[] = ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'];
-
-function methodNotAllowed(allowed: string[]): Response {
-  const response = authJson({ error: { code: 'METHOD_NOT_ALLOWED', message: 'This method is not supported for this resource.' } }, 405);
-  response.headers.set('Allow', allowed.join(', '));
-  return response;
-}
-function badRequest(code: string, message: string): never { throw new AuthError(400, code, message); }
-/** Reads a bounded JSON body: Content-Type must be application/json (415), size and syntax errors are 400. */
-async function readJson(request: Request): Promise<unknown> {
-  const type = (request.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
-  if (type !== 'application/json') throw new AuthError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Send the request body as application/json.');
-  const declared = request.headers.get('content-length');
-  if (declared !== null && Number(declared) > BODY_LIMIT_BYTES) badRequest('BODY_TOO_LARGE', 'The request body is too large.');
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  const reader = request.body?.getReader();
-  if (reader) {
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > BODY_LIMIT_BYTES) badRequest('BODY_TOO_LARGE', 'The request body is too large.');
-        chunks.push(value);
-      }
-    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
-  catch { return badRequest('INVALID_JSON', 'The request body is not valid JSON.'); }
-}
-function validated<T>(result: AdminValidation<T>): T {
-  if (!result.ok) badRequest('INVALID_REQUEST', result.error);
-  return result.value;
-}
-function mutationResponse(error: AdminMutationError): Response {
-  return authJson({ error: { code: error.code, message: error.message } }, error.status);
-}
-async function detail(account: AccountDetailRow, deps: AdminDependencies) {
-  const [row] = await enrich([account], deps);
-  return { ...row, memberships: account.memberships };
-}
-
 export async function handleAdminRequest(request: Request, deps: AdminDependencies): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return null;
   try {
-    // The actor is always the authorized administrator's own verified Clerk ID, never a value from the request.
-    const actor = (await authorize(request, deps.auth, { roles: ['SYSTEM_ADMIN'] })).clerkUserId;
-    const method = request.method;
-    const allow = (...methods: string[]) => methods.includes(method) ? null : methodNotAllowed(methods);
-    const usersMutation = /^\/api\/admin\/users\/([1-9]\d*)\/(roles|access)$/.exec(url.pathname);
-    const roleDelete = /^\/api\/admin\/users\/([1-9]\d*)\/roles\/([^/]+)$/.exec(url.pathname);
-    const invitationDelete = /^\/api\/admin\/invitations\/([^/]+)$/.exec(url.pathname);
-
-    if (url.pathname === '/api/admin/users' && method === 'POST') {
-      parameters(url, []);
-      const input = validated(validateCreateAccountRequest(await readJson(request)));
-      const found = await deps.identities.findByEmail(input.email);
-      if (!found) throw new AdminMutationError('CLERK_USER_NOT_FOUND');
-      if (!found.emailVerified) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
-      if (!checkRoleEligibility({ address: found.verifiedEmail, verified: true }, input.roles).eligible) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
-      const created = await deps.repository.createAccount(found.clerkUserId, input.roles, actor, input.reason);
-      return authJson({ data: await detail(created, deps) }, 201);
+    await authorize(request, deps.auth, { roles: ['SYSTEM_ADMIN'] });
+    if (request.method !== 'GET') {
+      const response = authJson({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Administration is read-only in this release.' } }, 405);
+      response.headers.set('Allow', 'GET'); return response;
     }
-    if (usersMutation && usersMutation[2] === 'roles') {
-      const denied = allow('POST'); if (denied) return denied;
-      parameters(url, []);
-      const accountId = positive(usersMutation[1]!, 'account ID');
-      const input = validated(validateGrantRoleRequest(await readJson(request)));
-      const target = await deps.repository.account(accountId);
-      if (!target) throw new AdminMutationError('NOT_FOUND');
-      // Re-check eligibility against the target's CURRENT verified email, never the stored role history.
-      const identity = (await deps.identities.lookup([target.clerkUserId])).get(target.clerkUserId);
-      if (!identity || identity.state === 'not_found') throw new AdminMutationError('CLERK_USER_NOT_FOUND');
-      if (identity.state !== 'available') throw new Error('Identity provider unavailable');
-      if (!checkRoleEligibility(identity.email ? { address: identity.email, verified: identity.emailVerified } : null, [input.role]).eligible) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
-      return authJson({ data: await detail(await deps.repository.grantRole(accountId, input.role, actor, input.reason), deps) });
-    }
-    if (usersMutation) {
-      const denied = allow('PATCH'); if (denied) return denied;
-      parameters(url, []);
-      const input = validated(validateChangeAccessRequest(await readJson(request)));
-      return authJson({ data: await detail(await deps.repository.setAccessStatus(positive(usersMutation[1]!, 'account ID'), input.status, actor, input.reason), deps) });
-    }
-    if (roleDelete) {
-      const denied = allow('DELETE'); if (denied) return denied;
-      parameters(url, []);
-      const role = decodeURIComponent(roleDelete[2]!);
-      if (!isAdminRole(role)) badRequest('INVALID_REQUEST', 'Invalid role.');
-      const input = validated(validateRevokeRoleRequest(await readJson(request)));
-      return authJson({ data: await detail(await deps.repository.revokeRole(positive(roleDelete[1]!, 'account ID'), role, actor, input.reason), deps) });
-    }
-    if (url.pathname === '/api/admin/invitations') {
-      const denied = allow('GET', 'POST'); if (denied) return denied;
-      if (method === 'GET') {
-        parameters(url, ['page', 'status']);
-        const status = url.searchParams.get('status') ?? '';
-        if (status && !INVITATION_STATUSES.includes(status)) invalid('Check the invitation status filter.');
-        return authJson({ data: await deps.repository.listInvitations({ page: page(url.searchParams), status: status as AdminInvitationStatus | '' }) });
-      }
-      parameters(url, []);
-      const input = validated(validateCreateInvitationRequest(await readJson(request)));
-      if (!checkRoleEligibility({ address: input.email, verified: true }, input.roles).eligible) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
-      const existing = await deps.identities.findByEmail(input.email);
-      if (existing) throw new AdminMutationError(await deps.auth.access.find(existing.clerkUserId) ? 'ACCOUNT_EXISTS' : 'CLERK_USER_EXISTS');
-      const pending = await deps.repository.createInvitation(input.email, input.roles, actor, input.reason, new Date(Date.now() + INVITATION_DAYS * 86_400_000));
-      let clerkInvitationId: string;
-      try { clerkInvitationId = (await deps.identities.createInvitation(input.email, undefined, INVITATION_DAYS)).clerkInvitationId; }
-      catch {
-        await deps.repository.revokeInvitation(pending.id, actor, 'Invitation email could not be delivered').catch(() => undefined);
-        throw new AdminMutationError('INVITATION_DELIVERY_FAILED');
-      }
-      try { return authJson({ data: await deps.repository.attachClerkInvitation(pending.id, clerkInvitationId, actor) }, 201); }
-      catch (error) {
-        await deps.identities.revokeInvitation(clerkInvitationId).catch(() => undefined);
-        await deps.repository.revokeInvitation(pending.id, actor, 'Invitation could not be recorded').catch(() => undefined);
-        throw error;
-      }
-    }
-    if (invitationDelete) {
-      const denied = allow('DELETE'); if (denied) return denied;
-      parameters(url, []);
-      const id = invitationDelete[1]!;
-      if (!UUID.test(id)) badRequest('INVALID_REQUEST', 'Invalid invitation ID.');
-      const input = validated(validateRevokeRoleRequest(await readJson(request)));
-      const clerkInvitationId = await deps.repository.clerkInvitationIdOf(id);
-      const revoked = await deps.repository.revokeInvitation(id, actor, input.reason);
-      // The database row is authoritative (redemption requires PENDING), so a provider failure here is not fatal.
-      if (clerkInvitationId) await deps.identities.revokeInvitation(clerkInvitationId).catch(() => undefined);
-      return authJson({ data: revoked });
-    }
-    if (url.pathname === '/api/admin/users') {
-      const denied = allow('GET', 'POST'); if (denied) return denied;
-    }
-    const known = url.pathname === '/api/admin/overview' || url.pathname === '/api/admin/audit' || /^\/api\/admin\/users\/[1-9]\d*$/.test(url.pathname) || url.pathname === '/api/admin/users';
-    if (known && method !== 'GET') return methodNotAllowed(['GET']);
     if (url.pathname === '/api/admin/overview') {
       parameters(url, []);
       const [overview, recent] = await Promise.all([deps.repository.overview(), deps.repository.audit({ page: 1, kind: 'ALL' }, 5)]);
@@ -219,7 +83,6 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
     }
     throw new AuthError(404, 'ADMIN_ROUTE_NOT_FOUND', 'Administration page not found.');
   } catch (error) {
-    if (error instanceof AdminMutationError) return mutationResponse(error);
     if (error instanceof AuthError) return authErrorResponse(error);
     return authJson({ error: { code: 'ADMIN_UNAVAILABLE', message: 'Administration data is unavailable. Please retry.' } }, 503);
   }

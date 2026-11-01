@@ -49,24 +49,6 @@ node tools/auth/provision-roles.mjs --target <approved-target.json> --user-id <v
 
 This default dry-run performs only SELECTs after identity verification. To execute the reviewed grant, repeat the same command with `--apply`. This implementation task has not run that live command. Normal coordinator provisioning uses `--roles COORDINATOR`, an exact verified `utm.my` address and no `--owner` flag. Provisioning is additive, audited, idempotent and refuses to reactivate suspended accounts. A new staff account does not retain an implicit student grant. Existing grants are preserved. Protected owner rotation/unprotection is unsupported and requires a separately reviewed database-owner recovery process.
 
-## Admin user management
-
-SYSTEM_ADMIN-only routes (full contract: `docs/api/admin-users.openapi.json`). The acting administrator is always the verified Clerk user from the session, never a body field. Mutation bodies must be `application/json`, at most 16 KB, with no unknown fields, and every mutation needs a trimmed 1-500 character `reason` that is stored in the audit log. There is no hard delete: removing access means suspending the account.
-
-| Route | Purpose |
-| --- | --- |
-| `POST /api/admin/users` | Add an application account for an existing Clerk user, looked up by exact primary email (must be verified and role-eligible). |
-| `POST /api/admin/users/:id/roles` | Grant a role; eligibility is re-checked against the target's current verified email. Suspended accounts may receive roles. |
-| `DELETE /api/admin/users/:id/roles/:role` | Revoke a role (body carries the reason). |
-| `PATCH /api/admin/users/:id/access` | Suspend or reactivate (`{ status, reason }`). |
-| `GET /api/admin/invitations?page&status` | List invitations (lapsed pending rows read as EXPIRED). |
-| `POST /api/admin/invitations` | Invite someone who has not signed up (`{ email, roles, reason }`). |
-| `DELETE /api/admin/invitations/:id` | Revoke a pending invitation. |
-
-Rules: an administrator cannot suspend themselves or remove their own SYSTEM_ADMIN role (`SELF_LOCKOUT`); the protected owner cannot be suspended or lose roles (`PROTECTED_OWNER`); the last active SYSTEM_ADMIN cannot be removed or suspended (`LAST_ACTIVE_ADMIN`); an account's last remaining role cannot be removed, suspend instead (`LAST_ROLE`). COORDINATOR and SYSTEM_ADMIN require a verified exact `@utm.my` email, STUDENT a verified `@graduate.utm.my` email (`ROLE_NOT_ELIGIBLE`, 422). Unsupported methods on known paths return 405 with an `Allow` header.
-
-Invitation flow: the admin creates a PENDING database row (7-day expiry), then a Clerk email invitation (`expiresInDays: 7`), then the Clerk reference is attached. If Clerk fails the row is revoked and the API returns 503 `INVITATION_DELIVERY_FAILED`. The invited email is checked against the requested roles at creation, and an email that already has an application account is refused (`ACCOUNT_EXISTS`), as is an email that already has a Clerk sign-in account without an application account (`CLERK_USER_EXISTS`, "Use Add account instead"). Roles live only in the database; nothing is stored in Clerk metadata. At first sign-in (`POST /api/me/initialize`, before student self-registration) a user with no application account and a PENDING, unexpired invitation whose email equals their verified primary email gets the invited roles in one transaction (account, roles, invitation marked ACCEPTED), with the roles re-checked against that verified email. If the roles are no longer eligible, the invitation lapsed, or the user already has an account, nothing is granted and the existing behaviour (student self-registration for `@graduate.utm.my`, otherwise rejection) applies unchanged. Existing accounts never receive invited roles automatically; an administrator grants them explicitly.
-
 ## Local verification
 
 ```powershell

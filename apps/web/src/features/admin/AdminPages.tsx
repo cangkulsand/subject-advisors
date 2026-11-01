@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
-import { AddUserPanel, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
-import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
-import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAuditQuery, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 
-const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pending', ACCEPTED: 'Accepted', REVOKED: 'Revoked', EXPIRED: 'Expired' };
+const labels: Record<AdminRole, string> = { STUDENT: 'Student', COORDINATOR: 'Coordinator', SYSTEM_ADMIN: 'System Admin' };
 function when(value: string) { return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
 function useRead<T>(load: (signal: AbortSignal) => Promise<T>, key: string) {
   const latest = useRef(load); latest.current = load;
@@ -59,36 +57,12 @@ export function AdminOverviewPage({ client }: { client: AdminClient }) {
       </section>
     </>}</Panel></>;
 }
-function InvitationsSection({ client, refreshKey, onStatus }: { client: AdminClient; refreshKey: number; onStatus: (text: string) => void }) {
-  const [filters, setFilters] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
-  const [target, setTarget] = useState<AdminInvitation>();
-  const result = useRead(signal => client.listInvitations(filters, signal), 'invitations:' + refreshKey + ':' + JSON.stringify(filters));
-  return <section className="admin-card" aria-labelledby="admin-invitations-title">
-    <div className="admin-card-title"><div><h2 id="admin-invitations-title">Invitations</h2><p className="admin-muted">Invitations are valid for 7 days. Roles apply only if the verified email still qualifies at first sign-in.</p></div>
-      <label className="admin-inline-filter">Invitation status<select aria-label="Invitation status" value={filters.status} onChange={event => setFilters({ page: 1, status: event.target.value as AdminInvitationStatus | '' })}><option value="">All</option>{Object.entries(invitationLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label></div>
-    <Panel error={result.error} retry={result.retry}>{result.data && <>
-      {!result.data.items.length ? <p className="admin-empty">No invitations match this filter.</p> : <div className="admin-table-scroll" role="region" aria-label="Invitations table" tabIndex={0}><table><thead><tr><th>Email</th><th>Roles</th><th>Status</th><th>Invited</th><th>Expires</th><th><span className="admin-sr-only">Actions</span></th></tr></thead><tbody>{result.data.items.map(item => <tr key={item.id}>
-        <td className="admin-wrap">{item.email}</td><td><RolePills roles={item.roles}/></td><td><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
-        <td><time dateTime={item.createdAt}>{when(item.createdAt)}</time></td><td><time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></td>
-        <td>{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
-      </tr>)}</tbody></table></div>}
-      {result.data.total > result.data.pageSize && <Pager result={result.data} onPage={page => setFilters(old => ({ ...old, page }))}/>}
-    </>}</Panel>
-    {target && <ReasonDialog title="Revoke invitation" confirmLabel="Revoke invitation" danger onCancel={() => setTarget(undefined)}
-      description={<p>The invitation for <strong>{target.email}</strong> will stop working. You can send a new invitation later.</p>}
-      onSubmit={async reason => { await client.revokeInvitation(target.id, { reason }); setTarget(undefined); onStatus(`Invitation for ${target.email} revoked.`); result.retry(); }}/>}
-  </section>;
-}
 export function AdminUsersPage({ client, search }: { client: AdminClient; search: string }) {
   const parameters = new URLSearchParams(search);
   const [filters, setFilters] = useState<AdminUsersQuery>({ page: 1, q: '', role: ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'].includes(parameters.get('role') ?? '') ? parameters.get('role') as AdminRole : '', status: ['ACTIVE', 'SUSPENDED'].includes(parameters.get('status') ?? '') ? parameters.get('status') as 'ACTIVE' | 'SUSPENDED' : '' });
   const [term, setTerm] = useState('');
-  const [changes, setChanges] = useState(0), [notice, setNotice] = useState('');
-  const result = useRead(signal => client.users(filters, signal), 'users:' + changes + ':' + JSON.stringify(filters));
-  return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations." refresh={result.retry}/>
-    <AddUserPanel client={client} onChanged={() => { setChanges(value => value + 1); setNotice(''); }}/>
-    <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice}</p>}</div>
-    <InvitationsSection client={client} refreshKey={changes} onStatus={setNotice}/>
+  const result = useRead(signal => client.users(filters, signal), 'users:' + JSON.stringify(filters));
+  return <><PageHeading title="Users & Access" text="Find application accounts and review their assigned roles and access status." refresh={result.retry}/>
     <section className="admin-card admin-users-card">
       <form className="admin-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, page: 1, q: term.trim() })); }}>
         <label className="admin-search-field">Search accounts<input type="search" maxLength={100} value={term} onChange={event => setTerm(event.target.value)} placeholder="Name, email or Clerk account ID"/></label>
@@ -125,53 +99,17 @@ export function AdminAuditView({ client, accountId }: { client: AdminClient; acc
     </>}</Panel>
   </section>;
 }
-type PendingAction = { kind: 'revoke'; role: AdminRole } | { kind: 'grant'; role: AdminRole } | { kind: 'access'; status: 'ACTIVE' | 'SUSPENDED' };
-function dialogCopy(pending: PendingAction) {
-  if (pending.kind === 'revoke') return { title: `Remove ${labels[pending.role]} role`, confirm: 'Remove role', danger: true, text: `This account loses the ${labels[pending.role]} role immediately. An account must keep at least one role.` };
-  if (pending.kind === 'grant') return { title: `Add ${labels[pending.role]} role`, confirm: 'Add role', danger: false, text: 'The role is added only if the verified email address of the account is eligible for it.' };
-  return pending.status === 'SUSPENDED'
-    ? { title: 'Suspend account', confirm: 'Suspend account', danger: true, text: 'The account holder is blocked from using the application until access is reactivated. Roles are kept.' }
-    : { title: 'Reactivate account', confirm: 'Reactivate account', danger: false, text: 'The account holder can use the application again with their existing roles.' };
-}
-export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { client: AdminClient; accountId: number; viewerClerkUserId?: string | null }) {
+export function AdminAccountPage({ client, accountId }: { client: AdminClient; accountId: number }) {
   const result = useRead(signal => client.account(accountId, signal), 'account:' + accountId);
-  const [updated, setUpdated] = useState<AdminAccountDetail>();
-  const [pending, setPending] = useState<PendingAction>();
-  const [notice, setNotice] = useState(''), [auditVersion, setAuditVersion] = useState(0), [grant, setGrant] = useState('');
-  const account = updated ?? result.data;
-  const self = !!account && !!viewerClerkUserId && account.clerkUserId === viewerClerkUserId;
-  const missing = account ? ADMIN_ROLES.filter(role => !account.roles.includes(role)) : [];
-  const copy = pending ? dialogCopy(pending) : undefined;
-  async function confirm(reason: string) {
-    if (!pending) return;
-    const done = (detail: AdminAccountDetail, text: string) => { setUpdated(detail); setPending(undefined); setNotice(text); setAuditVersion(value => value + 1); setGrant(''); };
-    if (pending.kind === 'revoke') done(await client.revokeRole(accountId, pending.role, { reason }), `${labels[pending.role]} role removed.`);
-    else if (pending.kind === 'grant') done(await client.grantRole(accountId, { role: pending.role, reason }), `${labels[pending.role]} role added.`);
-    else done(await client.setAccess(accountId, { status: pending.status, reason }), pending.status === 'SUSPENDED' ? 'Account suspended.' : 'Account reactivated.');
-  }
-  return <><AppLink className="admin-back" href="/admin/users">← All accounts</AppLink><PageHeading title="Account details" text="Identity, assigned memberships and recorded access changes." refresh={() => { setUpdated(undefined); result.retry(); }}/>
-    <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice}</p>}</div>
+  const account = result.data;
+  return <><AppLink className="admin-back" href="/admin/users">← All accounts</AppLink><PageHeading title="Account details" text="Identity, assigned memberships and recorded access changes." refresh={result.retry}/>
     <Panel error={result.error} retry={result.retry}>{account && <>
       <section className="admin-card"><div className="admin-account-heading"><span className="admin-account-avatar" aria-hidden="true">{(account.identity.name ?? 'A').slice(0, 1).toUpperCase()}</span><Identity account={account}/><AccessPill status={account.accessStatus}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</div>
         <dl className="admin-account-facts"><div><dt>Primary email</dt><dd>{account.identity.email ?? 'Unavailable'}</dd></div><div><dt>Email verification</dt><dd>{account.identity.state !== 'available' ? 'Unavailable' : account.identity.emailVerified ? 'Verified' : 'Not verified'}</dd></div><div><dt>Application account created</dt><dd>{when(account.createdAt)}</dd></div><div><dt>Last access update</dt><dd>{when(account.updatedAt)}</dd></div></dl>
       </section>
-      <section className="admin-card"><h2>Role memberships</h2>{!account.memberships.length ? <p>No explicit memberships are assigned.</p> : <div className="admin-memberships">{account.memberships.map(membership => <article key={membership.role}><RolePills roles={[membership.role]}/><dl><div><dt>Assigned</dt><dd>{when(membership.grantedAt)}</dd></div><div><dt>Source</dt><dd>{({ MIGRATION_COMPAT: 'Legacy role migration', LEGACY_INIT: 'Student registration', OPERATOR: 'Trusted operator' } as Record<string, string>)[membership.source] ?? membership.source}</dd></div><div><dt>Email policy</dt><dd>{membership.emailPolicy === 'OWNER_STUDENT_COORDINATOR' ? 'Protected owner exception' : 'Role eligibility policy'}</dd></div><div><dt>Reason</dt><dd>{membership.reason}</dd></div></dl>{membership.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}
-          {membership.protectedOwner ? <p className="admin-locked">Locked. The protected owner role cannot be changed.</p> : self && membership.role === 'SYSTEM_ADMIN' ? <p className="admin-locked">You cannot remove your own System Admin role.</p> : <button type="button" className="admin-row-action admin-danger-outline" onClick={() => setPending({ kind: 'revoke', role: membership.role })}>Remove role<span className="admin-sr-only"> {labels[membership.role]}</span></button>}
-        </article>)}</div>}
-        {missing.length ? <form className="admin-add-role" onSubmit={event => { event.preventDefault(); if (grant) setPending({ kind: 'grant', role: grant as AdminRole }); }}>
-          <label>Role to add<select aria-label="Role to add" value={grant} onChange={event => setGrant(event.target.value)}><option value="">Choose a role</option>{missing.map(role => <option value={role} key={role}>{labels[role]}</option>)}</select></label>
-          <button type="submit" disabled={!grant}>Add role</button></form> : <p className="admin-muted">This account already holds every role.</p>}
-      </section>
-      <section className="admin-card admin-access-card"><h2>Account access</h2>
-        <p className="admin-muted">Suspending blocks the application without deleting the account or its roles. Accounts are never deleted.</p>
-        {account.protectedOwner ? <p className="admin-locked">Locked. The protected owner account cannot be suspended.</p>
-          : account.accessStatus === 'SUSPENDED' ? <button type="button" className="admin-primary" onClick={() => setPending({ kind: 'access', status: 'ACTIVE' })}>Reactivate account</button>
-          : self ? <p className="admin-locked">You cannot suspend your own account.</p>
-          : <button type="button" className="admin-danger-outline" onClick={() => setPending({ kind: 'access', status: 'SUSPENDED' })}>Suspend account</button>}
-      </section>
-      <AdminAuditView key={auditVersion} client={client} accountId={accountId}/>
+      <section className="admin-card"><h2>Role memberships</h2>{!account.memberships.length ? <p>No explicit memberships are assigned.</p> : <div className="admin-memberships">{account.memberships.map(membership => <article key={membership.role}><RolePills roles={[membership.role]}/><dl><div><dt>Assigned</dt><dd>{when(membership.grantedAt)}</dd></div><div><dt>Source</dt><dd>{({ MIGRATION_COMPAT: 'Legacy role migration', LEGACY_INIT: 'Student registration', OPERATOR: 'Trusted operator' } as Record<string, string>)[membership.source] ?? membership.source}</dd></div><div><dt>Email policy</dt><dd>{membership.emailPolicy === 'OWNER_STUDENT_COORDINATOR' ? 'Protected owner exception' : 'Role eligibility policy'}</dd></div><div><dt>Reason</dt><dd>{membership.reason}</dd></div></dl>{membership.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</article>)}</div>}</section>
+      <AdminAuditView client={client} accountId={accountId}/>
     </>}</Panel>
-    {pending && copy && <ReasonDialog title={copy.title} confirmLabel={copy.confirm} danger={copy.danger} description={<p>{copy.text}</p>} onCancel={() => setPending(undefined)} onSubmit={confirm}/>}
   </>;
 }
 export function AdminAuditPage({ client }: { client: AdminClient }) { return <><PageHeading title="Audit Log" text="Read-only history of application role and access changes."/><AdminAuditView client={client}/></>; }

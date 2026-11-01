@@ -25,7 +25,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -56,18 +56,6 @@ test('0005 is additive only and registers the approved nullable curriculum metad
  assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
  const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,2);
-});
-test('0006 audits access-status changes and adds a protected pending-invitation table',async()=>{
- const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0006');
- assert.ok(migration);assert.equal(migration.file,'0006_admin_user_management.sql');
- assert.match(migration.sql,/CREATE TRIGGER user_access_status_audit AFTER UPDATE OF access_status ON public\.user_access_assignment/);
- assert.match(migration.sql,/'ACCESS_STATUS_CHANGE'/);
- assert.match(migration.sql,/CREATE UNIQUE INDEX admin_user_invitation_one_pending_email_idx[^;]+WHERE status = 'PENDING'/);
- assert.match(migration.sql,/REFERENCES public\.user_access_assignment\(access_assignment_id\) ON DELETE RESTRICT/);
- assert.match(migration.sql,/BEFORE DELETE ON public\.admin_user_invitation/);
- assert.match(migration.sql,/REVOKE ALL ON public\.admin_user_invitation FROM PUBLIC/);
- assert.doesNotMatch(migration.sql,/\bprotected_owner\s+boolean|\bDROP\s+(?:TABLE|TRIGGER)|UPDATE\s+public\./i);
- assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.admin_user_invitation']);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));

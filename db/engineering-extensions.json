@@ -26,11 +26,6 @@
         }
       ],
       "purpose": "Additive curriculum reference metadata and private technical import receipt; does not add an SRS domain entity"
-    },
-    {
-      "migration": "0006",
-      "tables": ["admin_user_invitation"],
-      "purpose": "P004 pending admin user invitations (roles are re-checked at redemption); excluded from the frozen 26-entity SRS baseline"
     }
   ]
 }
