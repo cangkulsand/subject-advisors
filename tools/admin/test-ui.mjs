@@ -6,19 +6,26 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { fixtureResponse } from './fixtures.mjs';
+import { fixtureMutation, fixtureResponse } from './fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
 const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', loader: { '.png': 'dataurl' }, alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
 const css = output.outputFiles.find(file => file.path.endsWith('.css'))?.text ?? '';
 const serve = process.argv.includes('--serve');
-const server = createServer((req, res) => {
+const serveState = {};
+const server = createServer(async (req, res) => {
   if (req.url === '/app.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(script); }
   else if (req.url?.startsWith('/api/')) {
-    const data = fixtureResponse(new URL(req.url, 'http://127.0.0.1'));
+    const url = new URL(req.url, 'http://127.0.0.1');
     res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'no-store');
-    res.statusCode = req.method !== 'GET' ? 405 : data ? 200 : 404;
-    res.end(JSON.stringify({ data }));
+    if (req.method !== 'GET') {
+      let raw = ''; for await (const chunk of req) raw += chunk;
+      const result = serve ? fixtureMutation(req.method, url, JSON.parse(raw || '{}'), serveState) : null;
+      res.statusCode = result?.status ?? 405; res.end(JSON.stringify(result?.payload ?? { error: { code: 'METHOD_NOT_ALLOWED', message: 'Not supported.' } }));
+    } else {
+      const data = fixtureResponse(url, serveState);
+      res.statusCode = data ? 200 : 404; res.end(JSON.stringify({ data }));
+    }
   } else {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.end('<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Admin preview — fictional data</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style></head><body>' + (serve ? '<div style="position:relative;z-index:1;padding:6px 12px;background:#fffbeb;color:#78350f;font:12px system-ui;margin:-2rem -1rem 2rem">LOCAL PREVIEW · Fictional accounts and counts · No live Clerk or database connection</div>' : '') + '<div id="root"></div><script type="module" src="/app.js"></script></body></html>');
@@ -36,6 +43,12 @@ else {
       const url = new URL(route.request().url()); (state.requests ??= []).push({ path: url.pathname, search: url.search, method: route.request().method() });
       if (state.delay && url.pathname.startsWith('/api/admin')) await new Promise(done => setTimeout(done, state.delay));
       const failed = state.fail && url.pathname.startsWith('/api/admin');
+      if (route.request().method() !== 'GET') {
+        (state.bodies ??= []).push({ method: route.request().method(), path: url.pathname, body: route.request().postDataJSON() });
+        const result = state.mutationError ? { status: state.mutationError.status, payload: { error: state.mutationError } } : fixtureMutation(route.request().method(), url, route.request().postDataJSON(), state);
+        await route.fulfill({ status: result?.status ?? 405, contentType: 'application/json', body: JSON.stringify(result?.payload ?? { error: { code: 'METHOD_NOT_ALLOWED', message: 'Not supported.' } }) });
+        return;
+      }
       const data = fixtureResponse(url, state);
       await route.fulfill({ status: failed ? 503 : data ? 200 : 404, contentType: 'application/json', body: JSON.stringify(failed ? { error: { code: 'ADMIN_UNAVAILABLE', message: 'Fixture service unavailable. Please retry.' } } : { data }) });
     });
@@ -44,6 +57,8 @@ else {
   async function check(name, body, width = 1440) {
     const page = await browser.newPage({ viewport: { width, height: 960 } }); const errors = []; page.setDefaultTimeout(10000);
     page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(() => { for (const name of ['alert', 'confirm', 'prompt']) window[name] = () => { throw new Error('window.' + name + ' must not be used'); }; });
+    page.on('dialog', async dialog => { errors.push('Unexpected window dialog: ' + dialog.type() + ' ' + dialog.message()); await dialog.dismiss(); });
     try { await body(page); assert.deepEqual(errors, []); passed++; console.log('PASS ' + name); }
     catch (error) { console.error(name, errors, await page.locator('body').innerText()); throw error; }
     finally { await page.close(); }
@@ -258,9 +273,162 @@ else {
         await page.keyboard.press('Shift+Tab'); assert.ok(await page.evaluate(() => !!document.activeElement?.closest('dialog')));
         await page.keyboard.press('Escape'); assert.equal(await page.getByRole('dialog').isVisible(), false); assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
         const table = page.getByRole('region', { name: 'Application accounts table' }); await table.focus(); await page.keyboard.press('ArrowRight');
-        await page.waitForFunction(() => document.querySelector('.admin-table-scroll').scrollLeft > 0);
+        await page.waitForFunction(() => document.querySelector('[aria-label="Application accounts table"]').scrollLeft > 0);
       }
       if (width === 375 || width === 1280) await page.screenshot({ path: '.wrangler/admin-review/users-' + width + '.png', fullPage: true });
+    }, width);
+    const reasonLabel = 'Reason (recorded in the audit log)';
+    async function openAddPanel(page) {
+      await page.getByRole('heading', { name: 'Add a user', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Add user', exact: true }).click();
+      await page.getByLabel('Email address', { exact: true }).waitFor();
+    }
+    async function submitAdd(page, { email, role, reason = 'Fictional reason for the audit log.', label }) {
+      await page.getByLabel('Email address', { exact: true }).fill(email);
+      for (const checkbox of await page.getByRole('checkbox').all()) if (await checkbox.isChecked()) await checkbox.uncheck();
+      await page.getByRole('checkbox', { name: role, exact: true }).check();
+      await page.getByLabel(reasonLabel).fill(reason);
+      await page.getByRole('button', { name: label, exact: true }).click();
+    }
+    await check('add existing user: client validation, ROLE_NOT_ELIGIBLE, CLERK_USER_NOT_FOUND and success with link to the new account', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users'); await openAddPanel(page);
+      await page.getByRole('button', { name: 'Add user', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'A valid email is required.' }).waitFor();
+      assert.equal((state.bodies ?? []).length, 0);
+      await page.getByLabel('Email address', { exact: true }).fill('someone@utm.my');
+      await page.getByRole('button', { name: 'Add user', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'At least one role is required.' }).waitFor();
+      await submitAdd(page, { email: 'student@graduate.utm.my', role: 'Coordinator', label: 'Add user' });
+      await page.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
+      await submitAdd(page, { email: 'nobody@utm.my', role: 'Coordinator', label: 'Add user' });
+      await page.getByRole('alert').filter({ hasText: 'No matching sign-in account was found.' }).waitFor();
+      await submitAdd(page, { email: '  New.Staff@UTM.my ', role: 'Coordinator', label: 'Add user' });
+      await page.getByRole('status').filter({ hasText: 'Account added for new.staff@utm.my.' }).waitFor();
+      assert.equal(await page.getByRole('alert').count(), 0);
+      assert.equal(await page.getByLabel('Email address', { exact: true }).inputValue(), '');
+      const posted = state.bodies.filter(item => item.method === 'POST' && item.path === '/api/admin/users').at(-1).body;
+      assert.deepEqual(posted, { email: 'new.staff@utm.my', roles: ['COORDINATOR'], reason: 'Fictional reason for the audit log.' });
+      await page.screenshot({ path: '.wrangler/admin-review/users-add-desktop.png', fullPage: true });
+      await page.getByRole('link', { name: /View account/ }).click();
+      await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.ok(page.url().endsWith('/admin/users/24'));
+      await page.getByText('new.staff@utm.my', { exact: true }).first().waitFor();
+    });
+    await check('send invitation: CLERK_USER_EXISTS, success, then revoke with an in-page reason', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users'); await openAddPanel(page);
+      await page.getByRole('radio', { name: 'Send invitation' }).check();
+      await submitAdd(page, { email: 'clerk.only@utm.my', role: 'Coordinator', label: 'Send invitation' });
+      await page.getByRole('alert').filter({ hasText: 'This person already has a sign-in account. Use Add account instead.' }).waitFor();
+      await submitAdd(page, { email: 'invitee@utm.my', role: 'Coordinator', label: 'Send invitation' });
+      await page.getByRole('status').filter({ hasText: 'Invitation sent to invitee@utm.my.' }).waitFor();
+      const table = page.getByRole('region', { name: 'Invitations table' }); await table.getByText('invitee@utm.my', { exact: true }).waitFor();
+      assert.equal(await table.getByRole('row').count(), 4); // header + invitee + the two seeded pending rows
+      await page.screenshot({ path: '.wrangler/admin-review/users-invitations-desktop.png', fullPage: true });
+      // Escape cancels and returns focus to the control that opened the dialog.
+      const opener = page.getByRole('button', { name: 'Revoke invitation for pending.one@utm.my' }); await opener.click();
+      const dialog = page.getByRole('dialog', { name: 'Revoke invitation' }); await dialog.waitFor();
+      assert.equal(await dialog.getByLabel(reasonLabel).evaluate(element => element === document.activeElement), true);
+      assert.equal(await dialog.getByRole('button', { name: 'Revoke invitation' }).isDisabled(), true);
+      assert.ok((await dialog.innerText()).includes('0 / 500'));
+      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+      assert.equal(await opener.evaluate(element => element === document.activeElement), true);
+      assert.equal(state.bodies.filter(item => item.method === 'DELETE').length, 0);
+      await opener.click(); await dialog.getByLabel(reasonLabel).fill('Fictional: sent to the wrong address.');
+      await dialog.getByRole('button', { name: 'Revoke invitation' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Invitation for pending.one@utm.my revoked.' }).waitFor();
+      await table.getByText('pending.one@utm.my', { exact: true }).waitFor({ state: 'detached' });
+      assert.deepEqual(state.bodies.find(item => item.method === 'DELETE').body, { reason: 'Fictional: sent to the wrong address.' });
+      await page.getByLabel('Invitation status', { exact: true }).selectOption('REVOKED');
+      await table.getByText('pending.one@utm.my', { exact: true }).waitFor();
+    });
+    await check('account actions: grant, error, remove with reason, LAST_ROLE, suspend, reactivate and no window dialogs', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/4'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.locator('.admin-memberships article').count(), 1);
+      const add = page.getByLabel('Role to add', { exact: true });
+      assert.equal(await page.getByRole('button', { name: 'Add role', exact: true }).isDisabled(), true);
+      assert.deepEqual(await add.locator('option').allInnerTexts(), ['Choose a role', 'Coordinator', 'System Admin']); // roles already held are not offered
+      await add.selectOption('SYSTEM_ADMIN'); await page.getByRole('button', { name: 'Add role', exact: true }).click();
+      const dialog = page.getByRole('dialog'); await dialog.getByRole('heading', { name: 'Add System Admin role' }).waitFor();
+      await dialog.getByLabel(reasonLabel).fill('Fictional: needs administrator access.'); await dialog.getByRole('button', { name: 'Add role' }).click();
+      await dialog.getByRole('alert').filter({ hasText: 'not eligible' }).waitFor();
+      assert.equal(await dialog.isVisible(), true);
+      await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await add.selectOption('COORDINATOR'); await page.getByRole('button', { name: 'Add role', exact: true }).click();
+      await dialog.getByLabel(reasonLabel).fill('x'.repeat(501));
+      assert.ok((await dialog.innerText()).includes('501 / 500')); assert.equal(await dialog.getByRole('button', { name: 'Add role' }).isDisabled(), true);
+      await page.screenshot({ path: '.wrangler/admin-review/account-dialog-desktop.png', fullPage: true });
+      await dialog.getByLabel(reasonLabel).fill('Fictional: coordinates the programme.'); await dialog.getByRole('button', { name: 'Add role' }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Coordinator role added.' }).waitFor();
+      assert.equal(await page.locator('.admin-memberships article').count(), 2);
+      await page.getByRole('table').getByText('Role granted · Coordinator').first().waitFor(); // audit list refreshed
+      assert.deepEqual(state.bodies.filter(item => item.method === 'POST').at(-1).body, { role: 'COORDINATOR', reason: 'Fictional: coordinates the programme.' });
+      await page.screenshot({ path: '.wrangler/admin-review/account-controls-desktop.png', fullPage: true });
+      // Remove a role (reason required), guarded against double submit.
+      await page.getByRole('button', { name: 'Remove role Coordinator' }).click();
+      await dialog.getByRole('heading', { name: 'Remove Coordinator role' }).waitFor();
+      await dialog.getByLabel(reasonLabel).fill('Fictional: no longer coordinating.'); state.delay = 300;
+      await dialog.getByRole('button', { name: 'Remove role' }).dblclick(); await dialog.waitFor({ state: 'hidden' }); state.delay = 0;
+      await page.getByRole('status').filter({ hasText: 'Coordinator role removed.' }).waitFor();
+      assert.equal(state.bodies.filter(item => item.method === 'DELETE').length, 1);
+      assert.equal(await page.locator('.admin-memberships article').count(), 1);
+      // The server's LAST_ROLE message is shown inline.
+      await page.getByRole('button', { name: 'Remove role Student' }).click();
+      await dialog.getByLabel(reasonLabel).fill('Fictional: attempt to remove the last role.'); await dialog.getByRole('button', { name: 'Remove role' }).click();
+      await dialog.getByRole('alert').filter({ hasText: 'An account must keep at least one role. Suspend the account instead of removing its last role.' }).waitFor();
+      await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'hidden' });
+      assert.equal(await page.locator('.admin-memberships article').count(), 1);
+      // Suspend then reactivate.
+      await page.getByRole('button', { name: 'Suspend account', exact: true }).click();
+      await dialog.getByLabel(reasonLabel).fill('Fictional: investigation.'); await dialog.getByRole('button', { name: 'Suspend account' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Account suspended.' }).waitFor();
+      assert.equal(await page.locator('.admin-account-heading .admin-status-suspended').count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Suspend account', exact: true }).count(), 0);
+      await page.getByRole('button', { name: 'Reactivate account', exact: true }).click();
+      await dialog.getByLabel(reasonLabel).fill('Fictional: cleared.'); await dialog.getByRole('button', { name: 'Reactivate account' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Account reactivated.' }).waitFor();
+      assert.equal(await page.locator('.admin-account-heading .admin-status-active').count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Reactivate account', exact: true }).count(), 0);
+      await page.getByRole('table').getByText('Access status changed').first().waitFor();
+      assert.ok(state.bodies.every(item => !('status' in item.body) || ['SUSPENDED', 'ACTIVE'].includes(item.body.status)));
+    });
+    await check('protected owner is locked and self-lockout controls are hidden', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/1'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Remove role System Admin' }).count(), 0);
+      assert.equal(await page.getByText('Locked. The protected owner role cannot be changed.').count(), 1);
+      assert.equal(await page.getByRole('button', { name: /Suspend account|Reactivate account/ }).count(), 0);
+      assert.equal(await page.getByText('Locked. The protected owner account cannot be suspended.').count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Remove role Student' }).count(), 1);
+      fixtureResponse(new URL(base + '/api/admin/users'), state); state.store.accounts[1].roles.push('SYSTEM_ADMIN');
+      state.clerkUserId = 'user_fictional_2';
+      await page.goto(base + '/admin/users/2?test-user=user_fictional_2'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Remove role System Admin' }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Remove role Coordinator' }).count(), 1);
+      assert.equal(await page.getByText('You cannot remove your own System Admin role.').count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Suspend account', exact: true }).count(), 0);
+      assert.equal(await page.getByText('You cannot suspend your own account.').count(), 1);
+      // Another account is not self: both controls are offered.
+      state.clerkUserId = 'user_someone_else';
+      await page.goto(base + '/admin/users/2?test-user=user_someone_else'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Remove role System Admin' }).count(), 1);
+      assert.equal(await page.getByRole('button', { name: 'Suspend account', exact: true }).count(), 1);
+    });
+    for (const width of [320, 375, 768]) await check('user management has no horizontal overflow and keeps dialog on screen at ' + width, async page => {
+      const state = await mock(page); await page.setViewportSize({ width, height: 844 });
+      await page.goto(base + '/admin/users'); await openAddPanel(page);
+      await page.getByRole('region', { name: 'Invitations table' }).waitFor();
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/users-add-mobile.png', fullPage: true });
+      await page.getByRole('button', { name: 'Revoke invitation for pending.one@utm.my' }).click();
+      const dialog = page.getByRole('dialog'); await dialog.waitFor();
+      const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 844);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/users-dialog-mobile.png' });
+      await page.keyboard.press('Escape');
+      await page.goto(base + '/admin/users/4'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/account-mobile.png', fullPage: true });
+      assert.ok(state.requests.length > 0);
     }, width);
     console.log('PASS ' + passed + ' administration browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }

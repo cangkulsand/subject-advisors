@@ -13,8 +13,11 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
     auth: { verify: vi.fn(async () => ({ clerkUserId: 'user_fixture', sessionId: 'session_test', primaryEmail: { address: 'fixture@graduate.utm.my', verified: true } })),
       access: { find: vi.fn(async () => ({ ...account, appRole: roles[0]! })), initializeStudent: vi.fn() }, profiles: { stateFor: vi.fn(async () => 'SETUP_REQUIRED' as const) } },
     repository: { overview: vi.fn(async () => ({ generatedAt: date, accounts: { total: 1, active: 1, suspended: 0 }, roles: { STUDENT: 0, COORDINATOR: 0, SYSTEM_ADMIN: 1 }, configuration: { programmes: 1, curricula: 1, subjects: 4, semesters: 3 } })),
-      accounts: vi.fn(async () => ({ ...page, items: [account] })), account: vi.fn(async () => ({ ...account, memberships: [] })), audit: vi.fn(async () => page) },
-    identities: { search: vi.fn(async () => ({ ids: ['user_fixture'], total: 1 })), lookup: vi.fn(async () => new Map([['user_fixture', { state: 'available' as const, name: 'Fictional Account', email: 'fixture@graduate.utm.my', emailVerified: true }]])) },
+      accounts: vi.fn(async () => ({ ...page, items: [account] })), account: vi.fn(async () => ({ ...account, memberships: [] })), audit: vi.fn(async () => page),
+      createAccount: vi.fn(), grantRole: vi.fn(), revokeRole: vi.fn(), setAccessStatus: vi.fn(), createInvitation: vi.fn(), attachClerkInvitation: vi.fn(),
+      listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn() },
+    identities: { search: vi.fn(async () => ({ ids: ['user_fixture'], total: 1 })), lookup: vi.fn(async () => new Map([['user_fixture', { state: 'available' as const, name: 'Fictional Account', email: 'fixture@graduate.utm.my', emailVerified: true }]])),
+      findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn() },
   };
   return deps;
 }
@@ -39,7 +42,7 @@ describe('read-only administration authorization and privacy', () => {
     const body = await response!.text(); expect(body).not.toContain('user_fixture'); expect(body).not.toContain('Private account context'); expect(body).toContain('recentEvents');
   });
   it.each(['POST', 'PUT', 'DELETE', 'PATCH'])('rejects %s before data reads', async method => {
-    const deps = fixture(); const response = await handleAdminRequest(request('/api/admin/users', method), deps);
+    const deps = fixture(); const response = await handleAdminRequest(request('/api/admin/overview', method), deps);
     expect(response?.status).toBe(405); expect(response?.headers.get('Allow')).toBe('GET'); expect(deps.repository.accounts).not.toHaveBeenCalled();
   });
   it.each(['/api/admin/users?status=bogus', '/api/admin/users?role=OWNER', '/api/admin/users?page=0', '/api/admin/users?q=a&q=b', '/api/admin/users?ownerId=1', '/api/admin/audit?from=2026-02-30', '/api/admin/audit?from=0000-01-01', '/api/admin/audit?from=2026-10-29&to=2026-10-28', '/api/admin/users/2147483648'])('validates query %s', async path => {

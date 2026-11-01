@@ -32,6 +32,11 @@
       "version": "0005",
       "file": "0005_network_security_reference_support.sql",
       "description": "Add nullable curriculum-specific display/prerequisite metadata and private reference-import receipts"
+    },
+    {
+      "version": "0006",
+      "file": "0006_admin_user_management.sql",
+      "description": "Audit access-status changes and add the pending admin user invitation table"
     }
   ],
   "historicalExcluded": [

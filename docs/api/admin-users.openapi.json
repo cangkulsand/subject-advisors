@@ -1,0 +1,1448 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Subject Advisors admin user management API",
+    "version": "1.0.0",
+    "description": "SYSTEM_ADMIN-only mutations for application accounts, roles, access status and invitations (S2-P004-004). Every route requires a Clerk bearer token and an active SYSTEM_ADMIN with an eligible verified email. The acting administrator is always taken from the verified session, never from the body. Mutation bodies must be application/json, at most 16 KB, and must contain no unknown fields. All responses are Cache-Control: no-store. Delete means suspend: there is no hard delete. Existing read routes (GET /api/admin/overview, /users, /users/{id}, /audit) are unchanged; an unsupported method on a known path returns 405 with an Allow header."
+  },
+  "servers": [
+    {
+      "url": "https://subject-advisors.example"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/admin/users": {
+      "post": {
+        "operationId": "createAdminAccount",
+        "summary": "Add an application account for an existing Clerk user",
+        "description": "Looks the user up by exact primary email. The email must be verified and eligible for every requested role (STUDENT: verified @graduate.utm.my; COORDINATOR and SYSTEM_ADMIN: verified @utm.my). reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              },
+              "example": {
+                "email": "ali@utm.my",
+                "roles": [
+                  "COORDINATOR"
+                ],
+                "reason": "Appointed programme coordinator"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetailEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No matching Clerk user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "CLERK_USER_NOT_FOUND",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: ACCOUNT_EXISTS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Email unverified or not eligible for a requested role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_NOT_ELIGIBLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/roles": {
+      "post": {
+        "operationId": "grantAdminRole",
+        "summary": "Grant a role to an account",
+        "description": "Eligibility is re-checked against the target current verified Clerk email. Suspended accounts may receive roles. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRoleRequest"
+              },
+              "example": {
+                "role": "COORDINATOR",
+                "reason": "Covering for leave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetailEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business rule violation. Stable codes: NOT_FOUND, CLERK_USER_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: ROLE_ALREADY_ASSIGNED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Target email is not eligible for the role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_NOT_ELIGIBLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/roles/{role}": {
+      "delete": {
+        "operationId": "revokeAdminRole",
+        "summary": "Revoke a role from an account",
+        "description": "The request body carries the reason. An account must keep at least one role: suspend instead of removing the last one. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Role"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              },
+              "example": {
+                "reason": "Left the programme"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetailEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business rule violation. Stable codes: NOT_FOUND, ROLE_NOT_ASSIGNED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: SELF_LOCKOUT, LAST_ACTIVE_ADMIN, PROTECTED_OWNER, LAST_ROLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/access": {
+      "patch": {
+        "operationId": "changeAdminAccess",
+        "summary": "Suspend or reactivate an account",
+        "description": "Suspension is the only way to remove an account access. An administrator cannot suspend themselves, the protected owner cannot be suspended, and the last active SYSTEM_ADMIN cannot be suspended. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAccessRequest"
+              },
+              "example": {
+                "status": "SUSPENDED",
+                "reason": "Misconduct report 2026-11"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetailEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business rule violation. Stable codes: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: SELF_LOCKOUT, LAST_ACTIVE_ADMIN, PROTECTED_OWNER",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/invitations": {
+      "get": {
+        "operationId": "listAdminInvitations",
+        "summary": "List invitations (20 per page, newest first)",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InvitationStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation page. Lapsed pending rows read as EXPIRED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPageEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported, duplicate or invalid query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_ADMIN_QUERY",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAdminInvitation",
+        "summary": "Invite someone who has not signed up yet",
+        "description": "Roles must be eligible for the invited email domain. Order: database row (PENDING, expires in 7 days), then the Clerk email invitation (expiresInDays 7), then the Clerk reference is attached. If Clerk fails the row is revoked and 503 INVITATION_DELIVERY_FAILED is returned. If the email already belongs to a Clerk user with an application account the result is 409 ACCOUNT_EXISTS; if it belongs to a Clerk user without an application account the result is 409 CLERK_USER_EXISTS (use POST /api/admin/users instead). At first sign-in (POST /api/me/initialize) the invitation is redeemed only if the VERIFIED primary email equals the invited email and the roles are still eligible for it; otherwise normal student self-registration applies. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationRequest"
+              },
+              "example": {
+                "email": "new.staff@utm.my",
+                "roles": [
+                  "COORDINATOR"
+                ],
+                "reason": "New coordinator for 2026/27"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation created and emailed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: ACCOUNT_EXISTS, CLERK_USER_EXISTS, INVITATION_EXISTS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Roles not eligible for the invited email domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_NOT_ELIGIBLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "INVITATION_DELIVERY_FAILED (Clerk could not send the email) or ADMIN_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVITATION_DELIVERY_FAILED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/invitations/{id}": {
+      "delete": {
+        "operationId": "revokeAdminInvitation",
+        "summary": "Revoke a pending invitation",
+        "description": "Marks the database row REVOKED (it can then never be redeemed) and, best effort, revokes the Clerk invitation. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              },
+              "example": {
+                "reason": "Sent to the wrong person"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked invitation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "SESSION_INVALID",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ROLE_DENIED",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Business rule violation. Stable codes: NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule violation. Stable codes: INVITATION_NOT_PENDING, INVITATION_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "UNSUPPORTED_MEDIA_TYPE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or identity provider unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "error": {
+                    "code": "ADMIN_UNAVAILABLE",
+                    "message": "See the error code catalogue."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Role": {
+        "type": "string",
+        "enum": [
+          "STUDENT",
+          "COORDINATOR",
+          "SYSTEM_ADMIN"
+        ]
+      },
+      "InvitationStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "ACCEPTED",
+          "REVOKED",
+          "EXPIRED"
+        ]
+      },
+      "Reason": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500,
+        "description": "Trimmed before validation; stored in the audit log."
+      },
+      "Email": {
+        "type": "string",
+        "maxLength": 254,
+        "description": "Trimmed and lower-cased."
+      },
+      "Roles": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 3,
+        "uniqueItems": true,
+        "items": {
+          "$ref": "#/components/schemas/Role"
+        }
+      },
+      "ReasonRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "CreateAccountRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "roles",
+          "reason"
+        ],
+        "properties": {
+          "email": {
+            "$ref": "#/components/schemas/Email"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/Roles"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "CreateInvitationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "roles",
+          "reason"
+        ],
+        "properties": {
+          "email": {
+            "$ref": "#/components/schemas/Email"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/Roles"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "GrantRoleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "reason"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "ChangeAccessRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "Identity": {
+        "type": "object",
+        "required": [
+          "state",
+          "name",
+          "email",
+          "emailVerified"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "not_found",
+              "unavailable"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emailVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Membership": {
+        "type": "object",
+        "required": [
+          "role",
+          "emailPolicy",
+          "source",
+          "protectedOwner",
+          "reason",
+          "grantedAt"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "emailPolicy": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "protectedOwner": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountDetail": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "clerkUserId",
+          "roles",
+          "accessStatus",
+          "protectedOwner",
+          "createdAt",
+          "updatedAt",
+          "identity",
+          "memberships"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "integer"
+          },
+          "clerkUserId": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          "accessStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "protectedOwner": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Membership"
+            }
+          }
+        }
+      },
+      "AccountDetailEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AccountDetail"
+          }
+        }
+      },
+      "Invitation": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "roles",
+          "status",
+          "invitedBy",
+          "reason",
+          "createdAt",
+          "expiresAt",
+          "acceptedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/Roles"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvitationStatus"
+          },
+          "invitedBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "InvitationEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Invitation"
+          }
+        }
+      },
+      "InvitationPageEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "items",
+              "total",
+              "page",
+              "pageSize",
+              "generatedAt"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Invitation"
+                }
+              },
+              "total": {
+                "type": "integer"
+              },
+              "page": {
+                "type": "integer"
+              },
+              "pageSize": {
+                "type": "integer",
+                "const": 20
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string",
+                "description": "Fixed safe text; never SQL, provider or credential details."
+              }
+            }
+          }
+        }
+      },
+      "ErrorCode": {
+        "type": "string",
+        "description": "Stable error codes.",
+        "enum": [
+          "SESSION_INVALID",
+          "ROLE_DENIED",
+          "EMAIL_DOMAIN_DENIED",
+          "ACCOUNT_SUSPENDED",
+          "INVALID_REQUEST",
+          "INVALID_JSON",
+          "BODY_TOO_LARGE",
+          "UNSUPPORTED_MEDIA_TYPE",
+          "INVALID_ADMIN_QUERY",
+          "METHOD_NOT_ALLOWED",
+          "ADMIN_ROUTE_NOT_FOUND",
+          "ADMIN_UNAVAILABLE",
+          "ROLE_ALREADY_ASSIGNED",
+          "LAST_ACTIVE_ADMIN",
+          "PROTECTED_OWNER",
+          "SELF_LOCKOUT",
+          "ROLE_NOT_ELIGIBLE",
+          "ACCOUNT_EXISTS",
+          "CLERK_USER_EXISTS",
+          "CLERK_USER_NOT_FOUND",
+          "INVITATION_EXISTS",
+          "LAST_ROLE",
+          "INVITATION_DELIVERY_FAILED",
+          "NOT_FOUND",
+          "ROLE_NOT_ASSIGNED",
+          "INVITATION_NOT_PENDING",
+          "INVITATION_EXPIRED",
+          "CONFLICT",
+          "MUTATION_FAILED"
+        ]
+      }
+    }
+  }
+}

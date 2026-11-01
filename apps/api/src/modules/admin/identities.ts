@@ -24,5 +24,26 @@ export function createAdminIdentities(secretKey: string): AdminIdentities {
       }
       return result;
     },
+    async findByEmail(email) {
+      const wanted = email.trim().toLowerCase();
+      const response = await clerk.users.getUserList({ emailAddress: [wanted], limit: 10 });
+      // Only an exact PRIMARY email match counts; a secondary address must not select an account.
+      const matches = response.data.flatMap(user => {
+        const primary = user.emailAddresses.find(item => item.id === user.primaryEmailAddressId);
+        return primary && primary.emailAddress.toLowerCase() === wanted
+          ? [{ clerkUserId: user.id, verifiedEmail: primary.emailAddress.toLowerCase(), emailVerified: primary.verification?.status === 'verified' }] : [];
+      });
+      // Ambiguity is treated as not found rather than guessing which account an administrator meant.
+      return matches.length === 1 ? matches[0]! : null;
+    },
+    async createInvitation(email, redirectUrl, expiresInDays) {
+      // No publicMetadata: roles live only in the application database and are re-checked at redemption.
+      const invitation = await clerk.invitations.createInvitation({ emailAddress: email.trim().toLowerCase(), ignoreExisting: false, notify: true,
+        ...(redirectUrl ? { redirectUrl } : {}), ...(expiresInDays ? { expiresInDays } : {}) });
+      return { clerkInvitationId: invitation.id };
+    },
+    async revokeInvitation(clerkInvitationId) {
+      await clerk.invitations.revokeInvitation(clerkInvitationId);
+    },
   };
 }

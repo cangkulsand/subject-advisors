@@ -25,7 +25,7 @@ function Workspace() {
   const title = pathname === '/admin/users' ? 'Users & Access' : detail ? 'Account details' : pathname === '/admin/audit' ? 'Audit Log' : planned?.title ?? (pathname === '/admin' ? 'Overview' : 'Page not found');
   const key = [userId, sessionId, pathname, location.search].join('|');
   return <AdminShell path={pathname} title={title}><div key={key}>
-    {pathname === '/admin' ? <AdminOverviewPage client={client}/> : pathname === '/admin/users' ? <AdminUsersPage client={client} search={location.search}/> : detail && Number(detail[1]) <= 2147483647 ? <AdminAccountPage client={client} accountId={Number(detail[1])}/> : pathname === '/admin/audit' ? <AdminAuditPage client={client}/> : planned ? <StaffPlannedPage {...planned}/> : <section className="admin-card"><h1>Page not found</h1><p>Choose a page from the administration menu.</p></section>}
+    {pathname === '/admin' ? <AdminOverviewPage client={client}/> : pathname === '/admin/users' ? <AdminUsersPage client={client} search={location.search}/> : detail && Number(detail[1]) <= 2147483647 ? <AdminAccountPage client={client} accountId={Number(detail[1])} viewerClerkUserId={userId}/> : pathname === '/admin/audit' ? <AdminAuditPage client={client}/> : planned ? <StaffPlannedPage {...planned}/> : <section className="admin-card"><h1>Page not found</h1><p>Choose a page from the administration menu.</p></section>}
   </div></AdminShell>;
 }
 export function AdminRoutes() { return <AuthGate roles={['SYSTEM_ADMIN']}><Workspace/></AuthGate>; }
