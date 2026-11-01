@@ -1,0 +1,34 @@
+P001 SPRINT 2 — UC05 AND UC06 ONLY
+
+UC05: own academic progress, accumulated/remaining credits, exemption recognition,
+retake-safe credit counting, outstanding subjects and read-only requirement progress.
+UC06: administrator subject/catalogue mapping, prerequisite/co-requisite/advisory
+relationships, cycle validation and explicit per-subject semester rules.
+
+This is an additive overlay for the supplied shared project WITH P001 Sprint 1 installed.
+Extract the ZIP first, then merge its contents into the existing project root.
+Do not replace entire apps/docs/tools folders. No shared-file replacements, package
+manifest changes, migrations, credentials or other owners' feature files are included.
+
+Before copying, optional read-only collision check:
+  node <extracted-folder>/tools/p001-sprint2/verify-handoff.mjs --project <project-folder> --preflight
+
+After copying, from the existing project root:
+  npm.cmd ci
+  node tools/p001-sprint2/verify-handoff.mjs
+  node tools/p001-sprint2/check.mjs
+  node tools/p001-sprint2/dev.mjs
+
+Open http://127.0.0.1:5173/student/progress as a STUDENT with completed profile setup.
+Open http://127.0.0.1:5173/admin/curriculum as an existing active SYSTEM_ADMIN.
+Reuse the private team Clerk/Neon settings. Stop another preview using ports 5173/8787.
+Use THIS Sprint 2 launcher: the unchanged npm run dev starts the older shared app.
+The dedicated launcher preserves existing profile/record functions and provides the
+two new routes without overwriting the shared application. Shared-router integration
+instructions are in docs/p001-sprint2-handoff.md.
+
+UC07 graduation-configuration editors and semester-load settings are not included.
+No production deployment, live database update, commit or push was performed.
+Real Clerk/Neon account acceptance and independent peer review remain pending.
+
+See docs/p001-sprint2-handoff.md for contracts, assumptions, checks and rollback.

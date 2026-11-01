@@ -1,0 +1,232 @@
+{
+  "checks": {
+    "isolatedPostgresPassed": 16,
+    "unitSkipped": 5,
+    "browserPassed": 22,
+    "liveNeon": "NOT RUN",
+    "unitPassed": 153
+  },
+  "useCases": [
+    "UC05",
+    "UC06"
+  ],
+  "baselineFiles": [
+    {
+      "sha256": "a5d7a3382725d0eae7b6cbd349fcfbf1a7b46f02fbfdecffb449a24790524f2b",
+      "path": "package.json"
+    },
+    {
+      "sha256": "6c07ea54ce3369c8b5332d59f527ea5ccafe6fb523a36997239d88b17a3745ea",
+      "path": "package-lock.json"
+    },
+    {
+      "sha256": "fd46667883f9dba7551bcb52d6a3d1ba30b6d8ffa108d5e8067a3e3efec37005",
+      "path": "tsconfig.auth.json"
+    },
+    {
+      "sha256": "c2633288590f35565f629e1ba0c1b24cec5af89d3af72c765f0d3403f5cf092c",
+      "path": "vitest.auth.config.ts"
+    },
+    {
+      "sha256": "314f3293cde6ebd9d510319e63dd54e4d09a77fc9d6e2111cfa1db0cd851c37b",
+      "path": "apps/api/src/modules/auth/index.ts"
+    },
+    {
+      "sha256": "709241ddf011a11443e5b74414f31d90c8d6c18861d1a1381ac91b7698ae2860",
+      "path": "apps/api/src/middleware/auth.ts"
+    },
+    {
+      "sha256": "8b579b8d1d31742f8ae05fee79c343a6db764977318e1133c834ad518db40f81",
+      "path": "apps/api/src/modules/profile/index.ts"
+    },
+    {
+      "sha256": "a057b53383742a8e607a62028e60f5055c6106909b1d08e172182989d205f380",
+      "path": "apps/api/src/modules/profile/validation.ts"
+    },
+    {
+      "sha256": "cfc4ee95123900d7540b0f896fc78719f1e98226ac8bac4e37f7610775570ad5",
+      "path": "apps/api/src/modules/profile/contracts.ts"
+    },
+    {
+      "sha256": "3e94da4613e7a197a5861397475077bb2fcb5adf8a4525576da737717edb77d3",
+      "path": "apps/api/src/modules/records/contracts.ts"
+    },
+    {
+      "sha256": "f0c546ca9f0facb803dcc5212a8aad7397dc3290c75591f8902984077d2a8ccd",
+      "path": "apps/api/src/integration/router.ts"
+    },
+    {
+      "sha256": "9680604bfa5ae168e9b4117595b7222fa7c359e15e4c86dfba0212ff0fe56a32",
+      "path": "apps/web/src/features/auth/index.ts"
+    },
+    {
+      "sha256": "acc30c77d164874e05abc8d46651dcb4d946590ba63b8a03609f6a3e28a7e0f4",
+      "path": "apps/web/src/features/profile/ProfilePage.tsx"
+    },
+    {
+      "sha256": "7bd2f559f5ca450480b8fb224531ae2a0a11065678545474b06e440a03abc7dd",
+      "path": "apps/web/src/features/profile/client.ts"
+    },
+    {
+      "sha256": "d1768ac797715b30058d20c0d1e34919d04120f12114c87ec6577f1c8de46cac",
+      "path": "apps/web/src/features/records/RecordsPage.tsx"
+    },
+    {
+      "sha256": "2715b11803beba3e9265858907dbf0afbad4288b84a41e9a70271c7d4d23e0af",
+      "path": "tools/integration/prepare.mjs"
+    },
+    {
+      "sha256": "dc6ec0153a7a7b10608c61378ed58b4ca5ca1e8d361357fd1c8e5fdd2798d78d",
+      "path": "db/migrations/0001_initial_schema.sql"
+    }
+  ],
+  "files": [
+    {
+      "sha256": "6a134e9102a0a66b86ccaaab0ace0dfb27719756243b5c71f04cb211e80d9068",
+      "path": "apps/api/src/modules/p001-sprint2/contracts.ts"
+    },
+    {
+      "sha256": "f19d16a7953b93f58404aacb7359df3927b10072a41385405704408790cde0fb",
+      "path": "apps/api/src/modules/p001-sprint2/index.ts"
+    },
+    {
+      "sha256": "30198dfbd273bcf3a60d13c6ad580963873aecafa614d9d1e38cb696ed0e73a4",
+      "path": "apps/api/src/modules/p001-sprint2/progress.ts"
+    },
+    {
+      "sha256": "263b9d285fb2dbdb508c778b0a63b1f56594b6e855747f5a239d4b6126b38b6d",
+      "path": "apps/api/src/modules/p001-sprint2/repository.ts"
+    },
+    {
+      "sha256": "af803dd28ac86bc8ef42caf4da7bc95d5d8e0770064a5658097ee445b1d1a363",
+      "path": "apps/api/src/modules/p001-sprint2/routes.ts"
+    },
+    {
+      "sha256": "bbd5310a6eb127275c523b191d9005de80461627eafaf2702f53f5eade7f8612",
+      "path": "apps/api/src/modules/p001-sprint2/sprint2.test.ts"
+    },
+    {
+      "sha256": "a040453affa7a5fe3a0c4ee2315714d8592bd8db508052ba42fdfec1c8d02d8f",
+      "path": "apps/api/src/modules/p001-sprint2/validation.ts"
+    },
+    {
+      "sha256": "22fd4330f5cc029c38f3b0bbbaa2429a39d8df063b4205a44ba87778ed9bc6b7",
+      "path": "apps/web/src/features/p001-sprint2/client.ts"
+    },
+    {
+      "sha256": "f1295abde0932ec1894f7b5531dd4050edfe2a266061feb16b2ac277d3258975",
+      "path": "apps/web/src/features/p001-sprint2/CurriculumPage.tsx"
+    },
+    {
+      "sha256": "8ac66a9480f0434c085264b9495c652fad2ca8e0c323bb6933dc3a4a5cf2425a",
+      "path": "apps/web/src/features/p001-sprint2/ProgressPage.tsx"
+    },
+    {
+      "sha256": "b734846dab71f9b9ce24292ec4e54320fda834ad0de5de0daa457783fd58fe24",
+      "path": "apps/web/src/features/p001-sprint2/sprint2.css"
+    },
+    {
+      "sha256": "1551ea3f1b7052f4fc0e6d7198bac8f4fff0b786e1ddbef5354cb88d50f6ec3a",
+      "path": "apps/web/src/features/p001-sprint2/Sprint2Routes.tsx"
+    },
+    {
+      "sha256": "f2443bb348ae7dd62a75de163d67b4ea1b0773306d2037313f78d6dbcc18b1d7",
+      "path": "docs/changes/S2-P001-001-progress-curriculum.md"
+    },
+    {
+      "sha256": "9de59873738a1322a5d29113acfb490e36ce857eb676ddeffd674a82e3a04eb9",
+      "path": "docs/p001-sprint2-handoff.md"
+    },
+    {
+      "sha256": "0bc386c4ca4164b6555ed0aeb72e72f5b16c059ee442d676d4cf90ec87b735e9",
+      "path": "docs/p001-sprint2-review/curriculum-1440.png"
+    },
+    {
+      "sha256": "ea959401e9ac1cbbf7433970e423c961b620c6b991d03c8774bfc8dd1d206895",
+      "path": "docs/p001-sprint2-review/curriculum-390.png"
+    },
+    {
+      "sha256": "08c4d6760fba07cf1bce235f127008721b845da2cf153205edb10b800bd9e6e5",
+      "path": "docs/p001-sprint2-review/progress-1440.png"
+    },
+    {
+      "sha256": "465b90c233dc1d040a39c04cd5630990100b962a504b1f765f864e0b4b730131",
+      "path": "docs/p001-sprint2-review/progress-390.png"
+    },
+    {
+      "sha256": "1362c0d0c6b3e548053f128a1c5ed9784b8ce3e3924397a6b3018dadccb70193",
+      "path": "P001-SPRINT2-HANDOFF.txt"
+    },
+    {
+      "sha256": "221ab3f28c9d84e88e8b949ca737fa651e798d41c73b1131d2fe2b15aabc3eec",
+      "path": "tools/p001-sprint2/check.mjs"
+    },
+    {
+      "sha256": "c8c7b0457f572950961a41e1d87feea048178e262b6bef3565dc7ea7c3fee2f8",
+      "path": "tools/p001-sprint2/dev.mjs"
+    },
+    {
+      "sha256": "93c315cbe83f2f287cc696ede3217771187eacfc9680702842e7dbc6837baa03",
+      "path": "tools/p001-sprint2/local/api.ts"
+    },
+    {
+      "sha256": "d48a5443d923365d5316996ee9a91d5c1d5ad64fadd5884e7e898b123afccc35",
+      "path": "tools/p001-sprint2/local/index.html"
+    },
+    {
+      "sha256": "06771b187a64017b56781f47a2828f1dfe7c1fb0bcccecde81d81a88265a5dcf",
+      "path": "tools/p001-sprint2/local/main.tsx"
+    },
+    {
+      "sha256": "c5adf8af98b6e7e05f849e0b8679a570133ced4932831593e4a09f0905ddb2e5",
+      "path": "tools/p001-sprint2/test-db.mjs"
+    },
+    {
+      "sha256": "aae3b5ac3935eba5f3f9cb08ae3ad70d7421926e8a4f970ddb11a0d91f1f4cd0",
+      "path": "tools/p001-sprint2/test-ui.mjs"
+    },
+    {
+      "sha256": "bd7fe4fc0461dfaf22729348e03db266f7c048e99f05b7affa6946342824e973",
+      "path": "tools/p001-sprint2/testing/main.tsx"
+    },
+    {
+      "sha256": "bbe8921ed6837a64f0c234f0c5b9f0d14af50451fcf3ebd4197568846112dc78",
+      "path": "tools/p001-sprint2/verify-handoff.mjs"
+    },
+    {
+      "sha256": "bb7f09f6e3110d7fb4f8ca57d1cac03781e3dbe643aaa11c00f3ed26bd4941c1",
+      "path": "tsconfig.p001-sprint2.json"
+    },
+    {
+      "sha256": "e63ce193984c8e2fc82cf1cfaffe7a9b41ee1da64fc1f8dd89a4da49b9bae208",
+      "path": "vite.p001-sprint2.config.ts"
+    },
+    {
+      "sha256": "12099047e716ac4941f7b3d9338b69e4fbe296c0cbf4b1ef6b7a19f354e9b899",
+      "path": "wrangler.p001-sprint2.jsonc"
+    }
+  ],
+  "requiredBaseFiles": [
+    "package.json",
+    "package-lock.json",
+    "tsconfig.auth.json",
+    "vitest.auth.config.ts",
+    "apps/api/src/modules/auth/index.ts",
+    "apps/api/src/middleware/auth.ts",
+    "apps/api/src/modules/profile/index.ts",
+    "apps/api/src/modules/profile/validation.ts",
+    "apps/api/src/modules/profile/contracts.ts",
+    "apps/api/src/modules/records/contracts.ts",
+    "apps/api/src/integration/router.ts",
+    "apps/web/src/features/auth/index.ts",
+    "apps/web/src/features/profile/ProfilePage.tsx",
+    "apps/web/src/features/profile/client.ts",
+    "apps/web/src/features/records/RecordsPage.tsx",
+    "tools/integration/prepare.mjs",
+    "db/migrations/0001_initial_schema.sql"
+  ],
+  "requires": "Supplied shared main plus P001 Sprint 1",
+  "additiveOnly": true,
+  "package": "P001-Sprint2",
+  "date": "2026-10-31"
+}
