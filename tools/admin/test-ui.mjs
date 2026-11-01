@@ -97,7 +97,7 @@ else {
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
     });
-    await check('coordinator quick links open two frontend previews and five planned routes use only account access', async page => {
+    await check('coordinator quick links: five planned routes use only account access', async page => {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const destinations = [
@@ -109,21 +109,7 @@ else {
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Coordinator navigation' });
-      for (const [label, title] of destinations.slice(0, 1).concat([destinations[2]])) {
-        await navigation.getByRole('link', { name: label, exact: true }).click();
-        await page.getByRole('heading', { name: title, exact: true }).waitFor();
-        await page.getByText('A selected CSV stays local and is not parsed or sent.', { exact: false }).waitFor();
-        await page.getByRole('button', { name: 'Load demo cohort' }).waitFor();
-        assert.equal(await page.locator('form').count(), 1);
-        assert.equal(await page.getByRole('heading', { name: 'Forecast preview' }).count(), 0);
-        if (label === 'Class Offering Forecast') {
-          const action = page.getByRole('button', { name: 'Load demo cohort' });
-          assert.equal(await action.evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(107, 29, 47)');
-          assert.equal(await action.evaluate(element => getComputedStyle(element).color), 'rgb(255, 255, 255)');
-          await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-forecast-desktop.png', fullPage: true });
-        }
-      }
-      for (const [label, title] of destinations.filter((_, index) => ![0, 2].includes(index))) {
+      for (const [label, title] of destinations.filter((_, index) => ![0, 2, 5].includes(index))) {
         await navigation.getByRole('link', { name: label, exact: true }).click();
         await page.getByRole('heading', { name: title, exact: true }).waitFor();
         await page.getByText('This workspace is planned.', { exact: false }).waitFor();
@@ -140,7 +126,7 @@ else {
       assert.equal(await navigation.getByRole('link', { name: 'Overview', exact: true }).getAttribute('aria-current'), null);
       const workspace = page.getByRole('combobox', { name: 'Workspace view' });
       assert.equal(await workspace.inputValue(), 'SYSTEM_ADMIN');
-      await page.goto(base + '/coordinator/imports'); await page.getByRole('heading', { name: 'Data Imports', exact: true }).waitFor();
+      await page.goto(base + '/coordinator/decisions'); await page.getByRole('heading', { name: 'Offering Decisions', exact: true }).waitFor();
       assert.equal(await page.getByRole('combobox', { name: 'Workspace view' }).inputValue(), 'COORDINATOR');
       assert.equal(await page.getByRole('heading', { name: 'Academic profile setup' }).count(), 0);
     });
@@ -224,7 +210,7 @@ else {
       await page.keyboard.press('Escape'); assert.equal(await dialog.isVisible(), false); assert.equal(await opener.evaluate(element => element === document.activeElement), true);
       await opener.click(); await page.mouse.click(350, 550); assert.equal(await dialog.isVisible(), false);
       await opener.click(); await dialog.getByRole('link', { name: 'Data Imports', exact: true }).click();
-      await page.getByRole('heading', { name: 'Data Imports', exact: true }).waitFor(); assert.equal(await dialog.isVisible(), false);
+      await page.getByRole('heading', { name: 'Data Imports', exact: true }).first().waitFor(); assert.equal(await dialog.isVisible(), false);
     }, 375);
     await check('search, overlapping roles, pagination, account details and audit', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users'); await page.getByText('Fictional Administrator', { exact: true }).waitFor();

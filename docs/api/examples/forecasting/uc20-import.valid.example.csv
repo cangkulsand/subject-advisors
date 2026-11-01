@@ -1,3 +1,3 @@
-external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic
-DEMO-VALID-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,COMPLETED,1001,3,true
-DEMO-VALID-002,2024-DEMO,ACTIVE,UNKNOWN,,,,,
+external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name
+DEMO-VALID-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,COMPLETED,1001,3,true,Demo Valid One
+DEMO-VALID-002,2024-DEMO,ACTIVE,UNKNOWN,,,,,,

@@ -92,7 +92,7 @@ const configurationExample = {
 } satisfies ForecastConfiguration;
 const acceptedImportExample = {
   ...scope, importBatchId: 911, sourceDate: '2099-01-15', sourceLabel: 'Fictional demo cohort',
-  acceptedAt: '2099-01-16T00:00:00Z', sourceFingerprint: 'sha256:fictional-accepted-source',
+  acceptedAt: '2099-01-16T00:00:00Z', sourceFingerprint: 'sha256:fictional-accepted-source', source: 'CSV',
   counts: { studentRows: 2, uniqueStudents: 2, validAttempts: 1, rejectedRows: 0, partialStudents: 0, unknownHistoryStudents: 1 },
   snapshotStatus: 'ACCEPTED_IMMUTABLE',
   validationReport: {
@@ -248,7 +248,7 @@ describe('UC20 transport contracts and example alignment', () => {
     expect(duplicateStudentRows.map(row => row.slice(0, 4))).toEqual(Array.from({ length: 3 }, () => ['DEMO-001', '2024-DEMO', 'ACTIVE', 'COMPLETE']));
     expect(at(duplicateStudentRows, 1)[7]).toBe('');
     const noHistory = at(validRows, 2).split(',');
-    expect(noHistory.slice(4)).toEqual(['', '', '', '', '']);
+    expect(noHistory.slice(4, 9)).toEqual(['', '', '', '', '']);
     expect(correctionRows.join('\n')).toContain('WITHDRAWN');
     expect(report.error.report.counts).toMatchObject({ uniqueStudents: 3, validAttempts: 2, rejectedRows: 2, unknownHistoryStudents: 2 });
     expect(report.error.report.completenessChanges).toEqual([{ externalReference: 'DEMO-001', before: 'COMPLETE', after: 'PARTIAL', rejectedRows: 1 }]);

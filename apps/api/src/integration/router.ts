@@ -1,7 +1,7 @@
 import { authorize, authJson, handleAuthRequest } from '../modules/auth';
 import type { AuthDependencies } from '../modules/auth/contracts';
 export type FeatureHandler = (request: Request) => Promise<Response | null>;
-export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler }
+export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler; forecasting?: FeatureHandler }
 /** Owners retain validation/authorization inside their handlers. No business logic here. */
 export async function dispatchIntegratedRequest(request: Request, services: IntegratedServices): Promise<Response> {
   const path = new URL(request.url).pathname;
@@ -11,6 +11,11 @@ export async function dispatchIntegratedRequest(request: Request, services: Inte
     if (services.admin) return await services.admin(request) ?? authJson({ error: { code: 'NOT_FOUND', message: 'Route not found.' } }, 404);
     await authorize(request, services.auth, { roles: ['SYSTEM_ADMIN'] });
     return authJson({ error: { code: 'ADMIN_UNAVAILABLE', message: 'Administration is not available.' } }, 503);
+  }
+  if (path === '/api/coordinator' || path.startsWith('/api/coordinator/')) {
+    if (services.forecasting) return await services.forecasting(request) ?? authJson({ error: { code: 'NOT_FOUND', message: 'Route not found.' } }, 404);
+    await authorize(request, services.auth, { roles: ['COORDINATOR'] });
+    return authJson({ error: { code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting is not available.' } }, 503);
   }
   const profileRoute = path === '/api/profile' || path === '/api/profile/options' || path === '/api/academic-records' || /^\/api\/academic-records\/[^/]+$/.test(path);
   const offeringRoute = path === '/api/semester-offerings';

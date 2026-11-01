@@ -46,10 +46,11 @@ or `LAB`. Prerequisite availability distinguishes a known empty rule from unavai
 source data.
 
 Every upload and run is scoped by programme, centre and target semester. An imported
-person is identified only by an external reference. No student portal account, Clerk
-student ID, StudentProfile, AcademicRecord or student/profile/options endpoint is needed
-or consulted. Uploaded records do not link to portal students; only the Coordinator is
-authenticated. Every student's curriculum must belong to the selected programme. A blank
+person is identified only by an external reference. **Qualified 2026-11-02 (MT8):** for a CSV upload no student portal
+account, Clerk student ID, StudentProfile or AcademicRecord is consulted and uploaded records do not link to portal
+students. The system-students snapshot (`POST forecast-imports/system-snapshots`) is the main source and does read
+StudentProfile and AcademicRecord, read-only; its people are `PORTAL-<student_id>` external references and no portal
+ID or credential is returned. Only the Coordinator is authenticated. Every student's curriculum must belong to the selected programme. A blank
 `curriculum_version` may resolve only when exactly one configured version exists; when
 more than one exists, require an explicit per-row version rather than selecting latest.
 Scope IDs are carried in operation bodies and list filters, echoed by resources, and
@@ -63,8 +64,10 @@ displayed beside the forecast, seniority-ordered as a display aid, and never an 
 The proposed template has this exact header and order:
 
 ```csv
-external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic
+external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name
 ```
+
+`student_name` is OPTIONAL (product owner decision 2026-11-01: coordinators manage their students and need to know who is who). The earlier nine-column header (without `student_name`) is still accepted and leaves names blank. The name is returned to the assigned Coordinator in the import roster read (`GET /api/coordinator/forecast-imports/{importBatchId}/students`) and is frozen with the accepted snapshot.
 
 The correction example uses fictional `DEMO-*` references and assumes its selected
 fictional programme has exactly one configured curriculum version, so the blank version
@@ -74,7 +77,7 @@ an explicit curriculum version, as required when the selected programme has mult
 CSV v1 is UTF-8 with an optional BOM, comma-delimited, and accepts standard double-quoted
 field escaping with doubled quotes. LF and CRLF line endings are accepted. Trim surrounding
 space before validation; an empty trimmed field is blank. External references are opaque,
-case-sensitive values of 1-128 Unicode characters. Semester IDs use positive decimal int32
+case-sensitive values of 1-100 Unicode characters (limited by the stored `varchar(100)` column; longer references are a correction finding). Semester IDs use positive decimal int32
 lexemes; recognized credits use nonnegative decimal integers; `is_synthetic` is exactly
 `true` or `false` for attempts. The API limits uploads to 5 MiB and 10,000 data rows; these
 are proposed transport safeguards, not institutional policy.
@@ -97,7 +100,7 @@ the Coordinator elects to accept the remaining valid rows.
 
 | Field | Contract |
 | --- | --- |
-| `external_reference` | Required opaque source identifier; no names, portal IDs or credentials. |
+| `external_reference` | Required opaque source identifier; no portal IDs or credentials (a display name goes in the optional `student_name`). |
 | `curriculum_version` | Required unless one configured version exists for the selected programme. Must resolve to a curriculum in that programme. |
 | `cohort_status` | Source-provided nonblank token. Propose `ACTIVE` as a configured engineering mapping to potential eligible-pool demand, not an institutional claim. Unsupported tokens make only that student's eligibility uncertain. |
 | `history_completeness` | `COMPLETE`, `PARTIAL`, or `UNKNOWN`. `COMPLETE` with no attempts means source-attested empty history; `UNKNOWN` means no evidence. Rejection changes only `COMPLETE` to `PARTIAL`; `UNKNOWN` remains `UNKNOWN`. |
@@ -106,6 +109,7 @@ the Coordinator elects to accept the remaining valid rows.
 | `record_semester_id` | Optional positive canonical int32 semester ID when known; blank means undated/unknown, not a guessed semester. |
 | `recognized_credits` | Optional source evidence, nonnegative and bounded by verified subject credits. `FAILED`/`IN_PROGRESS` permit only blank or `0`, never positive recognized credits. Blank evidence leaves credit-based conditions uncertain; Package 2 must persist it. |
 | `is_synthetic` | Required `true`/`false` on an attempt; blank only when there is no attempt group. |
+| `student_name` | Optional display name, at most 255 characters, no control characters; blank allowed; student-level (identical on every row of a student, else a metadata conflict). Never a portal ID or credential. |
 
 Different-semester repeats are valid attempts. Conflicting same-student/subject/semester
 attempts, duplicate undated attempts, unknown curriculum versions, unmatched codes and
@@ -155,8 +159,15 @@ reason.
 
 Obtain subject names, codes, curriculum membership, prerequisite expressions/conditions,
 `include_in_offering_forecast`, configured exclusions and reasons from the selected
-programme's catalogue/configuration. Excluded subjects, including configured FYP and
-Industrial Training exclusions, remain visible with their configured reason and receive
+programme's catalogue/configuration. Normal/Short offering rule (decision 2026-11-02): `subject_semester_rule` rows are authoritative; a subject
+whose rows (in every curriculum containing it) exclude the target semester type is `semesterTypeExcluded`
+(stored `configuration_status` EXCLUDED, `forecast_count` NULL, reason "Runs only in Short semesters" / "Runs only
+in Normal semesters" in `scenario_assumptions`), has no demand or sections, is outside the totals
+(`summary.notOfferedInSemesterTypeSubjects`, separate from `excludedSubjects`) and confirmation returns 422
+`SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE` (`details.subjectIds`). No rule rows means unrestricted. Engine version
+`uc20-engine-1.1.0`; `ruleSnapshot.semesterTypeExclusions` lists these subjects. Excluded subjects, including
+Projek Sarjana Muda 1/2, Latihan Industri (SECJ3032, SECJ4134, SECJ4114, SECJ4118, SECR3032, SECR4134, SECR4114,
+SECR4118) and UKQT3001 (`include_in_offering_forecast = false`), remain visible with their configured reason and receive
 no classroom section. The center does not select a different curriculum. Missing catalogue
 rules never create or default a subject.
 
@@ -194,13 +205,14 @@ against configured catalogue and stored resource scope; resources echo that scop
 | `POST /api/coordinator/forecast-imports` | Active Coordinator; multipart one CSV with required programme/centre/semester IDs plus source date/label. Fully valid upload accepts directly; row errors return 422 report and validation ID without accepting rejected history. |
 | `POST /api/coordinator/forecast-imports/{validationId}/subset-acceptances` | Same role; request repeats exact scope and acknowledges rejected rows. Required `If-Match` binds acknowledgement to the validated fingerprint/revision; a validation can be accepted once. |
 | `GET /api/coordinator/forecast-imports?programmeId=&learningCentreId=&targetSemesterId=&limit=&cursor=` | Active Coordinator; paged import summaries, not raw CSV. |
+| `GET /api/coordinator/forecast-imports/{importBatchId}/students?limit=&cursor=` | Active assigned Coordinator; paged retained roster of an accepted import (external reference, optional name, curriculum version, cohort status, final history completeness); no attempts, no raw CSV. |
 | `GET /api/coordinator/forecast-imports/{importBatchId}` | Active Coordinator; full validation report and warnings remain retrievable for every accepted import; no raw CSV. |
 | `GET /api/coordinator/forecast-runs?programmeId=&learningCentreId=&targetSemesterId=&limit=&cursor=` | Active Coordinator; paged runs for the required scope. |
-| `POST /api/coordinator/forecast-runs` | Active Coordinator; body includes required programme/centre/semester scope and matching accepted import; create initial version 1 with null parent. |
-| `POST /api/coordinator/forecast-runs/{forecastRunId}/reviews` | Same scope; explicit `DRAFT` to `UNDER_REVIEW` transition, optimistic revision and atomic audit. |
+| `POST /api/coordinator/forecast-runs` | Active Coordinator; body includes required programme/centre/semester scope and matching accepted import; creates a DRAFT run from the engine. An import snapshot yields one run (a repeat returns the same receipt, 200); a newer accepted snapshot of the same scope creates version N+1 with the previous version as parent (MT5a deviation from the version-1-only rule). Runs report `newerForecastAvailable` (OP1, informational). |
+| `POST /api/coordinator/forecast-runs/{forecastRunId}/reviews` | Same scope; explicit `DRAFT` to `UNDER_REVIEW` transition with `If-Match` (revision `fr<id>.<status>.<auditCount>`; stale gives 412). The step writes a run-level `START_REVIEW` audit entry (no subject, reason defaults to "Review started.") in the same transaction; at most once per run, only from DRAFT. |
 | `GET /api/coordinator/forecast-runs/{forecastRunId}` and `GET /api/coordinator/forecast-runs/{forecastRunId}/audit?limit=&cursor=` | Same role; resource echoes stored scope; paged audit; unknown IDs return 404 without data leakage. |
-| `POST /api/coordinator/forecast-runs/{forecastRunId}/decisions` | Same scope; body includes scope; justified decision/section adjustment; `subjectId` is canonical `subject.subject_id`, not a `curriculum_subject_id`; actor and before/after values derived server-side and audited atomically. |
-| `POST /api/coordinator/forecast-runs/{forecastRunId}/finalizations` | Same scope; body includes scope; resolve required review, append final audit, then freeze in one transaction. Finalization publishes nothing; offering confirmation is the separate step below. |
+| `POST /api/coordinator/forecast-runs/{forecastRunId}/decisions` | Same scope; body includes scope; justified decision/section adjustment; `subjectId` is canonical `subject.subject_id`, not a `curriculum_subject_id`; actor and before/after values derived server-side and audited atomically. REVIEW/APPROVE/DEFER stamp the subject sections; REPLACE_ALLOCATION replaces the sections but must keep the subject forecast total, with each size at most the exception maximum (normal maximum when none) and a justification above the normal maximum. Every decision needs a 1-500 character reason; the batch is all-or-nothing. Allowed in DRAFT and UNDER_REVIEW. |
+| `POST /api/coordinator/forecast-runs/{forecastRunId}/finalizations` | Same scope; body includes scope; requires UNDER_REVIEW with no PENDING section (422 `REVIEWS_INCOMPLETE`), appends the FINALIZE audit, then freezes in one transaction. Finalization publishes nothing; offering confirmation is the separate step below. |
 | `GET /api/coordinator/confirmed-offerings?programmeId=&learningCentreId=&targetSemesterId=` (PLANNED, S2-P004-006) | Active Coordinator; latest confirmation state per subject for the scope; the latest confirmation is authoritative and is what students see. |
 | `POST /api/coordinator/confirmed-offerings` (PLANNED) | Active Coordinator; confirm or re-confirm subjects from a FINALIZED run for the same scope; reason required; `baseRevision`, `Idempotency-Key`; audited atomically; excluded subjects rejected. |
 | `POST /api/coordinator/confirmed-offerings/withdrawals` (PLANNED) | Same protections; withdraw subjects with a reason. |
