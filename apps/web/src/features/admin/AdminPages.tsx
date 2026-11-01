@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
-import { AddUserPanel, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
+import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 
@@ -59,51 +59,53 @@ export function AdminOverviewPage({ client }: { client: AdminClient }) {
       </section>
     </>}</Panel></>;
 }
-function InvitationsSection({ client, refreshKey, onStatus }: { client: AdminClient; refreshKey: number; onStatus: (text: string) => void }) {
-  const [filters, setFilters] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
-  const [target, setTarget] = useState<AdminInvitation>();
-  const result = useRead(signal => client.listInvitations(filters, signal), 'invitations:' + refreshKey + ':' + JSON.stringify(filters));
-  return <section className="admin-card" aria-labelledby="admin-invitations-title">
-    <div className="admin-card-title"><div><h2 id="admin-invitations-title">Invitations</h2><p className="admin-muted">Invitations are valid for 7 days. Roles apply only if the verified email still qualifies at first sign-in.</p></div>
-      <label className="admin-inline-filter">Invitation status<select aria-label="Invitation status" value={filters.status} onChange={event => setFilters({ page: 1, status: event.target.value as AdminInvitationStatus | '' })}><option value="">All</option>{Object.entries(invitationLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label></div>
-    <Panel error={result.error} retry={result.retry}>{result.data && <>
-      {!result.data.items.length ? <p className="admin-empty">No invitations match this filter.</p> : <div className="admin-table-scroll" role="region" aria-label="Invitations table" tabIndex={0}><table><thead><tr><th>Email</th><th>Roles</th><th>Status</th><th>Invited</th><th>Expires</th><th><span className="admin-sr-only">Actions</span></th></tr></thead><tbody>{result.data.items.map(item => <tr key={item.id}>
-        <td className="admin-wrap">{item.email}</td><td><RolePills roles={item.roles}/></td><td><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
-        <td><time dateTime={item.createdAt}>{when(item.createdAt)}</time></td><td><time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></td>
-        <td>{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
-      </tr>)}</tbody></table></div>}
-      {result.data.total > result.data.pageSize && <Pager result={result.data} onPage={page => setFilters(old => ({ ...old, page }))}/>}
-    </>}</Panel>
-    {target && <ReasonDialog title="Revoke invitation" confirmLabel="Revoke invitation" danger onCancel={() => setTarget(undefined)}
-      description={<p>The invitation for <strong>{target.email}</strong> will stop working. You can send a new invitation later.</p>}
-      onSubmit={async reason => { await client.revokeInvitation(target.id, { reason }); setTarget(undefined); onStatus(`Invitation for ${target.email} revoked.`); result.retry(); }}/>}
-  </section>;
-}
+function InviteIcon() { return <svg className="admin-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>; }
 export function AdminUsersPage({ client, search }: { client: AdminClient; search: string }) {
   const parameters = new URLSearchParams(search);
   const [filters, setFilters] = useState<AdminUsersQuery>({ page: 1, q: '', role: ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'].includes(parameters.get('role') ?? '') ? parameters.get('role') as AdminRole : '', status: ['ACTIVE', 'SUSPENDED'].includes(parameters.get('status') ?? '') ? parameters.get('status') as 'ACTIVE' | 'SUSPENDED' : '' });
+  const [invited, setInvited] = useState(false), [invitationFilter, setInvitationFilter] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
   const [term, setTerm] = useState('');
-  const [changes, setChanges] = useState(0), [notice, setNotice] = useState('');
-  const result = useRead(signal => client.users(filters, signal), 'users:' + changes + ':' + JSON.stringify(filters));
-  return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations." refresh={result.retry}/>
-    <AddUserPanel client={client} onChanged={() => { setChanges(value => value + 1); setNotice(''); }}/>
-    <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice}</p>}</div>
-    <InvitationsSection client={client} refreshKey={changes} onStatus={setNotice}/>
-    <section className="admin-card admin-users-card">
-      <form className="admin-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, page: 1, q: term.trim() })); }}>
-        <label className="admin-search-field">Search accounts<input type="search" maxLength={100} value={term} onChange={event => setTerm(event.target.value)} placeholder="Name, email or Clerk account ID"/></label>
-        <label>Role<select aria-label="Role" value={filters.role} onChange={event => setFilters(old => ({ ...old, role: event.target.value as AdminUsersQuery['role'], page: 1 }))}><option value="">All roles</option>{Object.entries(labels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-        <label>Access<select aria-label="Access" value={filters.status} onChange={event => setFilters(old => ({ ...old, status: event.target.value as AdminUsersQuery['status'], page: 1 }))}><option value="">All access states</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option></select></label>
+  const [changes, setChanges] = useState(0), [notice, setNotice] = useState<{ text: string; accountId?: number }>(), [adding, setAdding] = useState(false), [target, setTarget] = useState<AdminInvitation>();
+  const showInvitations = invited || !filters.status, invitationQuery = invited ? invitationFilter : { page: 1, status: 'PENDING' as const };
+  const accounts = useRead(signal => invited ? Promise.resolve(null) : client.users(filters, signal), 'users:' + changes + ':' + invited + ':' + JSON.stringify(filters));
+  const invitations = useRead(signal => showInvitations ? client.listInvitations(invitationQuery, signal) : Promise.resolve(null), 'invitations:' + changes + ':' + showInvitations + ':' + JSON.stringify(invitationQuery));
+  const retry = () => { accounts.retry(); invitations.retry(); };
+  const needle = filters.q.toLowerCase();
+  const invitationRows = (invitations.data?.items ?? []).filter(item => (!needle || item.email.toLowerCase().includes(needle)) && (!filters.role || item.roles.includes(filters.role)));
+  const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined;
+  const reset = () => { setTerm(''); setInvited(false); setInvitationFilter({ page: 1, status: 'PENDING' }); setFilters({ page: 1, q: '', role: '', status: '' }); retry(); };
+  return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations." refresh={retry}/>
+    <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice.text} {notice.accountId && <AppLink href={'/admin/users/' + notice.accountId}>View account →</AppLink>}</p>}</div>
+    <section className="admin-card admin-users-card" aria-labelledby="admin-users-title">
+      <div className="admin-card-title"><div><h2 id="admin-users-title">Users and invitations</h2><p className="admin-muted">Invitations are valid for 7 days. Roles apply only if the verified email still qualifies at first sign-in.</p></div>
+        <button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>
+      <form className="admin-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>
+        <label className="admin-search-field">Search users<input type="search" maxLength={100} value={term} onChange={event => setTerm(event.target.value)} placeholder="Name, email or Clerk account ID"/></label>
+        <label>Role<select aria-label="Role" value={filters.role} onChange={event => { setFilters(old => ({ ...old, role: event.target.value as AdminUsersQuery['role'], page: 1 })); setInvitationFilter(old => ({ ...old, page: 1 })); }}><option value="">All roles</option>{Object.entries(labels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
+        <label>Access<select aria-label="Access" value={invited ? 'INVITED' : filters.status} onChange={event => { const value = event.target.value; setInvited(value === 'INVITED'); setFilters(old => ({ ...old, status: value === 'INVITED' ? '' : value as AdminUsersQuery['status'], page: 1 })); setInvitationFilter({ page: 1, status: 'PENDING' }); }}><option value="">All</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INVITED">Invited</option></select></label>
+        {invited && <label>Invitation status<select aria-label="Invitation status" value={invitationFilter.status} onChange={event => setInvitationFilter({ page: 1, status: event.target.value as AdminInvitationStatus | '' })}><option value="">All</option>{Object.entries(invitationLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
         <button className="admin-primary" type="submit">Search</button>
       </form>
-      <Panel error={result.error} retry={result.retry}>{result.data && <>
-        {result.data.items.some(item => item.identity.state !== 'available') && <p className="admin-notice" role="status">Some Clerk identity details are unavailable. Application roles and access status are shown below.</p>}
-        {!result.data.items.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={() => { setTerm(''); setFilters({ page: 1, q: '', role: '', status: '' }); result.retry(); }}>Reset filters</button></div> : <div className="admin-table-scroll" role="region" aria-label="Application accounts table" tabIndex={0}><table><thead><tr><th>Account</th><th>Roles</th><th>Access</th><th>Updated</th><th><span className="admin-sr-only">Details</span></th></tr></thead><tbody>{result.data.items.map(account => <tr key={account.accountId}>
-          <td><Identity account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td><RolePills roles={account.roles}/></td><td><AccessPill status={account.accessStatus}/></td><td><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
-        </tr>)}</tbody></table></div>}
-        <Pager result={result.data} onPage={page => setFilters(old => ({ ...old, page }))}/><p className="admin-snapshot">Retrieved {when(result.data.generatedAt)}</p>
+      <Panel error={accounts.error ?? invitations.error} retry={retry}>{loaded && <>
+        {accountRows.some(item => item.identity.state !== 'available') && <p className="admin-notice" role="status">Some Clerk identity details are unavailable. Application roles and access status are shown below.</p>}
+        {!invitationRows.length && !accountRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll" role="region" aria-label="Users and invitations table" tabIndex={0}><table><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
+          {!!invitationRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Invitations ({invitationRows.length})</th></tr>{invitationRows.map(item => <tr key={item.id}>
+            <td className="admin-wrap"><div className="admin-identity"><strong>{item.email}</strong><span className="admin-pill admin-invite-tag">Invitation</span></div></td><td><RolePills roles={item.roles}/></td><td><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
+            <td className="admin-invite-dates"><span>Invited <time dateTime={item.createdAt}>{when(item.createdAt)}</time></span><span>Expires <time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></span></td>
+            <td>{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
+          </tr>)}</tbody>}
+          {!!accountRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Accounts ({accounts.data?.total ?? accountRows.length})</th></tr>{accountRows.map(account => <tr key={account.accountId}>
+            <td><Identity account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td><RolePills roles={account.roles}/></td><td><AccessPill status={account.accessStatus}/></td><td><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
+          </tr>)}</tbody>}
+        </table></div>}
+        {invited && invitations.data && invitations.data.total > invitations.data.pageSize && <Pager result={invitations.data} onPage={page => setInvitationFilter(old => ({ ...old, page }))}/>}
+        {accounts.data && <><Pager result={accounts.data} onPage={page => setFilters(old => ({ ...old, page }))}/><p className="admin-snapshot">Retrieved {when(accounts.data.generatedAt)}</p></>}
       </>}</Panel>
     </section>
+    {adding && <AddUserDialog client={client} onClose={() => setAdding(false)} onAdded={done => { setAdding(false); setNotice(done); setChanges(value => value + 1); }}/>}
+    {target && <ReasonDialog title="Revoke invitation" confirmLabel="Revoke invitation" danger onCancel={() => setTarget(undefined)}
+      description={<p>The invitation for <strong>{target.email}</strong> will stop working. You can send a new invitation later.</p>}
+      onSubmit={async reason => { await client.revokeInvitation(target.id, { reason }); setTarget(undefined); setNotice({ text: `Invitation for ${target.email} revoked.` }); setChanges(value => value + 1); }}/>}
   </>;
 }
 export function AdminAuditView({ client, accountId }: { client: AdminClient; accountId?: number }) {

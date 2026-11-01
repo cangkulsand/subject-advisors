@@ -229,7 +229,7 @@ else {
     await check('search, overlapping roles, pagination, account details and audit', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users'); await page.getByText('Fictional Administrator', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Next', exact: true }).click(); await page.getByText('Fictional Account 23', { exact: true }).waitFor();
-      await page.getByLabel('Search accounts', { exact: true }).fill('fixture1@example.invalid'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByLabel('Search users', { exact: true }).fill('fixture1@example.invalid'); await page.getByRole('button', { name: 'Search', exact: true }).click();
       await page.getByText('1 result · Page 1 of 1', { exact: true }).waitFor();
       await page.getByRole('link', { name: /View details for Fictional Administrator/ }).click(); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
       assert.equal(await page.locator('.admin-memberships article').count(), 3);
@@ -272,72 +272,114 @@ else {
         const toggle = page.getByRole('button', { name: 'Open navigation' }); await toggle.click(); await page.getByRole('dialog', { name: 'Administration menu' }).waitFor();
         await page.keyboard.press('Shift+Tab'); assert.ok(await page.evaluate(() => !!document.activeElement?.closest('dialog')));
         await page.keyboard.press('Escape'); assert.equal(await page.getByRole('dialog').isVisible(), false); assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
-        const table = page.getByRole('region', { name: 'Application accounts table' }); await table.focus(); await page.keyboard.press('ArrowRight');
-        await page.waitForFunction(() => document.querySelector('[aria-label="Application accounts table"]').scrollLeft > 0);
+        const table = page.getByRole('region', { name: 'Users and invitations table' }); await table.focus(); await page.keyboard.press('ArrowRight');
+        await page.waitForFunction(() => document.querySelector('[aria-label="Users and invitations table"]').scrollLeft > 0);
       }
       if (width === 375 || width === 1280) await page.screenshot({ path: '.wrangler/admin-review/users-' + width + '.png', fullPage: true });
     }, width);
     const reasonLabel = 'Reason (recorded in the audit log)';
-    async function openAddPanel(page) {
-      await page.getByRole('heading', { name: 'Add a user', exact: true }).waitFor();
+    const usersTable = 'Users and invitations table';
+    async function openAddDialog(page) {
+      await page.getByRole('region', { name: usersTable }).waitFor();
+      assert.equal(await page.locator('.admin-card').count(), 1); // a single card holds filters, invitations and accounts
       await page.getByRole('button', { name: 'Add user', exact: true }).click();
-      await page.getByLabel('Email address', { exact: true }).waitFor();
+      const dialog = page.getByRole('dialog', { name: 'Add user' }); await dialog.waitFor();
+      return dialog;
     }
-    async function submitAdd(page, { email, role, reason = 'Fictional reason for the audit log.', label }) {
-      await page.getByLabel('Email address', { exact: true }).fill(email);
-      for (const checkbox of await page.getByRole('checkbox').all()) if (await checkbox.isChecked()) await checkbox.uncheck();
-      await page.getByRole('checkbox', { name: role, exact: true }).check();
-      await page.getByLabel(reasonLabel).fill(reason);
-      await page.getByRole('button', { name: label, exact: true }).click();
+    async function submitAdd(dialog, { email, role, reason = 'Fictional reason for the audit log.', label }) {
+      await dialog.getByLabel('Email address', { exact: true }).fill(email);
+      for (const checkbox of await dialog.getByRole('checkbox').all()) if (await checkbox.isChecked()) await checkbox.uncheck();
+      await dialog.getByRole('checkbox', { name: role, exact: true }).check();
+      await dialog.getByLabel(reasonLabel).fill(reason);
+      await dialog.getByRole('button', { name: label, exact: true }).click();
     }
-    await check('add existing user: client validation, ROLE_NOT_ELIGIBLE, CLERK_USER_NOT_FOUND and success with link to the new account', async page => {
-      const state = await mock(page); await page.goto(base + '/admin/users'); await openAddPanel(page);
-      await page.getByRole('button', { name: 'Add user', exact: true }).click();
-      await page.getByRole('alert').filter({ hasText: 'A valid email is required.' }).waitFor();
+    await check('add user opens a modal: icon button, Escape, client validation, server errors keep it open, success closes it with a link to the new account', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users');
+      const opener = page.getByRole('button', { name: 'Add user', exact: true }); await opener.waitFor();
+      assert.equal(await opener.locator('svg[aria-hidden="true"]').count(), 1);
+      const dialog = await openAddDialog(page);
+      assert.equal(await dialog.getByLabel('Email address', { exact: true }).evaluate(element => element === document.activeElement), true);
+      assert.equal(await dialog.getByRole('radio', { name: 'Add existing user' }).isChecked(), true);
+      await page.screenshot({ path: '.wrangler/admin-review/users-add-dialog-desktop.png', fullPage: true });
+      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+      assert.equal(await opener.evaluate(element => element === document.activeElement), true);
+      await opener.click(); await dialog.waitFor();
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+      await opener.click(); await dialog.waitFor();
+      await dialog.getByRole('button', { name: 'Add user', exact: true }).click();
+      await dialog.getByRole('alert').filter({ hasText: 'A valid email is required.' }).waitFor();
       assert.equal((state.bodies ?? []).length, 0);
-      await page.getByLabel('Email address', { exact: true }).fill('someone@utm.my');
-      await page.getByRole('button', { name: 'Add user', exact: true }).click();
-      await page.getByRole('alert').filter({ hasText: 'At least one role is required.' }).waitFor();
-      await submitAdd(page, { email: 'student@graduate.utm.my', role: 'Coordinator', label: 'Add user' });
-      await page.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
-      await submitAdd(page, { email: 'nobody@utm.my', role: 'Coordinator', label: 'Add user' });
-      await page.getByRole('alert').filter({ hasText: 'No matching sign-in account was found.' }).waitFor();
-      await submitAdd(page, { email: '  New.Staff@UTM.my ', role: 'Coordinator', label: 'Add user' });
-      await page.getByRole('status').filter({ hasText: 'Account added for new.staff@utm.my.' }).waitFor();
+      await dialog.getByLabel('Email address', { exact: true }).fill('someone@utm.my');
+      await dialog.getByRole('button', { name: 'Add user', exact: true }).click();
+      await dialog.getByRole('alert').filter({ hasText: 'At least one role is required.' }).waitFor();
+      await submitAdd(dialog, { email: 'student@graduate.utm.my', role: 'Coordinator', label: 'Add user' });
+      await dialog.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
+      assert.equal(await dialog.isVisible(), true);
+      await submitAdd(dialog, { email: 'nobody@utm.my', role: 'Coordinator', label: 'Add user' });
+      await dialog.getByRole('alert').filter({ hasText: 'No matching sign-in account was found.' }).waitFor();
+      assert.equal(await dialog.isVisible(), true);
+      await submitAdd(dialog, { email: '  New.Staff@UTM.my ', role: 'Coordinator', label: 'Add user' });
+      await dialog.waitFor({ state: 'hidden' });
+      await page.locator('#admin-action-status').getByRole('status').filter({ hasText: 'Account added for new.staff@utm.my.' }).waitFor();
       assert.equal(await page.getByRole('alert').count(), 0);
-      assert.equal(await page.getByLabel('Email address', { exact: true }).inputValue(), '');
+      assert.equal(await page.locator('.admin-card').count(), 1);
       const posted = state.bodies.filter(item => item.method === 'POST' && item.path === '/api/admin/users').at(-1).body;
       assert.deepEqual(posted, { email: 'new.staff@utm.my', roles: ['COORDINATOR'], reason: 'Fictional reason for the audit log.' });
       await page.screenshot({ path: '.wrangler/admin-review/users-add-desktop.png', fullPage: true });
+      await opener.click(); await dialog.waitFor(); assert.equal(await dialog.getByLabel('Email address', { exact: true }).inputValue(), ''); await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('link', { name: /View account/ }).click();
       await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
       assert.ok(page.url().endsWith('/admin/users/24'));
       await page.getByText('new.staff@utm.my', { exact: true }).first().waitFor();
     });
+    await check('one grouped table: invitations display as invites; filters cover both groups', async page => {
+      await mock(page); await page.goto(base + '/admin/users');
+      const table = page.getByRole('region', { name: usersTable }); await table.getByText('Fictional Administrator', { exact: true }).waitFor();
+      assert.equal(await page.locator('.admin-card').count(), 1); assert.equal(await page.locator('table').count(), 1);
+      await table.getByText('Invitations (2)', { exact: true }).waitFor(); await table.getByText('Accounts (23)', { exact: true }).waitFor();
+      const row = table.getByRole('row').filter({ hasText: 'pending.one@utm.my' });
+      assert.ok((await row.innerText()).includes('Invitation')); assert.ok((await row.innerText()).includes('Pending'));
+      assert.equal(await table.getByText('accepted@utm.my').count(), 0); // only pending invitations in the combined view
+      await page.getByLabel('Search users', { exact: true }).fill('pending.two'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await table.getByText('Invitations (1)', { exact: true }).waitFor(); assert.equal(await table.getByText('pending.one@utm.my').count(), 0);
+      await page.getByLabel('Search users', { exact: true }).fill(''); await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByLabel('Role', { exact: true }).selectOption('STUDENT'); await table.getByText('Invitations (1)', { exact: true }).waitFor();
+      await page.getByLabel('Role', { exact: true }).selectOption('');
+      await page.getByLabel('Access', { exact: true }).selectOption('ACTIVE'); await table.getByText(/^Accounts \(/).waitFor();
+      assert.equal(await table.getByText(/^Invitations \(/).count(), 0);
+      await page.getByLabel('Access', { exact: true }).selectOption('INVITED'); await table.getByText('Invitations (2)', { exact: true }).waitFor();
+      assert.equal(await table.getByText(/^Accounts \(/).count(), 0);
+      await page.getByLabel('Invitation status', { exact: true }).selectOption('');
+      await table.getByText('Invitations (4)', { exact: true }).waitFor(); await table.getByText('accepted@utm.my').waitFor();
+    });
     await check('send invitation: CLERK_USER_EXISTS, success, then revoke with an in-page reason', async page => {
-      const state = await mock(page); await page.goto(base + '/admin/users'); await openAddPanel(page);
-      await page.getByRole('radio', { name: 'Send invitation' }).check();
-      await submitAdd(page, { email: 'clerk.only@utm.my', role: 'Coordinator', label: 'Send invitation' });
-      await page.getByRole('alert').filter({ hasText: 'This person already has a sign-in account. Use Add account instead.' }).waitFor();
-      await submitAdd(page, { email: 'invitee@utm.my', role: 'Coordinator', label: 'Send invitation' });
-      await page.getByRole('status').filter({ hasText: 'Invitation sent to invitee@utm.my.' }).waitFor();
-      const table = page.getByRole('region', { name: 'Invitations table' }); await table.getByText('invitee@utm.my', { exact: true }).waitFor();
-      assert.equal(await table.getByRole('row').count(), 4); // header + invitee + the two seeded pending rows
+      const state = await mock(page); await page.goto(base + '/admin/users'); const dialog = await openAddDialog(page);
+      await dialog.getByRole('radio', { name: 'Send invitation' }).check();
+      await submitAdd(dialog, { email: 'clerk.only@utm.my', role: 'Coordinator', label: 'Send invitation' });
+      await dialog.getByRole('alert').filter({ hasText: 'This person already has a sign-in account. Use Add account instead.' }).waitFor();
+      assert.equal(await dialog.isVisible(), true);
+      await submitAdd(dialog, { email: 'invitee@utm.my', role: 'Coordinator', label: 'Send invitation' });
+      await dialog.waitFor({ state: 'hidden' });
+      await page.locator('#admin-action-status').getByRole('status').filter({ hasText: 'Invitation sent to invitee@utm.my.' }).waitFor();
+      const table = page.getByRole('region', { name: usersTable }); await table.getByText('invitee@utm.my', { exact: true }).waitFor();
+      await table.getByText('Invitations (3)', { exact: true }).waitFor(); // invitee + the two seeded pending rows
+      assert.equal(await page.locator('.admin-card').count(), 1);
       await page.screenshot({ path: '.wrangler/admin-review/users-invitations-desktop.png', fullPage: true });
       // Escape cancels and returns focus to the control that opened the dialog.
       const opener = page.getByRole('button', { name: 'Revoke invitation for pending.one@utm.my' }); await opener.click();
-      const dialog = page.getByRole('dialog', { name: 'Revoke invitation' }); await dialog.waitFor();
-      assert.equal(await dialog.getByLabel(reasonLabel).evaluate(element => element === document.activeElement), true);
-      assert.equal(await dialog.getByRole('button', { name: 'Revoke invitation' }).isDisabled(), true);
-      assert.ok((await dialog.innerText()).includes('0 / 500'));
-      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+      const revoke = page.getByRole('dialog', { name: 'Revoke invitation' }); await revoke.waitFor();
+      assert.equal(await revoke.getByLabel(reasonLabel).evaluate(element => element === document.activeElement), true);
+      assert.equal(await revoke.getByRole('button', { name: 'Revoke invitation' }).isDisabled(), true);
+      assert.ok((await revoke.innerText()).includes('0 / 500'));
+      await page.keyboard.press('Escape'); await revoke.waitFor({ state: 'hidden' });
       assert.equal(await opener.evaluate(element => element === document.activeElement), true);
       assert.equal(state.bodies.filter(item => item.method === 'DELETE').length, 0);
-      await opener.click(); await dialog.getByLabel(reasonLabel).fill('Fictional: sent to the wrong address.');
-      await dialog.getByRole('button', { name: 'Revoke invitation' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await opener.click(); await revoke.getByLabel(reasonLabel).fill('Fictional: sent to the wrong address.');
+      await revoke.getByRole('button', { name: 'Revoke invitation' }).click(); await revoke.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Invitation for pending.one@utm.my revoked.' }).waitFor();
       await table.getByText('pending.one@utm.my', { exact: true }).waitFor({ state: 'detached' });
       assert.deepEqual(state.bodies.find(item => item.method === 'DELETE').body, { reason: 'Fictional: sent to the wrong address.' });
+      await page.getByLabel('Access', { exact: true }).selectOption('INVITED');
       await page.getByLabel('Invitation status', { exact: true }).selectOption('REVOKED');
       await table.getByText('pending.one@utm.my', { exact: true }).waitFor();
     });
@@ -415,10 +457,11 @@ else {
     });
     for (const width of [320, 375, 768]) await check('user management has no horizontal overflow and keeps dialog on screen at ' + width, async page => {
       const state = await mock(page); await page.setViewportSize({ width, height: 844 });
-      await page.goto(base + '/admin/users'); await openAddPanel(page);
-      await page.getByRole('region', { name: 'Invitations table' }).waitFor();
+      await page.goto(base + '/admin/users'); const addDialog = await openAddDialog(page);
+      { const box = await addDialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 844); }
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/users-add-mobile.png', fullPage: true });
+      await page.keyboard.press('Escape'); await addDialog.waitFor({ state: 'hidden' });
       await page.getByRole('button', { name: 'Revoke invitation for pending.one@utm.my' }).click();
       const dialog = page.getByRole('dialog'); await dialog.waitFor();
       const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 844);
