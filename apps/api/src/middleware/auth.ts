@@ -10,8 +10,12 @@ export async function authorize(
   const identity = await deps.verify(request);
   let assignment = await deps.access.find(identity.clerkUserId);
   if (!assignment && options.initialize) {
-    requireStudentEmail(identity);
-    assignment = await deps.access.initializeStudent(identity.clerkUserId);
+    // An administrator invitation for the verified email takes precedence; otherwise behaviour is unchanged.
+    if (deps.invitations) assignment = await deps.invitations.redeem(identity);
+    if (!assignment) {
+      requireStudentEmail(identity);
+      assignment = await deps.access.initializeStudent(identity.clerkUserId);
+    }
   }
   if (!assignment) {
     throw new AuthError(403, 'ACCESS_NOT_ASSIGNED', 'Complete student registration or request an approved staff assignment.');

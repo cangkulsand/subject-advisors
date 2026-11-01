@@ -206,3 +206,60 @@
   .admin-activity li { flex-wrap: wrap; }
   .admin-activity time { flex-basis: calc(100% - 22px); margin-left: 20px; }
 }
+
+/* ---- User management (S2-P004-004) ---- */
+.admin-shell textarea { width: 100%; min-height: 88px; padding: 9px 11px; border: 1px solid var(--color-outline); border-radius: 7px; background: #fff; color: var(--color-heading); font: inherit; resize: vertical; }
+.admin-shell :is(textarea):focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.admin-shell input[type="checkbox"], .admin-shell input[type="radio"] { width: 20px; min-height: 20px; height: 20px; padding: 0; flex: 0 0 auto; accent-color: var(--color-brand); }
+.admin-form { display: grid; gap: 18px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-surface-subtle); max-width: 720px; }
+.admin-field { display: grid; gap: 7px; }
+.admin-field > label, .admin-add-role label, .admin-inline-filter { font-size: 11px; font-weight: 600; color: var(--color-body); }
+.admin-inline-filter { display: grid; gap: 7px; min-width: 160px; }
+.admin-form fieldset, .admin-reason-dialog fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.admin-form legend { padding: 0; margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--color-body); }
+.admin-checks, .admin-modes { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.admin-checks legend, .admin-modes legend { flex: 0 0 100%; }
+.admin-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px; cursor: pointer; }
+.admin-counter { color: var(--color-muted); font-size: 11px; }
+.admin-counter-over { color: #b91c1c; font-weight: 650; }
+.admin-form-error { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 10px 14px; font-size: 12px; overflow-wrap: anywhere; }
+.admin-success { color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 14px; margin-bottom: 18px !important; font-size: 12px; }
+.admin-status-region:empty { display: none; }
+.admin-status-region:focus { outline: none; }
+.admin-status-region:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.admin-add-user .admin-status-region { margin-top: 16px; }
+.admin-add-user .admin-success { margin-bottom: 0 !important; }
+.admin-form-actions, .admin-dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.admin-dialog-actions { justify-content: flex-end; }
+.admin-shell button.admin-danger { color: #fff; background: var(--color-cancel); border-color: var(--color-cancel); }
+.admin-shell button.admin-danger:hover:not(:disabled) { background: var(--color-cancel-hover); border-color: var(--color-cancel-hover); }
+.admin-shell button.admin-danger-outline { color: var(--color-cancel); border-color: var(--color-cancel); }
+.admin-shell button.admin-danger-outline:hover:not(:disabled) { background: #fef2f2; }
+.admin-shell button.admin-row-action { min-height: 44px; padding: 6px 12px; font-size: 12px; }
+.admin-memberships article { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.admin-memberships article dl { width: 100%; }
+.admin-memberships article > button { margin-top: auto; }
+.admin-locked { font-size: 12px; color: var(--color-muted); padding: 8px 12px; border-radius: 6px; background: var(--color-surface-subtle); margin-top: 8px !important; }
+.admin-memberships .admin-locked { margin-top: auto !important; }
+.admin-add-role { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--color-surface-subtle); }
+.admin-add-role label { display: grid; gap: 7px; min-width: 220px; }
+.admin-access-card .admin-locked { display: inline-block; margin-top: 14px !important; }
+.admin-access-card button { margin-top: 16px; }
+.admin-wrap { overflow-wrap: anywhere; min-width: 160px; }
+.admin-invite-pending { color: #92400e; background: #fffbeb; }
+.admin-invite-accepted { color: #166534; background: #f0fdf4; }
+.admin-invite-revoked, .admin-invite-expired { color: #57534e; background: #f5f5f4; }
+.admin-reason-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--color-surface); color: var(--admin-text); box-shadow: 0 20px 50px rgb(26 26 26 / 25%); }
+.admin-reason-dialog::backdrop { background: rgb(26 26 26 / 50%); }
+.admin-reason-dialog form { display: grid; gap: 16px; }
+.admin-reason-dialog h2 { margin: 0; }
+.admin-reason-dialog p { margin: 0; }
+.admin-dialog-text { font-size: 13px; color: var(--color-body); overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .admin-add-user .admin-card-title > button { width: 100%; }
+  .admin-inline-filter { width: 100%; }
+  .admin-add-role > *, .admin-add-role button { width: 100%; }
+  .admin-reason-dialog { padding: 20px; }
+  .admin-dialog-actions > button { flex: 1 1 140px; }
+  .admin-form-actions > button { width: 100%; }
+}

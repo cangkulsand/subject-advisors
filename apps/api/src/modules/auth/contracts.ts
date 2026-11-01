@@ -32,8 +32,17 @@ export interface AccessRepository {
 export interface ProfileReader {
   stateFor(clerkUserId: string): Promise<'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE'>;
 }
+/**
+ * Optional first-sign-in hook: turns a matching pending administrator invitation into an application account.
+ * Returns the new assignment, or null when nothing was redeemed (no invitation, ineligible, expired, account exists).
+ * Infrastructure failures throw so a transient fault never silently falls back to student self-registration.
+ */
+export interface InvitationRedeemer {
+  redeem(identity: VerifiedIdentity): Promise<AccessAssignment | null>;
+}
 export interface AuthDependencies {
   verify(request: Request): Promise<VerifiedIdentity>;
   access: AccessRepository;
   profiles?: ProfileReader;
+  invitations?: InvitationRedeemer;
 }

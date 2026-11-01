@@ -31,3 +31,31 @@ it('rejects malformed success data rather than rendering it as account data', as
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { items: [{ roles: ['OWNER'] }], total: 1, page: 1, pageSize: 20, generatedAt: '' } })));
   await expect(createAdminClient(async () => 'TEST_ONLY').users({ page: 1, q: '', role: '', status: '' })).rejects.toThrow('Invalid administration response');
 });
+const accountDetail = { accountId: 5, clerkUserId: 'user_target', roles: ['COORDINATOR'], accessStatus: 'ACTIVE', protectedOwner: false, createdAt: '2026-10-28T00:00:00Z', updatedAt: '2026-10-28T00:00:00Z', identity: { state: 'available', name: 'T', email: 't@utm.my', emailVerified: true }, memberships: [{ role: 'COORDINATOR', emailPolicy: 'ROLE_DOMAIN', source: 'OPERATOR', protectedOwner: false, reason: 'r', grantedAt: '2026-10-28T00:00:00Z' }] };
+const invitationRow = { id: '6f1c9d2e-0000-4000-8000-000000000001', email: 'new@utm.my', roles: ['COORDINATOR'], status: 'PENDING', invitedBy: 'user_admin', reason: 'r', createdAt: '2026-10-28T00:00:00Z', expiresAt: '2026-11-04T00:00:00Z', acceptedAt: null };
+it.each([
+  ['createAccount', (c: ReturnType<typeof createAdminClient>) => c.createAccount({ email: 't@utm.my', roles: ['COORDINATOR'], reason: 'Why' }), 'POST', '/api/admin/users', accountDetail],
+  ['grantRole', (c: ReturnType<typeof createAdminClient>) => c.grantRole(5, { role: 'STUDENT', reason: 'Why' }), 'POST', '/api/admin/users/5/roles', accountDetail],
+  ['revokeRole', (c: ReturnType<typeof createAdminClient>) => c.revokeRole(5, 'COORDINATOR', { reason: 'Why' }), 'DELETE', '/api/admin/users/5/roles/COORDINATOR', accountDetail],
+  ['setAccess', (c: ReturnType<typeof createAdminClient>) => c.setAccess(5, { status: 'SUSPENDED', reason: 'Why' }), 'PATCH', '/api/admin/users/5/access', accountDetail],
+  ['createInvitation', (c: ReturnType<typeof createAdminClient>) => c.createInvitation({ email: 'new@utm.my', roles: ['COORDINATOR'], reason: 'Why' }), 'POST', '/api/admin/invitations', invitationRow],
+  ['revokeInvitation', (c: ReturnType<typeof createAdminClient>) => c.revokeInvitation(invitationRow.id, { reason: 'Why' }), 'DELETE', '/api/admin/invitations/' + invitationRow.id, invitationRow],
+])('%s sends a JSON body with the bearer token and decodes the strict response', async (_name, call, method, path, data) => {
+  const fetcher = vi.fn(async () => Response.json({ data })); vi.stubGlobal('fetch', fetcher);
+  await expect(call(createAdminClient(async () => 'TEST_ONLY'))).resolves.toBeTruthy();
+  expect(fetcher).toHaveBeenCalledWith(path, expect.objectContaining({ method, credentials: 'omit', cache: 'no-store', headers: { Authorization: 'Bearer TEST_ONLY', 'Content-Type': 'application/json' }, body: expect.stringContaining('"reason":"Why"') }));
+});
+it('lists invitations with the status filter and validates every row', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: { items: [invitationRow], total: 1, page: 1, pageSize: 20, generatedAt: '2026-10-28T00:00:00Z' } })); vi.stubGlobal('fetch', fetcher);
+  const result = await createAdminClient(async () => 'TEST_ONLY').listInvitations({ page: 1, status: 'PENDING' });
+  expect(result.items[0]?.email).toBe('new@utm.my');
+  expect(fetcher).toHaveBeenCalledWith('/api/admin/invitations?page=1&status=PENDING', expect.objectContaining({ method: 'GET', headers: { Authorization: 'Bearer TEST_ONLY' } }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { items: [{ ...invitationRow, status: 'LOST' }], total: 1, page: 1, pageSize: 20, generatedAt: '' } })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').listInvitations({ page: 1, status: '' })).rejects.toThrow('Invalid administration response');
+});
+it('rejects a malformed mutation response and parses API errors into AdminApiError', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { ...accountDetail, memberships: [{ role: 'OWNER' }] } })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').setAccess(5, { status: 'ACTIVE', reason: 'Why' })).rejects.toThrow('Invalid administration response');
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' } }, { status: 422 })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').grantRole(5, { role: 'SYSTEM_ADMIN', reason: 'Why' })).rejects.toMatchObject({ name: 'Error', status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' });
+});
