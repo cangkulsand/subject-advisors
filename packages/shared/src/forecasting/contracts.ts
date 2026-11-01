@@ -4,8 +4,24 @@ export type { CurriculumPrerequisiteExpression } from '../curriculum-reference';
 
 export const IMPORT_CSV_HEADER = [
   'external_reference', 'curriculum_version', 'cohort_status', 'history_completeness',
-  'subject_code', 'subject_status', 'record_semester_id', 'recognized_credits', 'is_synthetic',
+  'subject_code', 'subject_status', 'record_semester_id', 'recognized_credits', 'is_synthetic', 'student_name',
 ] as const;
+/** Header of CSV v1 files written before the optional `student_name` column; still accepted (names stay blank). */
+export const IMPORT_CSV_LEGACY_HEADER = IMPORT_CSV_HEADER.slice(0, 9);
+/**
+ * CSV v1 transport safeguards (Package 1). `maxExternalReferenceLength` is 100, not the 128 in the
+ * earlier contract text, because `imported_student.external_reference` is varchar(100); longer
+ * references are a correction finding rather than silently truncated.
+ */
+export const IMPORT_LIMITS = {
+  maxBytes: 5 * 1024 * 1024,
+  maxDataRows: 10_000,
+  maxExternalReferenceLength: 100,
+  maxCohortStatusLength: 20,
+  maxStudentNameLength: 255,
+  maxSourceLabelLength: 255,
+  maxIssues: 500,
+} as const;
 export const IMPORTED_SUBJECT_STATUSES = ['COMPLETED', 'EXEMPTED', 'FAILED', 'IN_PROGRESS'] as const;
 export const HISTORY_COMPLETENESS = ['COMPLETE', 'PARTIAL', 'UNKNOWN'] as const;
 export type HistoryCompleteness = (typeof HISTORY_COMPLETENESS)[number];
@@ -50,6 +66,12 @@ export interface ForecastContext {
   programmes: ProgrammeOption[];
   learningCentres: CentreOption[];
   targetSemesters: SemesterOption[];
+  /** Assigned programme x centre pairs (the Coordinator may only use these). */
+  assignedScopes?: Array<{ programmeId: Int32Id; learningCentreId: Int32Id }>;
+  /** System current semester (admin-managed marker); null when none is set. */
+  currentSemesterId?: Int32Id | null;
+  /** The only semester an import may target: the one after the current semester; null when unavailable. */
+  targetSemesterId?: Int32Id | null;
   curricula: CurriculumOption[];
   subjects: ForecastSubjectOption[];
 }
@@ -64,6 +86,8 @@ export interface ImportCsvRow {
   record_semester_id: string;
   recognized_credits: string;
   is_synthetic: '' | 'true' | 'false';
+  /** Optional display name (product owner decision 2026-11-01); blank allowed. Never a portal ID or credential. */
+  student_name: string;
 }
 export interface ImportCounts {
   studentRows: number;
@@ -92,6 +116,25 @@ export interface AcceptedSnapshotReceipt {
   acceptedAt: string;
   sourceFingerprint: string;
 }
+/** Where an accepted import snapshot came from: an uploaded CSV, or the students in the system (portal snapshot, MT8). */
+export type ImportSource = 'CSV' | 'SYSTEM';
+/**
+ * Coverage of a system-students snapshot. Student-entered academic records count as COMPLETE history; students with no
+ * academic record at all are UNKNOWN history and so count as uncertain in the forecast.
+ */
+export interface SystemSnapshotCoverage {
+  studentsFound: number;
+  studentsWithRecords: number;
+  studentsWithoutRecords: number;
+  recordsMapped: number;
+  /** Records skipped because the subject is not part of the student's curriculum. */
+  recordsUnmapped: number;
+  /** Mapped records whose student-entered status was WITHDRAWN; stored as FAILED (not a passed status). */
+  withdrawnStoredAsFailed: number;
+  excluded: { otherProgramme: number; otherCentre: number; inactiveAccess: number };
+  /** Documents the interim centre rule while student profiles have no learning centre. */
+  centreNote: string;
+}
 export interface ImportValidationReport {
   validationId: string;
   validationRevision: string;
@@ -101,14 +144,60 @@ export interface ImportValidationReport {
   completenessChanges: CompletenessChange[];
   subsetAcknowledgementRequired: boolean;
   acceptedSnapshot: AcceptedSnapshotReceipt | null;
+  /** Absent on CSV snapshots written before MT8 (read as 'CSV'). */
+  source?: ImportSource;
+  /** Present only on system-students snapshots. */
+  coverage?: SystemSnapshotCoverage;
+}
+/** Stable validation issue codes produced by the UC20 CSV validator (file, group, attempt and warning findings). */
+export const IMPORT_FILE_ERROR_CODES = [
+  'CSV_ENCODING_INVALID', 'CSV_MALFORMED', 'CSV_EMPTY', 'CSV_HEADER_INVALID', 'CSV_COLUMN_COUNT',
+  'CSV_TOO_MANY_ROWS', 'CSV_NO_DATA_ROWS',
+] as const;
+export const IMPORT_ROW_ERROR_CODES = [
+  'EXTERNAL_REFERENCE_REQUIRED', 'EXTERNAL_REFERENCE_TOO_LONG', 'CURRICULUM_VERSION_REQUIRED', 'CURRICULUM_VERSION_UNKNOWN',
+  'COHORT_STATUS_REQUIRED', 'COHORT_STATUS_TOO_LONG', 'STUDENT_NAME_INVALID', 'HISTORY_COMPLETENESS_INVALID', 'STUDENT_METADATA_CONFLICT',
+  'ATTEMPT_INCOMPLETE', 'UNKNOWN_SUBJECT_CODE', 'SUBJECT_NOT_IN_CURRICULUM', 'UNMAPPED_SUBJECT_STATUS',
+  'SEMESTER_ID_INVALID', 'SEMESTER_NOT_FOUND', 'RECOGNIZED_CREDITS_INVALID', 'RECOGNIZED_CREDITS_EXCEEDS_SUBJECT',
+  'RECOGNIZED_CREDITS_NOT_ALLOWED', 'IS_SYNTHETIC_INVALID', 'DUPLICATE_ATTEMPT',
+] as const;
+export const IMPORT_WARNING_CODES = [
+  'RETAKE_OUTCOME_UNRESOLVED', 'HISTORY_UNKNOWN', 'HISTORY_PARTIAL', 'SYNTHETIC_ATTEMPT', 'SEMESTER_UNKNOWN',
+  'CREDIT_EVIDENCE_MISSING', 'STALE_SOURCE_THRESHOLD_NOT_CONFIGURED', 'ISSUES_TRUNCATED',
+] as const;
+export type ImportIssueCode = (typeof IMPORT_FILE_ERROR_CODES)[number] | (typeof IMPORT_ROW_ERROR_CODES)[number] | (typeof IMPORT_WARNING_CODES)[number];
+/**
+ * Internal, non-public part of the stored `academic_import_batch.validation_summary` (never returned by the API).
+ * `rejectedRowsByStudent` lists every retained student with at least one rejected history row, so the engine can
+ * record REJECTED_HISTORY_ROW uncertainty even when completeness was already PARTIAL or UNKNOWN.
+ */
+export interface StoredValidationInternals {
+  schemaVersion: 1;
+  csvVersion: 1;
+  /** 'PORTAL' marks a system-students snapshot built from student_profile / academic_record (MT8); absent for CSV. */
+  source?: 'PORTAL';
+  dataRows: number;
+  rejectedRowsByStudent: Record<string, number>;
+  subsetAcknowledgedBy?: string;
 }
 export interface ImportValidationEnvelope { error: { code: string; message: string; report: ImportValidationReport } }
+/** One retained roster student of an accepted import (read by the Coordinator who manages the cohort). */
+export interface ImportedStudentSummary {
+  importedStudentId: Int32Id;
+  externalReference: string;
+  studentName: string | null;
+  curriculumVersion: string;
+  cohortStatus: string;
+  historyCompleteness: HistoryCompleteness;
+}
 export interface AcceptedImport extends ForecastScope {
   importBatchId: Int32Id;
   sourceDate: string;
   sourceLabel: string;
   acceptedAt: string;
   sourceFingerprint: string;
+  /** 'SYSTEM' for snapshots built from the students in the system, otherwise 'CSV'. */
+  source: ImportSource;
   counts: ImportCounts;
   snapshotStatus: 'ACCEPTED_IMMUTABLE';
   validationReport: ImportValidationReport;
@@ -119,6 +208,8 @@ export interface ImportUploadRequest extends ForecastScope {
   sourceLabel: string;
   file: File;
 }
+/** POST /api/coordinator/forecast-imports/system-snapshots; the response is an AcceptedImport (201 created, 200 replay). */
+export interface SystemSnapshotRequest extends ForecastScope { sourceLabel?: string }
 export interface AcceptSubsetRequest extends ForecastScope {
   validationRevision: string;
   acknowledgeRejectedRows: true;
@@ -289,6 +380,8 @@ export type ForecastConfigurationEnvelope = Envelope<ForecastConfiguration>;
 export type ForecastTemplateResponse = string;
 export interface Paginated<T> { items: T[]; nextCursor?: string }
 export type ImportListData = Paginated<ImportSummary>;
+export type ImportStudentListData = Paginated<ImportedStudentSummary>;
+export type ImportStudentListResponse = Envelope<ImportStudentListData>;
 export type ForecastRunListData = Paginated<ForecastRun>;
 export type ForecastAuditData = Paginated<ForecastAuditEntry>;
 export type ImportListResponse = Envelope<ImportListData>;

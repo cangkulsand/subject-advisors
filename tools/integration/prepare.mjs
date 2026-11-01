@@ -15,6 +15,7 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     p002Web:await entry('apps/web/src/features/offerings','apps/web/src/features/offerings/index.ts'),
     p003Api:await entry('apps/api/src/modules/pathway','apps/api/src/modules/pathway/index.ts'),
     adminApi:await entry('apps/api/src/modules/admin','apps/api/src/modules/admin/index.ts'),
+    forecastingApi:await entry('apps/api/src/modules/forecasting','apps/api/src/modules/forecasting/index.ts'),
   };
   if(features.p001Web)for(const file of ['apps/web/src/features/profile/client.ts','apps/web/src/features/records/RecordsPage.tsx'])if(!await exists(file))throw new Error('Incomplete P001 web overlay; missing '+file);
   const api=[
@@ -24,11 +25,13 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     ...(features.p002Api?["import { createOfferingHandler } from '../apps/api/src/modules/offerings';"]:[]),
     ...(features.p003Api?["import { createPathwayHandler } from '../apps/api/src/modules/pathway';"]:[]),
     ...(features.adminApi?["import { createAdminHandler, createInvitationRedeemer } from '../apps/api/src/modules/admin';"]:[]),
+    ...(features.forecastingApi?["import { createForecastingHandler } from '../apps/api/src/modules/forecasting';"]:[]),
     'export function createIntegratedServices(env: AuthBindings): IntegratedServices {',
     ...(features.p001Api?['  const p001 = createP001Dependencies(env);','  const auth = p001.auth;']:['  const auth = createAuthDependencies(env);']),
     ...(features.adminApi?['  auth.invitations = createInvitationRedeemer(env, auth.access);']:[]),
     '  return { auth,',
     ...(features.adminApi?['    admin: createAdminHandler(env, auth),']:[]),
+    ...(features.forecastingApi?['    forecasting: createForecastingHandler(env, auth),']:[]),
     ...(features.p001Api?['    profile: request => handleP001Request(request, p001),']:[]),
     ...(features.p002Api?["    offerings: createOfferingHandler(env, { profiles: auth.profiles ?? { stateFor: async () => 'UNAVAILABLE' as const } }),"]:[]),
     ...(features.p003Api?["    pathway: createPathwayHandler(env, auth),"]:[]),

@@ -96,20 +96,23 @@ DO $test$ BEGIN
 END $test$;
 
 INSERT INTO public.learning_centre(learning_centre_id,centre_code,centre_name) VALUES(-2000000121,'DBTEST_A','DEMO'),(-2000000122,'DBTEST_B','DEMO');
-INSERT INTO public.academic_import_batch(import_batch_id,learning_centre_id,snapshot_date,provided_by,source_label,import_status) VALUES
- (-2000000131,-2000000121,'1000-01-01','__DB_TEST_COORDINATOR','DEMO NOT OFFICIAL','DEMO'),
- (-2000000132,-2000000122,'1000-01-01','__DB_TEST_COORDINATOR','DEMO NOT OFFICIAL','DEMO');
+INSERT INTO public.academic_import_batch(import_batch_id,learning_centre_id,snapshot_date,provided_by,source_label,import_status,programme_id) VALUES
+ (-2000000131,-2000000121,'1000-01-01','__DB_TEST_COORDINATOR','DEMO NOT OFFICIAL','UPLOADED',-2000000001),
+ (-2000000132,-2000000122,'1000-01-01','__DB_TEST_COORDINATOR','DEMO NOT OFFICIAL','UPLOADED',-2000000001);
 INSERT INTO public.imported_student(imported_student_id,import_batch_id,curriculum_id,external_reference,cohort_status) VALUES(-2000000141,-2000000131,-2000000011,'DEMO_NOT_A_PERSON','DEMO');
 INSERT INTO public.imported_subject_record(imported_student_id,subject_id,subject_status,semester_id,is_synthetic) VALUES
  (-2000000141,-2000000021,'FAILED',-2000000041,true),(-2000000141,-2000000021,'COMPLETED',-2000000042,true);
 SELECT pg_temp.assert_rejected('imported record outside curriculum',$q$INSERT INTO public.imported_subject_record(imported_student_id,subject_id,subject_status,is_synthetic) VALUES(-2000000141,-2000000023,'COMPLETED',true)$q$);
+-- UC20 (0007): batches must be accepted before a forecast can reference them.
+UPDATE public.academic_import_batch SET import_status='VALIDATED',source_fingerprint=repeat('a',64),validation_summary='{}',target_semester_id=-2000000041 WHERE import_batch_id IN (-2000000131,-2000000132);
+UPDATE public.academic_import_batch SET import_status='ACCEPTED',accepted_by='__DB_TEST_COORDINATOR' WHERE import_batch_id IN (-2000000131,-2000000132);
 SELECT pg_temp.assert_true('coordinator and portal identities separate',(SELECT count(*)=2 FROM public.student_profile WHERE clerk_user_id LIKE '__DB_TEST_STUDENT_%') AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='imported_student' AND column_name='student_id'));
 INSERT INTO public.class_capacity_rule(capacity_rule_id,class_type,minimum_enrollment,break_even_target,normal_maximum,exception_maximum,is_active) VALUES(-2000000151,'LECTURE',1,2,3,4,true);
 SELECT pg_temp.assert_rejected('impossible capacity',$q$UPDATE public.class_capacity_rule SET minimum_enrollment=9 WHERE capacity_rule_id=-2000000151$q$);
-INSERT INTO public.forecast_run(forecast_run_id,import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number) VALUES
- (-2000000161,-2000000131,-2000000041,'{}','__DB_TEST_COORDINATOR','DRAFT',-2000000121,1);
-SELECT pg_temp.assert_rejected('forecast batch centre mismatch',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number) VALUES(-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000122,1)$q$);
-SELECT pg_temp.assert_rejected('duplicate forecast version',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number) VALUES(-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000121,1)$q$);
+INSERT INTO public.forecast_run(forecast_run_id,import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,programme_id,rule_snapshot,engine_version) VALUES
+ (-2000000161,-2000000131,-2000000041,'{}','__DB_TEST_COORDINATOR','DRAFT',-2000000121,1,-2000000001,'{}','test-engine');
+SELECT pg_temp.assert_rejected('forecast batch centre mismatch',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,programme_id,rule_snapshot,engine_version) VALUES(-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000122,1,-2000000001,'{}','test-engine')$q$);
+SELECT pg_temp.assert_rejected('duplicate forecast version',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,programme_id,rule_snapshot,engine_version) VALUES(-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000121,1,-2000000001,'{}','test-engine')$q$);
 SELECT pg_temp.assert_rejected('referenced snapshot edit',$q$UPDATE public.academic_import_batch SET source_label='MUTATED' WHERE import_batch_id=-2000000131$q$);
 SELECT pg_temp.assert_rejected('referenced imported history edit',$q$UPDATE public.imported_subject_record SET subject_status='EXEMPTED' WHERE imported_student_id=-2000000141$q$);
 INSERT INTO public.forecast_subject_demand(demand_id,forecast_run_id,subject_id,eligible_count,forecast_count,graduation_critical_count,data_quality_status) VALUES(-2000000171,-2000000161,-2000000021,NULL,2,NULL,'PRELIMINARY');
@@ -135,8 +138,8 @@ SELECT pg_temp.assert_rejected('finalized assumptions update',$q$UPDATE public.f
 SELECT pg_temp.assert_rejected('finalized source change',$q$UPDATE public.forecast_run SET import_batch_id=-2000000132 WHERE forecast_run_id=-2000000161$q$);
 SELECT pg_temp.assert_rejected('finalized reopen',$q$UPDATE public.forecast_run SET status='DRAFT',finalized_by=NULL,finalized_at=NULL WHERE forecast_run_id=-2000000161$q$);
 SELECT pg_temp.assert_rejected('finalized delete',$q$DELETE FROM public.forecast_run WHERE forecast_run_id=-2000000161$q$);
-INSERT INTO public.forecast_run(forecast_run_id,import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,parent_forecast_run_id) VALUES(-2000000162,-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000121,2,-2000000161);
-SELECT pg_temp.assert_rejected('forecast parent semester mismatch',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,parent_forecast_run_id) VALUES(-2000000131,-2000000042,'{}','DEMO','DRAFT',-2000000121,2,-2000000161)$q$);
+INSERT INTO public.forecast_run(forecast_run_id,import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,parent_forecast_run_id,programme_id,rule_snapshot,engine_version) VALUES(-2000000162,-2000000131,-2000000041,'{}','DEMO','DRAFT',-2000000121,2,-2000000161,-2000000001,'{}','test-engine');
+SELECT pg_temp.assert_rejected('forecast parent semester mismatch',$q$INSERT INTO public.forecast_run(import_batch_id,target_semester_id,scenario_assumptions,generated_by,status,learning_centre_id,version_number,parent_forecast_run_id,programme_id,rule_snapshot,engine_version) VALUES(-2000000131,-2000000042,'{}','DEMO','DRAFT',-2000000121,2,-2000000161,-2000000001,'{}','test-engine')$q$);
 UPDATE public.forecast_run SET status='SUPERSEDED' WHERE forecast_run_id=-2000000161;
 SELECT pg_temp.assert_rejected('superseded demand remains frozen',$q$UPDATE public.forecast_subject_demand SET forecast_count=7 WHERE demand_id=-2000000171$q$);
 UPDATE public.forecast_run SET status='ARCHIVED' WHERE forecast_run_id=-2000000161;

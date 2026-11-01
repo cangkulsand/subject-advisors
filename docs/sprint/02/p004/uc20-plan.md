@@ -22,8 +22,10 @@ The repository already supplies guarded coordinator navigation, import and forec
 tables, append-only decision audits, and database protections for referenced
 snapshots, capacity rules and finalized forecasts. The coordinator screens are
 placeholders; these structures do not constitute an implemented UC20 workflow.
-Uploaded cohort members are identified only by source external references and do not
-need or use portal accounts or student-profile endpoints.
+Decided 2026-11-02 (MT8): data provision has two sources. The main source is a frozen snapshot of the
+students currently in the system (`student_profile` / `academic_record`, read-only; external reference
+`PORTAL-<student_id>`); a CSV upload is the fallback. A forecast uses one source. Uploaded (CSV) cohort
+members are identified only by source external references and do not need portal accounts.
 
 Build on the existing contracts and protections:
 
@@ -67,6 +69,8 @@ Each implementation package requires its own Plan, Implementation, Review and
 Changelog record. Review each completed package before dependent work begins.
 
 ## 3. Academic data provision and validation
+
+**Two sources (decided 2026-11-02, MT8).** "Use students in the system" is the main option: `POST /api/coordinator/forecast-imports/system-snapshots` selects students of the programme (curriculum), of the requested centre (via the scope provider; interim KL for all), with ACTIVE access and the STUDENT role, and stores an ACCEPTED snapshot with a coverage report. Student-entered records are COMPLETE history; no records means UNKNOWN. WITHDRAWN is stored as FAILED. The CSV flow below stays as the fallback.
 
 Provide one downloadable CSV template as the initial input format. Support an explicit
 student row even when no subject history is supplied, so missing histories do not
@@ -151,12 +155,28 @@ curriculum subject:
    forecasting assumptions.
 2. Resolve completed and exempted subjects under the agreed outcome and retake
    policy, counting each student once per subject.
-3. Apply curriculum membership and configured semester restrictions.
+3. Apply curriculum membership and configured semester restrictions (the Normal/Short
+   offering rule, see below).
 4. Evaluate mandatory prerequisites from supplied evidence. Recommended prior
    knowledge remains advisory; corequisites remain distinct.
 5. Mark unsupported history, credit or corequisite conditions uncertain rather than
    inventing a satisfied or failed requirement.
 6. Apply subject-level forecast exclusions.
+
+**Normal/Short offering rule (product owner decision 2026-11-02).** The rule from
+[S1-P002-006](../../../changes/S1-P002-006-guided-offerings.md) is an official offering rule stored as data in
+`subject_semester_rule` (one NORMAL or SHORT row per curriculum subject): Short (semester 3) runs 2-credit or
+Elective U1/U2 subjects except Project I; Normal (1/2) runs the rest plus Project I. Explicit additions: SECD3761
+is Short-only; paired lecture/lab subjects (SECR2242/SECR2941, SECR3242/SECR3941) run in Normal. The stored rows are
+authoritative; no code special cases. A subject is **not offered in the target semester type** when every
+curriculum that contains it has rule rows for it and none is the target type; it then gets no demand, no sections,
+is not counted in totals, stays visible with "Runs only in Short semesters" / "Runs only in Normal semesters", and
+is persisted as `configuration_status = 'EXCLUDED'`, `forecast_count` NULL, with `semesterTypeExcluded` and the
+reason in `scenario_assumptions.subjects` (distinct from catalogue exclusions; no migration change). A subject with
+**no** rule rows is unrestricted. The rule snapshot carries the curriculum fingerprints (which include the rules)
+and `semesterTypeExclusions`; the engine version is `uc20-engine-1.1.0`. Projek Sarjana Muda 1/2, Latihan Industri
+(SECJ3032, SECJ4134, SECJ4114, SECJ4118, SECR3032, SECR4134, SECR4114, SECR4118) and UKQT3001 are excluded in the
+catalogue (`include_in_offering_forecast = false`) and are never forecast or confirmed.
 
 Return supported eligibility, uncertain eligibility, estimated demand under the
 selected assumptions, supported graduation-critical counts, and exclusions with
@@ -260,8 +280,8 @@ within the Coordinator's assignment (decided 2026-11-01). System Administrators 
 A selected centre in a browser request is not proof of authorization. Provide a
 Coordinator-only catalogue/context operation for configured programmes, centres,
 semesters and the selected programme's curriculum versions, subjects, conditions and
-exclusion reasons. Never query student profiles/options to populate UC20. The only
-student-derived data a Coordinator sees is the pick read in section 11 (pick counts and the
+exclusion reasons. Superseded 2026-11-02: the system-students snapshot reads student profiles and records (read-only, frozen
+snapshot) as the main data source. Outside that snapshot the student-derived data a Coordinator sees is the pick read in section 11 (pick counts and the
 pickers' name and profile/record fields, within the Coordinator's assignment only).
 
 Keep raw cohorts out of browser persistence, shared caches and application logs.
@@ -345,7 +365,8 @@ planned work; nothing here is implemented yet.
 - **Step after review.** After import and forecast, the Coordinator confirms which subjects
   will be offered for programme + learning centre + target semester. It is deliberate (never
   automatic) and audited (actor, time, reason). It is allowed from a FINALIZED run for the same
-  scope; the run is stored as provenance. Excluded subjects (FYP, Industrial Training) cannot
+  scope; the run is stored as provenance. Excluded subjects (Projek Sarjana Muda 1/2, Latihan Industri, UKQT3001) and subjects that do not run
+  in the target semester type (Normal/Short rule, 422 `SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE`) cannot
   be confirmed.
 - **Lifecycle.** A subject is `CONFIRMED` or `WITHDRAWN`. Confirm adds or re-confirms, withdraw
   removes it from the student list, both with a reason and an append-only audit entry. The

@@ -236,6 +236,45 @@ on success. The student's five-minute snapshot may briefly lag a confirmation ch
   (WITHDRAWN status, re-confirmation, audit tables) are engineering proposals pending review.
 - **Rollback:** revert the documentation/contract commit; no data or runtime change exists.
 
+### Decided 2026-11-02 (Normal/Short offering rule and excluded subjects)
+
+The Normal/Short semester rule from [S1-P002-006](S1-P002-006-guided-offerings.md) (lines 23 and 44) is now
+an **official offering rule**, no longer display-only. It is stored as data in `subject_semester_rule`
+(one NORMAL or SHORT row per `curriculum_subject`; loaded in Neon development by the coordinator, then adjusted
+below). The stored rows are the single source of truth; no subject-specific code exists.
+
+- **Short semester (semester 3):** subjects worth 2 credits OR category Elective U1/U2, EXCEPT Project I
+  (SECJ3032 / SECR3032). **Normal semesters (1/2):** all other subjects plus Project I. So the 2-credit Core
+  university subjects (UHLB1112, UHLB2122, UHLB3132, UHIS1022, UHMS1182, UHMT1012, UHIT2302, UBSS1032, UKXQ2022)
+  are Short-only (confirmed by the product owner).
+- **Explicit additions to the S1-P002-006 rule:** SECD3761 "Seminar Keusahawanan Teknologi Maklumat" (1 credit) is
+  **Short-only** (SHORT rows in both curricula). **Paired lecture/lab subjects run in Normal semesters**, overriding
+  the 2-credit Short rule: SECR2242 Computer Networks (2) + SECR2941 Computer Networks Lab (1), and SECR3242
+  Internetworking Technology (2) + SECR3941 Internetworking Technology (Lab) (1); all four rows are NORMAL.
+- **Never forecast or confirmed** (`include_in_offering_forecast = false`, shown under "Excluded subjects"):
+  Projek Sarjana Muda 1 and 2 and Latihan Industri (SECJ3032, SECJ4134, SECJ4114, SECJ4118, SECR3032, SECR4134,
+  SECR4114, SECR4118) and UKQT3001 "Pengalaman Pembelajaran Luar Kurikulum" (1 credit, never offered in Normal or
+  Short semesters). Because Project I is excluded from the forecast, its Normal-only rule matters only to the
+  student page.
+- **UC20 effect:** a subject whose rows exclude the target semester type is "Not offered in this semester type":
+  no demand, no sections, not in totals, listed with "Runs only in Short semesters" / "Runs only in Normal
+  semesters", and cannot be confirmed (422 `SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE`). A subject with no rule rows stays
+  unrestricted. Built in S2-P004-007 MT7 (engine `uc20-engine-1.1.0`).
+- **P002 follow-up (not changed here):** the student offerings page should later read `subject_semester_rule`
+  instead of its hardcoded predicate in `apps/web/src/features/offerings/display-filter.ts`, so the student and
+  coordinator views cannot diverge.
+- **Follow-up:** pair-aware confirmation (a hint when only one subject of a lecture/lab pair is selected) is not built.
+
+### Decided 2026-11-02 (MT8: data source is the students in the system)
+
+Product owner decisions that **replace** the old UC20 rule "never query student profiles/options to populate UC20 / independent of student portal participation" and every BR1-style statement of it (this file's "independent of student portal participation" line above, SRS A12 BR1, uc20-plan section 1 and 3, package-1-contracts):
+
+1. **Main source.** The Coordinator builds the forecast from the CURRENT STUDENTS IN THE SYSTEM ("Use students in the system"). A CSV upload stays as the fallback. A forecast uses exactly one source (one import snapshot).
+2. **Records are complete history.** Student-entered academic records count as COMPLETE history, labelled "student-entered". Students with no academic record at all have UNKNOWN history and count as uncertain.
+3. **Old rule replaced.** The forecast may read `student_profile` and `academic_record` (read-only) through the system-students snapshot. The snapshot is frozen like a CSV one; the student tables are never written. The pick data (pickers beside the forecast) remains display only and is still not an input of the calculation.
+
+Interim limitation: `student_profile` has no learning centre yet, so the `ScopeProvider` returns KL for every student and all students count under KL until the profile learning centre lands.
+
 ## 2. Implementation
 
 - **Status:** Complete for contracts/specifications. No handler, migration or UI implemented.
