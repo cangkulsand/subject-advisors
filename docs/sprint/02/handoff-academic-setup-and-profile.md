@@ -23,6 +23,8 @@ Until Packages A and B land, the forecast build uses a temporary hardcoded `Scop
 `currentSemesterId()`, `studentLearningCentreId(studentId)`). Package A's read API should make a
 DB-backed `ScopeProvider` easy to write, so that only one file changes when it lands.
 
+The forecast build has since merged (S2-P004-007). The temporary provider is `apps/api/src/config/interim-scope.ts`: replace `getScopeProvider()` with the DB-backed provider. For the subject create/edit menu (class type, semester type, "offered as a class"), follow [subject-configuration-rules.md](../../database/subject-configuration-rules.md).
+
 ## Package A prompt: admin academic setup
 
 ```text
