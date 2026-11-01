@@ -59,7 +59,7 @@ export function fixtureResponse(url, state = {}) {
   }
   if (url.pathname === '/api/admin/invitations') {
     const status = url.searchParams.get('status');
-    return paged(store(state).invitations.filter(item => !status || item.status === status), url);
+    return paged(state.empty ? [] : store(state).invitations.filter(item => !status || item.status === status), url);
   }
   if (url.pathname === '/api/admin/audit') return paged(store(state).events.filter(event => (!url.searchParams.get('accountId') || event.accountId === Number(url.searchParams.get('accountId'))) && (!url.searchParams.get('kind') || url.searchParams.get('kind') === 'ALL' || event.kind === url.searchParams.get('kind')) && (!url.searchParams.get('from') || generatedAt.slice(0, 10) >= url.searchParams.get('from')) && (!url.searchParams.get('to') || generatedAt.slice(0, 10) <= url.searchParams.get('to'))), url);
   return null;
