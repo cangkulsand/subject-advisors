@@ -1,0 +1,55 @@
+{
+  "error": {
+    "code": "IMPORT_CORRECTION_REQUIRED",
+    "message": "Correct or explicitly acknowledge rejected history rows before accepting this subset.",
+    "report": {
+      "validationId": "00000000-0000-4000-8000-000000000020",
+      "validationRevision": "sha256:fictional-validation-revision",
+      "status": "CORRECTION_REQUIRED",
+      "counts": {
+        "studentRows": 5,
+        "uniqueStudents": 3,
+        "validAttempts": 2,
+        "rejectedRows": 2,
+        "partialStudents": 1,
+        "unknownHistoryStudents": 2
+      },
+      "issues": [
+        {
+          "severity": "ERROR",
+          "code": "UNMAPPED_SUBJECT_STATUS",
+          "row": 4,
+          "field": "subject_status",
+          "message": "WITHDRAWN is not a canonical imported subject status.",
+          "correctiveAction": "Provide a source-supported mapped status or omit and correct this attempt."
+        },
+        {
+          "severity": "WARNING",
+          "code": "RETAKE_OUTCOME_UNRESOLVED",
+          "row": null,
+          "field": "subject_code",
+          "message": "The repeated DEMO101 attempts have no configured precedence rule.",
+          "correctiveAction": "Keep this student's DEMO101 result uncertain until a rule is configured."
+        },
+        {
+          "severity": "ERROR",
+          "code": "UNMAPPED_SUBJECT_STATUS",
+          "row": 6,
+          "field": "subject_status",
+          "message": "WITHDRAWN is not a canonical imported subject status.",
+          "correctiveAction": "Provide a source-supported mapped status or omit and correct this attempt."
+        }
+      ],
+      "completenessChanges": [
+        {
+          "externalReference": "DEMO-001",
+          "before": "COMPLETE",
+          "after": "PARTIAL",
+          "rejectedRows": 1
+        }
+      ],
+      "subsetAcknowledgementRequired": true,
+      "acceptedSnapshot": null
+    }
+  }
+}

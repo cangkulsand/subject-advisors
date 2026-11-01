@@ -2,6 +2,7 @@ import { AuthGate } from '../auth';
 import { useAppLocation } from '../../app/navigation';
 import { StaffNavigationShell, StaffPlannedPage, type StaffNavigationGroup } from '../admin/staff-navigation';
 import { AppLink } from '../../app/navigation';
+import { ForecastingPreview } from './ForecastingPreview';
 
 const groups: StaffNavigationGroup[] = [
   { label: 'Workspace', links: [{ href: '/coordinator', label: 'Overview', icon: 'overview' }] },
@@ -22,7 +23,7 @@ const quickLinks = groups.slice(1).flatMap(group => group.links);
 
 function Overview() {
   return <><header className="admin-page-heading"><div><p className="admin-eyebrow">COORDINATOR WORKSPACE</p><h1>Overview</h1><p>Choose a workspace to review academic snapshots, forecast planning and decisions.</p></div></header>
-    <div className="admin-metrics coordinator-quicklinks">{quickLinks.map(link => <AppLink className="admin-card coordinator-quicklink" href={link.href} key={link.href}><strong>{link.label}</strong><span>Planned workspace <span aria-hidden="true">→</span></span></AppLink>)}</div>
+    <div className="admin-metrics coordinator-quicklinks">{quickLinks.map(link => <AppLink className="admin-card coordinator-quicklink" href={link.href} key={link.href}><strong>{link.label}</strong><span>{link.href === '/coordinator/imports' || link.href === '/coordinator/forecasts' ? 'Open preview' : 'Planned workspace'} <span aria-hidden="true">→</span></span></AppLink>)}</div>
     <p className="coordinator-separation-note">Coordinator planning data is separate from student academic records.</p>
   </>;
 }
@@ -32,7 +33,7 @@ function Workspace() {
   const page = pages[path];
   const title = page?.title ?? (path === '/coordinator' ? 'Overview' : 'Page not found');
   return <StaffNavigationShell path={path} title={title} workspace="Coordinator" roleLabel="Academic coordinator" home="/coordinator" navLabel="Coordinator navigation" groups={groups} variant="coordinator">
-    {path === '/coordinator' ? <Overview/> : page ? <StaffPlannedPage {...page}/> : <section className="admin-card"><h1>Page not found</h1><p>Choose a page from the coordinator menu.</p></section>}
+    {path === '/coordinator' ? <Overview/> : path === '/coordinator/imports' ? <ForecastingPreview title="Data Imports"/> : path === '/coordinator/forecasts' ? <ForecastingPreview/> : page ? <StaffPlannedPage {...page}/> : <section className="admin-card"><h1>Page not found</h1><p>Choose a page from the coordinator menu.</p></section>}
   </StaffNavigationShell>;
 }
 
