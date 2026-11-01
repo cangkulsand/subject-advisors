@@ -46,7 +46,7 @@ explicit change to the agreed project requirements.
    and semester query. Keep identity at key index zero. Increment the narrow UC08
    contract marker when additive context fields are introduced so older five-minute
    snapshots cannot hide fields without changing other academic cache behavior. Its
-   current marker is `p002-context-v5-curriculum-prerequisite-details`; prerequisite metadata keeps
+   current marker is `p002-context-v5-curriculum-prerequisite-details` (to be bumped, suggested `p002-context-v6-confirmed-offerings`, by the P002 confirmed-offerings package of S2-P004-006 because the response changes meaning and shape: confirmed offerings for the next semester, `status` CONFIRMED / NOT_YET_CONFIRMED / NO_NEXT_SEMESTER, confirmation revision, pick deadline and OPEN/CLOSED window, remaining allowance, picks; the deadline can pass while a snapshot is cached, so the page computes OPEN/CLOSED from the deadline and `PUT` is authoritative with `409 PICKS_CLOSED`). A coordinator confirm or withdraw changes what students see: those responses are `no-store`, coordinator-side snapshots are cleared on success, and the student five-minute snapshot may lag briefly, so `PUT` always validates picks against current server state (`409 OFFERING_NOT_CONFIRMED`, then the page reloads and clears its snapshot). Coordinator confirmation, pick-count and picker-list reads (personal data) are private, `no-store`, and not cached in shared caches or logged; prerequisite metadata keeps
    known-empty (`available` with no items) distinct from unavailable or legacy data.
    P001 academic-history read continues to use the session-long academic-records
    cache; do not put the composed page data or local selection draft into that
