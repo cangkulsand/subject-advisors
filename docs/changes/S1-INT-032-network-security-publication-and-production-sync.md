@@ -1,23 +1,23 @@
 # S1-INT-032 — Network Security publication and production sync
 
-- **Status:** READY_FOR_REVIEW — staged for coordinator inspection; offline validation and code-scope review passed; human peer review pending; live remote access unavailable
+- **Status:** BLOCKED — live GitHub publication unavailable; local Network Security sync complete; human peer review pending
 - **Date:** 2026-11-01
 - **Sprint:** Sprint 1 integration
 - **Owner:** INT / Integration
 - **Related UC / FR:** P001 UC03/UC04, P002 UC08, P003 UC17; shared Network Security curriculum reference
-- **Branch / PR:** DEV `main`; no commit or PR created
+- **Branch / PR:** PROD `main` equaled scoped commit `b73090964a1e25cbcbb8c72f4f3319cac2ade90f` at the local-sync checkpoint; receipt prepared as a separate documentation-only change, coordinator receipt review pending
 - **Reviewer:** Coordinator actual-diff review passed; human peer review pending
 
 ## 1. Plan
 
 ### Objective / problem
-Prepare the requested Network Security changes in `subject-advisors` for publication to `subject-advisors-prod` and both `main` branches, preserving local history and restricting the change to the reviewed Network Security scope.
+Prepare the requested Network Security publication and record its actual outcome in the PROD repository at `subject-advisors-prod`.
 
 ### Scope and requirements
-- In scope: the exact 46-path allowlist below (33 tracked modifications and 13 untracked additions, including this record); local commit on DEV `main` after coordinator review; local-history-preserving fast-forward of PROD `main` from DEV; offline asset-only build in PROD with all database URL variables removed; ordinary non-force pushes to the requested `main` branches when live remotes are reachable.
+- In scope: PROD-only publication receipt for the reviewed 46-path change, documenting scoped DEV commit, local PROD fast-forward, asset-only validation, concurrent unrelated Sprint 2 source advancement, and failed remote pushes. This receipt itself is staged only in PROD for coordinator review.
 - Out of scope: any unlisted path; production database migration/import or data edits; curriculum activation; deployment or Wrangler dry-run; auth/provider operations; dependency updates; changing old migration bytes or checksums; modifying source assets or actual environment files; reset, rebase, force push or deletion.
 
-### Exact staged path allowlist
+### Reviewed implementation path allowlist
 - `.gitattributes`
 - `apps/api/src/modules/offerings/context.test.ts`, `apps/api/src/modules/offerings/context.ts`
 - `apps/api/src/modules/pathway/adapter.ts`, `apps/api/src/modules/pathway/contracts.ts`, `apps/api/src/modules/pathway/pathway.test.ts`, `apps/api/src/modules/pathway/repository.ts`
@@ -32,25 +32,26 @@ Prepare the requested Network Security changes in `subject-advisors` for publica
 - `tools/db/cli.mjs`, `tools/db/import-reference.mjs`, `tools/db/import-reference.test.mjs`, `tools/db/migrations.test.mjs`, `tools/db/review.mjs`
 
 ### Proposed implementation and publication sequence
-1. After coordinator approval of this staged diff, commit only the allowlist on DEV `main`.
-2. Fetch from the local DEV repository into PROD and fast-forward local PROD `main` only if its history permits; stop on divergence or unexpected local work. Do not rewrite history.
-3. In PROD, run the asset-only Cloudflare build with `DATABASE_URL`, `AUTH_TEST_DATABASE_URL`, `OFFERINGS_TEST_DATABASE_URL`, and `DB_FOUNDATION_URL` removed. Do not deploy or run a dry-run.
-4. Compare local DEV and PROD `main` commit IDs and worktrees. Separately retry live remote fetch/verification; where reachable, push both requested `main` branches with ordinary non-force pushes. Network failure can leave live remotes unverified without undoing safe local history.
+1. Completed: committed only the reviewed allowlist on DEV `main` as `b73090964a1e25cbcbb8c72f4f3319cac2ade90f` (tree `a08d409f6047788d261a94e3fb970d071474718c`, parent `4b013ee7eba266ad6690d790ebfb5d25d48c1e75`).
+2. Completed: fetched the local DEV repository from the PROD working directory and fast-forwarded clean PROD `main` from `4b013ee7eba266ad6690d790ebfb5d25d48c1e75` to scoped commit `b73090964a1e25cbcbb8c72f4f3319cac2ade90f`; no history was rewritten.
+3. Completed in PROD: `npm.cmd run build:cloudflare` passed as an asset-only build with `DATABASE_URL`, `AUTH_TEST_DATABASE_URL`, `OFFERINGS_TEST_DATABASE_URL`, and `DB_FOUNDATION_URL` removed. No deployment/dry-run.
+4. Scoped PROD commit/tree are verified. DEV `main` subsequently advanced to unrelated Sprint 2 commit `7f1d9d6206c435cecaad0b41ca97b12a66185aa3` (parent is the scoped commit); it is preserved in DEV and excluded from PROD. Thus current DEV/PROD branch heads intentionally differ, while scoped commit `b73090964a1e25cbcbb8c72f4f3319cac2ade90f` is PROD `main` and an ancestor of DEV `main`. Ordinary non-force pushes of only that scoped commit to both `origin/main` refs were attempted and failed because `github.com:443` was unreachable; live remote tips remain unverified.
 
 ### APIs / database / interfaces
 Migration 0005 adds nullable curriculum metadata and private import-receipt support. No production-side schema or data operation is part of repository publication.
 
 ### Acceptance criteria
-- [x] Only the exact 46 listed paths are staged; staged diff passes `git diff --cached --check`. Coordinator staged-diff inspection pending.
-- [x] Migration and manifest staged blobs preserve their source bytes and recorded SHA-256 values.
-- [ ] After review, the DEV commit and PROD fast-forward preserve local history; local repository equality is recorded separately from live GitHub tip/ancestry verification.
-- [ ] The PROD asset-only build passes with DB URL variables removed; no deployment, migration, import, activation or database connection is performed.
-- [ ] Ordinary non-force pushes are attempted only when the live remotes are reachable; report success or network blocker accurately. Human peer review remains pending.
+- [x] The reviewed 46-path implementation candidate was staged exclusively and passed coordinator review; the staged diff passed `git diff --cached --check`. The current receipt is a separate documentation-only change.
+- [x] Migration and manifest committed blobs preserve their source bytes and recorded SHA-256 values.
+- [x] The reviewed DEV commit and PROD fast-forward preserve local history. The scoped commit is PROD `main` and an ancestor of DEV `main`; current heads differ because DEV later received the unrelated S2 commit, excluded from PROD.
+- [x] The PROD asset-only build passed with all four DB URL variables removed; no deployment, migration, import, activation or database connection was performed.
+- [x] Ordinary non-force pushes of the scoped commit were attempted for both origins and failed on network connectivity to `github.com:443`; live remote tips are unverified. Human peer review remains pending.
+- [ ] Live GitHub publication succeeds and current remote tips are verified; this remains pending because the exact scoped pushes could not reach `github.com:443`.
 
 ### Verification plan
 - Before staging, confirm the 46-path working-tree candidate set exactly matches this allowlist.
 - Stage explicit paths only; compare the full staged path set against the allowlist, inspect `git diff --cached --stat` and `git diff --cached --check`, and verify migration/manifest blob hashes.
-- Following the coordinator gate, perform local DEV commit, fetch DEV locally into PROD and fast-forward only, run the PROD asset-only build with the four DB URL variables removed, compare local commits/status, then attempt ordinary pushes if network permits.
+- Completed: DEV scoped commit, local DEV-to-PROD fetch/fast-forward, PROD asset-only build with DB URL variables removed, local commit/tree/hash comparisons, and ordinary non-force push attempts. Do not copy DEV S2 commit `7f1d9d6206c435cecaad0b41ca97b12a66185aa3` to PROD.
 
 ### Risk / assumptions / rollback
 - Risks: broad shared API/consumer surface; production local `main` may contain unique commits or work; live remotes were not reachable during preparation. The imported `SECRH` curriculum is INACTIVE; publication does not activate it.
@@ -59,30 +60,30 @@ Migration 0005 adds nullable curriculum metadata and private import-receipt supp
 
 ## 2. Implementation
 
-- **Status:** STAGED FOR COORDINATOR INSPECTION; no commit created
-- **Files actually changed in this mini-task:** This record and the header metadata in `S1-FOUNDATION-007-network-security-reference-import.md`. Both changes are staged with the reviewed 44 other Network Security paths.
-- **Summary:** Corrected FOUNDATION007 top-level status/reviewer to match its already-recorded completed development import, inactive curriculum and pending human review. Updated this record with the exact 46-path allowlist and the authorized local commit/sync/build/push sequence. Staged only the explicit allowlist for review.
-- **Decisions / deviations from plan:** Live fetches of both GitHub remotes failed because `github.com:443` was unreachable. Cached DEV and PROD `origin/main` refs and both local `HEAD`s were `4b013ee7eba266ad6690d790ebfb5d25d48c1e75`; these cached refs do not verify live tips or ancestry. Local commit, DEV-to-PROD sync, PROD build and pushes have not yet occurred.
-- **Migrations / env / shared contracts:** No schema, runtime, dependency, environment or database changes made in this mini-task.
+- **Status:** PROD LOCAL SYNC PASS; external GitHub publication BLOCKED
+- **Files actually changed in this mini-task:** This record only, in the PROD repository; prepared as a separate documentation-only change for coordinator receipt review.
+- **Summary:** Recorded the scoped commit and local production sync, passed PROD asset build, unchanged migration/manifest hashes, concurrent DEV-only Sprint 2 commit exclusion, and failed non-force pushes. The original 46-path change is committed in DEV and PROD; only this final receipt remains staged.
+- **Decisions / deviations from plan:** The DEV scoped commit is `b73090964a1e25cbcbb8c72f4f3319cac2ade90f` (tree `a08d409f6047788d261a94e3fb970d071474718c`, parent `4b013ee7eba266ad6690d790ebfb5d25d48c1e75`). At the local-sync checkpoint PROD `main` equaled that commit/tree. DEV `main` advanced afterward to unrelated S2 commit `7f1d9d6206c435cecaad0b41ca97b12a66185aa3`; that commit and its S2 files remain in DEV only. Scoped commit is an ancestor of current DEV; branch-head equality is intentionally not claimed. Pushes to both origins were attempted using exact scoped-commit refspecs and failed with `github.com:443` connection errors; live remote tips are unverified.
+- **Migrations / env / shared contracts:** No schema, runtime, dependency, environment or database changes were made by this documentation-only receipt.
 
 ## 3. Review
 
 - **Self-review checklist:** Coordinator reviewed the actual runtime/schema/importer/test diff and found it scoped, compatible and without identified runtime defects. The 46-path allowlist is explicit. Staging verification is recorded below. Human peer review pending. No production database/deployment actions performed.
-- **Test evidence:** With `DATABASE_URL`, `AUTH_TEST_DATABASE_URL`, `OFFERINGS_TEST_DATABASE_URL`, and `DB_FOUNDATION_URL` removed from each child environment: `npm.cmd test` PASS (39 files passed, 2 skipped; 524 tests passed, 13 skipped); `npm.cmd run test:offerings` PASS (13 files passed, 1 skipped; 158 passed, 8 skipped); `npm.cmd run typecheck`, `npm.cmd run typecheck:offerings`, and `tsc -p tsconfig.p001.json --noEmit` PASS; `npm.cmd run lint` and `npm.cmd run lint:db` PASS; `npm.cmd run db:review` PASS (static only, databaseExecution NOT_PERFORMED); `node tools/db/import-reference.mjs validate` PASS (79 subjects, 195 pool credits, 7 categories); importer tests PASS (13/13); migration tests PASS (13/13); `npm.cmd run build:offerings` PASS; `npm.cmd run build:cloudflare` PASS (asset build only; no Wrangler deployment/dry-run). Node syntax checks and `git diff --check` PASS. No database URL was available to these commands.
-- **Manual checks:** GitHub fetch failed in both repositories with connection failure to `github.com:443`; no escalation requested. Local cached refs equal local HEADs, but are not proof of current GitHub tips. PROD worktree was initially clean and remains unchanged so far.
-- **Path inventory:** 33 modified tracked paths plus 13 untracked paths (12 before INT032) = 46 allowlisted candidate paths. No other path may be staged.
-- **Raw-byte evidence:** `.gitattributes` marks migration SQL and reference manifests `-text`; `git check-attr` reports `text: unset` and `whitespace: cr-at-eol,-blank-at-eof`. Source SHA-256: migration `ac58ab7856291e60a7b4175d370c6514679870d03c911cbf2b22e4abc6654cc8`; manifest `9dfb303e10af42355ed7b4da92391df1fdd82cb6f1a88e1a6b20c13093511c02`. Staged blob IDs match working-tree blobs: migration `c66dc560f58ebe3223c3f5296687ef4af76b738f`; manifest `9f9d2cc2744b6b4d6887858ff46328df4de89c59`. Raw SHA-256 values match the source hashes above.
-- **Staging evidence:** Exactly 46 allowlisted paths staged; staged path set equals the expected path set. `git diff --cached --check` PASS. Staged diff summary: 46 files changed, 5,773 insertions(+), 38 deletions(-). Migration and manifest staged blob IDs match working-tree blob IDs; source SHA-256 values match the recorded hashes. No unstaged tracked changes remain. The unrelated untracked `docs/changes/S2-P004-001-uc20-sprint-plan.md` and `docs/sprint/02/p004/uc20-plan.md` are excluded and untouched. Coordinator inspection of staged documentation and overall diff is pending.
-- **Review outcome:** Code/schema/importer/test scope review PASS. Documentation corrections and staged path/hash checks are complete; coordinator staged-diff inspection pending. Human peer review pending; live remote verification unavailable.
+- **Test evidence:** Prior offline validation remains applicable: `npm.cmd test` PASS (39 files passed, 2 skipped; 524 passed, 13 skipped); offerings suite PASS (13 files passed, 1 skipped; 158 passed, 8 skipped); auth/offerings/P001 typechecks PASS; lint and lint:db PASS; static DB review PASS (no database execution); importer validation and tests PASS (79 subjects; 13/13 tests); migration tests PASS (13/13); offerings build PASS; `npm.cmd run build:cloudflare` in PROD PASS (asset-only, all DB URL variables removed). No test suite was rerun for this documentation-only receipt.
+- **Manual checks:** Verified local DEV commit parent/tree, PROD `main` exact scoped commit/tree, local fast-forward, and scoped commit ancestry in both repositories. PROD asset build passed. Both exact scoped non-force pushes failed with `github.com:443` connection errors; no live remote tip/ancestry verification was possible.
+- **Path inventory:** The reviewed commit contains exactly the 46-path allowlist (33 modified tracked files and 13 additions including INT032). No DEV S2 paths were copied to PROD.
+- **Raw-byte evidence:** `.gitattributes` marks migration SQL and reference manifests `-text`; `git check-attr` reports `text: unset` and `whitespace: cr-at-eol,-blank-at-eof`. Source SHA-256: migration `ac58ab7856291e60a7b4175d370c6514679870d03c911cbf2b22e4abc6654cc8`; manifest `9dfb303e10af42355ed7b4da92391df1fdd82cb6f1a88e1a6b20c13093511c02`. PROD commit blobs are migration `c66dc560f58ebe3223c3f5296687ef4af76b738f` and manifest `9f9d2cc2744b6b4d6887858ff46328df4de89c59`, matching the reviewed staged blobs and raw source hashes.
+- **Staging evidence:** During receipt preparation, only `docs/changes/S1-INT-032-network-security-publication-and-production-sync.md` was staged in PROD; `git diff --cached --check` passed. Coordinator receipt review pending.
+- **Review outcome:** Local Network Security commit/sync and asset build PASS. Live publication to GitHub is BLOCKED by network unavailability; remote tips are unverified. Human peer review pending.
 - **Human reviewer / approval:** Pending.
 
 ## 4. Changelog
 
 - **Date:** 2026-11-01
 - **Type:** Docs / Chore
-- **Added / Changed / Fixed / Removed:** Added the publication and production-sync plan; corrected FOUNDATION007 metadata to `READY_FOR_REVIEW`, coordinator review passed and human review pending; staged the exact reviewed candidate paths for coordinator inspection.
+- **Added / Changed / Fixed / Removed:** Updated the PROD-only receipt with actual local publication and build outcomes, concurrent S2 branch-head divergence, preserved source-only S2 commit, and both failed remote push attempts.
 - **Affected routes / tables / consumers:** Documentation update plus staged Network Security reference schema/importer and P001/P002/P003 consumer changes.
 - **Breaking changes / migration steps:** None performed. Production migration/import, deployment and activation remain excluded.
-- **Verification summary:** Offline suites, typechecks, lint, static database review, manifest validation, importer/migration tests and asset builds passed. Exactly 46 paths staged; `git diff --cached --check` passed; staged migration and manifest blob IDs equal working-tree blob IDs and SHA-256 values remain unchanged.
-- **Outstanding blockers / follow-up:** Coordinator inspect staged paths/diff and hashes; then local DEV commit, local-history-preserving fast-forward to PROD, PROD asset-only build, local equality check and ordinary remote pushes if reachable. Live remote verification remains unavailable; human peer review is pending. No production database operation or deployment is planned.
-- **Final status:** READY_FOR_REVIEW — staged for coordinator inspection; no commit, local sync or push yet.
+- **Verification summary:** Scoped commit `b73090964a1e25cbcbb8c72f4f3319cac2ade90f` (tree `a08d409f6047788d261a94e3fb970d071474718c`, parent `4b013ee7eba266ad6690d790ebfb5d25d48c1e75`) is PROD `main`; PROD asset-only build passed. SHA-256 migration `ac58ab7856291e60a7b4175d370c6514679870d03c911cbf2b22e4abc6654cc8`; manifest `9dfb303e10af42355ed7b4da92391df1fdd82cb6f1a88e1a6b20c13093511c02`. Both exact scoped non-force pushes failed because GitHub port 443 is unreachable.
+- **Outstanding blockers / follow-up:** Retry exact scoped commit pushes when GitHub is reachable and verify live remote tips; human peer review remains pending. The PROD-only receipt is prepared as a separate documentation-only change for coordinator review. No production database operation, activation or deployment occurred.
+- **Final status:** BLOCKED — local Network Security sync PASS; GitHub publication remains blocked by network connectivity; human peer review pending.
