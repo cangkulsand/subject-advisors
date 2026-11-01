@@ -7,11 +7,14 @@
 - **Date:** 2026-11-01
 - **Actors:** Academic Coordinator; System Administrator for configuration only
 - **Change record:** [S2-P004-001](../../../changes/S2-P004-001-uc20-sprint-plan.md)
+- **Updated 2026-11-01:** [S2-P004-006](../../../changes/S2-P004-006-confirmed-offerings-rule.md) adds coordinator offering confirmation (section 11). Earlier statements that offerings are never published or that UC20 ignores student data are superseded where they conflict with section 11.
 
 UC20 provides a dated academic snapshot, generates an initial advisory forecast,
 and supports review of proposed class sections. The forecast preserves its inputs,
 rules, assumptions, quality warnings and decisions as the baseline for UC23.
-It does not publish official semester offerings.
+A forecast, including a FINALIZED one, is advisory and publishes nothing. After review the Coordinator
+separately CONFIRMS the offered subjects per programme + learning centre + target semester
+(section 11); only that confirmation is what students see.
 
 ## 1. Existing foundation and scope
 
@@ -33,9 +36,10 @@ The current user-supplied UC20 definition governs this plan. CSV input, API path
 and detailed schema additions below are proposed implementation choices. Capacity
 figures remain configurable examples until set in the catalogue/configuration.
 
-The coordinator flow is degree/programme -> configured centre -> upload. An active,
-authorized Coordinator may choose any configured programme and centre; there is no
-per-centre assignment gate. The selected programme supplies the curriculum/subject
+The coordinator flow is degree/programme -> configured centre -> upload. An active
+Coordinator may choose only a programme and learning centre within their admin-managed
+assignment (faculty, degree, learning centre; decided 2026-11-01, supersedes the earlier
+any-centre statement); outside it the server returns 403 `SCOPE_NOT_ASSIGNED`. The selected programme supplies the curriculum/subject
 catalogue and rules; centre only scopes the cohort and forecast.
 
 In scope are data provision and validation, subject-code reconciliation, dated
@@ -43,8 +47,8 @@ snapshots, conditional demand estimation, exclusions, capacity-based proposals,
 quality warnings, justified review and finalization of the initial baseline.
 
 Out of scope are UC23 updates and comparisons, historical accuracy validation
-without real outcomes, timetabling, lecturer or room optimization, official offering
-publication, LLM explanations, transcript extraction, and other owners' complete
+without real outcomes, timetabling, lecturer or room optimization, automatic or official
+offering publication (coordinator confirmation is a separate step, section 11), LLM explanations, transcript extraction, and other owners' complete
 eligibility or graduation engines.
 
 ## 2. Implementation sequence
@@ -106,8 +110,7 @@ coverage warnings. Rejected history must not make a student appear to have compl
 records or verified eligibility.
 
 Acceptance creates a separate, immutable dated snapshot. Corrected data creates
-another snapshot. Never overwrite StudentProfile, AcademicRecord or student-reported
-semester offerings. M6 must work without imported students having portal accounts.
+another snapshot. Never overwrite StudentProfile, AcademicRecord or student offering picks. M6 must work without imported students having portal accounts.
 Source staleness uses an explicit configurable policy and warns about deferred or
 changed enrollments.
 
@@ -188,8 +191,8 @@ evenly while preserving the total and respecting capacity limits.
 | Example using provisional policies | Proposal |
 | --- | --- |
 | 14 students; minimum 15 | One section flagged for review |
-| 41 students; lecture capacity 40 | Two sections, approximately 21 and 20 |
-| 61 students; lab capacity 30 | Three sections, approximately 21, 20 and 20 |
+| 46 students; lecture maximum 45 | Two sections, 23 and 23 |
+| 71 students; lab maximum 35 | Three sections, approximately 24, 24 and 23 |
 | Zero supported demand with unresolved histories | Preserve the insufficient-data indication where applicable |
 
 Flag sections below minimum enrollment and below the break-even reference
@@ -204,8 +207,10 @@ warning, not a cohort-wide block.
 
 Use subject configuration to exclude FYP1, FYP2 and Industrial Training from
 classroom recommendations. Keep the excluded subjects visible with their reasons.
-The working figures of minimum 15, break-even around 25, lecture around 40, lab
-around 30 and selected 35-student exceptions are configurable, provisional values.
+Decided 2026-11-01: two class types, LAB and non-lab (LECTURE); maximum per class LAB 35 and
+LECTURE 45; optimal class size 25 (the break-even target). These replace the earlier 40 / 30 /
+35 examples and are administrator-configurable values, entered as configuration. The minimum
+of 15 remains a provisional example.
 
 ## 7. Review, decisions and finalization
 
@@ -224,14 +229,15 @@ timestamp. Save the final audit entries before freezing the run in the same
 transaction, consistent with existing database protections.
 
 Finalized results and decisions are read-only through both API and database paths.
-Finalization records an advisory result; it does not publish offerings or grant
-institutional approval. UC20 creates the initial baseline. Changes to generated
+Finalization records an advisory result; it does not publish or confirm offerings or grant
+institutional approval. Confirmation is a later, separate coordinator step (section 11). UC20 creates the initial baseline. Changes to generated
 source inputs or assumptions, and later version comparison, belong to UC23.
 
 ## 8. Screens, interfaces and access
 
 Activate existing coordinator destinations for imports, data quality, forecasts,
-decisions and audit. Version updates and comparisons remain under UC23. Provide
+decisions and audit. The "Offering Decisions" page (`/coordinator/decisions`) is the planned
+home of the confirmation screen (section 11). Version updates and comparisons remain under UC23. Provide
 loading, empty, correction, forbidden and retryable failure states, with keyboard
 and responsive behavior consistent with the shared staff shell.
 
@@ -249,12 +255,14 @@ idempotency protection, plus transactional version allocation, so retries or
 concurrent requests cannot create duplicate initial baselines.
 
 Every endpoint enforces current backend authorization. Only an active, authorized
-Coordinator accesses uploaded cohorts and forecasts; any configured centre and
-programme may be selected. System Administrators receive configuration access only.
+Coordinator accesses uploaded cohorts and forecasts, and only for programmes and centres
+within the Coordinator's assignment (decided 2026-11-01). System Administrators receive configuration access only.
 A selected centre in a browser request is not proof of authorization. Provide a
 Coordinator-only catalogue/context operation for configured programmes, centres,
 semesters and the selected programme's curriculum versions, subjects, conditions and
-exclusion reasons. Never query student profiles/options to populate UC20.
+exclusion reasons. Never query student profiles/options to populate UC20. The only
+student-derived data a Coordinator sees is the pick read in section 11 (pick counts and the
+pickers' name and profile/record fields, within the Coordinator's assignment only).
 
 Keep raw cohorts out of browser persistence, shared caches and application logs.
 Minimize identifying fields and define source access, retention, expiry and deletion
@@ -273,8 +281,9 @@ not an extra Coordinator workflow approval step.
 
 - **P001 / M2:** Shared curriculum, subject, prerequisite, semester and requirement
   contracts; approved reference data and configuration ownership.
-- **P002:** Reuse an agreed pure eligibility contract where compatible. Coordinator
-  estimation must remain independent of student-profile participation.
+- **P002:** Reuse an agreed pure eligibility contract where compatible. The forecast
+  calculation stays independent of student-profile participation; student pick counts are
+  displayed beside it and are never a calculation input (section 11).
 - **P003:** Graduation-critical evidence can consume the agreed graduation contract
   when available. The documented manual designation provides an honest fallback.
 - **P004 / FOUNDATION:** Current authentication and role checks, programme-scoped
@@ -284,9 +293,9 @@ not an extra Coordinator workflow approval step.
 Before implementation with real data, settle the CSV/outcome mappings, cohort-status
 interpretation, retake precedence, capacity values/precedence and exceptional-review
 authority, stale-source threshold and retention obligations. Use the advisory eligible
-pool as the default assumption without an approval screen. Centre access is approved
-for any active authorized Coordinator across configured centres and is not an unresolved
-policy gate. Unavailable evidence stays uncertain for affected students or marks affected
+pool as the default assumption without an approval screen. Centre access follows the
+Coordinator's admin-managed assignment (decided 2026-11-01); the assignment model is a
+dependency, not an unresolved policy. Unavailable evidence stays uncertain for affected students or marks affected
 sections `CONFIGURATION_REQUIRED`; do not invent an institutional rule or block unrelated
 supported forecast results.
 
@@ -304,7 +313,7 @@ supported forecast results.
 - [ ] Retries, concurrent generation and conflicting reviews cannot duplicate or silently overwrite work.
 - [ ] Changes to the shared catalogue do not alter a saved forecast's meaning.
 - [ ] Source provenance and retention controls are documented and exercised appropriately.
-- [ ] No student records or official offerings are modified by the workflow.
+- [ ] No student records are modified by the workflow, and forecast generation/finalization publishes nothing; only an explicit coordinator confirmation (section 11) makes subjects visible to students.
 - [ ] Synthetic tests are labelled and make no real demand-accuracy claim.
 
 Run focused engine, API, database and browser tests for these behaviors, followed by
@@ -326,3 +335,60 @@ distinguish mocks, live checks and human review.
 Rollback of future implementation should disable the new entry points and revert
 feature code while preserving accepted snapshots, forecasts and audits. Review
 migration recovery separately; do not delete live records as a routine rollback.
+
+## 11. Offering confirmation (product owner decision 2026-11-01)
+
+Change record: [S2-P004-006](../../../changes/S2-P004-006-confirmed-offerings-rule.md). SRS wording:
+[amendment](../../../requirements/srs-amendment-2026-11-01-confirmed-offerings.md). This section is
+planned work; nothing here is implemented yet.
+
+- **Step after review.** After import and forecast, the Coordinator confirms which subjects
+  will be offered for programme + learning centre + target semester. It is deliberate (never
+  automatic) and audited (actor, time, reason). It is allowed from a FINALIZED run for the same
+  scope; the run is stored as provenance. Excluded subjects (FYP, Industrial Training) cannot
+  be confirmed.
+- **Lifecycle.** A subject is `CONFIRMED` or `WITHDRAWN`. Confirm adds or re-confirms, withdraw
+  removes it from the student list, both with a reason and an append-only audit entry. The
+  **latest confirmation for programme + centre + semester is authoritative.**
+- **Target semester.** The confirmation is for the NEXT semester after the system current
+  semester. The System Administrator advances the system current semester in the Academic
+  Semesters module (not students); a planned admin-managed current-semester marker is a
+  P004/admin follow-up (`academic_semester` has no such flag today). The student profile
+  current semester remains the student's own setup value.
+- **Pick deadline.** Confirming sets a pick deadline for the scope (replaces the Google Form
+  practice). Students pick or change picks only until it; afterwards picks are closed
+  (read-only). The Coordinator may change it (audited, `SET_DEADLINE`).
+- **Limits.** Picks respect `academic_semester.max_subjects` / `max_credits` (enforced on save);
+  already-passed subjects are hidden; prerequisites stay a display aid (UC09 owns eligibility).
+- **Scope of access.** Only within the Coordinator's assignments (faculty, degree, centre).
+- **Cycle end.** The cycle ends when students have picked and the Coordinator sees the counts:
+  no class sections from picks, no registration, no timetable. Pick counts show the implied
+  number of classes (`ceil(picks / max)`; LAB 35, LECTURE 45) against the optimal 25 as a
+  display aid only.
+- **Dependencies.** Coordinator-assignment model, admin-managed current-semester marker, and a
+  future admin reference-data module (learning centres, degrees, faculties, degree subjects);
+  `forecast_run.programme_id` (Package 2) is required. Planned migrations target the
+  development database only.
+- **Students.** The semester offerings page shows only these confirmed subjects for the
+  student's programme + learning centre + next semester, labelled "Confirmed by coordinator".
+  If none are confirmed: "Offerings not yet confirmed by the coordinator", no picking. Students
+  pick from the confirmed list only.
+- **Coordinator view.** The forecast and the student pick counts and pickers (per subject,
+  assigned scope only) are shown side by side so the Coordinator can decide which
+  subjects to make available next semester. Pick counts are display only and are NOT an input
+  to the forecast calculation. This partially reverses the old rule that UC20 is independent of
+  student portal participation: the calculation remains independent; the display is not.
+- **Pickers (decided 2026-11-01, reverses "counts only").** For each subject the coordinator sees the pick count AND the list of students who picked it (name, matric number, current semester, credits completed, and intake once recorded), only for students whose profile programme + learning centre fall within the coordinator's assignment (403 `SCOPE_NOT_ASSIGNED` otherwise). No small-number suppression. Students never see other students' picks. This replaces the old process of importing names and untaken subjects from the student management system. Fields: name, matric number, current semester and credits completed exist today (credits derived from the records); intake semester is a planned addition (P001). Seniority (decided 2026-11-01, OP16): credits completed toward the student's curriculum, highest first; tie-break the earliest intake, then the current semester. A display aid only: the coordinator decides and nothing is allocated automatically. The ordering is the display-aid policy, version 1, implemented in ONE shared helper (`SENIORITY_POLICY_VERSION`, `compareBySeniority`, `sortPickers` in `packages/shared/src/forecasting/confirmed-offerings.ts`) and is revisable: a later change needs a new change record plus an update to that helper. It needs no database migration because the ordering is computed and never stored.
+- **Wording.** No claim of official registration or a guaranteed timetable (SRS BR8 updated).
+- **Interfaces.** Operations are in `docs/api/forecasting-uc20.openapi.json` (tag "Offering
+  confirmation"): list/confirm/withdraw confirmed offerings, audit, and pick counts. Shared
+  types: `packages/shared/src/forecasting/confirmed-offerings.ts`.
+- **Data (planned, P004 with P001/P002).** `confirmed_offering` and `confirmed_offering_audit`
+  (P004), `student_offering_pick` (P002), `student_profile.learning_centre_id` (P001). Migration
+  order and owners are in the change record.
+- **Forecast versions (UC23), decided.** A new forecast run or version never changes, invalidates
+  or requires re-confirmation of offerings already confirmed; the forecast is a guide only. The
+  confirmation keeps its source `forecastRunId` for provenance. The coordinator changes offerings
+  only by explicitly confirming or withdrawing. Optional display aid: an informational "newer
+  forecast available" notice when a newer run exists for the same programme + centre + semester;
+  no automatic effect.

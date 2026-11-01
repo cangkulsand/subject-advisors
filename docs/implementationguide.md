@@ -29,10 +29,10 @@ When a scope or architecture conflict is discovered, record it as a blocker/deci
 | Owner | Sprint 1 responsibility | Use cases |
 | --- | --- | --- |
 | FOUNDATION | One-time shared setup, tooling, reference catalogue and API contracts | Shared infrastructure only |
-| P001 / Programmer 1 | Student academic profile and subject records | UC03, UC04 |
-| P002 / Programmer 2 | Student-reported semester subject offerings | UC08 |
+| P001 / Programmer 1 | Student academic profile (now including learning centre and the lock on programme/curriculum/learning centre, S2-P004-006) and subject records | UC03, UC04 |
+| P002 / Programmer 2 | Semester offerings page: coordinator-confirmed subjects for the next semester and student picks (Sprint 1 delivered student-reported offerings; superseded in part by S2-P004-006, 2026-11-01) | UC08 |
 | P003 / Programmer 3 | Interactive Academic Pathway talent-tree prototype | UC17 |
-| P004 / Programmer 4 | Clerk registration, login/logout and backend role/access checks | UC01, UC02 |
+| P004 / Programmer 4 | Clerk registration, login/logout and backend role/access checks (Sprint 2: UC20 forecasting, coordinator offering confirmation with pick deadline and pick-count read; planned admin follow-ups: coordinator assignments, current-semester marker) | UC01, UC02 |
 
 - Work in **one designated owner scope at a time**. Reading another section for context does not authorize implementing it.
 - Recommended branches: `feature/p001-s1-profile`, `feature/p002-s1-offerings`, `feature/p003-s1-pathway`, `feature/p004-s1-auth`, and `chore/foundation-s1` (adapt to repository conventions).

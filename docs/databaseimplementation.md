@@ -57,12 +57,12 @@ This one-off database task is **separate from Sprint 1 ownership**. Once the sch
 
 - **26 entities total:** **15 academic** (M1–M5), **9 coordinator forecast** (M6) and **2 administrator access/audit** (M0/M7). All are defined in §5 / Appendix A.
 - Initial release supports **one selected programme and curriculum version**. The schema supports future curricula, but never seeds unverified programme rules as official.
-- Students manually enter academic history and current offerings; **no direct official UTM/UTMSPACE integration** is in scope.
-- Coordinator-provided `academic_import_batch` → `imported_student` → `imported_subject_record` records are independent of `student_profile`/`academic_record`. Never merge their identities or expose cohorts to students.
+- Students manually enter academic history; the offerings students see are **confirmed by the Academic Coordinator** and students pick from them (S2-P004-006, 2026-11-01). **No direct official UTM/UTMSPACE integration** is in scope.
+- Coordinator-provided `academic_import_batch` → `imported_student` → `imported_subject_record` records are independent of `student_profile`/`academic_record`. Never merge their identities or expose cohorts to students. Assigned coordinators see which students picked each subject (name, matric number, current semester, credits completed) for their programme + learning centre only (S2-P004-006, product owner 2026-11-01); students never see other students' picks.
 - `subject` and `curriculum` are shared references; students use curriculum mapping and coordinator imports use the same vetted catalogue.
 - Clerk owns credentials, verification and sessions. PostgreSQL stores **only `clerk_user_id` mappings and application authorization**; no local passwords or secret tokens.
 - Three roles: `STUDENT`, `COORDINATOR`, `SYSTEM_ADMIN`; application state: `ACTIVE`/`SUSPENDED`. **Never grant elevated roles from client-submitted values.**
-- All personalized academic outputs are advisory. The DB must never imply official enrollment, confirmed offering or guaranteed graduation.
+- All personalized academic outputs are advisory. The DB must never imply official enrollment or guaranteed graduation. A "confirmed" offering means only that the Academic Coordinator confirmed it in this system (`confirmed_offering`, planned); it is not official registration or a guaranteed timetable.
 - Academic records and simulations are distinct: simulation updates must never write academic-record history.
 - Planning rules (credits, prerequisites, exceptions, capacities) must be **configuration-driven**, not assumed universal constants.
 
@@ -379,6 +379,8 @@ The **attribute labels, order and source descriptions** below are transcribed fr
 | `student_id` | INTEGER; FK; NOT NULL | Student who reported the offering. |
 | `semester_id` | INTEGER; FK; NOT NULL | AcademicSemester to which the offering applies. |
 | `curriculum_subject_id` | INTEGER; FK; NOT NULL | Offered CurriculumSubject. |
+
+> **Superseded in part (S2-P004-006, 2026-11-01):** `semester_offering` is student-reported and is deprecated/read-only. Planned additive structures: `student_profile.learning_centre_id` (P001, nullable FK, locked after setup); `confirmed_offering` (programme, learning centre, target semester, subject, status CONFIRMED/WITHDRAWN, source forecast run, actor/time/reason, revision; unique per programme + centre + semester + subject) and append-only `confirmed_offering_audit` (P004); `student_offering_pick` (student, confirmed offering; unique pair) (P002). Also planned: `offering_confirmation` (scope header with pick deadline), a coordinator-assignment table (admin-managed; faculty + programme + learning centre), an admin-managed current-semester marker on `academic_semester` (today only `student_profile.current_semester_id` exists), and `forecast_run.programme_id` (required). Picks are limited by `academic_semester.max_subjects` / `max_credits` (A.08). Also planned (P001): `student_profile.intake_semester_id` (no intake is stored today; used for the seniority tie-break). Credits completed for the picker list are derived from `academic_record.recognized_credits` (COMPLETED/EXEMPTED). Migrations target the development database (Neon development branch) only. Details and migration order: [S2-P004-006](changes/S2-P004-006-confirmed-offerings-rule.md).
 
 ### A.12 AcademicPlan → `academic_plan`
 

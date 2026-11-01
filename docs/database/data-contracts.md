@@ -44,6 +44,8 @@ until CGPA handling is defined.
 
 ## P002 — semesters, offerings and plans
 
+> **S2-P004-006 (2026-11-01):** offerings are now confirmed by the coordinator and students pick from them. `semester_offering` (below) is the legacy student-reported table: deprecated, read-only, not counted. Planned: `confirmed_offering` + `confirmed_offering_audit` (P004; unique programme + learning centre + target semester + subject) and `student_offering_pick` (P002; FK to `confirmed_offering`, unique student + confirmed offering). Picks are for the next semester after the profile current semester. Also planned: `offering_confirmation` (pick deadline per scope), coordinator assignments (admin-managed), an admin-managed current-semester marker on `academic_semester` (the target semester is the next one after it), and `forecast_run.programme_id`. Picks respect `academic_semester.max_subjects` / `max_credits`; already-passed subjects are hidden. See the change record for columns and migration order. Assigned coordinators see the pickers per subject (`student_profile.student_name`, `matric_no`, `current_semester_id`, credits completed derived from `academic_record.recognized_credits`) for their programme + learning centre; planned `student_profile.intake_semester_id` (P001) for the seniority tie-break; students never see others' picks. Planned migrations target the development database only.
+
 Consume academic_semester, semester_offering, academic_plan and plan_subject.
 SemesterOffering uniqueness: student_id + semester_id + curriculum_subject_id.
 Storage uses integer IDs. The current P002 integration adapter serializes these as
@@ -59,7 +61,7 @@ Read the same catalogue and academic records. Treat duplicate attempts with the
 agreed outcome/credit policy; do not count every attempt as independent earned credit.
 MANDATORY is a blocking edge, RECOMMENDED advisory, COREQUISITE distinct.
 SimulationScenario source plan must have the same owner; simulated subjects remain
-separate from academic_record. No learning-centre FK is invented for StudentProfile.
+separate from academic_record. Superseded (S2-P004-006): StudentProfile gains a learning centre (`student_profile.learning_centre_id`, P001); programme, curriculum and learning centre are locked after setup.
 The DB contains scenario/plan data structures, not scheduling/forecast algorithms.
 
 ## P004 — authentication, M6 and M7 persistence

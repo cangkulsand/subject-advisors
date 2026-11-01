@@ -3,7 +3,7 @@
   "info": {
     "title": "Subject Advisors UC20 Forecast Planning API",
     "version": "0.1.0",
-    "description": "PLANNED contract only. These endpoints are not implemented. Uploaded people are external-reference cohorts and are never linked to portal students or profiles."
+    "description": "PLANNED contract only. These endpoints are not implemented. Uploaded people are external-reference cohorts and are never linked to portal students or profiles. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
   },
   "servers": [
     {
@@ -26,11 +26,15 @@
     },
     {
       "name": "Forecasts",
-      "description": "Initial advisory baseline, decisions and audit."
+      "description": "Initial advisory baseline, decisions and audit. A forecast (including FINALIZED) is advisory and publishes nothing; it helps the Coordinator decide which subjects to make available next semester."
     },
     {
       "name": "Configuration",
       "description": "Forecast configuration for System Administrators only."
+    },
+    {
+      "name": "Offering confirmation",
+      "description": "PLANNED. Coordinator confirmation of the subjects offered for a programme + learning centre + target (next) semester, and read-only student pick counts with the list of pickers per subject (assigned coordinators only). Confirmation is deliberate, audited, and is what students see as 'Confirmed by coordinator'."
     }
   ],
   "paths": {
@@ -473,7 +477,7 @@
         ],
         "operationId": "finalizeForecastRun",
         "summary": "Finalize a reviewed baseline",
-        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. No offering is published. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run.",
+        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. Finalization is advisory and does not itself publish or confirm any offering; the Coordinator confirms offerings as a separate, later step (see Offering confirmation operations). Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ForecastRunId"
@@ -689,6 +693,300 @@
           },
           "412": {
             "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/confirmed-offerings": {
+      "get": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "listConfirmedOfferings",
+        "summary": "PLANNED: read the confirmed offerings for a programme + centre + target semester",
+        "description": "Active Coordinator only. Returns the latest confirmation state per subject (CONFIRMED and WITHDRAWN) and the set revision (also as ETag). The latest confirmation for the scope is authoritative and is what students see. The target semester is the next semester for the students served. Private, no-store. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ConfirmedOfferingSetResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "confirmOfferings",
+        "summary": "PLANNED: confirm (or re-confirm) offered subjects",
+        "description": "Active Coordinator only. A deliberate action, never automatic. Requires a FINALIZED forecast run for the same programme + centre + target semester (recorded as provenance); excluded subjects (FYP, Industrial Training, non-classroom) cannot be confirmed; a WITHDRAWN subject may be re-confirmed. A non-blank reason is required and a pick deadline (pickDeadline, future date-time; send the current one on re-confirmation) is part of the confirmation: students can pick and change picks only until it, after which picks are closed (read-only). Actor and time are derived server-side and appended to the audit atomically with the state change. The request carries baseRevision (null when no confirmation exists); a stale revision returns 412. Idempotency-Key replays return the original receipt. Students then see these subjects as 'Confirmed by coordinator'; this is not official registration and not a guaranteed timetable. Forecasts and pick counts are not changed by this operation. A new forecast run/version never changes, invalidates or requires re-confirmation of existing confirmations (decided); the confirmation only keeps forecastRunId as provenance. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmOfferingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/confirmed-offerings/withdrawals": {
+      "post": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "withdrawOfferings",
+        "summary": "PLANNED: withdraw previously confirmed subjects",
+        "description": "Active Coordinator only. Marks the listed subjects WITHDRAWN for the scope with a required reason, audited atomically. Withdrawn subjects disappear from the student list; existing student picks for them are kept but excluded from the student's list and from pick counts (OP7). Requires baseRevision (stale returns 412) and Idempotency-Key. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawOfferingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/confirmed-offerings/audit": {
+      "get": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "listConfirmedOfferingAudit",
+        "summary": "PLANNED: audit of confirm and withdraw actions in a scope",
+        "description": "Active Coordinator only. Append-only entries with actor, time, reason and before/after status. Bounded by limit/cursor. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ConfirmedOfferingAuditResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/offering-pick-counts": {
+      "get": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "getOfferingPickCounts",
+        "summary": "PLANNED: student pick counts and pickers per subject for a scope",
+        "description": "Active assigned Coordinator only. Per subject, the COUNT of student picks and the LIST of students who picked it, for programme + learning centre + target (next) semester, shown side by side with the forecast. Decided 2026-11-01: coordinators manage the students of their assigned centre and need to see who picked (this replaces importing names and untaken subjects from the student management system), so that senior students can be prioritised to graduate sooner. Only students whose profile programme + learning centre fall within the coordinator's assignment are returned; otherwise 403 SCOPE_NOT_ASSIGNED. No small-number suppression. Pickers carry studentId (profile ID, never a Clerk ID), studentName, matricNo, currentSemester, creditsCompleted and the planned intakeSemester. The default order is by seniority (decided 2026-11-01: credits completed toward the curriculum, highest first; tie-break the earliest intake, then the current semester); this is a display aid, the coordinator decides and nothing is allocated automatically. Students never see other students' picks. Display only: not an input to the forecast calculation. Each entry also carries classType and implied classes (ceil(picks / maximum), LAB 35 / LECTURE 45) against optimal 25 as a display aid. The cycle ends here: no class sections from picks, no registration, no timetable. Private, no-store; personal data must not be cached in shared caches or logged. Coordinator scope: the authenticated Coordinator must be assigned to the programme and learning centre. The seniority ordering is display-aid policy version 1, revisable by a new change record and an update to the single shared helper; no migration because ordering is computed, never stored.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "seniority",
+                "name"
+              ],
+              "default": "seniority"
+            },
+            "description": "Order of pickers within each subject; display aid."
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfferingPickCountResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/confirmed-offerings/pick-deadline": {
+      "post": {
+        "tags": [
+          "Offering confirmation"
+        ],
+        "operationId": "setOfferingPickDeadline",
+        "summary": "PLANNED: change the pick deadline for a scope",
+        "description": "Active assigned Coordinator. Sets the date-time after which students can no longer pick or change picks for the programme + learning centre + target semester (replaces the Google Form practice). A future date-time and a reason are required; actor and time are derived server-side and the change is audited (action SET_DEADLINE) atomically. Requires baseRevision (stale returns 412) and Idempotency-Key. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPickDeadlineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
@@ -2254,7 +2552,7 @@
             "description": "Null means no end semester; otherwise a positive canonical int32 ID."
           }
         },
-        "description": "Semantic validation: GLOBAL has no centre or subject IDs; CENTRE requires a centre and no subject ID; SUBJECT_CENTRE requires both. minimumEnrollment <= breakEvenTarget <= normalMaximum. A non-null exceptionMaximum must be >= normalMaximum. Semester IDs are positive int32 values from the shared configured semester catalogue. Effective ranges use configured academic-year/term chronology, never numeric ID order; a non-null end must not precede its start."
+        "description": "Decided 2026-11-01: two class types, LAB (normalMaximum 35) and LECTURE/non-lab (normalMaximum 45); optimal class size 25 is the breakEvenTarget. Entered as configuration, not seeded. Earlier example values 40 / 30 / 35 are withdrawn."
       },
       "SubjectExclusion": {
         "type": "object",
@@ -2897,6 +3195,512 @@
             ]
           }
         ]
+      },
+      "ConfirmedOfferingStatus": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "WITHDRAWN"
+        ]
+      },
+      "ConfirmedOffering": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confirmedOfferingId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "creditHours",
+          "classType",
+          "status",
+          "forecastRunId",
+          "confirmedBy",
+          "confirmedAt",
+          "reason"
+        ],
+        "properties": {
+          "confirmedOfferingId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "creditHours": {
+            "type": "number"
+          },
+          "classType": {
+            "type": "string",
+            "enum": [
+              "LECTURE",
+              "LAB"
+            ],
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConfirmedOfferingStatus"
+          },
+          "forecastRunId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "FINALIZED run the confirmation was based on (provenance)."
+          },
+          "confirmedBy": {
+            "type": "string"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmedOfferingSet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "revision",
+          "offerings",
+          "pickDeadline"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "revision": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null before the first confirmation for the scope."
+          },
+          "offerings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmedOffering"
+            }
+          },
+          "pickDeadline": {
+            "nullable": true,
+            "description": "Deadline after which student picks are closed; null before the first confirmation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "newerForecastAvailable": {
+            "type": "boolean",
+            "description": "Informational display aid: a newer forecast run exists for the same programme + centre + semester. No automatic effect on the confirmation."
+          }
+        }
+      },
+      "ConfirmedOfferingSetEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConfirmedOfferingSet"
+          }
+        }
+      },
+      "ConfirmOfferingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "forecastRunId",
+          "subjectIds",
+          "reason",
+          "baseRevision",
+          "pickDeadline"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/Int32Id"
+            },
+            "description": "Canonical subject.subject_id values."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseRevision": {
+            "type": "string",
+            "nullable": true
+          },
+          "pickDeadline": {
+            "description": "Pick deadline. Students may pick or change picks only until this time.",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WithdrawOfferingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "subjectIds",
+          "reason",
+          "baseRevision"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/Int32Id"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseRevision": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmedOfferingAuditEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auditId",
+          "scope",
+          "subjectId",
+          "action",
+          "beforeStatus",
+          "afterStatus",
+          "recordedBy",
+          "recordedAt",
+          "reason",
+          "forecastRunId",
+          "beforeDeadline",
+          "afterDeadline"
+        ],
+        "properties": {
+          "auditId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Null for SET_DEADLINE."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CONFIRM",
+              "WITHDRAW",
+              "SET_DEADLINE"
+            ]
+          },
+          "beforeStatus": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "WITHDRAWN"
+            ],
+            "nullable": true
+          },
+          "afterStatus": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "WITHDRAWN"
+            ],
+            "nullable": true
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "forecastRunId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "beforeDeadline": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          },
+          "afterDeadline": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConfirmedOfferingAuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfirmedOfferingAuditEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmedOfferingAuditEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConfirmedOfferingAuditPage"
+          }
+        }
+      },
+      "OfferingPickCount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "pickCount",
+          "classType",
+          "implied",
+          "pickers"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "pickCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "classType": {
+            "type": "string",
+            "enum": [
+              "LECTURE",
+              "LAB"
+            ],
+            "nullable": true,
+            "description": "Null is treated as LECTURE (non-lab)."
+          },
+          "implied": {
+            "$ref": "#/components/schemas/ImpliedClasses"
+          },
+          "pickers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferingPicker"
+            },
+            "description": "Length equals pickCount. Seniority order by default."
+          }
+        }
+      },
+      "OfferingPickCountSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "asOf",
+          "counts",
+          "pickDeadline"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferingPickCount"
+            }
+          },
+          "pickDeadline": {
+            "nullable": true,
+            "description": "Picks are closed (read-only) after this time.",
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Pick counts and the list of pickers per subject, for an assigned Coordinator only. Display only; not an input to the forecast calculation; no automatic allocation."
+      },
+      "OfferingPickCountEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OfferingPickCountSummary"
+          }
+        }
+      },
+      "SetPickDeadlineRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "pickDeadline",
+          "reason",
+          "baseRevision"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "pickDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseRevision": {
+            "type": "string"
+          }
+        }
+      },
+      "ImpliedClasses": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Display aid only; not a class-section proposal and not a forecast input.",
+        "required": [
+          "maxPerClass",
+          "classesAtMaximum",
+          "classesAtOptimal",
+          "averageSizeAtMaximum"
+        ],
+        "properties": {
+          "maxPerClass": {
+            "type": "integer",
+            "description": "LAB 35, LECTURE (non-lab) 45."
+          },
+          "classesAtMaximum": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "ceil(picks / maxPerClass)"
+          },
+          "classesAtOptimal": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "ceil(picks / 25); optimal class size 25."
+          },
+          "averageSizeAtMaximum": {
+            "type": "number",
+            "minimum": 0,
+            "description": "picks / classesAtMaximum, to compare with the optimal size 25."
+          }
+        }
+      },
+      "OfferingPicker": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "studentId",
+          "studentName",
+          "matricNo",
+          "currentSemester",
+          "intakeSemester",
+          "creditsCompleted"
+        ],
+        "description": "A student who picked the subject, shown to an assigned Coordinator only.",
+        "properties": {
+          "studentId": {
+            "$ref": "#/components/schemas/Int32Id",
+            "description": "student_profile.student_id; never a Clerk user ID."
+          },
+          "studentName": {
+            "type": "string"
+          },
+          "matricNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentSemester": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SemesterOption"
+              }
+            ]
+          },
+          "intakeSemester": {
+            "nullable": true,
+            "description": "PLANNED field (P001); no intake is stored today, null until recorded.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SemesterOption"
+              }
+            ]
+          },
+          "creditsCompleted": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Sum of recognized credits of COMPLETED/EXEMPTED academic records toward the curriculum; null when unavailable."
+          }
+        }
       }
     },
     "responses": {
@@ -3187,6 +3991,54 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "ConfirmedOfferingSetResponse": {
+        "description": "Latest confirmation state per subject for the scope; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ConfirmedOfferingSetEnvelope"
+            }
+          }
+        }
+      },
+      "ConfirmedOfferingAuditResponse": {
+        "description": "Bounded audit page; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ConfirmedOfferingAuditEnvelope"
+            }
+          }
+        }
+      },
+      "OfferingPickCountResponse": {
+        "description": "Pick counts and pickers per subject (assigned coordinator only); contains personal data; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfferingPickCountEnvelope"
             }
           }
         }

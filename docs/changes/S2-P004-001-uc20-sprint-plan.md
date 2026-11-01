@@ -1,5 +1,8 @@
 # S2-P004-001 UC20 Sprint 2 plan
 
+> Superseded in part by [S2-P004-006](S2-P004-006-confirmed-offerings-rule.md) (2026-11-01): offerings are now confirmed by the coordinator and students pick from them; where this record says offerings are not published, are student-reported, or UC20 is independent of student participation, the new rule governs.
+
+
 - **Status:** READY_FOR_REVIEW
 - **Date:** 2026-11-01
 - **Sprint:** Sprint 2

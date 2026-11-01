@@ -32,7 +32,7 @@ The interface must be:
 - **Calm and efficient:** clear visual hierarchy, generous spacing, restrained decoration, short paths to frequent actions.
 - **Task-first:** expose *Overview*, *Academic Records*, *Semester Planner*, and *My Pathway* to students rather than `M1`, `M3`, or `UC17`.
 - **Progressive:** show today's most relevant information first; reveal more detail when requested.
-- **Honest:** distinguish self-reported records and offered subjects from official verification; distinguish actual progress, proposed plans, and hypothetical scenarios.
+- **Honest:** distinguish self-reported records and coordinator-confirmed offerings ("Confirmed by coordinator") from official registration; distinguish actual progress, proposed plans, and hypothetical scenarios.
 - **Accessible:** understandable without color alone; keyboard-friendly; labeled; readable on smaller screens.
 - **Responsive:** optimized for phone and laptop; adult students may review their academic plan during short breaks.
 - **Consistent across roles:** shared type, palette, spacing, and controls; coordinator/admin dashboards use denser professional tables, not gamified chrome.
@@ -45,7 +45,7 @@ The interface must be:
 | **What can I do next?** | One obvious primary action such as *Complete profile* or *Enter semester offerings*. |
 | **What happens if I change my plan?** | A distinct, clearly labeled **simulation** view when the relevant later-sprint functionality exists. |
 
-**Do not** label preliminary student-reported information as university-confirmed, display unsupported graduation guarantees, or imply that a saved plan is an official enrollment.
+**Do not** label preliminary student-reported information as university-confirmed, and do not describe a coordinator-confirmed offering as official registration or a guaranteed timetable (shown only as "Confirmed by coordinator"), display unsupported graduation guarantees, or imply that a saved plan is an official enrollment.
 
 ---
 
@@ -281,7 +281,7 @@ Avoid heavy drop shadows, gradients, glassmorphism, glowing text, and decorative
 
 1. **Overview** — current academic situation and next action.
 2. **Academic Records** — profile and academic subject history.
-3. **Semester Planner** — student-reported offerings and later eligible choices/recommendations.
+3. **Semester Planner** — coordinator-confirmed offerings for the next semester (student picks) and later eligible choices/recommendations.
 4. **My Pathway** — the prerequisite tree and, in later sprints, timeline and simulations.
 
 **Coordinator/admin navigation:** professional, functional titles. Do not apply game UI metaphors to validation workflows, role management, audit data, or class forecast decisions.
@@ -415,10 +415,16 @@ Use real state management and truthful feedback; do not show success before a sa
 ### P002 — Semester Offerings (UC08)
 
 - Header should identify **academic year**, **semester 1/2/3**, and derived **semester type** (Normal/Short).
-- Display subject code, subject name, credit hours, and selected state.
+- Display only subjects confirmed by the coordinator for the student's programme, learning centre and the **next** semester (S2-P004-006). Show subject code, subject name, credit hours, prerequisite display and picked state.
+- If nothing is confirmed, show "Offerings not yet confirmed by the coordinator" and disable picking.
+- Show the coordinator's pick deadline. After it, show picks read-only with "Picking is closed".
+- Show the remaining allowance (subjects and credits left against the semester limits) and hide subjects the student already passed. Prerequisites are a display aid only.
+- The header semester is the target (next) semester set by the system current semester, not by the student.
+- Students never see other students' picks.
+- Coordinator view (Offering Decisions): per subject show the pick count and the list of pickers (name, matric number, current semester, credits completed, intake once recorded), seniority order by default with a name sort option, beside the forecast and the implied classes versus optimal 25. Label the ordering as a display aid; the coordinator decides. Treat names as personal data: no sharing outside the assigned coordinator view.
 - Use search/filter only when useful; avoid dense multi-step screens for a short list.
-- Distinguish a **student-reported subject offering** from an officially verified offering in copy and badges.
-- If no subjects are selected, explain what must be entered before later recommendations can be generated.
+- Label offerings **"Confirmed by coordinator"** in copy and badges (`CONFIRMED_OFFERING_LABEL`). Never imply official registration or a guaranteed timetable (`CONFIRMED_OFFERING_NOTICE`). The word "student-reported" no longer applies to offerings (it still applies to academic records).
+- If no subjects are picked, explain that picking from the confirmed list is needed before later recommendations can be generated.
 - Do not build eligibility or recommendation algorithms as part of this Sprint 1 UI.
 
 ### P003 — Interactive Academic Pathway (UC17)

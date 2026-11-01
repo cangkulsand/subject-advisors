@@ -2,6 +2,7 @@
 
 **Status:** Proposed contract for review; no UC20 endpoint or import/forecast behavior is implemented.
 **Owner:** P004 / Sprint 2. **Trace:** UC20, FR-H1–H9.
+**Updated 2026-11-01:** [S2-P004-006](../../changes/S2-P004-006-confirmed-offerings-rule.md) adds coordinator offering confirmation and student pick counts; statements below that nothing is published or that student data is never consulted are superseded only where they conflict with that rule.
 
 ## Scope and source of truth
 
@@ -9,7 +10,9 @@ Package 1 defines the CSV, validation results, advisory forecast vocabulary and 
 HTTP contract before implementation. The user-provided UC20 definition governs. The API
 spec at `docs/api/forecasting-uc20.openapi.json` is authoritative; TypeScript types and
 fictional examples must agree with it. This is an additive M6 contract, not a student
-profile API, eligibility engine, final timetable or official offering publication.
+profile API, eligibility engine, final timetable or official offering publication. Finalizing a forecast still publishes
+nothing; coordinator offering confirmation is a separate, later, audited step defined by the
+"Offering confirmation" operations in the OpenAPI spec.
 
 The canonical database has import/forecast/audit tables, but its current import freeze
 only protects a batch after a forecast references it. Package 2 must add programme scope
@@ -19,11 +22,12 @@ running forecasting API already exist.
 ## Coordinator flow, catalogue and cohort identity
 
 1. An active, backend-authorized Coordinator chooses a configured degree/programme.
-2. The Coordinator chooses any configured learning centre and target semester.
+2. The Coordinator chooses a learning centre within their assignment and a target semester.
 3. The Coordinator uploads one CSV file.
 
-Any active Coordinator may choose any configured programme and centre. There is no
-per-centre assignment or extra policy-approval screen. System Administrators may manage
+An active Coordinator may choose only programmes and centres within their admin-managed
+assignment (faculty, degree, learning centre; decided 2026-11-01, supersedes the earlier
+any-centre statement; `403 SCOPE_NOT_ASSIGNED` otherwise). There is no extra policy-approval screen. System Administrators may manage
 forecast configuration only; they do not receive cohort or forecast access by that role.
 The server derives actor and role from the verified Clerk session and current assignments.
 
@@ -49,7 +53,10 @@ authenticated. Every student's curriculum must belong to the selected programme.
 `curriculum_version` may resolve only when exactly one configured version exists; when
 more than one exists, require an explicit per-row version rather than selecting latest.
 Scope IDs are carried in operation bodies and list filters, echoed by resources, and
-checked against stored scope; the URL keeps resource paths shallow.
+checked against stored scope; the URL keeps resource paths shallow. Exception (S2-P004-006):
+the separate coordinator pick read returns the pick count and the list of pickers per subject (name, matric
+number, current semester, credits completed; intake once recorded) for the Coordinator's assigned scope only,
+displayed beside the forecast, seniority-ordered as a display aid, and never an input to the forecast calculation.
 
 ## Single-file CSV contract
 
@@ -158,9 +165,10 @@ rule, then global class-type rule. Tie or missing active configuration returns
 `CONFIGURATION_REQUIRED` for affected sections; other calculable subjects may proceed.
 Normal capacity drives balanced `ceil(supportedDemand / normalCapacity)` sections. Never
 fill exception capacity automatically; an exception requires configured maximum and
-justification, with approval reference where configured policy requires one. Values 15
-minimum, 25 break-even, 40 lecture, 30 lab and selected 35 exceptions remain examples,
-not defaults. Missing stale-source threshold warns, not whole-cohort blocks.
+justification, with approval reference where configured policy requires one. Decided
+2026-11-01: class types are LAB and non-lab (LECTURE); maximum per class LAB 35, LECTURE 45;
+optimal class size 25 (used as `breakEvenTarget`). These replace the earlier 40 / 30 / 35
+examples and are entered as configuration, not seeded. The minimum of 15 remains an unconfirmed example. Missing stale-source threshold warns, not whole-cohort blocks.
 Compare effective-semester ranges by configured academic-year and term chronology, not
 numeric semester-ID order.
 Validate capacity scope tuples: `GLOBAL` has neither centre nor subject ID; `CENTRE` requires
@@ -192,7 +200,13 @@ against configured catalogue and stored resource scope; resources echo that scop
 | `POST /api/coordinator/forecast-runs/{forecastRunId}/reviews` | Same scope; explicit `DRAFT` to `UNDER_REVIEW` transition, optimistic revision and atomic audit. |
 | `GET /api/coordinator/forecast-runs/{forecastRunId}` and `GET /api/coordinator/forecast-runs/{forecastRunId}/audit?limit=&cursor=` | Same role; resource echoes stored scope; paged audit; unknown IDs return 404 without data leakage. |
 | `POST /api/coordinator/forecast-runs/{forecastRunId}/decisions` | Same scope; body includes scope; justified decision/section adjustment; `subjectId` is canonical `subject.subject_id`, not a `curriculum_subject_id`; actor and before/after values derived server-side and audited atomically. |
-| `POST /api/coordinator/forecast-runs/{forecastRunId}/finalizations` | Same scope; body includes scope; resolve required review, append final audit, then freeze in one transaction. No publication endpoint. |
+| `POST /api/coordinator/forecast-runs/{forecastRunId}/finalizations` | Same scope; body includes scope; resolve required review, append final audit, then freeze in one transaction. Finalization publishes nothing; offering confirmation is the separate step below. |
+| `GET /api/coordinator/confirmed-offerings?programmeId=&learningCentreId=&targetSemesterId=` (PLANNED, S2-P004-006) | Active Coordinator; latest confirmation state per subject for the scope; the latest confirmation is authoritative and is what students see. |
+| `POST /api/coordinator/confirmed-offerings` (PLANNED) | Active Coordinator; confirm or re-confirm subjects from a FINALIZED run for the same scope; reason required; `baseRevision`, `Idempotency-Key`; audited atomically; excluded subjects rejected. |
+| `POST /api/coordinator/confirmed-offerings/withdrawals` (PLANNED) | Same protections; withdraw subjects with a reason. |
+| `GET /api/coordinator/confirmed-offerings/audit?...` (PLANNED) | Active Coordinator; paged append-only confirm/withdraw audit. |
+| `POST /api/coordinator/confirmed-offerings/pick-deadline` (PLANNED) | Active assigned Coordinator; change the pick deadline (future date-time, reason, `baseRevision`); audited `SET_DEADLINE`. Students pick/change only until it. |
+| `GET /api/coordinator/offering-pick-counts?programmeId=&learningCentreId=&targetSemesterId=` (PLANNED) | Active Coordinator; per-subject pick counts plus the list of pickers (assigned scope only, `sort=seniority|name`, default seniority: credits completed highest first, then earliest intake / current semester); display aid, no automatic allocation, never a forecast input; students never see others' picks. |
 | `GET/PUT /api/admin/forecasting/configuration` | Active System Administrator only; read/update UC20 capacities, precedence, exclusions and staleness settings; no cohort access. |
 
 The multipart contract uses a UTF-8 CSV upload with the v1 size/row bounds above. A 422
@@ -249,6 +263,5 @@ Do not invent source outcome mappings, retake precedence, official credit/CGPA e
 capacity values, exception authority or retention duration. The proposed `ACTIVE` to
 supported-potential-demand mapping is a provisional engineering default, not an institutional
 eligibility claim; unknown source tokens stay uncertain per student. Missing capacity
-is section-level `CONFIGURATION_REQUIRED`, not a fabricated value. User-approved global
-configured-centre/programme selection and the advisory supported-pool baseline are not
-approval gates.
+is section-level `CONFIGURATION_REQUIRED`, not a fabricated value. Centre/programme access follows the Coordinator assignment (decided 2026-11-01; planned
+admin-managed model, a dependency). The advisory supported-pool baseline is not an approval gate.
