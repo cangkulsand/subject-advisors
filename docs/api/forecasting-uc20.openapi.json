@@ -1,0 +1,3196 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Subject Advisors UC20 Forecast Planning API",
+    "version": "0.1.0",
+    "description": "PLANNED contract only. These endpoints are not implemented. Uploaded people are external-reference cohorts and are never linked to portal students or profiles."
+  },
+  "servers": [
+    {
+      "url": "https://subject-advisors.example"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Context",
+      "description": "Configured catalogue context for Coordinators."
+    },
+    {
+      "name": "Imports",
+      "description": "Single-file cohort upload and immutable accepted snapshots."
+    },
+    {
+      "name": "Forecasts",
+      "description": "Initial advisory baseline, decisions and audit."
+    },
+    {
+      "name": "Configuration",
+      "description": "Forecast configuration for System Administrators only."
+    }
+  ],
+  "paths": {
+    "/api/coordinator/forecast-context": {
+      "get": {
+        "tags": [
+          "Context"
+        ],
+        "operationId": "getForecastContext",
+        "summary": "Read configured programme, centre, semester and curriculum options",
+        "description": "Requires an active Coordinator. Returns configured programmes, centres and semesters. With programmeId, also returns that programme's configured curriculum versions, curriculum_subject -> subject catalogue, exclusions and prerequisite expressions/conditions. This endpoint never calls student/profile/options APIs.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastContextResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-import-template": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "downloadForecastImportTemplate",
+        "summary": "Download the single-file CSV template",
+        "responses": {
+          "200": {
+            "description": "UTF-8 CSV header in the defined field order.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-imports": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "listForecastImports",
+        "summary": "List import summaries in a required scope",
+        "description": "Programme, centre and target semester filters are required. The list is paginated and returns metadata/counts, not raw CSV rows. Import list rows are summaries; use import detail to retrieve the full validation report and warnings.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportListResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "submitForecastImport",
+        "summary": "Validate one CSV and accept it when all rows are valid",
+        "description": "Fully valid uploads are accepted directly, including warnings. Row errors return a 422 correction report without accepting rejected history. Valid roster metadata is retained when a subject-history row is invalid. The file is bound to programme, centre and target semester; the server verifies all IDs against configured catalogue rows. The caller actor is derived from the verified active Coordinator session. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. CSV v1 accepts optional UTF-8 BOM, comma/double-quote escaping and LF/CRLF; trims fields, treats trimmed-empty as blank, compares opaque external references case-sensitively (1-128 Unicode characters), allows int32 positive semester IDs and nonnegative integer credits, and limits uploads to 5 MiB/10,000 data rows. A successful accepted-import response includes the complete validation report, including nonblocking warnings; warnings remain retrievable from import detail. No raw CSV is returned.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUploadRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "text/csv"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImportValidationResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-imports/{importBatchId}": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "getForecastImport",
+        "summary": "Read import provenance and quality summary",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ImportBatchId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Returns the scoped accepted import and complete validation quality report, including nonblocking warnings; never returns raw CSV."
+      }
+    },
+    "/api/coordinator/forecast-imports/{validationId}/subset-acceptances": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "acceptValidImportSubset",
+        "summary": "Accept remaining valid rows after explicit acknowledgement",
+        "description": "Only available for a validation with row errors and valid rows remaining. If-Match binds acknowledgement to the validation report/fingerprint revision; the validation may be accepted once. This is the uploading Coordinator's acknowledgement, not a second-person policy approval. After authentication, an idempotent replay resolves to the original receipt before current validation state is checked. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ValidationId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptSubsetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "listForecastRuns",
+        "summary": "List runs in a required programme/centre/semester scope",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastRunListResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "generateInitialForecast",
+        "summary": "Generate the version 1 advisory baseline",
+        "description": "Requires an accepted import matching all three scope IDs. Creates version 1 with parent null. Supported eligible-pool demand is advisory, not registration. Missing evidence creates per-student/subject uncertainty; missing capacity creates CONFIGURATION_REQUIRED on affected sections. Neither blocks unrelated supported rows. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateForecastRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs/{forecastRunId}": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "getForecastRun",
+        "summary": "Read a run and its saved assumptions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastRunResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs/{forecastRunId}/decisions": {
+      "post": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "recordForecastDecisions",
+        "summary": "Review or adjust sections and append audit entries",
+        "description": "Request carries all three scope IDs; server verifies them against the stored run. Requires If-Match and Idempotency-Key. Actor, before/after values and timestamp are server-derived. Changes and append-only audits commit atomically. An idempotent replay returns the original receipt after authentication, before the current revision is checked. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs/{forecastRunId}/finalizations": {
+      "post": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "finalizeForecastRun",
+        "summary": "Finalize a reviewed baseline",
+        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. No offering is published. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeForecastRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs/{forecastRunId}/audit": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "listForecastAudit",
+        "summary": "Read a bounded page of append-only decisions",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastAuditResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/admin/forecasting/configuration": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "getForecastConfiguration",
+        "summary": "Read configuration without cohort access",
+        "description": "Active System Administrator only. This role does not gain access to cohort imports or forecasts.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastConfigurationResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "updateForecastConfiguration",
+        "summary": "Update capacity, exclusion and stale-source configuration",
+        "description": "Active System Administrator only. Requires If-Match and Idempotency-Key. The API never seeds provisional capacity numbers. The new version appends configuration and never mutates rows referenced by existing runs. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForecastConfigurationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastConfigurationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-runs/{forecastRunId}/reviews": {
+      "post": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "startForecastReview",
+        "summary": "Move an initial draft into review",
+        "description": "Explicit DRAFT to UNDER_REVIEW transition. Scope must match the stored run. Requires If-Match and Idempotency-Key. Replay lookup follows authentication and precedes current state/revision checks. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "description": "Private response; do not cache.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "no-store"
+          ]
+        }
+      },
+      "ETag": {
+        "description": "Opaque current revision used with If-Match.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "parameters": {
+      "ProgrammeQuery": {
+        "name": "programmeId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "ProgrammeQueryRequired": {
+        "name": "programmeId",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "CentreQueryRequired": {
+        "name": "learningCentreId",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "SemesterQueryRequired": {
+        "name": "targetSemesterId",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "ImportBatchId": {
+        "name": "importBatchId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "ValidationId": {
+        "name": "validationId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "ForecastRunId": {
+        "name": "forecastRunId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": "Server namespaces by authenticated actor, operation and programme/centre/semester scope."
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    },
+    "schemas": {
+      "Int32Id": {
+        "type": "integer",
+        "format": "int32",
+        "minimum": 1,
+        "maximum": 2147483647
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiError"
+          }
+        }
+      },
+      "ValidationIssue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "ERROR",
+              "WARNING"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "row": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "field": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          }
+        }
+      },
+      "ProgrammeOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "programmeCode",
+          "programmeName"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeCode": {
+            "type": "string"
+          },
+          "programmeName": {
+            "type": "string"
+          }
+        }
+      },
+      "CentreOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "learningCentreId",
+          "centreCode",
+          "centreName"
+        ],
+        "properties": {
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "centreCode": {
+            "type": "string"
+          },
+          "centreName": {
+            "type": "string"
+          }
+        }
+      },
+      "SemesterOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "semesterId",
+          "academicYear",
+          "semesterNumber"
+        ],
+        "properties": {
+          "semesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "academicYear": {
+            "type": "string"
+          },
+          "semesterNumber": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          }
+        }
+      },
+      "CurriculumOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "curriculumId",
+          "programmeId",
+          "curriculumVersion"
+        ],
+        "properties": {
+          "curriculumId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "effectiveYear": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "PrerequisiteCourse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator",
+          "code"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "course"
+            ]
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "PrerequisiteGroup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator",
+          "operands"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "allOf",
+              "anyOf"
+            ]
+          },
+          "operands": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PrerequisiteExpression"
+            }
+          }
+        }
+      },
+      "PrerequisiteExpression": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PrerequisiteCourse"
+          },
+          {
+            "$ref": "#/components/schemas/PrerequisiteGroup"
+          }
+        ]
+      },
+      "PrerequisiteCondition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "operator",
+          "value"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "completedCredits",
+              "cgpa"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              ">",
+              ">="
+            ]
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "PrerequisiteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "availability"
+        ],
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/ConditionalPrerequisiteAvailability"
+          }
+        }
+      },
+      "ForecastSubjectOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "curriculumSubjectId",
+          "curriculumId",
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "creditHours",
+          "classType",
+          "includeInOfferingForecast",
+          "exclusionReason",
+          "prerequisiteLinks",
+          "conditionalPrerequisites"
+        ],
+        "properties": {
+          "curriculumSubjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "creditHours": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "classType": {
+            "type": "string",
+            "enum": [
+              "LECTURE",
+              "LAB",
+              null
+            ],
+            "nullable": true,
+            "description": "May be null when the canonical subject class_type is absent."
+          },
+          "includeInOfferingForecast": {
+            "type": "boolean"
+          },
+          "exclusionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "prerequisiteLinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectPrerequisiteLink"
+            }
+          },
+          "conditionalPrerequisites": {
+            "$ref": "#/components/schemas/ConditionalPrerequisiteAvailability"
+          }
+        }
+      },
+      "ForecastContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmes",
+          "learningCentres",
+          "targetSemesters",
+          "curricula",
+          "subjects"
+        ],
+        "properties": {
+          "programmes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgrammeOption"
+            }
+          },
+          "learningCentres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CentreOption"
+            }
+          },
+          "targetSemesters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SemesterOption"
+            }
+          },
+          "curricula": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurriculumOption"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastSubjectOption"
+            }
+          }
+        }
+      },
+      "ImportUploadRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "sourceDate",
+          "sourceLabel",
+          "file"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sourceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "sourceLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "UTF-8 CSV with optional BOM, comma delimiting, doubled-quote escaping, LF or CRLF. Trim surrounding spaces; trimmed-empty is blank. At most 5 MiB and 10,000 data rows."
+          }
+        }
+      },
+      "ImportCsvRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "external_reference",
+          "curriculum_version",
+          "cohort_status",
+          "history_completeness",
+          "subject_code",
+          "subject_status",
+          "record_semester_id",
+          "recognized_credits",
+          "is_synthetic"
+        ],
+        "properties": {
+          "external_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Opaque case-sensitive source reference, 1 to 128 Unicode characters; never a portal identity."
+          },
+          "curriculum_version": {
+            "type": "string",
+            "description": "Blank only with exactly one configured programme curriculum version."
+          },
+          "cohort_status": {
+            "type": "string",
+            "description": "ACTIVE has a provisional engineering mapping to supported potential demand. Unrecognized tokens are per-student uncertainty."
+          },
+          "history_completeness": {
+            "$ref": "#/components/schemas/HistoryCompleteness"
+          },
+          "subject_code": {
+            "type": "string",
+            "description": "Blank only when the five-field attempt group is empty."
+          },
+          "subject_status": {
+            "type": "string",
+            "enum": [
+              "",
+              "COMPLETED",
+              "EXEMPTED",
+              "FAILED",
+              "IN_PROGRESS"
+            ],
+            "description": "Blank only when all five attempt fields are blank. WITHDRAWN is not normalized."
+          },
+          "record_semester_id": {
+            "type": "string",
+            "maxLength": 10,
+            "pattern": "^$|^[1-9][0-9]*$",
+            "description": "Positive decimal int32 lexeme; implementations must reject numeric values above 2147483647."
+          },
+          "recognized_credits": {
+            "type": "string",
+            "pattern": "^$|^[0-9]+$",
+            "description": "Nonnegative decimal integer no greater than verified catalogue credit hours. FAILED and IN_PROGRESS accept blank or 0 only; positive recognized credit on either is invalid."
+          },
+          "is_synthetic": {
+            "type": "string",
+            "enum": [
+              "",
+              "true",
+              "false"
+            ],
+            "description": "Blank only for a no-history row."
+          }
+        }
+      },
+      "ImportCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "studentRows",
+          "uniqueStudents",
+          "validAttempts",
+          "rejectedRows",
+          "partialStudents",
+          "unknownHistoryStudents"
+        ],
+        "properties": {
+          "studentRows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uniqueStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "validAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejectedRows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partialStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unknownHistoryStudents": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportValidationReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "validationId",
+          "validationRevision",
+          "status",
+          "counts",
+          "issues",
+          "completenessChanges",
+          "subsetAcknowledgementRequired",
+          "acceptedSnapshot"
+        ],
+        "properties": {
+          "validationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "validationRevision": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "VALID",
+              "CORRECTION_REQUIRED",
+              "FILE_REJECTED"
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            }
+          },
+          "completenessChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompletenessChange"
+            }
+          },
+          "subsetAcknowledgementRequired": {
+            "type": "boolean"
+          },
+          "acceptedSnapshot": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": false,
+            "required": [
+              "importBatchId",
+              "acceptedAt",
+              "sourceFingerprint"
+            ],
+            "properties": {
+              "importBatchId": {
+                "$ref": "#/components/schemas/Int32Id"
+              },
+              "acceptedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sourceFingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "CompletenessChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "externalReference",
+          "before",
+          "after",
+          "rejectedRows"
+        ],
+        "properties": {
+          "externalReference": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string",
+            "enum": [
+              "COMPLETE",
+              "PARTIAL",
+              "UNKNOWN"
+            ]
+          },
+          "after": {
+            "type": "string",
+            "enum": [
+              "PARTIAL",
+              "UNKNOWN"
+            ]
+          },
+          "rejectedRows": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "ImportValidationError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "report"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/ImportValidationReport"
+          }
+        }
+      },
+      "ImportValidationEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ImportValidationError"
+          }
+        }
+      },
+      "AcceptSubsetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "acknowledgeRejectedRows",
+          "validationRevision"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "acknowledgeRejectedRows": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "validationRevision": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "AcceptedImport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "importBatchId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "sourceDate",
+          "sourceLabel",
+          "acceptedAt",
+          "counts",
+          "snapshotStatus",
+          "sourceFingerprint",
+          "validationReport"
+        ],
+        "properties": {
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sourceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "snapshotStatus": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED_IMMUTABLE"
+            ]
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "validationReport": {
+            "$ref": "#/components/schemas/ImportValidationReport"
+          }
+        }
+      },
+      "AcceptedImportEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AcceptedImport"
+          }
+        }
+      },
+      "ImportList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportListEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ImportList"
+          }
+        }
+      },
+      "SupportedDemandAssumption": {
+        "type": "string",
+        "enum": [
+          "SUPPORTED_ELIGIBLE_POOL"
+        ]
+      },
+      "UncertaintyReason": {
+        "type": "string",
+        "enum": [
+          "COHORT_STATUS_UNMAPPED",
+          "HISTORY_UNKNOWN",
+          "HISTORY_PARTIAL",
+          "SOURCE_STATUS_UNMAPPED",
+          "RETAKE_OUTCOME_UNRESOLVED",
+          "CREDIT_EVIDENCE_MISSING",
+          "CGPA_EVIDENCE_MISSING",
+          "PREREQUISITE_EVIDENCE_MISSING",
+          "COREQUISITE_EVIDENCE_MISSING",
+          "CURRICULUM_VERSION_UNRESOLVED",
+          "REJECTED_HISTORY_ROW"
+        ]
+      },
+      "GenerateForecastRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "importBatchId",
+          "demandAssumption"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "demandAssumption": {
+            "$ref": "#/components/schemas/SupportedDemandAssumption"
+          }
+        }
+      },
+      "ProposedSection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposedSectionId",
+          "sectionNumber",
+          "expectedStudents",
+          "minimumEnrollment",
+          "breakEvenTarget",
+          "normalMaximum",
+          "exceptionMaximum",
+          "reviewStatus"
+        ],
+        "properties": {
+          "proposedSectionId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sectionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minimumEnrollment": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "breakEvenTarget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "normalMaximum": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "exceptionMaximum": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "REVIEWED",
+              "APPROVED",
+              "DEFERRED"
+            ]
+          },
+          "justification": {
+            "type": "string"
+          }
+        }
+      },
+      "SubjectDemand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "supportedEligibleCount",
+          "uncertainStudentCount",
+          "forecastCount",
+          "qualityStatus",
+          "uncertaintyReasons",
+          "configurationStatus",
+          "sections"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "supportedEligibleCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uncertainStudentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "forecastCount": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Null is unknown; never encode as zero."
+          },
+          "graduationCriticalSupportedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "uncertaintyReasons": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/UncertaintyReason"
+            }
+          },
+          "configurationStatus": {
+            "type": "string",
+            "enum": [
+              "CONFIGURED",
+              "CONFIGURATION_REQUIRED",
+              "EXCLUDED"
+            ]
+          },
+          "configurationMessage": {
+            "type": "string"
+          },
+          "exclusionReason": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedSection"
+            }
+          },
+          "qualityStatus": {
+            "type": "string",
+            "enum": [
+              "SUPPORTED",
+              "PRELIMINARY",
+              "INSUFFICIENT_DATA"
+            ]
+          }
+        }
+      },
+      "ForecastRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Checked constraint: status FINALIZED requires non-null finalizedBy/finalizedAt; DRAFT and UNDER_REVIEW require both null. Finalized runs are immutable.",
+        "required": [
+          "forecastRunId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "importBatchId",
+          "versionNumber",
+          "parentForecastRunId",
+          "status",
+          "revision",
+          "demandAssumption",
+          "engineVersion",
+          "generatedBy",
+          "generatedAt",
+          "finalizedBy",
+          "finalizedAt",
+          "demands",
+          "qualityWarnings",
+          "ruleSnapshot",
+          "originalRecommendations"
+        ],
+        "properties": {
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "parentForecastRunId": {
+            "type": "integer",
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "UNDER_REVIEW",
+              "FINALIZED"
+            ]
+          },
+          "revision": {
+            "type": "string"
+          },
+          "demandAssumption": {
+            "$ref": "#/components/schemas/SupportedDemandAssumption"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedBy": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finalizedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "demands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectDemand"
+            }
+          },
+          "qualityWarnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            }
+          },
+          "ruleSnapshot": {
+            "$ref": "#/components/schemas/ForecastRuleSnapshot"
+          },
+          "originalRecommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OriginalSubjectRecommendation"
+            }
+          }
+        }
+      },
+      "ForecastRunEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastRun"
+          }
+        }
+      },
+      "ForecastRunList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastRun"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ForecastRunListEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastRunList"
+          }
+        }
+      },
+      "DecisionScope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          }
+        }
+      },
+      "ForecastDecision": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subjectId",
+              "action",
+              "reason"
+            ],
+            "properties": {
+              "subjectId": {
+                "$ref": "#/components/schemas/Int32Id"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "REVIEW",
+                  "APPROVE",
+                  "DEFER"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalReference": {
+                "type": "string"
+              }
+            },
+            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id."
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subjectId",
+              "action",
+              "reason",
+              "replacementSections"
+            ],
+            "properties": {
+              "subjectId": {
+                "$ref": "#/components/schemas/Int32Id"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "REPLACE_ALLOCATION"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "approvalReference": {
+                "type": "string"
+              },
+              "replacementSections": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SubjectAllocation"
+                },
+                "description": "Full replacement allocation for the subject. Omitted existing section IDs retire those sections from the current allocation; historical section/audit rows are retained."
+              }
+            },
+            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id."
+          }
+        ]
+      },
+      "DecisionBatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "decisions"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "decisions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ForecastDecision"
+            }
+          }
+        }
+      },
+      "FinalizeForecastRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approvalReference": {
+            "type": "string"
+          }
+        }
+      },
+      "OperationReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resourceId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "acceptedAt",
+          "revision"
+        ],
+        "properties": {
+          "resourceId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "OperationEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OperationReceipt"
+          }
+        }
+      },
+      "ForecastAuditEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decisionAuditId",
+          "forecastRunId",
+          "scope",
+          "subjectId",
+          "proposedSectionId",
+          "actionType",
+          "recordedBy",
+          "recordedAt",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "decisionAuditId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "proposedSectionId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "actionType": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approvalReference": {
+            "type": "string"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            }
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            }
+          }
+        }
+      },
+      "ForecastAuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastAuditEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ForecastAuditEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastAuditPage"
+          }
+        }
+      },
+      "CapacityRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scopeKind",
+          "classType",
+          "minimumEnrollment",
+          "breakEvenTarget",
+          "normalMaximum",
+          "exceptionMaximum",
+          "effectiveFromSemesterId",
+          "effectiveToSemesterId"
+        ],
+        "properties": {
+          "scopeKind": {
+            "type": "string",
+            "enum": [
+              "GLOBAL",
+              "CENTRE",
+              "SUBJECT_CENTRE"
+            ]
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "classType": {
+            "type": "string",
+            "enum": [
+              "LECTURE",
+              "LAB"
+            ]
+          },
+          "minimumEnrollment": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "breakEvenTarget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "normalMaximum": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "exceptionMaximum": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "effectiveFromSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "effectiveToSemesterId": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "nullable": true,
+            "description": "Null means no end semester; otherwise a positive canonical int32 ID."
+          }
+        },
+        "description": "Semantic validation: GLOBAL has no centre or subject IDs; CENTRE requires a centre and no subject ID; SUBJECT_CENTRE requires both. minimumEnrollment <= breakEvenTarget <= normalMaximum. A non-null exceptionMaximum must be >= normalMaximum. Semester IDs are positive int32 values from the shared configured semester catalogue. Effective ranges use configured academic-year/term chronology, never numeric ID order; a non-null end must not precede its start."
+      },
+      "SubjectExclusion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "reason",
+          "effectiveFromSemesterId",
+          "effectiveToSemesterId"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "effectiveFromSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "effectiveToSemesterId": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "nullable": true,
+            "description": "Null means no end semester; otherwise a positive canonical int32 ID."
+          }
+        },
+        "description": "subjectId is a positive canonical int32 ID from the subject catalogue. Effective semester IDs are positive canonical int32 IDs from the shared configured semester catalogue. Effective ranges use configured academic-year/term chronology, never numeric ID order; a non-null end must not precede its start."
+      },
+      "ForecastConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "configurationVersion",
+          "capacityRules",
+          "subjectExclusions",
+          "staleSourceMaxAgeDays"
+        ],
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "capacityRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapacityRule"
+            }
+          },
+          "subjectExclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectExclusion"
+            }
+          },
+          "staleSourceMaxAgeDays": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true,
+            "description": "Null means no configured threshold; emit a warning."
+          },
+          "configurationVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "ForecastConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capacityRules",
+          "subjectExclusions",
+          "baseRevision"
+        ],
+        "properties": {
+          "capacityRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapacityRule"
+            }
+          },
+          "subjectExclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectExclusion"
+            }
+          },
+          "staleSourceMaxAgeDays": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "baseRevision": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "description": "Create a new immutable configuration version/active pointer; never mutate capacity rows referenced by a forecast."
+      },
+      "ForecastConfigurationEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastConfiguration"
+          }
+        }
+      },
+      "PrerequisiteAvailability": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "expression",
+              "conditions"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "expression": {
+                "$ref": "#/components/schemas/PrerequisiteExpression",
+                "nullable": true
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PrerequisiteCondition"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "reason"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ForecastRuleSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "importBatchId",
+          "acceptedAt",
+          "sourceDate",
+          "sourceLabel",
+          "sourceFingerprint",
+          "curricula",
+          "exclusions",
+          "capacityRules",
+          "demandAssumption",
+          "cohortStatusMappings",
+          "engineVersion"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "sourceFingerprint": {
+            "type": "string"
+          },
+          "curricula": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastCurriculumSnapshot"
+            }
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectExclusion"
+            }
+          },
+          "capacityRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapacityRule"
+            }
+          },
+          "demandAssumption": {
+            "$ref": "#/components/schemas/SupportedDemandAssumption"
+          },
+          "cohortStatusMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "engineVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewForecastRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "action"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "START_REVIEW"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportSubjectStatus": {
+        "type": "string",
+        "enum": [
+          "COMPLETED",
+          "EXEMPTED",
+          "FAILED",
+          "IN_PROGRESS"
+        ]
+      },
+      "HistoryCompleteness": {
+        "type": "string",
+        "enum": [
+          "COMPLETE",
+          "PARTIAL",
+          "UNKNOWN"
+        ]
+      },
+      "SubjectPrerequisiteLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "prerequisiteId",
+          "curriculumSubjectId",
+          "requiredCurriculumSubjectId",
+          "requirementType"
+        ],
+        "properties": {
+          "prerequisiteId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumSubjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "requiredCurriculumSubjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "requirementType": {
+            "type": "string",
+            "enum": [
+              "MANDATORY",
+              "RECOMMENDED",
+              "COREQUISITE"
+            ]
+          }
+        }
+      },
+      "ConditionalPrerequisiteAvailability": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "details"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AVAILABLE"
+                ]
+              },
+              "details": {
+                "$ref": "#/components/schemas/CurriculumPrerequisiteSummary"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "reason"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "UNAVAILABLE"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "CurriculumPrerequisiteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expression",
+          "conditions",
+          "conditionNote"
+        ],
+        "properties": {
+          "expression": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PrerequisiteExpression"
+              },
+              {
+                "type": "object",
+                "nullable": true,
+                "enum": [
+                  null
+                ]
+              }
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrerequisiteCondition"
+            }
+          },
+          "conditionNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "topicDependent": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CurriculumRequirementSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirementId",
+          "curriculumId",
+          "requirementType",
+          "requiredCredits",
+          "requiredSubjects"
+        ],
+        "properties": {
+          "requirementId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "requirementType": {
+            "type": "string"
+          },
+          "requiredCredits": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "requiredSubjects": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          }
+        },
+        "description": "Mirrors curriculum_requirement; required_subjects is a nullable nonnegative count, not an ID list."
+      },
+      "SubjectSemesterRuleSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruleId",
+          "curriculumSubjectId",
+          "semesterType"
+        ],
+        "properties": {
+          "ruleId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumSubjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "semesterType": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "SHORT"
+            ]
+          }
+        }
+      },
+      "ForecastCurriculumSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "curriculumId",
+          "curriculumVersion",
+          "catalogueFingerprint",
+          "requirements",
+          "subjectSemesterRules",
+          "subjects"
+        ],
+        "properties": {
+          "curriculumId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "catalogueFingerprint": {
+            "type": "string"
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurriculumRequirementSnapshot"
+            }
+          },
+          "subjectSemesterRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectSemesterRuleSnapshot"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastSubjectOption"
+            }
+          }
+        }
+      },
+      "OriginalSubjectRecommendation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "sections"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedSection"
+            }
+          }
+        }
+      },
+      "SubjectAllocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sectionNumber",
+          "expectedStudents"
+        ],
+        "properties": {
+          "proposedSectionId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sectionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "justification": {
+            "type": "string"
+          }
+        }
+      },
+      "StartReviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "action"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "START_REVIEW"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "importBatchId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "sourceDate",
+          "sourceLabel",
+          "acceptedAt",
+          "counts",
+          "snapshotStatus",
+          "sourceFingerprint"
+        ],
+        "properties": {
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sourceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "snapshotStatus": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED_IMMUTABLE"
+            ]
+          },
+          "sourceFingerprint": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "JsonValue": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonValue"
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            }
+          },
+          {
+            "type": "object",
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          }
+        ]
+      }
+    },
+    "responses": {
+      "ForecastContextResponse": {
+        "description": "Configured catalogue context, no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "$ref": "#/components/schemas/ForecastContext"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ImportAcceptedResponse": {
+        "description": "Accepted immutable import or its summary; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AcceptedImportEnvelope"
+            }
+          }
+        }
+      },
+      "ImportListResponse": {
+        "description": "Bounded import summary page; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ImportListEnvelope"
+            }
+          }
+        }
+      },
+      "ImportValidationResponse": {
+        "description": "422 correction report. No invalid history is accepted. No-store; ETag binds a later subset acknowledgement.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ImportValidationEnvelope"
+            }
+          }
+        }
+      },
+      "ForecastRunResponse": {
+        "description": "Forecast and saved assumptions; no-store; ETag identifies its revision.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ForecastRunEnvelope"
+            }
+          }
+        }
+      },
+      "ForecastRunListResponse": {
+        "description": "Bounded forecast page; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ForecastRunListEnvelope"
+            }
+          }
+        }
+      },
+      "ForecastOperationResponse": {
+        "description": "Operation receipt. Replays return the original receipt, not the current mutable resource.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OperationEnvelope"
+            }
+          }
+        }
+      },
+      "ForecastAuditResponse": {
+        "description": "Bounded audit page; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ForecastAuditEnvelope"
+            }
+          }
+        }
+      },
+      "ForecastConfigurationResponse": {
+        "description": "System Administrator configuration only; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ForecastConfigurationEnvelope"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Malformed request or unknown fields.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid or expired session.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Active identity lacks the required verified role.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "ScopeNotFound": {
+        "description": "Resource or configured scope unavailable; mismatched IDs are not disclosed.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Idempotency mismatch, existing initial run or lifecycle conflict.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PreconditionFailed": {
+        "description": "If-Match revision is stale.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "Upload exceeds configured size limit.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "InvalidDecision": {
+        "description": "Decision/configuration is invalid for current state or rules.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Retryable dependency failure; SQL/provider details are not exposed.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    }
+  }
+}
