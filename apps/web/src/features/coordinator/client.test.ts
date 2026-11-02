@@ -222,3 +222,20 @@ it('surfaces an empty system snapshot as a typed error', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'SYSTEM_SNAPSHOT_EMPTY', message: 'No students match.' } }), { status: 422, headers: { 'Content-Type': 'application/json' } })));
   await expect(client().createSystemSnapshot(scope)).rejects.toMatchObject({ status: 422, code: 'SYSTEM_SNAPSHOT_EMPTY' });
 });
+
+it('uploads the combined snapshot as multipart to its own endpoint, with replay and the 422 correction outcome', async () => {
+  const combined = { ...accepted, source: 'COMBINED', sourceLabel: 'Both' };
+  const fetcher = vi.fn<Fetch>(async () => reply(combined, { status: 201 })); vi.stubGlobal('fetch', fetcher);
+  const input = { ...scope, sourceDate: '2026-10-30', sourceLabel: 'Both', file: new File(['x'], 'both.csv', { type: 'text/csv' }) };
+  expect(await client().uploadCombined(input)).toMatchObject({ kind: 'ACCEPTED', replay: false, data: { source: 'COMBINED' } });
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/forecast-imports/combined-snapshots');
+  const init = fetcher.mock.calls[0]![1] as RequestInit;
+  expect(init.body).toBeInstanceOf(FormData);
+  expect((init.body as FormData).get('file')).toBeInstanceOf(File);
+  expect(headersOf(fetcher)).toEqual({ Authorization: 'Bearer TEST_ONLY', 'Idempotency-Key': expect.any(String) });
+  fetcher.mockResolvedValueOnce(reply(combined, { status: 200 }));
+  expect(await client().uploadCombined(input)).toMatchObject({ replay: true });
+  const body = { error: { code: 'IMPORT_CORRECTION_REQUIRED', message: 'Correct', report: { ...report, source: 'COMBINED' } } };
+  fetcher.mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json', ETag: '"sha256:combined"' } }));
+  expect(await client().uploadCombined(input)).toMatchObject({ kind: 'CORRECTION_REQUIRED', revision: 'sha256:combined' });
+});

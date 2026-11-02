@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { AppLink } from '../../app/navigation';
 import { CoordinatorApiError, type CoordinatorClient, type MutationResult } from './client';
 import {
-  ActionDialog, LoadMore, PageHeading, Panel, ScopePicker, StatusRegion, chooseScope, readScope, scopeHref, usePagedList, useRead, when,
+  ActionDialog, LoadMore, PageHeading, Panel, ScopeFields, StatusRegion, chooseScope, readScope, scopeHref, usePagedList, useRead, when,
   type ChosenScope, type Notice,
 } from './coordinator-ui';
 import type { ForecastAuditEntry, ForecastScope, UncertaintyReason } from '../../../../../packages/shared/src/forecasting/contracts';
@@ -34,9 +34,11 @@ const plural = (count: number, one: string, many = one + 's') => `${count} ${cou
 function FlagBadges({ flags }: { flags: RunSectionFlag[] }) {
   return <>{flags.map(flag => <span key={flag} data-flag={flag} className={'admin-pill ' + (flag === 'ABOVE_NORMAL_MAXIMUM' ? 'coordinator-pill-danger' : 'coordinator-pill-warning')}>{flagLabels[flag]}</span>)}</>;
 }
+/** Subjects listed in the table: excluded and not-offered subjects are hidden, so they are not counted. */
+const shownSubjects = (summary: ForecastRunSummary['summary']) => summary.subjects - summary.excludedSubjects - summary.notOfferedInSemesterTypeSubjects;
 function SummaryFacts({ run }: { run: Pick<ForecastRunDetail, 'summary'> }) {
   const s = run.summary;
-  const facts: Array<[string, number]> = [['Subjects', s.subjects], ['Potential demand', s.totalSupportedDemand], ['Uncertain students', s.totalUncertain], ['Proposed sections', s.totalSections], ['Sections awaiting decision', s.pendingSections], ['Below minimum', s.sectionsBelowMinimum], ['Below optimal', s.sectionsBelowOptimal]];
+  const facts: Array<[string, number]> = [['Subjects', shownSubjects(s)], ['Potential demand', s.totalSupportedDemand], ['Uncertain students', s.totalUncertain], ['Proposed sections', s.totalSections], ['Sections awaiting decision', s.pendingSections], ['Below minimum', s.sectionsBelowMinimum], ['Below optimal', s.sectionsBelowOptimal]];
   return <dl className="coordinator-counts" aria-label="Forecast summary">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
 function NewerBadge({ newer, scope }: { newer: NewerForecastAvailable; scope: ForecastScope }) {
@@ -45,8 +47,8 @@ function NewerBadge({ newer, scope }: { newer: NewerForecastAvailable; scope: Fo
 
 function RunList({ client, scope }: { client: CoordinatorClient; scope: ChosenScope }) {
   const list = usePagedList<ForecastRunSummary>(signal => client.listRuns(scope, { limit: 20 }, signal), cursor => client.listRuns(scope, { limit: 20, cursor }), [scope.programmeId, scope.learningCentreId].join('|'));
-  return <section className="admin-card" aria-labelledby="coordinator-runs-heading">
-    <div className="admin-card-title"><div><h2 id="coordinator-runs-heading">Forecasts</h2><p className="admin-muted">Newest first. Each forecast comes from one accepted import. Figures are potential demand, not registration.</p></div></div>
+  return <section className="coordinator-setup-section" aria-labelledby="coordinator-runs-heading">
+    <div className="admin-card-title"><div><h3 id="coordinator-runs-heading">Forecasts</h3><p className="admin-muted">Newest first. Each forecast comes from one accepted import. Figures are potential demand, not registration.</p></div></div>
     <Panel error={list.error} retry={list.retry} label="forecasts">{list.data && (list.items.length === 0
       ? <div className="admin-empty"><h3>No forecasts yet</h3><p>Generate one from an accepted import.</p><AppLink className="coordinator-link-button" href={scopeHref('/coordinator/imports', scope)}>Go to Data Imports</AppLink></div>
       : <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Forecasts table" tabIndex={0}>
@@ -55,7 +57,7 @@ function RunList({ client, scope }: { client: CoordinatorClient; scope: ChosenSc
             <td><strong>Version {run.versionNumber}</strong><span className="admin-audit-id">Forecast #{run.forecastRunId} · import #{run.importBatchId}</span>
               {run.newerForecastAvailable && <NewerBadge newer={run.newerForecastAvailable} scope={run}/>}</td>
             <td><span className={'admin-pill ' + statusClass[run.status]}>{statusLabels[run.status]}</span></td><td>{when(run.generatedAt)}</td>
-            <td>{run.summary.subjects}</td><td>{run.summary.totalSupportedDemand}<span className="admin-audit-id">{run.summary.totalUncertain} uncertain</span></td>
+            <td>{shownSubjects(run.summary)}</td><td>{run.summary.totalSupportedDemand}<span className="admin-audit-id">{run.summary.totalUncertain} uncertain</span></td>
             <td>{run.summary.totalSections}</td><td>{run.summary.pendingSections}</td>
             <td><AppLink className="coordinator-link-button" href={scopeHref('/coordinator/forecasts', run, { run: run.forecastRunId })} aria-label={`Open forecast version ${run.versionNumber}`}>Open</AppLink></td></tr>)}</tbody></table></div>
         {list.loadMoreError && <p className="admin-form-error" role="alert">{list.loadMoreError}</p>}
@@ -123,13 +125,51 @@ function SectionList({ sections }: { sections: RunSection[] }) {
 
 type Dialog = null | { kind: 'start' } | { kind: 'finalize' } | { kind: 'decide'; action: Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>; subject: RunSubject } | { kind: 'allocate'; subject: RunSubject };
 
+const SORT_LABELS = { code: 'Subject code (A–Z)', demand: 'Potential demand (high to low)', uncertain: 'Uncertain (high to low)', near: 'Near graduation (high to low)', sections: 'Proposed sections (high to low)' } as const;
+type SubjectSort = keyof typeof SORT_LABELS;
+interface SubjectFilters { q: string; type: string; decision: string; flag: string; sort: SubjectSort }
+const NO_FILTERS: SubjectFilters = { q: '', type: '', decision: '', flag: '', sort: 'code' };
+function matchesFilters(subject: RunSubject, { q, type, decision, flag }: SubjectFilters) {
+  const term = q.trim().toLowerCase();
+  if (term && !subject.subjectCode.toLowerCase().includes(term) && !subject.subjectName.toLowerCase().includes(term)) return false;
+  if (type && (subject.classType ?? 'NONE') !== type) return false;
+  if (decision && subject.decisionStatus !== decision) return false;
+  if (flag === 'BELOW_MINIMUM' || flag === 'BELOW_OPTIMAL') return subject.sections.some(section => section.flags.includes(flag));
+  if (flag === 'CONFIG') return subject.configurationStatus === 'CONFIGURATION_REQUIRED';
+  if (flag === 'UNCERTAIN') return subject.uncertainStudentCount > 0;
+  return true;
+}
+function sortSubjects(list: RunSubject[], sort: SubjectSort) {
+  const value = (subject: RunSubject) => sort === 'demand' ? subject.supportedEligibleCount : sort === 'uncertain' ? subject.uncertainStudentCount : sort === 'near' ? subject.nearGraduationCount : subject.sections.length;
+  return [...list].sort((left, right) => (sort === 'code' ? 0 : value(right) - value(left)) || left.subjectCode.localeCompare(right.subjectCode));
+}
+const SUBJECT_PAGE_SIZE = 20;
 function SubjectTable({ run, editable, pendingIds, onDecide, onAllocate }: { run: ForecastRunDetail; editable: boolean; pendingIds: number[]; onDecide: (action: Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>, subject: RunSubject) => void; onAllocate: (subject: RunSubject) => void }) {
   const [open, setOpen] = useState<number[]>([]);
   const idBase = useId();
   const subjects = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded);
-  return <div className="admin-table-scroll coordinator-table coordinator-subjects" role="region" aria-label="Subjects table" tabIndex={0}>
+  const [filters, setFilters] = useState(NO_FILTERS), [requested, setPage] = useState(1), filtering = filters.q !== '' || filters.type !== '' || filters.decision !== '' || filters.flag !== '';
+  const matching = sortSubjects(subjects.filter(subject => matchesFilters(subject, filters)), filters.sort);
+  const pages = Math.max(1, Math.ceil(matching.length / SUBJECT_PAGE_SIZE)), page = Math.min(requested, pages);
+  const change = (patch: Partial<SubjectFilters>) => { setFilters(current => ({ ...current, ...patch })); setPage(1); };
+  const clear = () => { setFilters(current => ({ ...NO_FILTERS, sort: current.sort })); setPage(1); };
+  // After a finalize attempt with unreviewed subjects: clear filters and sorting (a filter could hide them), then show the page of the first one that still needs a decision.
+  useEffect(() => {
+    const first = sortSubjects(subjects, NO_FILTERS.sort).findIndex(subject => pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING');
+    if (first >= 0) { setFilters(NO_FILTERS); setPage(Math.floor(first / SUBJECT_PAGE_SIZE) + 1); }
+  }, [pendingIds]);
+  const toolbar = <form className="admin-filters coordinator-subject-filters" role="search" aria-label="Filter and sort subjects" onSubmit={event => event.preventDefault()}>
+    <label className="admin-search-field">Search subjects<input type="search" value={filters.q} placeholder="Subject code or name" onChange={event => change({ q: event.target.value })}/></label>
+    <label>Class type<select value={filters.type} onChange={event => change({ type: event.target.value })}><option value="">All</option><option value="LECTURE">Lecture</option><option value="LAB">Lab</option><option value="NONE">Not set</option></select></label>
+    <label>Decision<select value={filters.decision} onChange={event => change({ decision: event.target.value })}><option value="">All</option>{(['PENDING', 'APPROVED', 'REVIEWED', 'DEFERRED', 'MIXED', 'NONE'] as const).map(status => <option key={status} value={status}>{decisionLabels[status]}</option>)}</select></label>
+    <label>Flags<select value={filters.flag} onChange={event => change({ flag: event.target.value })}><option value="">All</option><option value="BELOW_MINIMUM">Below minimum</option><option value="BELOW_OPTIMAL">Below optimal</option><option value="CONFIG">Configuration required</option><option value="UNCERTAIN">Has uncertain students</option></select></label>
+    <label>Sort by<select value={filters.sort} onChange={event => change({ sort: event.target.value as SubjectSort })}>{Object.entries(SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    {filtering && <button type="button" onClick={clear}>Clear filters</button>}
+  </form>;
+  if (matching.length === 0) return <>{toolbar}<div className="admin-empty" role="status"><p>No subjects match these filters.</p><button type="button" onClick={clear}>Clear filters</button></div></>;
+  return <>{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects" role="region" aria-label="Subjects table" tabIndex={0}>
     <table><thead><tr><th scope="col">Subject</th><th scope="col">Class type</th><th scope="col">Potential demand</th><th scope="col">Uncertain</th><th scope="col">Near graduation</th><th scope="col">Quality</th><th scope="col">Proposed sections</th><th scope="col">Decision</th></tr></thead>
-      <tbody>{subjects.map(subject => {
+      <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(subject => {
         const expanded = open.includes(subject.subjectId), reasonsId = `${idBase}-r${subject.subjectId}`, highlight = pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING';
         const decidable = editable && subject.configurationStatus === 'CONFIGURED' && subject.sections.length > 0;
         return <tr key={subject.subjectId} className={highlight ? 'coordinator-row-pending' : undefined} data-subject={subject.subjectCode}>
@@ -151,7 +191,8 @@ function SubjectTable({ run, editable, pendingIds, onDecide, onAllocate }: { run
               <button type="button" className="admin-row-action" aria-label={`Change classes ${subject.subjectCode}`} onClick={() => onAllocate(subject)}>Change classes</button></div>}</td>
         </tr>;
       })}</tbody></table>
-  </div>;
+  </div>
+  {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${subjects.length}` : matching.length} subjects · Page {page} of {pages}</span><div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</>;
 }
 
 function AuditTable({ client, run }: { client: CoordinatorClient; run: ForecastRunDetail }) {
@@ -193,7 +234,7 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
   }
   return <Panel error={read.error} retry={read.retry} label="forecast">{run && (() => {
     const scope: ForecastScope = { programmeId: run.programmeId, learningCentreId: run.learningCentreId, targetSemesterId: run.targetSemesterId };
-    const editable = run.status === 'UNDER_REVIEW', excluded = run.subjects.filter(subject => subject.excluded), notOffered = run.subjects.filter(subject => subject.semesterTypeExcluded);
+    const editable = run.status === 'UNDER_REVIEW', shown = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded).length;
     const decide = (action: Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>, subject: RunSubject) => async (reason: string) => mutate(rev => client.decide(run.forecastRunId, rev, scope, [{ subjectId: subject.subjectId, action, reason }]), `${actionVerb[action].title}: ${subject.subjectCode} recorded.`);
     return <>
       <StatusRegion notice={notice}/>
@@ -201,7 +242,8 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
         <AppLink className="admin-back" href={scopeHref('/coordinator/forecasts', run)}>← Back to forecasts</AppLink>
         <div className="admin-card-title"><div><h2 id="coordinator-run-heading" tabIndex={-1} ref={heading}>Forecast version {run.versionNumber} <span className={'admin-pill ' + statusClass[run.status]}>{statusLabels[run.status]}</span></h2>
           <p className="admin-muted">Forecast #{run.forecastRunId} from import #{run.importBatchId} · generated {when(run.generatedAt)} by {run.generatedBy}{run.finalizedAt ? ` · finalized ${when(run.finalizedAt)} by ${run.finalizedBy}` : ''}</p>
-          {run.dataSource === 'SYSTEM' && <p><span className="admin-pill admin-status-active">System students</span> <span className="admin-muted">Based on student-entered records.</span></p>}</div>
+          {run.dataSource === 'SYSTEM' && <p><span className="admin-pill admin-status-active">System students</span> <span className="admin-muted">Based on student-entered records.</span></p>}
+          {run.dataSource === 'COMBINED' && <p><span className="admin-pill admin-status-active">Combined</span> <span className="admin-muted">Combined: student-entered records + CSV import.</span></p>}</div>
           <div className="coordinator-head-actions">
             <button type="button" onClick={() => void read.reload()}>Refresh</button>
             {run.status === 'DRAFT' && <button type="button" className="admin-primary" onClick={() => setDialog({ kind: 'start' })}>Start review</button>}
@@ -215,14 +257,8 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
       </section>
       <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
         <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Potential demand is the supported eligible pool. Uncertain students are not counted in it.</p></div></div>
-        {run.subjects.length - excluded.length - notOffered.length === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p> : <SubjectTable run={run} editable={editable} pendingIds={pendingIds} onDecide={(action, subject) => setDialog({ kind: 'decide', action, subject })} onAllocate={subject => setDialog({ kind: 'allocate', subject })}/>}
+        {shown === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p> : <SubjectTable run={run} editable={editable} pendingIds={pendingIds} onDecide={(action, subject) => setDialog({ kind: 'decide', action, subject })} onAllocate={subject => setDialog({ kind: 'allocate', subject })}/>}
       </section>
-      {excluded.length > 0 && <section className="admin-card" aria-labelledby="coordinator-excluded-heading">
-        <div className="admin-card-title"><div><h2 id="coordinator-excluded-heading">Excluded subjects</h2><p className="admin-muted">These subjects are not offered through the forecast and have no sections.</p></div></div>
-        <ul className="coordinator-excluded">{excluded.map(subject => <li key={subject.subjectId}><strong>{subject.subjectCode}</strong> {subject.subjectName}<span className="admin-muted">{subject.exclusionReason ?? 'Excluded in the subject catalogue.'}</span></li>)}</ul></section>}
-      {notOffered.length > 0 && <section className="admin-card" aria-labelledby="coordinator-not-offered-heading">
-        <div className="admin-card-title"><div><h2 id="coordinator-not-offered-heading">Not offered in this semester type</h2><p className="admin-muted">These subjects do not run in this semester type, so they have no demand or sections and cannot be confirmed for it.</p></div></div>
-        <ul className="coordinator-not-offered">{notOffered.map(subject => <li key={subject.subjectId} data-subject={subject.subjectCode}><strong>{subject.subjectCode}</strong> {subject.subjectName}<span className="admin-muted">{subject.semesterTypeExclusionReason ?? 'Not offered in this semester type.'}</span></li>)}</ul></section>}
       <AuditTable client={client} run={run}/>
       {dialog?.kind === 'start' && <ActionDialog title="Start review" confirmLabel="Start review" reasonLabel={null} onCancel={() => setDialog(null)}
         description="Move this draft forecast into review. You can then approve, review or defer each subject and change its classes."
@@ -259,9 +295,12 @@ export function ForecastsPage({ client, search }: { client: CoordinatorClient; s
     <PageHeading title="Class Offering Forecast" text="Review the potential demand for each subject, adjust the proposed classes, and finalize the forecast for your programme and learning centre."/>
     {runId !== null ? <RunDetail key={runId} client={client} runId={runId}/> :
       <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && <>
-        <ScopePicker context={context.data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/>
-        {scope ? <RunList key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope}/>
-          : <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to see its forecasts.</p></section>}
+        <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
+          <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
+          <div className="coordinator-setup-section"><ScopeFields context={context.data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/></div>
+          {scope ? <RunList key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope}/>
+            : <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecasts.</p></div>}
+        </section>
       </>}</Panel>}
   </>;
 }

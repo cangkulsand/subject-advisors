@@ -78,19 +78,39 @@ export function useSearch() { return new URL(useAppLocation(), window.location.o
 
 export interface ChosenScope extends ForecastScope { programmeLabel: string; centreLabel: string }
 /** Programme, then learning centre (from the assigned scopes), and the read-only target semester from the context. */
-export function ScopePicker({ context, path, programmeId, learningCentreId }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null }) {
-  const programmeField = useId(), centreField = useId(), semesterField = useId();
+function useScopeChoices({ context, path, programmeId, keep }: { context: ForecastContext; path: string; programmeId: number | null; keep?: Record<string, string> }) {
   const assigned = context.assignedScopes;
   const centres = context.learningCentres.filter(centre => !assigned || (programmeId !== null && assigned.some(pair => pair.programmeId === programmeId && pair.learningCentreId === centre.learningCentreId)));
   const target = context.targetSemesters.find(semester => semester.semesterId === context.targetSemesterId);
   const go = (nextProgramme: number | null, nextCentre: number | null) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(keep);
     if (nextProgramme) params.set('programmeId', String(nextProgramme));
     if (nextCentre) params.set('learningCentreId', String(nextCentre));
     navigateApp(path + (params.size ? '?' + params.toString() : ''), { replace: true, skipUnsaved: true });
   };
-  return <section className="admin-card" aria-labelledby={programmeField + '-heading'}>
-    <div className="admin-card-title"><div><h2 id={programmeField + '-heading'}>Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
+  return { centres, target, go };
+}
+
+export interface RadioOption { value: string; label: string; hint?: string }
+/** A native radio group drawn as tiles with a large visible radio circle (one tab stop, arrow keys, whole tile clickable). */
+export function RadioGroup({ legend, value, options, onChange, help, empty }: { legend: string; value: string; options: RadioOption[]; onChange: (value: string) => void; help?: string; empty?: string }) {
+  const name = useId(), helpId = name + '-help';
+  return <fieldset className="coordinator-radio-group" aria-describedby={help ? helpId : undefined}>
+    <legend>{legend}</legend>
+    {help && <p className="admin-muted" id={helpId}>{help}</p>}
+    {options.length
+      ? <div className="coordinator-segmented">{options.map(item => <label key={item.value} className={item.value === value ? 'is-selected' : undefined}>
+        <input type="radio" name={name} value={item.value} checked={item.value === value} onChange={() => onChange(item.value)}/>
+        <span className="coordinator-segmented-label">{item.label}</span>{item.hint && <small>{item.hint}</small>}</label>)}</div>
+      : <p className="admin-muted">{empty}</p>}
+  </fieldset>;
+}
+
+/** Card-less scope fields (programme and learning centre selects, read-only target semester) for the single setup card on Data Imports and Class Offering Forecast. */
+export function ScopeFields({ context, path, programmeId, learningCentreId, keep }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null; keep?: Record<string, string> }) {
+  const programmeField = useId(), centreField = useId(), semesterField = useId();
+  const { centres, target, go } = useScopeChoices({ context, path, programmeId, keep });
+  return <>
     <div className="coordinator-scope-grid">
       <div className="admin-field"><label htmlFor={programmeField}>Programme</label>
         <select id={programmeField} value={programmeId ?? ''} onChange={event => go(event.target.value ? Number(event.target.value) : null, null)}>
@@ -108,6 +128,14 @@ export function ScopePicker({ context, path, programmeId, learningCentreId }: { 
     </div>
     {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet.</p>}
     {context.targetSemesterId == null && <p className="admin-notice" role="status">No target semester is configured yet, so imports are unavailable.</p>}
+  </>;
+}
+
+export function ScopePicker({ context, path, programmeId, learningCentreId, keep }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null; keep?: Record<string, string> }) {
+  const heading = useId();
+  return <section className="admin-card" aria-labelledby={heading}>
+    <div className="admin-card-title"><div><h2 id={heading}>Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
+    <ScopeFields context={context} path={path} programmeId={programmeId} learningCentreId={learningCentreId} keep={keep}/>
   </section>;
 }
 export function chooseScope(context: ForecastContext, programmeId: number | null, learningCentreId: number | null): ChosenScope | null {

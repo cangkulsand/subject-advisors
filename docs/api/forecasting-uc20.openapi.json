@@ -3,7 +3,7 @@
   "info": {
     "title": "Subject Advisors UC20 Forecast Planning API",
     "version": "0.1.0",
-    "description": "PLANNED contract only. These endpoints are not implemented. Decided 2026-11-02 (MT8): data provision has two sources. The main source snapshots the current students in the system (student_profile / academic_record, read-only; student-entered records count as COMPLETE history, students without records are UNKNOWN); a CSV upload stays as the fallback. A forecast uses one source. This replaces the earlier rule that UC20 never queries student profiles. CSV people remain external-reference cohorts and are never linked to portal students. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
+    "description": "PLANNED contract only. These endpoints are not implemented. Decided 2026-11-02 (MT8): data provision has two sources. The main source snapshots the current students in the system (student_profile / academic_record, read-only; student-entered records count as COMPLETE history, students without records are UNKNOWN); a CSV upload is the other source. Decided 2026-11-02 (MT9): the Coordinator chooses the data source PER FORECAST on the Imports screen (students in the system, CSV import, or Both); it is not an admin setting. Both builds ONE combined snapshot (system students plus the CSV students not already in the system, system record wins on a matric match; see createCombinedSnapshot). Each forecast is based on one snapshot. This replaces the earlier rule that UC20 never queries student profiles. CSV people remain external-reference cohorts and are never linked to portal students. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
   },
   "servers": [
     {
@@ -211,7 +211,7 @@
         ],
         "operationId": "createSystemStudentsSnapshot",
         "summary": "Snapshot the students in the system (main data source)",
-        "description": "Decided 2026-11-02: the Coordinator can build the forecast from the CURRENT STUDENTS IN THE SYSTEM instead of uploading a CSV (CSV stays as a fallback; a forecast uses one source). The server stores one ACCEPTED, immutable snapshot of the students whose curriculum belongs to the programme, whose learning centre equals the requested centre (resolved through the scope provider; interim: every student counts under KL until profiles record a centre) and whose access is ACTIVE with the STUDENT role. Student-entered academic records count as COMPLETE history (source: student-entered); a student with no academic record is UNKNOWN history. COMPLETED, EXEMPTED and FAILED map as-is; WITHDRAWN is stored as FAILED; records whose subject is not in the student's curriculum are skipped and counted. External reference is PORTAL-<student_id>. The response is the accepted import with source SYSTEM and a coverage report. The same fingerprint in the same scope replays the existing snapshot with 200; changed data creates a new snapshot (201). student_profile and academic_record are never written. Target semester must be the one after the current semester. 422 SYSTEM_SNAPSHOT_EMPTY when no student matches.",
+        "description": "Decided 2026-11-02: the Coordinator can build the forecast from the CURRENT STUDENTS IN THE SYSTEM instead of uploading a CSV (the Coordinator chooses the source per forecast; see also the CSV and combined snapshot operations). The server stores one ACCEPTED, immutable snapshot of the students whose curriculum belongs to the programme, whose learning centre equals the requested centre (resolved through the scope provider; interim: every student counts under KL until profiles record a centre) and whose access is ACTIVE with the STUDENT role. Student-entered academic records count as COMPLETE history (source: student-entered); a student with no academic record is UNKNOWN history. COMPLETED, EXEMPTED and FAILED map as-is; WITHDRAWN is stored as FAILED; records whose subject is not in the student's curriculum are skipped and counted. External reference is PORTAL-<student_id>. The response is the accepted import with source SYSTEM and a coverage report. The same fingerprint in the same scope replays the existing snapshot with 200; changed data creates a new snapshot (201). student_profile and academic_record are never written. Target semester must be the one after the current semester. 422 SYSTEM_SNAPSHOT_EMPTY when no student matches.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -1103,6 +1103,68 @@
           }
         }
       }
+    },
+    "/api/coordinator/forecast-imports/combined-snapshots": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "createCombinedSnapshot",
+        "summary": "Snapshot the students in the system plus a CSV (data source: Both)",
+        "description": "Decided 2026-11-02: the Coordinator chooses the data source per forecast (students in the system, CSV import, or both). \"Both\" builds ONE snapshot, therefore one forecast, made of the system students (same selection and mapping as the system snapshot) PLUS the students of the uploaded CSV who are not already in the system. Duplicates: the SYSTEM record wins and the CSV student is skipped when the CSV external_reference equals the system student's matric_no (trimmed, case-insensitive, only when matric_no is non-empty and unique among the selected system students) or the system PORTAL-<id> reference. A CSV student whose student_name equals a system student name (normalised) but whose reference differs is included and reported as a POSSIBLE_DUPLICATE_STUDENT warning; records are never merged on name. Matric numbers are used in memory only and are never stored. The CSV part is validated exactly like POST /forecast-imports. Rows to correct give 422 IMPORT_CORRECTION_REQUIRED with an ETag; the valid part (system students plus the valid CSV students) is stored as a VALIDATED batch and accepted with the existing POST /forecast-imports/{validationId}/subset-acceptances (If-Match). A valid CSV gives 201 with an ACCEPTED batch whose source is COMBINED. The fingerprint covers the CSV bytes and the system data; the same inputs in the same scope replay the existing snapshot with 200. History: system students COMPLETE (with records) or UNKNOWN (none); CSV students as given. validation_summary.internal keeps a per-student source map; GET .../students returns source per student. Generate run, review, finalize and confirm are unchanged.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUploadRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "text/csv"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "201": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImportValidationResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1847,7 +1909,11 @@
             "$ref": "#/components/schemas/ImportSource"
           },
           "coverage": {
-            "$ref": "#/components/schemas/SystemSnapshotCoverage"
+            "$ref": "#/components/schemas/SystemSnapshotCoverage",
+            "description": "Present on system-students and COMBINED snapshots (the system part)."
+          },
+          "combined": {
+            "$ref": "#/components/schemas/CombinedSnapshotCoverage"
           }
         }
       },
@@ -3928,7 +3994,8 @@
           "studentName",
           "curriculumVersion",
           "cohortStatus",
-          "historyCompleteness"
+          "historyCompleteness",
+          "source"
         ],
         "properties": {
           "importedStudentId": {
@@ -3949,6 +4016,9 @@
           },
           "historyCompleteness": {
             "$ref": "#/components/schemas/HistoryCompleteness"
+          },
+          "source": {
+            "$ref": "#/components/schemas/StudentSource"
           }
         }
       },
@@ -4551,7 +4621,7 @@
                 "$ref": "#/components/schemas/ImportSource"
               }
             ],
-            "description": "Source of the import snapshot the forecast is based on. SYSTEM means student-entered portal records."
+            "description": "Source of the import snapshot the forecast is based on. SYSTEM means student-entered portal records; COMBINED means student-entered records plus a CSV import (Combined: student-entered records + CSV import)."
           }
         }
       },
@@ -4601,9 +4671,10 @@
         "type": "string",
         "enum": [
           "CSV",
-          "SYSTEM"
+          "SYSTEM",
+          "COMBINED"
         ],
-        "description": "Where the snapshot came from: an uploaded CSV, or the students in the system (portal snapshot, MT8). Snapshots written before MT8 read as CSV."
+        "description": "Where the snapshot came from: an uploaded CSV, the students in the system (portal snapshot, MT8), or both in one COMBINED snapshot (MT9). The Coordinator chooses per forecast. Snapshots written before MT8 read as CSV."
       },
       "SystemSnapshotCoverage": {
         "type": "object",
@@ -4699,6 +4770,85 @@
             "minLength": 1,
             "maxLength": 255,
             "description": "Defaults to \"System students\"."
+          }
+        }
+      },
+      "StudentSource": {
+        "type": "string",
+        "enum": [
+          "SYSTEM",
+          "CSV"
+        ],
+        "description": "Where one retained student came from. In a COMBINED snapshot the system record always wins over a CSV record of the same student."
+      },
+      "CombinedSnapshotCoverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "csv",
+          "students",
+          "csvSkippedAlreadyInSystem",
+          "possibleDuplicates"
+        ],
+        "description": "Coverage of a COMBINED snapshot. The system part is the report coverage (SystemSnapshotCoverage).",
+        "properties": {
+          "csv": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rows",
+              "students",
+              "rejectedRows"
+            ],
+            "properties": {
+              "rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "students": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rejectedRows": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "students": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Students in the snapshot: system students plus the CSV students not already in the system."
+          },
+          "csvSkippedAlreadyInSystem": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "CSV references skipped because the external_reference equals the matric number (trimmed, case-insensitive, non-empty and unique among the selected system students) or the PORTAL reference of a system student. The system record is used."
+          },
+          "possibleDuplicates": {
+            "type": "array",
+            "description": "CSV students whose student_name equals a system student name (normalised: trimmed, whitespace collapsed, case-folded) but whose reference differs. Both are included; never merged on name.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "csvReference",
+                "systemReferences"
+              ],
+              "properties": {
+                "csvReference": {
+                  "type": "string"
+                },
+                "systemReferences": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         }
       }

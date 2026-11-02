@@ -1,6 +1,6 @@
 import type { ForecastScope } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ClassType, ImportedStudentSummary } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { ForecastingRepository, ImportBatchRow, ImportBatchStatus, PortalStudentSelection, ProgrammeCatalogue, StoredValidationSummary, StoreImportInput } from './contracts';
+import type { ForecastingRepository, ImportBatchRow, StoredStudentSummary, ImportBatchStatus, PortalStudentSelection, ProgrammeCatalogue, StoredValidationSummary, StoreImportInput } from './contracts';
 import { mapForecastingDatabaseError } from './errors';
 import type { CatalogueCurriculum, CatalogueSubject } from './validation';
 
@@ -86,7 +86,7 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
     systemStudents: (programmeId) => read(async (): Promise<PortalStudentSelection> => {
       // Read-only. The student must have an ACTIVE access assignment that also holds the STUDENT role (user_role_assignment, 0004).
       const [students, other] = await Promise.all([
-        query(`SELECT sp.student_id, sp.student_name, sp.curriculum_id,
+        query(`SELECT sp.student_id, sp.student_name, sp.matric_no, sp.curriculum_id,
             EXISTS (SELECT 1 FROM public.user_access_assignment ua JOIN public.user_role_assignment ur ON ur.access_assignment_id = ua.access_assignment_id
               WHERE ua.clerk_user_id = sp.clerk_user_id AND ua.access_status = 'ACTIVE' AND ur.app_role = 'STUDENT') AS eligible
           FROM public.student_profile sp JOIN public.curriculum c ON c.curriculum_id = sp.curriculum_id WHERE c.programme_id = $1 ORDER BY sp.student_id`, [programmeId]),
@@ -96,7 +96,7 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
         JOIN public.student_profile sp ON sp.student_id = ar.student_id JOIN public.curriculum c ON c.curriculum_id = sp.curriculum_id
         WHERE c.programme_id = $1 ORDER BY ar.student_id, ar.record_id`, [programmeId]);
       return {
-        students: students.map((row) => ({ studentId: integer(row.student_id), studentName: text(row.student_name), curriculumId: integer(row.curriculum_id), eligible: row.eligible === true })),
+        students: students.map((row) => ({ studentId: integer(row.student_id), studentName: text(row.student_name), matricNo: row.matric_no == null ? null : text(row.matric_no), curriculumId: integer(row.curriculum_id), eligible: row.eligible === true })),
         records: records.map((row) => ({ studentId: integer(row.student_id), subjectId: integer(row.subject_id), status: text(row.status), semesterId: row.semester_id == null ? null : integer(row.semester_id), recognizedCredits: integer(row.recognized_credits) })),
         otherProgrammeStudents: integer(other[0]?.total ?? 0),
       };
@@ -163,7 +163,7 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
     listStudents: (importBatchId, limit, afterId) => read(async () => (await query(`SELECT s.imported_student_id, s.external_reference, s.student_name, c.curriculum_version, s.cohort_status, s.history_completeness
       FROM public.imported_student s JOIN public.curriculum c ON c.curriculum_id=s.curriculum_id
       WHERE s.import_batch_id=$1 AND ($3::integer IS NULL OR s.imported_student_id>$3::integer) ORDER BY s.imported_student_id LIMIT $2`, [importBatchId, limit, afterId]))
-      .map((row): ImportedStudentSummary => ({ importedStudentId: integer(row.imported_student_id), externalReference: text(row.external_reference), studentName: row.student_name == null ? null : text(row.student_name),
+      .map((row): StoredStudentSummary => ({ importedStudentId: integer(row.imported_student_id), externalReference: text(row.external_reference), studentName: row.student_name == null ? null : text(row.student_name),
         curriculumVersion: text(row.curriculum_version), cohortStatus: text(row.cohort_status), historyCompleteness: text(row.history_completeness) as ImportedStudentSummary['historyCompleteness'] }))),
 
     acceptValidated: (importBatchId, actor) => read(async () => {

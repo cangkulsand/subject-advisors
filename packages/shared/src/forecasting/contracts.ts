@@ -116,8 +116,23 @@ export interface AcceptedSnapshotReceipt {
   acceptedAt: string;
   sourceFingerprint: string;
 }
-/** Where an accepted import snapshot came from: an uploaded CSV, or the students in the system (portal snapshot, MT8). */
-export type ImportSource = 'CSV' | 'SYSTEM';
+/**
+ * Where an accepted import snapshot came from: an uploaded CSV, the students in the system (portal snapshot, MT8), or both
+ * in one combined snapshot (MT9). The coordinator chooses per forecast.
+ */
+export type ImportSource = 'CSV' | 'SYSTEM' | 'COMBINED';
+/** Where one retained student of a snapshot came from. In a COMBINED snapshot the system record always wins over a CSV record. */
+export type StudentSource = 'SYSTEM' | 'CSV';
+/** Extra coverage of a COMBINED snapshot; the system part is the MT8 `coverage`. */
+export interface CombinedSnapshotCoverage {
+  csv: { rows: number; students: number; rejectedRows: number };
+  /** Students in the snapshot: system students plus the CSV students not already in the system. */
+  students: number;
+  /** CSV references skipped because the student is already in the system (matric number match, system record wins). */
+  csvSkippedAlreadyInSystem: string[];
+  /** CSV students with the same name as a system student but a different reference; both are included. */
+  possibleDuplicates: Array<{ csvReference: string; systemReferences: string[] }>;
+}
 /**
  * Coverage of a system-students snapshot. Student-entered academic records count as COMPLETE history; students with no
  * academic record at all are UNKNOWN history and so count as uncertain in the forecast.
@@ -146,8 +161,10 @@ export interface ImportValidationReport {
   acceptedSnapshot: AcceptedSnapshotReceipt | null;
   /** Absent on CSV snapshots written before MT8 (read as 'CSV'). */
   source?: ImportSource;
-  /** Present only on system-students snapshots. */
+  /** Present on system-students and combined snapshots (the system part). */
   coverage?: SystemSnapshotCoverage;
+  /** Present only on combined snapshots. */
+  combined?: CombinedSnapshotCoverage;
 }
 /** Stable validation issue codes produced by the UC20 CSV validator (file, group, attempt and warning findings). */
 export const IMPORT_FILE_ERROR_CODES = [
@@ -164,6 +181,8 @@ export const IMPORT_ROW_ERROR_CODES = [
 export const IMPORT_WARNING_CODES = [
   'RETAKE_OUTCOME_UNRESOLVED', 'HISTORY_UNKNOWN', 'HISTORY_PARTIAL', 'SYNTHETIC_ATTEMPT', 'SEMESTER_UNKNOWN',
   'CREDIT_EVIDENCE_MISSING', 'STALE_SOURCE_THRESHOLD_NOT_CONFIGURED', 'ISSUES_TRUNCATED',
+  'POSSIBLE_DUPLICATE_STUDENT', 'CSV_STUDENTS_ALREADY_IN_SYSTEM',
+  'POSSIBLE_DUPLICATE_STUDENT', 'CSV_STUDENTS_ALREADY_IN_SYSTEM',
 ] as const;
 export type ImportIssueCode = (typeof IMPORT_FILE_ERROR_CODES)[number] | (typeof IMPORT_ROW_ERROR_CODES)[number] | (typeof IMPORT_WARNING_CODES)[number];
 /**
@@ -174,8 +193,10 @@ export type ImportIssueCode = (typeof IMPORT_FILE_ERROR_CODES)[number] | (typeof
 export interface StoredValidationInternals {
   schemaVersion: 1;
   csvVersion: 1;
-  /** 'PORTAL' marks a system-students snapshot built from student_profile / academic_record (MT8); absent for CSV. */
-  source?: 'PORTAL';
+  /** 'PORTAL' marks a system-students snapshot built from student_profile / academic_record (MT8); 'COMBINED' a system + CSV snapshot (MT9); absent for CSV. */
+  source?: 'PORTAL' | 'COMBINED';
+  /** COMBINED only: where each retained student came from. */
+  sourceByReference?: Record<string, StudentSource>;
   dataRows: number;
   rejectedRowsByStudent: Record<string, number>;
   subsetAcknowledgedBy?: string;
@@ -189,6 +210,8 @@ export interface ImportedStudentSummary {
   curriculumVersion: string;
   cohortStatus: string;
   historyCompleteness: HistoryCompleteness;
+  /** Where the student came from (always SYSTEM or CSV, also in a COMBINED snapshot). */
+  source: StudentSource;
 }
 export interface AcceptedImport extends ForecastScope {
   importBatchId: Int32Id;
@@ -196,7 +219,7 @@ export interface AcceptedImport extends ForecastScope {
   sourceLabel: string;
   acceptedAt: string;
   sourceFingerprint: string;
-  /** 'SYSTEM' for snapshots built from the students in the system, otherwise 'CSV'. */
+  /** 'SYSTEM' (students in the system), 'COMBINED' (system + CSV), otherwise 'CSV'. */
   source: ImportSource;
   counts: ImportCounts;
   snapshotStatus: 'ACCEPTED_IMMUTABLE';

@@ -23,10 +23,15 @@ export interface ImportBatchRow extends ForecastScope {
   summary: StoredValidationSummary;
 }
 
+/** A roster row as stored; the route adds the per-student `source`. */
+export type StoredStudentSummary = Omit<ImportedStudentSummary, 'source'>;
+
 /** One student in the system (student_profile) of the requested programme, as read for a system-students snapshot. */
 export interface PortalStudentRow {
   studentId: number;
   studentName: string;
+  /** Only used in memory to match CSV students of a combined snapshot; never stored. */
+  matricNo?: string | null;
   curriculumId: number;
   /** ACTIVE access assignment that also holds the STUDENT role. */
   eligible: boolean;
@@ -72,7 +77,7 @@ export interface ForecastingRepository {
   findByValidationId(validationId: string): Promise<ImportBatchRow | null>;
   listAccepted(scope: ForecastScope, limit: number, beforeImportBatchId: number | null): Promise<ImportBatchRow[]>;
   /** Retained roster students of a batch, keyset-paged by imported_student_id. */
-  listStudents(importBatchId: number, limit: number, afterImportedStudentId: number | null): Promise<ImportedStudentSummary[]>;
+  listStudents(importBatchId: number, limit: number, afterImportedStudentId: number | null): Promise<StoredStudentSummary[]>;
   /** VALIDATED -> ACCEPTED guarded by status; returns null when the batch was not VALIDATED any more. */
   acceptValidated(importBatchId: number, actor: string): Promise<ImportBatchRow | null>;
 }

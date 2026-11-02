@@ -68,7 +68,8 @@ function systemSnapshot(state, headers, body) {
   return ok({ ...item, validationReport: systemReport(item) }, existing ? 200 : 201);
 }
 const systemReport = (item) => reportOf({ counts: systemCounts, source: 'SYSTEM', coverage, issues: [{ severity: 'WARNING', code: 'HISTORY_UNKNOWN', row: null, field: null, message: '3 students have no academic records in the system, so their history is unknown.', correctiveAction: 'Eligibility for these students stays uncertain until they enter their academic records.' }], acceptedSnapshot: { importBatchId: item.importBatchId, acceptedAt: item.acceptedAt, sourceFingerprint: item.sourceFingerprint } });
-const roster = () => Array.from({ length: 55 }, (_, index) => ({
+const roster = (item) => Array.from({ length: 55 }, (_, index) => ({
+  source: item?.source === 'SYSTEM' || (item?.source === 'COMBINED' && index < 40) ? 'SYSTEM' : 'CSV',
   importedStudentId: index + 1, externalReference: `ST${String(index + 1).padStart(4, '0')}`,
   studentName: index === 0 ? 'Aisyah <b>binti</b> Ahmad' : index === 2 ? null : `Fictional Student ${index + 1}`,
   curriculumVersion: '2023', cohortStatus: index % 11 === 0 ? 'DEFERRED' : 'ACTIVE', historyCompleteness: index % 9 === 0 ? 'PARTIAL' : 'COMPLETE',
@@ -101,6 +102,8 @@ function addRun(state, importBatchId) {
     audit: [], nextSection: 7, nextAudit: 1,
   };
   if (state.seed === 'review' || state.bulkAudit) for (let i = 0; i < 24; i++) run.audit.push(auditEntry(state, run, 'REVIEW', 102, `Earlier note ${24 - i}`));
+  // `manySubjects`: 21 reviewed filler subjects listed before the real ones, so the subjects table has two pages and the pending subjects sit on page 2.
+  if (state.manySubjects) { run.subjects.unshift(...Array.from({ length: 21 }, (_, i) => subject(200 + i, `FILL${String(1001 + i)}`, `Filler subject ${i + 1}`, 'LECTURE', 20, 0, [], 0, [section(100 + i, 1, 20, lec, 'APPROVED')]))); run.nextSection = 300; }
   state.runs.set(id, run);
   return run;
 }
@@ -154,6 +157,7 @@ export function handle(state, request) {
   if (route === 'forecast-context') return ok({ programmes, learningCentres, targetSemesters: [target], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
   if (route === 'forecast-import-template') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template.csv"' }, text: 'external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n' };
   if (route === 'forecast-imports/system-snapshots' && method === 'POST') return systemSnapshot(state, headers, safeJson(body));
+  if (route === 'forecast-imports/combined-snapshots' && method === 'POST') return upload(state, headers, body, true);
   if (route === 'forecast-imports' && method === 'POST') return upload(state, headers, body);
   const subset = /^forecast-imports\/([^/]+)\/subset-acceptances$/.exec(route);
   if (subset && method === 'POST') return acceptSubset(state, headers, safeJson(body));
@@ -166,8 +170,9 @@ export function handle(state, request) {
   if (importMatch) {
     const item = state.imports.find(entry => entry.importBatchId === Number(importMatch[1]));
     if (!item) return failure(404, 'IMPORT_NOT_FOUND', 'The import was not found.');
-    if (importMatch[2]) return ok(paginate(roster(), url));
+    if (importMatch[2]) return ok(paginate(roster(item), url));
     if (item.source === 'SYSTEM') return ok({ ...item, validationReport: systemReport(item) });
+    if (item.source === 'COMBINED') return ok({ ...item, validationReport: combinedReport(item) });
     return ok({ ...item, validationReport: reportOf({ status: 'VALID', acceptedSnapshot: { importBatchId: item.importBatchId, acceptedAt: item.acceptedAt, sourceFingerprint: item.sourceFingerprint } }) });
   }
   const confirmationResult = handleConfirmation(state, route, method, url, headers, body);
@@ -183,13 +188,32 @@ export function handle(state, request) {
 }
 function safeJson(text) { try { return text ? JSON.parse(text) : {}; } catch { return {}; } }
 
-function upload(state, headers, body) {
+const COMBINED_FINGERPRINT = 'c'.repeat(64);
+const combinedCoverage = { csv: { rows: 12, students: 9, rejectedRows: 0 }, students: 59, csvSkippedAlreadyInSystem: ['A100234', 'A100777'], possibleDuplicates: [{ csvReference: 'EXT-0042', systemReferences: ['PORTAL-17'] }] };
+const combinedCounts = { studentRows: 64, uniqueStudents: 59, validAttempts: 312, rejectedRows: 0, partialStudents: 0, unknownHistoryStudents: 3 };
+const combinedIssues = [
+  { severity: 'WARNING', code: 'CSV_STUDENTS_ALREADY_IN_SYSTEM', row: null, field: 'external_reference', message: '2 CSV students were skipped because the student is already in the system (the system record is used): A100234, A100777.', correctiveAction: 'No action needed; the system record is used for these students.' },
+  { severity: 'WARNING', code: 'POSSIBLE_DUPLICATE_STUDENT', row: null, field: 'student_name', message: 'CSV student EXT-0042 has the same name as PORTAL-17 in the system but a different reference. Both are included.', correctiveAction: 'Check whether this is the same person as the system student; if so, remove the CSV row and create the snapshot again.' },
+];
+const combinedReport = (item, extra = {}) => reportOf({ counts: combinedCounts, source: 'COMBINED', coverage, combined: combinedCoverage, issues: combinedIssues, acceptedSnapshot: { importBatchId: item.importBatchId, acceptedAt: item.acceptedAt, sourceFingerprint: item.sourceFingerprint }, ...extra });
+function addCombinedImport(state, label) {
+  const item = { importBatchId: state.nextImport++, ...scopeOf, sourceDate: '2026-10-30', sourceLabel: label, acceptedAt: generatedAt, sourceFingerprint: COMBINED_FINGERPRINT, source: 'COMBINED', counts: combinedCounts, snapshotStatus: 'ACCEPTED_IMMUTABLE' };
+  state.imports.unshift(item);
+  return item;
+}
+function upload(state, headers, body, combined = false) {
   if (state.pendingValidation) state.pendingValidation = null;
   const label = /name="sourceLabel"\r?\n\r?\n([^\r\n]*)/.exec(body)?.[1] ?? 'Upload';
   if (body.includes('REJECTME')) return { status: 422, payload: { error: { code: 'IMPORT_FILE_REJECTED', message: 'The file could not be read. Correct it and upload again.', report: reportOf({ status: 'FILE_REJECTED', counts: { ...counts, uniqueStudents: 0, rejectedRows: 0 }, issues: [{ severity: 'ERROR', code: 'CSV_HEADER_INVALID', row: 1, field: null, message: 'The header row does not match the template.', correctiveAction: 'Download the template and copy your data into it.' }] }) } } };
   if (body.includes('BADROWS')) {
-    state.pendingValidation = { label };
-    return { status: 422, headers: { ETag: '"sha256:rev1"' }, payload: { error: { code: 'IMPORT_CORRECTION_REQUIRED', message: 'Correct the rejected rows, or explicitly acknowledge them to accept the remaining valid rows.', report: reportOf({ status: 'CORRECTION_REQUIRED', counts: { ...counts, rejectedRows: 2 }, issues: errorIssues, subsetAcknowledgementRequired: true }) } } };
+    state.pendingValidation = { label, combined };
+    const extra = combined ? { source: 'COMBINED', coverage, combined: { ...combinedCoverage, csv: { rows: 12, students: 9, rejectedRows: 2 } } } : {};
+    return { status: 422, headers: { ETag: '"sha256:rev1"' }, payload: { error: { code: 'IMPORT_CORRECTION_REQUIRED', message: 'Correct the rejected rows, or explicitly acknowledge them to accept the remaining valid rows.', report: reportOf({ status: 'CORRECTION_REQUIRED', counts: { ...(combined ? combinedCounts : counts), rejectedRows: 2 }, issues: combined ? [...errorIssues, ...combinedIssues] : errorIssues, subsetAcknowledgementRequired: true, ...extra }) } } };
+  }
+  if (combined) {
+    const existing = state.imports.find(entry => entry.sourceFingerprint === COMBINED_FINGERPRINT);
+    const made = existing ?? addCombinedImport(state, label);
+    return ok({ ...made, validationReport: combinedReport(made) }, existing ? 200 : 201);
   }
   const item = addImport(state, label);
   return ok({ ...item, validationReport: reportOf({ acceptedSnapshot: { importBatchId: item.importBatchId, acceptedAt: item.acceptedAt, sourceFingerprint: item.sourceFingerprint } }) }, 201);
@@ -198,6 +222,11 @@ function acceptSubset(state, headers, body) {
   if (!state.pendingValidation) return failure(404, 'IMPORT_NOT_FOUND', 'The import was not found.');
   if (unquote(headers['if-match']) !== 'sha256:rev1' || body.validationRevision !== 'sha256:rev1') return failure(412, 'IMPORT_REVISION_MISMATCH', 'The validation changed or does not match the revision you acknowledged. Review the report again.');
   if (body.acknowledgeRejectedRows !== true) return failure(400, 'INVALID_REQUEST', 'acknowledgeRejectedRows must be true.');
+  if (state.pendingValidation.combined) {
+    const made = addCombinedImport(state, state.pendingValidation.label);
+    state.pendingValidation = null;
+    return ok({ ...made, counts: { ...combinedCounts, rejectedRows: 2 }, validationReport: combinedReport(made, { status: 'CORRECTION_REQUIRED' }) }, 201);
+  }
   const item = addImport(state, state.pendingValidation.label);
   state.pendingValidation = null;
   return ok({ ...item, counts: { ...counts, rejectedRows: 2 }, validationReport: reportOf({ status: 'CORRECTION_REQUIRED' }) }, 201);

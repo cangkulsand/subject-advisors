@@ -43,6 +43,8 @@ export interface BuiltSystemSnapshot {
   coverage: SystemSnapshotCoverage;
   /** sha256 of a stable serialisation of the selected data (independent of date, label and actor). */
   fingerprint: string;
+  /** Matric number per system reference, in memory only (used to match CSV students of a combined snapshot; never stored). */
+  matricByReference: Map<string, string | null>;
 }
 
 /** External reference of a system student: `PORTAL-<student_id>`. Stable, unique per batch and not personal data (matric numbers are not unique in the schema). */
@@ -74,12 +76,14 @@ export async function buildSystemSnapshot(
   }
   const students: StudentToStore[] = [];
   const records: RecordToStore[] = [];
+  const matricByReference = new Map<string, string | null>();
   let withoutRecords = 0, unmapped = 0, withdrawn = 0;
   for (const student of picked) {
     const own = recordsByStudent.get(student.studentId) ?? [];
     const subjects = subjectsByCurriculum.get(student.curriculumId);
     const reference = portalReference(student.studentId);
     if (own.length === 0) withoutRecords += 1;
+    matricByReference.set(reference, student.matricNo ?? null);
     students.push({ externalReference: reference, curriculumId: student.curriculumId, cohortStatus: 'ACTIVE', historyCompleteness: own.length > 0 ? 'COMPLETE' : 'UNKNOWN', studentName: student.studentName });
     for (const record of own) {
       const creditHours = subjects?.get(record.subjectId);
@@ -102,7 +106,7 @@ export async function buildSystemSnapshot(
     kind: 'system-students', v: 1, programmeId: catalogue.programmeId, learningCentreId,
     students: students.map((s) => [s.externalReference, s.studentName, s.curriculumId, s.historyCompleteness]), records: stable,
   }));
-  return { students, records, coverage, fingerprint };
+  return { students, records, coverage, fingerprint, matricByReference };
 }
 
 /** Public validation summary of a system snapshot: a VALID report with the coverage; the private marker says PORTAL. */

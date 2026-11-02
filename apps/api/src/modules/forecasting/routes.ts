@@ -9,7 +9,8 @@ import { ForecastingError } from './errors';
 import { bad, decodeCursor, encodeCursor, errorResponse, methodNotAllowed, noStore, onlyParameters, positive, readBounded, readJson, sha256Hex } from './http';
 import { handleOfferingRoute, OFFERING_ROUTE } from './offerings-routes';
 import { handleRunRoute, RUN_ROUTE } from './runs-routes';
-import { sourceOf } from './import-source';
+import { combinedFingerprint, combinedSummary, mergeCombined } from './combined-snapshot';
+import { sourceOf, studentSourceOf } from './import-source';
 import { buildSystemSnapshot, readSystemSnapshotRequest, systemSummary } from './system-snapshot';
 import { validateImportCsv } from './validation';
 
@@ -205,6 +206,41 @@ async function systemSnapshot(request: Request, deps: ForecastingDependencies, a
   return authJson({ data: acceptedOf(stored) }, 201);
 }
 
+/**
+ * Builds ONE snapshot from the students in the system plus the uploaded CSV students who are not already there (MT9).
+ * The CSV part is validated exactly like `upload`. Rows to correct give the same 422 + ETag; the VALIDATED batch already holds the final
+ * combined students, so the existing subset-acceptance endpoint accepts it unchanged. Same inputs replay (200).
+ */
+async function combinedSnapshot(request: Request, url: URL, deps: ForecastingDependencies, actor: string): Promise<Response> {
+  const now = (deps.now ?? (() => new Date()))();
+  const input = await readUpload(request, url, now);
+  await requireScope(deps, actor, input);
+  const { target } = await resolveTarget(deps);
+  if (!target) throw new ForecastingError('TARGET_SEMESTER_UNAVAILABLE');
+  if (target.semesterId !== input.targetSemesterId) throw new ForecastingError('TARGET_SEMESTER_NOT_ALLOWED');
+  const catalogue = await deps.repository.catalogue(input.programmeId);
+  if (!catalogue) throw new ForecastingError('SCOPE_NOT_FOUND');
+  const system = await buildSystemSnapshot(await deps.repository.systemStudents(input.programmeId), catalogue, input.learningCentreId, (studentId) => deps.scopes.studentLearningCentreId(studentId));
+  const csvFingerprint = await sha256Hex(input.bytes);
+  const fingerprint = await combinedFingerprint(csvFingerprint, system, input);
+  const existing = await deps.repository.findAcceptedByFingerprint(input, fingerprint);
+  if (existing) return authJson({ data: acceptedOf(existing) }, 200);
+
+  const outcome = validateImportCsv(input.bytes, catalogue);
+  const rejectedFile = outcome.report.status === 'FILE_REJECTED';
+  const merge = mergeCombined(system, rejectedFile ? { ...outcome, students: [], records: [] } : outcome);
+  const validationId = crypto.randomUUID();
+  const summary = await combinedSummary(system, outcome, merge, input, validationId, fingerprint);
+  const status = rejectedFile || merge.students.length === 0 ? 'REJECTED' : outcome.report.status === 'VALID' ? 'ACCEPTED' : 'VALIDATED';
+  const stored = await deps.repository.storeImport({
+    programmeId: input.programmeId, learningCentreId: input.learningCentreId, targetSemesterId: input.targetSemesterId, validationId,
+    sourceDate: input.sourceDate, sourceLabel: input.sourceLabel, actor, sourceFingerprint: fingerprint,
+    outcome: status, summary, students: status === 'REJECTED' ? [] : merge.students, records: status === 'REJECTED' ? [] : merge.records,
+  });
+  if (stored.status === 'ACCEPTED') return authJson({ data: acceptedOf(stored) }, 201);
+  return validationResponse(reportOf(stored), stored.status === 'VALIDATED' ? summary.validationRevision : null);
+}
+
 async function acceptSubset(request: Request, validationId: string, deps: ForecastingDependencies, actor: string): Promise<Response> {
   if (!UUID.test(validationId)) bad('Invalid validation ID.');
   const header = ifMatchValue(request);
@@ -238,7 +274,7 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
   const importId = /^forecast-imports\/([1-9]\d*)$/.exec(route);
   const students = /^forecast-imports\/([1-9]\d*)\/students$/.exec(route);
   const subset = /^forecast-imports\/([^/]+)\/subset-acceptances$/.exec(route);
-  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || OFFERING_ROUTE.test(route);
+  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots', 'forecast-imports/combined-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || OFFERING_ROUTE.test(route);
   if (!known) return null;
   try {
     // Coordinator only. The actor is always the verified Clerk user of the session, never a request value.
@@ -261,6 +297,10 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
       if (method !== 'POST') return methodNotAllowed(['POST']);
       onlyParameters(url, []);
       return await systemSnapshot(request, deps, actor);
+    }
+    if (route === 'forecast-imports/combined-snapshots') {
+      if (method !== 'POST') return methodNotAllowed(['POST']);
+      return await combinedSnapshot(request, url, deps, actor);
     }
     if (route === 'forecast-imports') {
       if (method === 'POST') return await upload(request, url, deps, actor);
@@ -295,7 +335,7 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
       const rows = await deps.repository.listStudents(batch.importBatchId, limit + 1, cursor);
       const page = rows.slice(0, limit);
       const last = page[page.length - 1];
-      return authJson({ data: { items: page, ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.importedStudentId) } : {}) } });
+      return authJson({ data: { items: page.map((row) => ({ ...row, source: studentSourceOf(batch, row.externalReference) })), ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.importedStudentId) } : {}) } });
     }
     if (method !== 'POST') return methodNotAllowed(['POST']);
     onlyParameters(url, []);

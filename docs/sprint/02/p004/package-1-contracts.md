@@ -50,7 +50,7 @@ person is identified only by an external reference. **Qualified 2026-11-02 (MT8)
 account, Clerk student ID, StudentProfile or AcademicRecord is consulted and uploaded records do not link to portal
 students. The system-students snapshot (`POST forecast-imports/system-snapshots`) is the main source and does read
 StudentProfile and AcademicRecord, read-only; its people are `PORTAL-<student_id>` external references and no portal
-ID or credential is returned. Only the Coordinator is authenticated. Every student's curriculum must belong to the selected programme. A blank
+ID or credential is returned. **Data sources (decided 2026-11-02, MT9):** the Coordinator chooses per forecast between `SYSTEM` (default), `CSV` and `COMBINED` (`ImportSource`). `COMBINED` (`POST forecast-imports/combined-snapshots`) stores one ACCEPTED batch of the system students plus the CSV students not already in the system; the system record wins when the CSV `external_reference` equals a system student's matric number (trimmed, case-insensitive, non-empty and unique among the selected system students) or `PORTAL-<id>`, and a same-name different-reference student is kept with a `POSSIBLE_DUPLICATE_STUDENT` warning. Each retained student has a `source` (`SYSTEM` | `CSV`), `ForecastRunDetail.dataSource` may be `COMBINED`, and the report adds `combined` coverage. Matric numbers are never stored. Only the Coordinator is authenticated. Every student's curriculum must belong to the selected programme. A blank
 `curriculum_version` may resolve only when exactly one configured version exists; when
 more than one exists, require an explicit per-row version rather than selecting latest.
 Scope IDs are carried in operation bodies and list filters, echoed by resources, and

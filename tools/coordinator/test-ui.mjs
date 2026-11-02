@@ -59,12 +59,18 @@ else {
     finally { await page.close(); }
   }
   const scoped = '?programmeId=5&learningCentreId=1';
+  const csvScoped = scoped + '&source=csv', bothScoped = scoped + '&source=both';
   const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
   const csv = (marker) => ({ name: 'cohort.csv', mimeType: 'text/csv', buffer: Buffer.from(marker + '\nexternal_reference,curriculum_version\n') });
   async function upload(page, marker, label = 'September cohort') {
     await page.getByLabel('Source label', { exact: true }).fill(label);
     await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
     await page.getByRole('button', { name: 'Upload and validate' }).click();
+  }
+  async function uploadBoth(page, marker, label = 'Combined export') {
+    await page.getByLabel('Source label', { exact: true }).fill(label);
+    await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
+    await page.getByRole('button', { name: 'Create combined snapshot' }).click();
   }
   const reasonLabel = 'Reason (recorded in the audit history)';
   const runUrl = '/coordinator/forecasts' + scoped + '&run=1';
@@ -79,7 +85,7 @@ else {
     browser = await chromium.launch({ headless: true });
 
     await check('imports: scope pickers follow assignments, target semester is read-only, template downloads', async page => {
-      const state = await mock(page); await page.goto(base + '/coordinator/imports');
+      const state = await mock(page); await page.goto(base + '/coordinator/imports?source=csv');
       await page.getByRole('heading', { name: 'Data Imports', exact: true }).first().waitFor();
       const programme = page.getByLabel('Programme', { exact: true }), centre = page.getByLabel('Learning centre', { exact: true });
       assert.equal(await centre.isDisabled(), true);
@@ -89,8 +95,10 @@ else {
       await programme.selectOption('7');
       assert.deepEqual(await centre.locator('option').allInnerTexts(), ['Select a learning centre', 'KL · UTMSPACE Kuala Lumpur']);
       assert.equal(await page.getByRole('button', { name: 'Upload and validate' }).count(), 0);
+      assert.equal(await page.getByRole('heading', { level: 2 }).filter({ hasText: 'Forecast scope' }).count(), 0, 'one setup card, no separate scope card');
       await centre.selectOption('1');
-      await page.getByRole('heading', { name: 'Or upload a CSV (fallback)' }).waitFor();
+      await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
+      assert.ok(page.url().includes('source=csv'), 'the data source choice survives a scope change');
       const target = page.locator('output.coordinator-readonly-value');
       assert.equal(await target.innerText(), '2026/2027 · Semester 2');
       assert.equal(await page.getByLabel('Target semester').evaluate(element => element.tagName), 'OUTPUT');
@@ -102,7 +110,7 @@ else {
     });
 
     await check('imports: client validation, valid upload is accepted and listed', async page => {
-      const state = await mock(page); await page.goto(base + '/coordinator/imports' + scoped);
+      const state = await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped);
       await page.getByRole('button', { name: 'Upload and validate' }).click();
       await page.getByText('Enter a short label for this data source.').waitFor();
       await page.getByText('Choose a CSV file to upload.').waitFor();
@@ -122,13 +130,13 @@ else {
       await page.screenshot({ path: shots + 'imports-desktop.png', fullPage: true });
     });
 
-    await check('imports: students in the system is the main option, snapshot shows coverage, lists the source and feeds the forecast', async page => {
+    await check('imports: students in the system is the default, snapshot shows coverage, lists the source and feeds the forecast', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports' + scoped);
-      const system = page.getByRole('heading', { name: 'Use students in the system' }); await system.waitFor();
-      const csvHeading = page.getByRole('heading', { name: 'Or upload a CSV (fallback)' }); await csvHeading.waitFor();
-      assert.ok((await system.boundingBox()).y < (await csvHeading.boundingBox()).y, 'the system card comes first');
-      const facts = page.getByLabel('Snapshot scope');
-      const factsText = await facts.innerText(); assert.ok(factsText.includes('SECJ') && factsText.includes('KL'));
+      const system = page.getByRole('heading', { name: 'Students in the system', exact: true }); await system.waitFor();
+      assert.equal(await page.getByRole('heading', { name: 'CSV import', exact: true }).count(), 0, 'only the system card is shown by default');
+      assert.equal(await page.getByLabel('Snapshot scope').count(), 0, 'the scope is not repeated inside the snapshot section');
+      assert.equal(await page.getByLabel('Programme', { exact: true }).inputValue(), '5');
+      assert.equal(await page.getByLabel('Learning centre', { exact: true }).inputValue(), '1');
       await page.getByRole('heading', { name: 'No accepted imports yet' }).waitFor();
       await page.getByRole('button', { name: 'Create snapshot' }).click();
       await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
@@ -162,6 +170,8 @@ else {
       await page.getByRole('button', { name: 'Create snapshot' }).click();
       await page.getByRole('alert').filter({ hasText: 'No students in the system match this programme and learning centre' }).waitFor();
       assert.equal(await page.getByRole('heading', { name: 'Snapshot created' }).count(), 0);
+      await page.getByRole('radio', { name: /CSV import/ }).check();
+      await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
       await upload(page, 'VALIDFILE');
       await page.getByRole('status').filter({ hasText: 'Import accepted: 55 students from "September cohort".' }).waitFor();
       const table = page.getByRole('region', { name: 'Accepted imports table' });
@@ -170,7 +180,7 @@ else {
     });
 
     await check('imports: correction report grouped by severity, subset accepted only after acknowledgement, with If-Match', async page => {
-      const state = await mock(page); await page.goto(base + '/coordinator/imports' + scoped);
+      const state = await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped);
       await page.getByLabel('Source label', { exact: true }).waitFor();
       await upload(page, 'BADROWS', 'Needs fixes');
       const report = page.getByRole('heading', { name: 'Validation report' }); await report.waitFor();
@@ -202,7 +212,7 @@ else {
     });
 
     await check('imports: a rejected file shows the report with no subset option', async page => {
-      await mock(page); await page.goto(base + '/coordinator/imports' + scoped); await page.getByLabel('Source label', { exact: true }).waitFor();
+      await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped); await page.getByLabel('Source label', { exact: true }).waitFor();
       await upload(page, 'REJECTME', 'Wrong header');
       await page.getByRole('heading', { name: 'Validation report' }).waitFor();
       await page.getByText('File rejected', { exact: true }).waitFor();
@@ -273,17 +283,91 @@ else {
       assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
       await lab.getByText('Academic history incomplete: 2').waitFor(); await lab.getByText('Prerequisite not proven: 1').waitFor();
       assert.ok((await subjects.locator('tr[data-subject="SECD2523"]').innerText()).includes('Configuration required: The subject has no class type.'));
-      const excluded = page.getByRole('heading', { name: 'Excluded subjects' }); await excluded.waitFor();
-      assert.ok((await page.locator('.coordinator-excluded').innerText()).includes('Final year project is not offered through the forecast.'));
-      assert.equal(await subjects.getByText('SECJ4118').count(), 0);
-      await page.getByRole('heading', { name: 'Not offered in this semester type' }).waitFor();
-      const notOffered = page.locator('.coordinator-not-offered');
-      assert.ok((await notOffered.innerText()).includes('SECD3761') && (await notOffered.innerText()).includes('Runs only in Short semesters'));
-      assert.equal(await subjects.getByText('SECD3761').count(), 0);
+      assert.equal(await page.getByRole('heading', { name: 'Excluded subjects' }).count(), 0, 'the excluded subjects card is gone');
+      assert.equal(await page.getByRole('heading', { name: 'Not offered in this semester type' }).count(), 0, 'the not-offered card is gone');
+      assert.equal(await page.getByText('SECJ4118').count(), 0); assert.equal(await page.getByText('SECD3761').count(), 0);
+      assert.equal(await page.locator('.admin-pagination').count(), 0, 'no pager when the subjects fit on one page');
+      assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '4', 'the Subjects tile counts the subjects in the table, not the hidden ones');
       await page.getByRole('link', { name: /Newer forecast available: version 2/ }).first().waitFor();
       assert.equal(await page.getByRole('button', { name: 'Start review' }).count(), 1);
       assert.equal(await page.getByRole('button', { name: /Approve SECJ1013/ }).count(), 0);
       await page.screenshot({ path: shots + 'forecast-draft-desktop.png', fullPage: true });
+    });
+
+    await check('forecasts: the subjects table is paged (20 per page) and the finalize highlight jumps to the page with the pending subjects', async page => {
+      await mock(page, { seed: 'review', manySubjects: true }); await page.goto(base + runUrl);
+      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const rows = page.locator('.coordinator-subjects tbody tr'), pager = page.locator('.admin-pagination');
+      await pager.getByText('25 subjects · Page 1 of 2').waitFor();
+      assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '25');
+      assert.equal(await rows.count(), 20); assert.equal(await page.locator('tr[data-subject="SECJ1013"]').count(), 0);
+      assert.equal(await pager.getByRole('button', { name: 'Previous' }).isDisabled(), true);
+      await pager.getByRole('button', { name: 'Next' }).click();
+      await pager.getByText('25 subjects · Page 2 of 2').waitFor();
+      assert.equal(await rows.count(), 5); assert.equal(await pager.getByRole('button', { name: 'Next' }).isDisabled(), true);
+      await page.locator('tr[data-subject="SECJ1013"]').waitFor();
+      await page.getByRole('button', { name: 'Approve SECJ1013' }).click();
+      const decide = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await decide.getByLabel(reasonLabel).fill('Checked on page 2');
+      await decide.getByRole('button', { name: 'Approve subject' }).click(); await decide.waitFor({ state: 'hidden' });
+      await page.locator('tr[data-subject="SECJ1013"]').getByText('Approved', { exact: true }).waitFor();
+      await pager.getByText('Page 2 of 2').waitFor();
+      await pager.getByRole('button', { name: 'Previous' }).click(); await pager.getByText('Page 1 of 2').waitFor();
+      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
+      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
+      await pager.getByText('Page 2 of 2').waitFor();
+      assert.equal(await page.locator('.coordinator-row-pending').count(), 2, 'the pending subjects are visible after the jump');
+      assert.ok(await noOverflow(page));
+    });
+
+    await check('forecasts: the subjects table can be searched, filtered and sorted; clearing and the finalize jump reset the filters', async page => {
+      await mock(page, { seed: 'review', manySubjects: true }); await page.goto(base + runUrl);
+      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const rows = page.locator('.coordinator-subjects tbody tr'), pager = page.locator('.admin-pagination'), bar = page.getByRole('search', { name: 'Filter and sort subjects' });
+      const tile = page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd');
+      const codes = async () => rows.evaluateAll(items => items.map(item => item.getAttribute('data-subject')));
+      await bar.waitFor(); assert.equal(await bar.getByRole('button', { name: 'Clear filters' }).count(), 0, 'no clear button while nothing is filtered');
+      await page.screenshot({ path: shots + 'forecast-subjects-filters-desktop.png', fullPage: true });
+      await bar.getByLabel('Search subjects').fill('DATABASE'); // case-insensitive, matches the name
+      assert.deepEqual(await codes(), ['SECD2523']); assert.equal(await pager.count(), 0); assert.equal(await tile.innerText(), '25', 'the summary tile stays unfiltered');
+      await bar.getByLabel('Search subjects').fill('secj10'); assert.deepEqual(await codes(), ['SECJ1013', 'SECJ1023']); // matches the code
+      await bar.getByRole('button', { name: 'Clear filters' }).click();
+      await pager.getByText('25 subjects · Page 1 of 2').waitFor(); assert.equal(await bar.getByLabel('Search subjects').inputValue(), '');
+      await pager.getByRole('button', { name: 'Next' }).click(); await pager.getByText('Page 2 of 2').waitFor();
+      await bar.getByLabel('Class type').selectOption('LAB');
+      assert.deepEqual(await codes(), ['SECJ1013', 'SECJ1023']); assert.equal(await pager.count(), 0, 'filtering returns to page 1 and hides the pager when one page is enough');
+      await bar.getByLabel('Class type').selectOption('NONE'); assert.deepEqual(await codes(), ['SECD2523']);
+      await bar.getByLabel('Class type').selectOption(''); await bar.getByLabel('Flags').selectOption('CONFIG'); assert.deepEqual(await codes(), ['SECD2523']);
+      await bar.getByLabel('Flags').selectOption('UNCERTAIN'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013']);
+      await bar.getByLabel('Flags').selectOption(''); await bar.getByLabel('Decision').selectOption('PENDING'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013', 'SECJ1023']);
+      await pager.count(); await bar.getByLabel('Decision').selectOption('APPROVED'); await pager.getByText('21 of 25 subjects · Page 1 of 2').waitFor();
+      // Finalize while a filter hides every pending subject: the filters are cleared and the table jumps to their page.
+      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
+      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
+      await pager.getByText('25 subjects · Page 2 of 2').waitFor();
+      assert.equal(await bar.getByLabel('Decision').inputValue(), ''); assert.equal(await page.locator('.coordinator-row-pending').count(), 3);
+      await bar.getByLabel('Decision').selectOption('NONE'); assert.deepEqual(await codes(), ['SECD2523']);
+      await bar.getByLabel('Decision').selectOption('');
+      await bar.getByLabel('Sort by').selectOption('demand'); await pager.getByText('Page 1 of 2').waitFor();
+      assert.deepEqual((await codes()).slice(0, 3), ['SCSJ1013', 'SECJ1013', 'SECD2523']); // 71, 46, 30
+      await bar.getByLabel('Sort by').selectOption('uncertain'); assert.deepEqual((await codes()).slice(0, 2), ['SCSJ1013', 'SECJ1013']);
+      await bar.getByLabel('Sort by').selectOption('code'); assert.equal((await codes())[0], 'FILL1001');
+      await bar.getByLabel('Search subjects').fill('zzz-no-match');
+      await page.getByText('No subjects match these filters.').waitFor(); assert.equal(await rows.count(), 0);
+      await page.getByRole('status').getByRole('button', { name: 'Clear filters' }).click(); await pager.getByText('25 subjects · Page 1 of 2').waitFor();
+      assert.ok(await noOverflow(page));
+    });
+
+    for (const width of [320, 375]) await check('mobile: the subjects filter toolbar wraps without horizontal overflow at ' + width, async page => {
+      await mock(page, { seed: 'review', manySubjects: true }); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const bar = page.getByRole('search', { name: 'Filter and sort subjects' }); await bar.waitFor();
+      await bar.getByLabel('Search subjects').fill('FILL'); assert.ok(await noOverflow(page));
+      const box = await bar.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width);
+      if (width === 320) await page.screenshot({ path: shots + 'forecast-subjects-filters-mobile-320.png', fullPage: true });
     });
 
     await check('forecasts: start review sends the DRAFT revision; a decision needs a reason and records an audit row', async page => {
@@ -654,6 +738,114 @@ else {
       await page.getByRole('region', { name: 'Confirmed offerings table' }).waitFor();
     });
 
+    await check('imports: the data source toggle is a keyboard-accessible radio group and each mode shows only its own card', async page => {
+      await mock(page, { seed: 'system' }); await page.goto(base + '/coordinator/imports' + scoped);
+      const group = page.getByRole('group', { name: 'Data source for this forecast' }); await group.waitFor();
+      const radios = group.getByRole('radio');
+      assert.deepEqual(await radios.evaluateAll(items => items.map(item => item.closest('label').innerText.split('\n')[0])), ['Students in the system', 'CSV import', 'Both']);
+      assert.equal(await group.getByRole('radio', { name: /Students in the system/ }).isChecked(), true, 'default is Students in the system');
+      const cards = { system: 'Students in the system', csv: 'CSV import', both: 'Students in the system + CSV import' };
+      const shown = async () => { const out = []; for (const [key, name] of Object.entries(cards)) if (await page.getByRole('heading', { name, exact: true, level: 3 }).count()) out.push(key); return out; };
+      assert.deepEqual(await shown(), ['system']);
+      assert.equal(await page.getByRole('region', { name: 'Accepted imports table' }).count(), 1, 'the accepted imports list is shown in every mode');
+      // Keyboard: focus the checked radio and arrow to the next option (native radio group behaviour).
+      await group.getByRole('radio', { name: /Students in the system/ }).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
+      assert.deepEqual(await shown(), ['csv']); assert.ok(page.url().includes('source=csv'));
+      assert.equal(await group.getByRole('radio', { name: /CSV import/ }).evaluate(element => element === document.activeElement), true, 'focus stays on the radio');
+      await page.keyboard.press('ArrowRight');
+      await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
+      assert.deepEqual(await shown(), ['both']); assert.ok(page.url().includes('source=both'));
+      assert.equal(await page.getByRole('region', { name: 'Accepted imports table' }).count(), 1);
+      // Remembered in the URL: a reload keeps the choice; the scope picker keeps it too.
+      await page.reload(); await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
+      assert.equal(await group.getByRole('radio', { name: /Both/ }).isChecked(), true);
+      await page.getByLabel('Learning centre', { exact: true }).selectOption('2');
+      await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor(); assert.ok(page.url().includes('source=both'));
+      await page.getByLabel('Learning centre', { exact: true }).selectOption('1');
+      await page.getByRole('radio', { name: /Students in the system/ }).check();
+      assert.deepEqual(await shown(), ['system']); assert.ok(!page.url().includes('source='), 'the default is not written to the URL');
+      await page.screenshot({ path: shots + 'imports-toggle-desktop.png', fullPage: true });
+    });
+
+    await check('imports: Both builds one combined snapshot with coverage, a source per student, and feeds the forecast', async page => {
+      const state = await mock(page); await page.goto(base + '/coordinator/imports' + bothScoped);
+      await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
+      await page.getByText('If a student is in both, the system record is used and the CSV student is skipped.').waitFor();
+      await page.getByRole('button', { name: 'Create combined snapshot' }).click();
+      await page.getByText('Enter a short label for this data source.').waitFor();
+      assert.equal(state.bodies.length, 0);
+      await uploadBoth(page, 'VALIDFILE');
+      await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
+      const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-imports/combined-snapshots');
+      assert.ok(post.headers['idempotency-key']); assert.ok(post.headers['content-type'].startsWith('multipart/form-data'));
+      assert.equal(state.bodies.filter(item => item.path === '/api/coordinator/forecast-imports').length, 0, 'the CSV endpoint is not used');
+      const system = page.getByLabel('Snapshot coverage'); assert.match(await system.innerText(), /Students found\s*52/);
+      const combined = page.getByLabel('Combined coverage counts'), text = await combined.innerText();
+      assert.match(text, /Students in the snapshot\s*59/); assert.match(text, /CSV skipped, already in system\s*2/); assert.match(text, /Possible duplicates\s*1/);
+      await page.getByText('A100234, A100777').waitFor();
+      await page.getByText('EXT-0042 ~ PORTAL-17').waitFor();
+      const table = page.getByRole('region', { name: 'Accepted imports table' });
+      await table.getByText('Combined', { exact: true }).waitFor();
+      await page.screenshot({ path: shots + 'imports-combined-desktop.png', fullPage: true });
+      await page.getByRole('link', { name: 'View roster' }).first().click();
+      await page.getByRole('heading', { name: 'Combined export', level: 2 }).waitFor();
+      await page.getByText('Combined: student-entered records + CSV import.').first().waitFor();
+      await page.getByRole('heading', { name: 'Combined coverage' }).waitFor();
+      const roster = page.getByRole('region', { name: 'Student roster table' });
+      assert.deepEqual(await roster.locator('thead th').allInnerTexts(), ['Name', 'Reference', 'Curriculum', 'Cohort status', 'History', 'Source']);
+      assert.ok(await roster.locator('tbody tr').first().innerText().then(value => value.includes('System students')));
+      await page.getByRole('link', { name: '← Back to imports' }).click();
+      await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
+      await uploadBoth(page, 'VALIDFILE', 'Again');
+      await page.getByText('have not changed since this snapshot').waitFor(); // replay (200)
+      assert.equal(state.imports.length, 1);
+      await page.getByRole('button', { name: 'Generate forecast' }).first().click();
+      await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
+      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.getByText('Combined: student-entered records + CSV import.').waitFor();
+      await page.screenshot({ path: shots + 'forecast-combined-desktop.png', fullPage: true });
+    });
+
+    await check('imports: Both with rows to correct shows the report with combined coverage and accepts the valid subset with If-Match', async page => {
+      const state = await mock(page); await page.goto(base + '/coordinator/imports' + bothScoped);
+      await page.getByLabel('Source label', { exact: true }).waitFor();
+      await uploadBoth(page, 'BADROWS', 'Needs fixes');
+      await page.getByRole('heading', { name: 'Validation report' }).waitFor();
+      assert.match(await page.getByLabel('Combined coverage counts').innerText(), /Rejected CSV rows\s*2/);
+      await page.getByRole('button', { name: 'Accept valid subset' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Accept the valid subset' }); await dialog.waitFor();
+      await dialog.getByText('stored as one frozen snapshot').waitFor();
+      await dialog.getByRole('checkbox').check();
+      await dialog.getByRole('button', { name: 'Accept valid subset' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'combined snapshot "Needs fixes"' }).waitFor();
+      await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
+      assert.equal(await page.getByRole('heading', { name: 'Validation report' }).count(), 0);
+      assert.equal(state.bodies.find(item => item.path.endsWith('subset-acceptances')).headers['if-match'], '"sha256:rev1"');
+      assert.equal(state.imports[0].source, 'COMBINED');
+      // A rejected file is reported without a subset action.
+      await page.getByRole('button', { name: 'Dismiss' }).click();
+      await uploadBoth(page, 'REJECTME', 'Bad file');
+      await page.getByText('File rejected').first().waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Accept valid subset' }).count(), 0);
+    });
+
+    for (const width of [320, 375]) await check('mobile: the toggle and the combined flow have no horizontal overflow at ' + width, async page => {
+      await mock(page, { seed: 'system' }); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + '/coordinator/imports' + bothScoped); await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
+      assert.ok(await noOverflow(page));
+      const group = page.getByRole('group', { name: 'Data source for this forecast' });
+      for (const radio of await group.getByRole('radio').all()) { const box = await radio.locator('xpath=..').boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.height >= 44); }
+      await uploadBoth(page, 'VALIDFILE'); await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
+      assert.ok(await noOverflow(page));
+      if (width === 375) await page.screenshot({ path: shots + 'imports-combined-mobile.png', fullPage: true });
+      await page.getByRole('button', { name: 'Dismiss' }).click();
+      await uploadBoth(page, 'BADROWS', 'Needs fixes'); await page.getByRole('heading', { name: 'Validation report' }).waitFor();
+      assert.ok(await noOverflow(page));
+      if (width === 375) await page.screenshot({ path: shots + 'imports-combined-report-mobile.png', fullPage: true });
+    });
+
     await check('a service error shows a retryable alert', async page => {
       const state = await mock(page, { seed: 'run' }); state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
       await page.goto(base + '/coordinator/forecasts' + scoped);
@@ -664,13 +856,14 @@ else {
 
     for (const width of [320, 375]) await check('mobile: imports and forecasts have no horizontal overflow at ' + width, async page => {
       await mock(page, { seed: 'review' }); await page.setViewportSize({ width, height: 800 });
-      await page.goto(base + '/coordinator/imports' + scoped); await page.getByRole('heading', { name: 'Or upload a CSV (fallback)' }).waitFor();
+      await page.goto(base + '/coordinator/imports' + scoped); await page.getByRole('heading', { name: 'Students in the system', exact: true }).waitFor();
       assert.ok(await noOverflow(page));
+      if (width === 320) await page.screenshot({ path: shots + 'imports-toggle-mobile-320.png', fullPage: true });
       await page.getByRole('button', { name: 'Create snapshot' }).click(); await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
       assert.ok(await noOverflow(page));
       if (width === 375) await page.screenshot({ path: shots + 'imports-system-mobile.png', fullPage: true });
       await page.goto(base + '/coordinator/forecasts' + scoped); await page.getByRole('region', { name: 'Forecasts table' }).waitFor();
-      await page.goto(base + '/coordinator/imports' + scoped); await page.getByRole('heading', { name: 'Or upload a CSV (fallback)' }).waitFor();
+      await page.goto(base + '/coordinator/imports' + csvScoped); await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
       await upload(page, 'BADROWS', 'Needs fixes'); await page.getByRole('heading', { name: 'Validation report' }).waitFor();
       assert.ok(await noOverflow(page));
       if (width === 375) await page.screenshot({ path: shots + 'imports-report-mobile.png', fullPage: true });

@@ -70,12 +70,14 @@ const ACTIONS: Record<ImportIssueCode, string> = {
   CREDIT_EVIDENCE_MISSING: 'Credit-based conditions stay uncertain for these attempts.',
   STALE_SOURCE_THRESHOLD_NOT_CONFIGURED: 'No action needed for this import; an administrator may configure a staleness threshold.',
   ISSUES_TRUNCATED: 'Fix the listed findings and upload again to see the rest.',
+  POSSIBLE_DUPLICATE_STUDENT: 'Check whether this is the same person as the system student; if so, remove the CSV row and create the snapshot again.',
+  CSV_STUDENTS_ALREADY_IN_SYSTEM: 'No action needed; the system record is used for these students.',
 };
 
 export function emptyCounts(): ImportCounts {
   return { studentRows: 0, uniqueStudents: 0, validAttempts: 0, rejectedRows: 0, partialStudents: 0, unknownHistoryStudents: 0 };
 }
-const issue = (severity: 'ERROR' | 'WARNING', code: ImportIssueCode, row: number | null, field: string | null, message: string): ValidationIssue =>
+export const issue = (severity: 'ERROR' | 'WARNING', code: ImportIssueCode, row: number | null, field: string | null, message: string): ValidationIssue =>
   ({ severity, code, row, field, message, correctiveAction: ACTIONS[code] });
 
 function fileRejected(code: ImportIssueCode, message: string, row: number | null = null, studentRows = 0): ValidationOutcome {

@@ -379,6 +379,78 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect(await studentTables()).toEqual(before);
     });
 
+    it('builds ONE combined snapshot (system + CSV): system wins on a matric match, name-only matches are kept, per-student source, replay, then generate-run works', async () => {
+      await client.query("SELECT set_config('app.access_actor','db-seed',true), set_config('app.access_reason','seed',true)");
+      const person = async (name: string, matric: string | null) => {
+        const clerk = 'user_cmb_' + Math.random().toString(36).slice(2, 10);
+        await client.query("INSERT INTO public.user_access_assignment(clerk_user_id, app_role, access_status) VALUES ($1,'STUDENT','ACTIVE')", [clerk]);
+        return Number((await scalar('INSERT INTO public.student_profile(clerk_user_id, matric_no, student_name, curriculum_id) VALUES ($1,$2,$3,$4) RETURNING student_id', [clerk, matric, name, ids.curriculum])).student_id);
+      };
+      const alya = await person('Alya Entered', 'A1000001');
+      const bob = await person('Bob No Records', 'B2000002');
+      await client.query('INSERT INTO public.academic_record(student_id, subject_id, status, recognized_credits, semester_id) VALUES ($1,$2,$3,$4,$5)', [alya, ids.s101, 'COMPLETED', 3, ids.current]);
+      const studentTables = () => scalar(`SELECT (SELECT md5(string_agg(p::text, ',' ORDER BY student_id)) FROM public.student_profile p) AS profiles,
+        (SELECT md5(string_agg(r::text, ',' ORDER BY record_id)) FROM public.academic_record r) AS records`);
+      const before = await studentTables();
+      const inCentre = { ...deps, scopes: { ...deps.scopes, studentLearningCentreId: async () => ids.centre } };
+      // a1000001 (lower case) is Alya's matric: skipped. CSV-NEW is new. CSV-NAME has Bob's name but another reference: kept with a warning.
+      const csv = [header,
+        row('a1000001', '', 'ACTIVE', 'COMPLETE', codes.b, 'COMPLETED', String(ids.current), '3', 'false', 'Alya From Csv'),
+        row('CSV-NEW', '', 'ACTIVE', 'COMPLETE', codes.a, 'COMPLETED', String(ids.current), '3', 'false', 'Nina New'),
+        row('CSV-NAME', '', 'ACTIVE', 'PARTIAL', '', '', '', '', '', ' bob   NO records ')].join('\n');
+      const combined = async (text: string) => {
+        const data = new FormData();
+        for (const [key, value] of Object.entries(fields())) data.append(key, value);
+        data.append('file', new File([text], 'both.csv', { type: 'text/csv' }));
+        return await handleForecastingRequest(new Request(base + 'forecast-imports/combined-snapshots', { method: 'POST', body: data }), inCentre) as Response;
+      };
+      const created = await combined(csv);
+      expect(created.status).toBe(201);
+      const accepted = (await created.json()).data;
+      expect(accepted).toMatchObject({ source: 'COMBINED', snapshotStatus: 'ACCEPTED_IMMUTABLE', counts: { uniqueStudents: 4 } });
+      expect(accepted.validationReport.combined).toMatchObject({ students: 4, csvSkippedAlreadyInSystem: ['a1000001'], csv: { rows: 3, students: 3 },
+        possibleDuplicates: [{ csvReference: 'CSV-NAME', systemReferences: ['PORTAL-' + bob] }] });
+      expect(accepted.validationReport.coverage).toMatchObject({ studentsFound: 2, studentsWithRecords: 1, studentsWithoutRecords: 1 });
+      expect(await scalar('SELECT import_status, validation_summary->>\'source\' AS source, validation_summary->\'internal\'->>\'source\' AS internal_source FROM public.academic_import_batch WHERE import_batch_id=$1', [accepted.importBatchId]))
+        .toEqual({ import_status: 'ACCEPTED', source: 'COMBINED', internal_source: 'COMBINED' });
+      const stored = (await client.query('SELECT external_reference, history_completeness FROM public.imported_student WHERE import_batch_id=$1 ORDER BY external_reference', [accepted.importBatchId])).rows;
+      expect(stored).toEqual([
+        { external_reference: 'CSV-NAME', history_completeness: 'PARTIAL' }, { external_reference: 'CSV-NEW', history_completeness: 'COMPLETE' },
+        { external_reference: 'PORTAL-' + alya, history_completeness: 'COMPLETE' }, { external_reference: 'PORTAL-' + bob, history_completeness: 'UNKNOWN' },
+      ].sort((a, b) => a.external_reference < b.external_reference ? -1 : 1));
+      // The skipped CSV student's record (codes.b) was dropped: only Alya's system record and Nina's record exist.
+      expect(Number((await scalar('SELECT count(*) AS n FROM public.imported_subject_record r JOIN public.imported_student s USING (imported_student_id) WHERE s.import_batch_id=$1', [accepted.importBatchId])).n)).toBe(2);
+      expect(JSON.stringify(await scalar('SELECT validation_summary FROM public.academic_import_batch WHERE import_batch_id=$1', [accepted.importBatchId]))).not.toContain('A1000001');
+      const summary = (await scalar('SELECT validation_summary->\'internal\'->\'sourceByReference\' AS map FROM public.academic_import_batch WHERE import_batch_id=$1', [accepted.importBatchId])).map;
+      expect(summary).toEqual({ ['PORTAL-' + alya]: 'SYSTEM', ['PORTAL-' + bob]: 'SYSTEM', 'CSV-NEW': 'CSV', 'CSV-NAME': 'CSV' });
+      const roster = (await (await call('forecast-imports/' + accepted.importBatchId + '/students')).json()).data.items;
+      expect(Object.fromEntries(roster.map((item: { externalReference: string; source: string }) => [item.externalReference, item.source]))).toEqual(summary);
+      const list = (await (await call(`forecast-imports?programmeId=${ids.programme}&learningCentreId=${ids.centre}&targetSemesterId=${ids.target}`)).json()).data.items;
+      expect(list.map((item: { source: string }) => item.source)).toEqual(['COMBINED']);
+      // Frozen; replay returns the same batch.
+      await rejects("UPDATE public.academic_import_batch SET source_label='changed' WHERE import_batch_id=$1", [accepted.importBatchId], /immutable/i);
+      const replay = await combined(csv);
+      expect(replay.status).toBe(200);
+      expect((await replay.json()).data.importBatchId).toBe(accepted.importBatchId);
+      // Rows to correct: 422, VALIDATED with the combined students, then the existing subset acceptance.
+      const bad = await combined(csv + '\n' + row('CSV-BAD', '', 'ACTIVE', 'COMPLETE', 'NOPE', 'COMPLETED', '', '', 'false', 'Bad'));
+      expect(bad.status).toBe(422);
+      const etag = bad.headers.get('ETag')!;
+      const report = (await bad.json()).error.report;
+      expect(await scalar('SELECT import_status FROM public.academic_import_batch WHERE validation_summary->>\'validationId\'=$1', [report.validationId])).toEqual({ import_status: 'VALIDATED' });
+      const subset = await post('forecast-imports/' + report.validationId + '/subset-acceptances', { ...runScope(), validationRevision: report.validationRevision, acknowledgeRejectedRows: true }, { 'If-Match': etag });
+      expect(subset.status).toBe(201);
+      expect((await subset.json()).data).toMatchObject({ source: 'COMBINED', counts: { uniqueStudents: 5 } });
+      // Generate, review, finalize and confirm work unchanged on the combined snapshot.
+      const run = await generate(accepted.importBatchId);
+      expect(run.status).toBe(201);
+      const receipt = (await run.json()).data;
+      const detail = (await (await call('forecast-runs/' + receipt.resourceId)).json()).data;
+      expect(detail.dataSource).toBe('COMBINED');
+      expect(detail.subjects.length).toBeGreaterThan(0);
+      expect(await studentTables()).toEqual(before);
+    });
+
     it('reviews, decides with before/after audit, finalizes, and the frozen forecast rejects every change', async () => {
       const batchId = await importCohort(30);
       const created = await generate(batchId);
