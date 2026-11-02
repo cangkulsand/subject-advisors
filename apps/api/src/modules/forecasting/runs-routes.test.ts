@@ -47,7 +47,8 @@ const batch = (importBatchId: number, status: ImportBatchRow['status'] = 'ACCEPT
 function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')[]; scopes?: ScopeProvider; actor?: string } = {}) {
   const roles = options.roles ?? ['COORDINATOR'];
   const batches = [batch(1), batch(2), batch(3, 'VALIDATED'), batch(4, 'ACCEPTED', { learningCentreId: 2 }),
-    batch(5, 'ACCEPTED', { summary: { source: 'SYSTEM', internal: { schemaVersion: 1, csvVersion: 1, source: 'PORTAL', dataRows: 0, rejectedRowsByStudent: {} } } as never })];
+    batch(5, 'ACCEPTED', { summary: { source: 'SYSTEM', internal: { schemaVersion: 1, csvVersion: 1, source: 'PORTAL', dataRows: 0, rejectedRowsByStudent: {} } } as never }),
+    batch(6, 'ACCEPTED', { summary: { source: 'COMBINED', internal: { schemaVersion: 1, csvVersion: 1, source: 'COMBINED', dataRows: 3, rejectedRowsByStudent: {}, sourceByReference: {} } } as never })];
   const fake = fakeRunsRepository({ ...inputs, curricula: [options.shortOnly ? withShortOnly : curriculum] });
   const deps: ForecastingDependencies = {
     auth: {
@@ -98,8 +99,9 @@ const approveAll = (extra: Array<Record<string, unknown>> = []) => [
 describe('UC20 forecast run API', () => {
   it('reports the data source of the import in the run detail (student-entered records for system snapshots)', async () => {
     const { deps } = fixture();
-    const fromCsv = await newRun(deps, 1), fromSystem = await newRun(deps, 5);
+    const fromCsv = await newRun(deps, 1), fromSystem = await newRun(deps, 5), fromBoth = await newRun(deps, 6);
     expect(fromSystem.created.status).toBe(201);
+    expect((await detailOf(deps, fromBoth.id)).dataSource).toBe('COMBINED');
     expect((await detailOf(deps, fromCsv.id)).dataSource).toBe('CSV');
     expect((await detailOf(deps, fromSystem.id)).dataSource).toBe('SYSTEM');
   });

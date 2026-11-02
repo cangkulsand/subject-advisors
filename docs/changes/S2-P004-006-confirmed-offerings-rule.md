@@ -273,6 +273,10 @@ Product owner decisions that **replace** the old UC20 rule "never query student 
 2. **Records are complete history.** Student-entered academic records count as COMPLETE history, labelled "student-entered". Students with no academic record at all have UNKNOWN history and count as uncertain.
 3. **Old rule replaced.** The forecast may read `student_profile` and `academic_record` (read-only) through the system-students snapshot. The snapshot is frozen like a CSV one; the student tables are never written. The pick data (pickers beside the forecast) remains display only and is still not an input of the calculation.
 
+### Decided 2026-11-02 (MT9: three data-source modes)
+
+The Coordinator chooses the data source per forecast (not an admin setting): "Students in the system" (default), "CSV import", or "Both" (one combined snapshot and forecast). This supersedes point 1's "CSV is the fallback; exactly one source": every forecast is still based on exactly one snapshot, but that snapshot may now be COMBINED. Duplicate rule for "Both": the system record wins; a CSV student is skipped when its `external_reference` equals a system student's `matric_no` (trimmed, case-insensitive, only when non-empty and unique among the selected system students); a same-name student with a different reference is included and flagged as a possible duplicate (warning), never merged on name. See [S2-P004-009](S2-P004-009-uc20-data-source-toggle.md).
+
 Interim limitation: `student_profile` has no learning centre yet, so the `ScopeProvider` returns KL for every student and all students count under KL until the profile learning centre lands.
 
 ## 2. Implementation

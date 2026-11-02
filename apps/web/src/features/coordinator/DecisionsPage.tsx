@@ -58,7 +58,7 @@ function SubjectPicker({ label, subjects, selected, locked, onChange }: { label:
           return <tr key={subject.subjectId} data-subject={subject.subjectCode} className={reason ? 'coordinator-row-disabled' : undefined}>
             <td><input type="checkbox" className="coordinator-check" checked={selected.includes(subject.subjectId)} disabled={reason !== null} aria-label={`Select ${subject.subjectCode}`} aria-describedby={reason ? noteId : undefined}
               onChange={event => toggle(subject.subjectId, event.target.checked)}/></td>
-            <th scope="row"><strong>{subject.subjectCode}</strong><span>{subject.subjectName}</span><span className="admin-audit-id">{subject.creditHours} credit hours</span>
+            <th scope="row"><strong>{subject.subjectName}</strong><span className="coordinator-subject-code">{subject.subjectCode}</span><span className="admin-audit-id">{subject.creditHours} credit hours</span>
               {reason && <span id={noteId} className="coordinator-disabled-reason">{off(subject) ? 'Cannot be confirmed: ' : ''}{reason}</span>}
               {!reason && subject.configurationStatus === 'CONFIGURATION_REQUIRED' && <span className="coordinator-config-issue">No classes proposed: configuration required.</span>}</th>
             <td>{classLabel(subject.classType)}</td>
@@ -231,7 +231,7 @@ function ExistingConfirmation({ client, scope, announce, reload, data }: Hooks &
             <tbody>{set.offerings.map(offering => {
               const forecast = numbers.get(offering.subjectId), withdrawn = offering.status === 'WITHDRAWN', pick = picks.data?.counts.find(item => item.subjectId === offering.subjectId);
               return <tr key={offering.subjectId} data-subject={offering.subjectCode} className={withdrawn ? 'coordinator-row-disabled' : undefined}>
-                <th scope="row"><strong>{offering.subjectCode}</strong><span>{offering.subjectName}</span><span className="admin-audit-id">{offering.creditHours} credit hours · {classLabel(offering.classType)}</span></th>
+                <th scope="row"><strong>{offering.subjectName}</strong><span className="coordinator-subject-code">{offering.subjectCode}</span><span className="admin-audit-id">{offering.creditHours} credit hours · {classLabel(offering.classType)}</span></th>
                 <td><span className={'admin-pill ' + (withdrawn ? 'coordinator-pill-muted' : 'coordinator-pill-success')}>{withdrawn ? 'Withdrawn' : CONFIRMED_OFFERING_LABEL}</span></td>
                 <td>{forecast ? <strong className="coordinator-number">{forecast.supportedEligibleCount}</strong> : '—'}</td>
                 <td>{forecast ? sectionsText(forecast) : '—'}</td>

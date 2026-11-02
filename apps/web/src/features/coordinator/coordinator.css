@@ -51,9 +51,6 @@
 .coordinator-head-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .admin-card-title { flex-wrap: wrap; }
 .admin-shell h2 .admin-pill { vertical-align: middle; margin-left: 8px; font-size: 11px; }
-.coordinator-excluded, .coordinator-not-offered { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
-.coordinator-excluded li, .coordinator-not-offered li { padding: 12px 14px; border: 1px solid var(--color-outline); border-radius: 8px; overflow-wrap: anywhere; }
-.coordinator-excluded .admin-muted, .coordinator-not-offered .admin-muted { display: block; margin-top: 2px !important; }
 .coordinator-more { display: flex; justify-content: center; padding: 14px 0 2px; }
 .coordinator-audit-details { margin-top: 6px; font-size: 11px; }
 .coordinator-audit-details summary { cursor: pointer; min-height: 24px; color: var(--color-brand); }
@@ -121,3 +118,50 @@
 .coordinator-scope-facts > div { padding: 10px 14px; border: 1px solid var(--color-outline); border-radius: 9px; background: var(--color-app-bg); }
 .coordinator-scope-facts dt { color: var(--color-muted); font-size: 11px; font-weight: 600; }
 .coordinator-scope-facts dd { margin: 2px 0 0; color: var(--color-heading); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+/* Setup card (one card per page) and radio-tile groups (S2-P004-009 MT9): native radios drawn as tiles with a large visible circle. */
+.coordinator-setup-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-outline); }
+.admin-shell .coordinator-setup-section > .coordinator-scope-grid { margin-top: 0; }
+.coordinator-setup-section > .admin-card-title + p, .coordinator-setup-section > h3 + p { margin-top: 6px; }
+.admin-shell .coordinator-setup-section > h3, .admin-shell .coordinator-setup-section .admin-card-title h3 { margin: 0; font-size: 15px; }
+.admin-shell fieldset.coordinator-radio-group { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.coordinator-setup-section > fieldset.coordinator-radio-group:last-child { margin-bottom: 0; }
+.coordinator-radio-group legend { float: left; width: 100%; padding: 0; margin: 0 0 4px; color: var(--color-heading); font-size: 14px; font-weight: 600; }
+.coordinator-radio-group > p { clear: both; margin: 0 0 4px; }
+.coordinator-segmented { clear: both; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 10px; margin-top: 10px; }
+.coordinator-segmented label { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; min-height: 56px; padding: 10px 14px; border: 1px solid var(--color-outline); border-radius: 9px; background: var(--color-app-bg); cursor: pointer; }
+.coordinator-segmented label.is-selected { border-color: var(--color-brand); background: var(--color-surface-subtle); box-shadow: inset 0 0 0 1px var(--color-brand); }
+.admin-shell .coordinator-segmented input[type="radio"] { appearance: none; -webkit-appearance: none; grid-row: 1 / span 2; width: 22px; height: 22px; min-height: 22px; margin: 0; padding: 0; border: 2px solid var(--color-muted); border-radius: 50%; background: #fff; cursor: pointer; }
+.admin-shell .coordinator-segmented input[type="radio"]:checked { border-color: var(--color-brand); background: radial-gradient(circle, var(--color-brand) 0 5px, #fff 6px); }
+.coordinator-segmented label:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.coordinator-segmented-label { color: var(--color-heading); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.coordinator-segmented small { grid-column: 2; color: var(--color-muted); font-size: 11px; overflow-wrap: anywhere; }
+.coordinator-combined { margin-top: 8px; }
+.admin-shell .coordinator-subject-filters { margin: 18px 0 16px; }
+
+/* Readable coordinator tables (S2-P004-009 UI revision): scoped to .coordinator-table so the admin tables keep their look. */
+.admin-shell .coordinator-table table { font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.admin-shell .coordinator-table th { padding: 14px 16px; font-size: 13px; line-height: 1.4; color: var(--color-heading); }
+.admin-shell .coordinator-table td, .admin-shell .coordinator-table th[scope="row"] { padding: 18px 16px; }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):not(.coordinator-row-disabled):nth-child(even) { background: rgba(0, 0, 0, 0.022); }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):hover { background: rgba(0, 0, 0, 0.045); }
+.admin-shell .coordinator-table th[scope="row"] { font-size: 14px; }
+.admin-shell .coordinator-table th[scope="row"] strong { display: block; color: var(--color-heading); font-size: 15px; font-weight: 600; line-height: 1.4; }
+.admin-shell .coordinator-table th[scope="row"] span { display: block; font-weight: 400; }
+.admin-shell .coordinator-table .coordinator-subject-code { margin-top: 2px; color: var(--color-muted); font-size: 13px; letter-spacing: 0.02em; }
+.admin-shell .coordinator-table .admin-audit-id { margin-top: 3px; font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill, .admin-shell .coordinator-table .coordinator-needed { font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill { padding: 3px 10px; }
+.admin-shell .coordinator-table button.admin-row-action, .admin-shell .coordinator-table a.coordinator-link-button { font-size: 13px; }
+.admin-shell .coordinator-table .coordinator-expander, .admin-shell .coordinator-table .coordinator-reasons { font-size: 13px; }
+.coordinator-reasons { text-align: left; }
+.coordinator-number { font-size: 20px; }
+.coordinator-audit-details { font-size: 12px; }
+.coordinator-audit-details pre { font-size: 12px; }
+.admin-shell .coordinator-subjects :is(th, td):nth-child(n+3):nth-child(-n+5) { text-align: right; }
+.admin-shell .coordinator-subjects .coordinator-reasons { text-align: left; }
+/* Coordinator filter bars: readable labels and controls (admin filter bars keep their size). */
+.admin-shell .coordinator-subject-filters label { font-size: 13px; }
+.admin-shell .coordinator-subject-filters :is(input, select) { min-height: 46px; font-size: 14px; }
+.admin-shell .coordinator-subject-filters button { min-height: 46px; font-size: 14px; }
+

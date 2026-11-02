@@ -24,7 +24,7 @@ snapshots, capacity rules and finalized forecasts. The coordinator screens are
 placeholders; these structures do not constitute an implemented UC20 workflow.
 Decided 2026-11-02 (MT8): data provision has two sources. The main source is a frozen snapshot of the
 students currently in the system (`student_profile` / `academic_record`, read-only; external reference
-`PORTAL-<student_id>`); a CSV upload is the fallback. A forecast uses one source. Uploaded (CSV) cohort
+`PORTAL-<student_id>`); a CSV upload is the other source. Decided 2026-11-02 (MT9): the Coordinator chooses per forecast between "Students in the system" (default), "CSV import" and "Both" (one combined snapshot). Uploaded (CSV) cohort
 members are identified only by source external references and do not need portal accounts.
 
 Build on the existing contracts and protections:
@@ -70,7 +70,11 @@ Changelog record. Review each completed package before dependent work begins.
 
 ## 3. Academic data provision and validation
 
-**Two sources (decided 2026-11-02, MT8).** "Use students in the system" is the main option: `POST /api/coordinator/forecast-imports/system-snapshots` selects students of the programme (curriculum), of the requested centre (via the scope provider; interim KL for all), with ACTIVE access and the STUDENT role, and stores an ACCEPTED snapshot with a coverage report. Student-entered records are COMPLETE history; no records means UNKNOWN. WITHDRAWN is stored as FAILED. The CSV flow below stays as the fallback.
+**Two sources (decided 2026-11-02, MT8).** "Use students in the system" is the main option: `POST /api/coordinator/forecast-imports/system-snapshots` selects students of the programme (curriculum), of the requested centre (via the scope provider; interim KL for all), with ACTIVE access and the STUDENT role, and stores an ACCEPTED snapshot with a coverage report. Student-entered records are COMPLETE history; no records means UNKNOWN. WITHDRAWN is stored as FAILED. The CSV flow below is the second option.
+
+**Three data sources, chosen per forecast (decided 2026-11-02, MT9).** The Coordinator picks the source on `/coordinator/imports` (radio group, default "Students in the system", remembered in the URL `source=csv|both`); it is not an admin setting. "CSV import" is the flow below. "Both" builds ONE combined snapshot (one forecast): the system students plus the CSV students who are not already in the system, via `POST /api/coordinator/forecast-imports/combined-snapshots` (multipart, same fields as the CSV upload). Duplicate rule: the SYSTEM record wins; a CSV student is skipped when its `external_reference` equals a system student's `matric_no` (trimmed, case-insensitive, only when non-empty and unique among the selected system students) or the system `PORTAL-<id>` reference; same name with a different reference is kept and reported as a `POSSIBLE_DUPLICATE_STUDENT` warning, never merged on name. The CSV part is validated exactly like the CSV flow (422 + ETag + `If-Match`, existing `subset-acceptances`); the batch source is `COMBINED`, every student carries a source (`SYSTEM` or `CSV`), the fingerprint covers the CSV bytes plus the system data, and the coverage report lists system, CSV and combined figures. Generate, review, finalize and confirm are unchanged. See [S2-P004-009](../../../changes/S2-P004-009-uc20-data-source-toggle.md).
+
+**Coordinator export format (decided 2026-11-02, S2-P004-010).** The CSV upload (CSV-only and "Both") also accepts the coordinators' own export, auto-detected from the header (`courseCode, subjCode, centerName, stuname, stuMetricNo, eMail, SemesterMohon, grade, status`); rows of other programmes or centres, inactive (`N`) and in-progress rows are skipped and counted, only the latest attempt per student and subject is kept, and the report shows the skip counts. See [package-1-contracts](package-1-contracts.md) and [S2-P004-010](../../../changes/S2-P004-010-uc20-coordinator-csv-format.md).
 
 Provide one downloadable CSV template as the initial input format. Support an explicit
 student row even when no subject history is supplied, so missing histories do not

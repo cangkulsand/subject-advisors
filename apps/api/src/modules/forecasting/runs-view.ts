@@ -82,7 +82,7 @@ export function summaryOf(subjects: RunSubject[]): RunSummary {
 export function detailOf(rows: RunDetailRows, newer: NewerForecastAvailable | null, audit: ForecastAuditEntry[], auditTruncated: boolean): ForecastRunDetail {
   const subjects = rows.subjects.map((row) => subjectOf(row, assumptionsFor(rows, row.subjectId), rows.sections));
   return {
-    ...headerOf(rows.run, newer), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' ? 'SYSTEM' : 'CSV', summary: summaryOf(subjects), subjects,
+    ...headerOf(rows.run, newer), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' || rows.scenarioAssumptions.importSource === 'COMBINED' ? rows.scenarioAssumptions.importSource : 'CSV', summary: summaryOf(subjects), subjects,
     ruleSnapshot: rows.ruleSnapshot, originalRecommendations: rows.originalRecommendations,
     audit: audit.slice(0, RUN_LIMITS.embeddedAuditEntries), auditTruncated,
   };

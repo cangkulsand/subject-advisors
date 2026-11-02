@@ -30,8 +30,10 @@ export interface ConfirmOfferingsInput { scope: ForecastScope; forecastRunId: nu
 
 export interface CoordinatorClient {
   context(programmeId?: number, signal?: AbortSignal): Promise<ForecastContext>;
-  template(signal?: AbortSignal): Promise<{ filename: string; text: string }>;
+  template(format?: 'native' | 'coordinator', signal?: AbortSignal): Promise<{ filename: string; text: string }>;
   uploadImport(input: UploadInput, signal?: AbortSignal): Promise<UploadOutcome>;
+  /** "Both": the students in the system plus the CSV students not already there, one snapshot. Same outcomes as `uploadImport`; subset acceptance uses `acceptSubset`. */
+  uploadCombined(input: UploadInput, signal?: AbortSignal): Promise<UploadOutcome>;
   /** Snapshot of the students in the system (main data source); 201 created, 200 replay of the same data. */
   createSystemSnapshot(request: SystemSnapshotRequest, signal?: AbortSignal): Promise<SystemSnapshotOutcome>;
   acceptSubset(scope: ForecastScope, report: Pick<ImportValidationReport, 'validationId' | 'validationRevision'>, revision: string): Promise<AcceptedImport>;
@@ -145,31 +147,33 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
     const data = receipt(raw.data);
     return { receipt: data, revision: raw.etag ?? data.revision, created: raw.status === 201 };
   }
+  async function upload(path: string, input: UploadInput, signal?: AbortSignal): Promise<UploadOutcome> {
+    const form = new FormData();
+    form.set('programmeId', String(input.programmeId)); form.set('learningCentreId', String(input.learningCentreId)); form.set('targetSemesterId', String(input.targetSemesterId));
+    form.set('sourceDate', input.sourceDate); form.set('sourceLabel', input.sourceLabel); form.set('file', input.file);
+    try {
+      const raw = await request(prefix + path, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey() }, body: form, timeoutMs: 60000 }, signal);
+      return { kind: 'ACCEPTED', replay: raw.status === 200, data: acceptedImport(raw.data) };
+    } catch (error) {
+      if (error instanceof CoordinatorApiError && error.report) {
+        if (error.code === 'IMPORT_CORRECTION_REQUIRED') return { kind: 'CORRECTION_REQUIRED', report: error.report, revision: error.etag ?? error.report.validationRevision };
+        if (error.code === 'IMPORT_FILE_REJECTED') return { kind: 'FILE_REJECTED', report: error.report };
+      }
+      throw error;
+    }
+  }
   return {
     context: async (programmeId, signal) => {
       const data = requireKeys((await request(prefix + 'forecast-context' + query({ programmeId }), { method: 'GET' }, signal)).data, [], [], ['programmes', 'learningCentres', 'targetSemesters']);
       return data as unknown as ForecastContext;
     },
-    template: async signal => {
-      const raw = await request(prefix + 'forecast-import-template', { method: 'GET', text: true }, signal);
+    template: async (format, signal) => {
+      const raw = await request(prefix + 'forecast-import-template' + (format === 'coordinator' ? '?format=coordinator' : ''), { method: 'GET', text: true }, signal);
       const name = /filename="?([^";]+)"?/.exec(raw.disposition ?? '')?.[1];
-      return { filename: name ?? 'uc20-import-template.csv', text: String(raw.data) };
+      return { filename: name ?? (format === 'coordinator' ? 'uc20-import-template-coordinator.csv' : 'uc20-import-template.csv'), text: String(raw.data) };
     },
-    uploadImport: async (input, signal) => {
-      const form = new FormData();
-      form.set('programmeId', String(input.programmeId)); form.set('learningCentreId', String(input.learningCentreId)); form.set('targetSemesterId', String(input.targetSemesterId));
-      form.set('sourceDate', input.sourceDate); form.set('sourceLabel', input.sourceLabel); form.set('file', input.file);
-      try {
-        const raw = await request(prefix + 'forecast-imports', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey() }, body: form, timeoutMs: 60000 }, signal);
-        return { kind: 'ACCEPTED', replay: raw.status === 200, data: acceptedImport(raw.data) };
-      } catch (error) {
-        if (error instanceof CoordinatorApiError && error.report) {
-          if (error.code === 'IMPORT_CORRECTION_REQUIRED') return { kind: 'CORRECTION_REQUIRED', report: error.report, revision: error.etag ?? error.report.validationRevision };
-          if (error.code === 'IMPORT_FILE_REJECTED') return { kind: 'FILE_REJECTED', report: error.report };
-        }
-        throw error;
-      }
-    },
+    uploadImport: (input, signal) => upload('forecast-imports', input, signal),
+    uploadCombined: (input, signal) => upload('forecast-imports/combined-snapshots', input, signal),
     createSystemSnapshot: async (input, signal) => {
       const raw = await request(prefix + 'forecast-imports/system-snapshots', {
         method: 'POST', headers: jsonHeaders(), timeoutMs: 60000,
