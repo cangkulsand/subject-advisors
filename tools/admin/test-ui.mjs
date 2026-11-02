@@ -302,6 +302,9 @@ else {
       await submitAdd(dialog, { email: 'student@graduate.utm.my', role: 'Coordinator', label: 'Add user' });
       await dialog.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
       assert.equal(await dialog.isVisible(), true);
+      await dialog.getByText('System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com', { exact: false }).waitFor();
+      await submitAdd(dialog, { email: 'friend@gmail.com', role: 'Coordinator', label: 'Add user' });
+      await dialog.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
       await submitAdd(dialog, { email: 'nobody@utm.my', role: 'Coordinator', label: 'Add user' });
       await dialog.getByRole('alert').filter({ hasText: 'No matching sign-in account was found.' }).waitFor();
       assert.equal(await dialog.isVisible(), true);
@@ -376,12 +379,15 @@ else {
       const add = page.getByLabel('Role to add', { exact: true });
       assert.equal(await page.getByRole('button', { name: 'Add role', exact: true }).isDisabled(), true);
       assert.deepEqual(await add.locator('option').allInnerTexts(), ['Choose a role', 'Coordinator', 'System Admin']); // roles already held are not offered
+      state.mutationError = { status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'The verified email address is not eligible for the requested role.' }; // server-side refusal (eligibility itself is covered by unit tests)
+      state.mutationError = { status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'The verified email address is not eligible for the requested role.' }; // server-side refusal; eligibility itself is covered by unit tests
       await add.selectOption('SYSTEM_ADMIN'); await page.getByRole('button', { name: 'Add role', exact: true }).click();
       const dialog = page.getByRole('dialog'); await dialog.getByRole('heading', { name: 'Add System Admin role' }).waitFor();
+      await dialog.getByText('System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com').waitFor();
       await dialog.getByLabel(reasonLabel).fill('Fictional: needs administrator access.'); await dialog.getByRole('button', { name: 'Add role' }).click();
       await dialog.getByRole('alert').filter({ hasText: 'not eligible' }).waitFor();
       assert.equal(await dialog.isVisible(), true);
-      await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'hidden' });
+      await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'hidden' }); delete state.mutationError;
       await add.selectOption('COORDINATOR'); await page.getByRole('button', { name: 'Add role', exact: true }).click();
       await dialog.getByLabel(reasonLabel).fill('x'.repeat(501));
       assert.ok((await dialog.innerText()).includes('501 / 500')); assert.equal(await dialog.getByRole('button', { name: 'Add role' }).isDisabled(), true);

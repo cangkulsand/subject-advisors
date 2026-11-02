@@ -20,7 +20,7 @@
       "post": {
         "operationId": "createAdminAccount",
         "summary": "Add an application account for an existing Clerk user",
-        "description": "Looks the user up by exact primary email. The email must be verified and eligible for every requested role (STUDENT: verified @graduate.utm.my; COORDINATOR and SYSTEM_ADMIN: verified @utm.my). reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "description": "Looks the user up by exact primary email. The email must be verified and eligible for every requested role (STUDENT: verified @graduate.utm.my; COORDINATOR: verified @utm.my; SYSTEM_ADMIN: verified @utm.my, @graduate.utm.my or @gmail.com). reason is trimmed, 1-500 characters, and is stored in the audit log.",
         "requestBody": {
           "required": true,
           "content": {

@@ -1,5 +1,6 @@
 import type { AccessAssignment, AppRole, VerifiedIdentity } from './contracts';
 import { AuthError } from './errors';
+import { isSystemAdminEmailDomain } from '../../../../../packages/shared/src/admin/admin';
 export function requireStudentEmail(identity: VerifiedIdentity): void {
   const email = identity.primaryEmail;
   if (!email?.verified) {
@@ -22,7 +23,7 @@ export function eligibleRoles(identity: VerifiedIdentity, assignment: AccessAssi
   }
   const student = /^[^@\s]+@graduate\.utm\.my$/i.test(identity.primaryEmail.address);
   const coordinator = /^[^@\s]+@utm\.my$/i.test(identity.primaryEmail.address);
-  return assignment.roles.filter(role => role === 'SYSTEM_ADMIN' ||
+  return assignment.roles.filter(role => role === 'SYSTEM_ADMIN' && isSystemAdminEmailDomain(identity.primaryEmail!.address) ||
     role === 'STUDENT' && student || role === 'COORDINATOR' &&
     (coordinator || student && assignment.coordinatorStudentException === true && assignment.protectedOwner === true));
 }

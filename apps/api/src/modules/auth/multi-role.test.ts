@@ -34,9 +34,21 @@ describe('explicit multi-role authorization',()=>{
     await expect(authorize(f.request,f.deps,{roles:['STUDENT'],requireProfile:true})).rejects.toMatchObject({code:'PROFILE_UNAVAILABLE'});
   });
   it('checks student eligibility only for student access',async()=>{
-    const f=fixture();f.identity.primaryEmail!.address='owner@personal.test';
+    const f=fixture();f.identity.primaryEmail!.address='owner@gmail.com';
     expect((await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).appRole).toBe('SYSTEM_ADMIN');
     await expect(authorize(f.request,f.deps,{roles:['STUDENT']})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
+  });
+  it.each(['a@utm.my','a@graduate.utm.my','a@gmail.com','A@GMAIL.COM'])('honours SYSTEM_ADMIN for %s',async address=>{
+    const f=fixture(['SYSTEM_ADMIN']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;f.identity.primaryEmail!.address=address;
+    expect(await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).toMatchObject({availableRoles:['SYSTEM_ADMIN'],landingPath:'/admin'});
+  });
+  it.each(['a@example.com','a@sub.gmail.com','a@evil-gmail.com','a@gmail.com.evil.io','a@utm.my.evil'])('does not honour SYSTEM_ADMIN for %s',async address=>{
+    const f=fixture(['SYSTEM_ADMIN']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;f.identity.primaryEmail!.address=address;
+    await expect(authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
+  });
+  it('does not honour a gmail COORDINATOR or STUDENT membership',async()=>{
+    const f=fixture(['STUDENT','COORDINATOR','SYSTEM_ADMIN']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;f.identity.primaryEmail!.address='a@gmail.com';
+    expect((await authorize(f.request,f.deps)).availableRoles).toEqual(['SYSTEM_ADMIN']);
   });
   it('honors current grants, global suspension and revocation on every API call',async()=>{
     const f=fixture();await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']});

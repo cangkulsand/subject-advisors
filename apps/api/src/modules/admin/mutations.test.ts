@@ -229,9 +229,18 @@ describe('role eligibility', () => {
   });
   it('requires an exact verified utm.my address for COORDINATOR and SYSTEM_ADMIN', () => {
     expect(checkRoleEligibility(verified('a@utm.my'), ['COORDINATOR', 'SYSTEM_ADMIN'])).toEqual({ eligible: true, ineligible: [] });
-    expect(checkRoleEligibility(verified('a@graduate.utm.my'), ['COORDINATOR', 'SYSTEM_ADMIN'])).toEqual({ eligible: false, ineligible: ['COORDINATOR', 'SYSTEM_ADMIN'] });
+    expect(checkRoleEligibility(verified('a@graduate.utm.my'), ['COORDINATOR', 'SYSTEM_ADMIN'])).toEqual({ eligible: false, ineligible: ['COORDINATOR'] });
     expect(checkRoleEligibility(verified('a@mail.utm.my'), ['COORDINATOR']).eligible).toBe(false);
-    expect(checkRoleEligibility(verified('a@utm.my.evil.test'), ['SYSTEM_ADMIN']).eligible).toBe(false);
+  });
+  it.each(['a@utm.my', 'a@graduate.utm.my', 'a@gmail.com', 'A@GMAIL.COM', 'a@Graduate.UTM.my'])('allows SYSTEM_ADMIN for %s', address => {
+    expect(checkRoleEligibility(verified(address), ['SYSTEM_ADMIN'])).toEqual({ eligible: true, ineligible: [] });
+  });
+  it.each(['a@evil-gmail.com', 'a@gmail.com.evil.io', 'a@sub.gmail.com', 'a@utm.my.evil', 'a@mail.utm.my', 'a@evil.graduate.utm.my', 'a@googlemail.com', 'a@gmail.com@evil.io', '@gmail.com', 'a b@gmail.com'])('denies SYSTEM_ADMIN for %s', address => {
+    expect(checkRoleEligibility(verified(address), ['SYSTEM_ADMIN']).eligible).toBe(false);
+  });
+  it('denies SYSTEM_ADMIN for an unverified gmail address and keeps gmail out of STUDENT and COORDINATOR', () => {
+    expect(checkRoleEligibility({ address: 'a@gmail.com', verified: false }, ['SYSTEM_ADMIN']).eligible).toBe(false);
+    expect(checkRoleEligibility(verified('a@gmail.com'), ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'])).toEqual({ eligible: false, ineligible: ['STUDENT', 'COORDINATOR'] });
   });
   it('reports only the offending roles for mixed requests and is case-insensitive', () => {
     expect(checkRoleEligibility(verified('A@UTM.MY'), ['COORDINATOR', 'STUDENT'])).toEqual({ eligible: false, ineligible: ['STUDENT'] });

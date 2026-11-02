@@ -35,6 +35,31 @@ describe('invitation redemption at first sign-in', () => {
     expect(f.repository.createAccount).toHaveBeenCalledWith('user_new', ['COORDINATOR'], 'user_new', `Invitation ${invitation().id} accepted`, { invitationId: invitation().id });
     expect(f.initializeStudent).not.toHaveBeenCalled();
   });
+  it('redeems an invited gmail.com SYSTEM_ADMIN without student registration', async () => {
+    const f = setup({ invitation: invitation({ email: 'friend@gmail.com', roles: ['SYSTEM_ADMIN'] }), email: { address: 'Friend@Gmail.com', verified: true } });
+    const me = await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true });
+    expect(me.roles).toEqual(['SYSTEM_ADMIN']); expect(me.availableRoles).toEqual(['SYSTEM_ADMIN']); expect(me.landingPath).toBe('/admin');
+    expect(f.initializeStudent).not.toHaveBeenCalled();
+  });
+  it('redeems an invited graduate.utm.my SYSTEM_ADMIN with only the invited role and no student account', async () => {
+    const f = setup({ invitation: invitation({ email: 'friend@graduate.utm.my', roles: ['SYSTEM_ADMIN'] }), email: { address: 'friend@graduate.utm.my', verified: true } });
+    const me = await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true });
+    expect(me.roles).toEqual(['SYSTEM_ADMIN']); expect(f.initializeStudent).not.toHaveBeenCalled();
+    await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true });
+    expect(f.repository.createAccount).toHaveBeenCalledTimes(1);
+  });
+  it('denies an uninvited gmail.com user (no self-signup)', async () => {
+    const f = setup({ invitation: null, email: { address: 'stranger@gmail.com', verified: true } });
+    await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code: 'EMAIL_DOMAIN_DENIED' });
+    expect(f.repository.createAccount).not.toHaveBeenCalled(); expect(f.initializeStudent).not.toHaveBeenCalled();
+  });
+  it('does not let a gmail.com invitation grant COORDINATOR or STUDENT', async () => {
+    for (const roles of [['COORDINATOR'], ['STUDENT']] as const) {
+      const f = setup({ invitation: invitation({ email: 'friend@gmail.com', roles: [...roles] }), email: { address: 'friend@gmail.com', verified: true } });
+      await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code: 'EMAIL_DOMAIN_DENIED' });
+      expect(f.repository.createAccount).not.toHaveBeenCalled();
+    }
+  });
   it('matches the verified primary email exactly after lower-casing', async () => {
     const f = setup({ email: { address: 'Coord@UTM.my', verified: true } });
     await authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true });
