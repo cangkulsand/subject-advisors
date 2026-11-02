@@ -45,6 +45,8 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
   afterAll(async () => { await client?.end(); });
   beforeEach(async () => {
     await client.query('BEGIN');
+    // 0008 audits reference-data writes (learning_centre, academic_semester) and needs a transaction-local actor/reason.
+    await client.query("SELECT set_config('app.access_actor','db-seed',true), set_config('app.access_reason','seed',true)");
     const programme = Number((await scalar("INSERT INTO public.programme(programme_code, programme_name) VALUES ('T' || substr(md5(random()::text),1,8), 'DB test programme') RETURNING programme_id")).programme_id);
     const centre = Number((await scalar("INSERT INTO public.learning_centre(centre_code, centre_name) VALUES (substr(md5(random()::text),1,8), 'DB test centre') RETURNING learning_centre_id")).learning_centre_id);
     const year = '20' + (50 + Math.floor(Math.random() * 40)) + '/20' + (51 + Math.floor(Math.random() * 40));
