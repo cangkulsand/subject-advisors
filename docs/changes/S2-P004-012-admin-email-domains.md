@@ -1,6 +1,6 @@
 # S2-P004-012 — SYSTEM_ADMIN allowed email domains
 
-- **Status:** IMPLEMENTED (pending coordinator review)
+- **Status:** MERGED to `main` (2026-11-02)
 - **Date:** 2026-11-02
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -51,3 +51,5 @@ gmail.com accounts are outside institutional identity. Administrator remains an 
 
 - **Changed.** System administrators can now be added or invited with a verified `@utm.my`, `@graduate.utm.my` or `@gmail.com` email (exact domain). The same rule applies at sign-in; the Add user dialog and Add System Admin role confirmation state it.
 - **Unchanged.** Student and Coordinator email rules; audit, self-lockout, protected-owner and last-admin protections.
+
+- 2026-11-02 — Coordinator review: diff and rule location reviewed; reran typecheck, lint, `npm test` 1366 passed / 59 skipped, admin UI 44 PASS. Owner confirmed the only System Administrator is the protected owner on @graduate.utm.my, so no existing admin loses access. Merged to `main`. Status: MERGED.
