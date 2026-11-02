@@ -31,14 +31,17 @@ export const PathwayPage: ComponentType<StudentPageProps> = ({ getToken }) => {
 
   const displayed = showDemo ? DEMO_PATHWAY_GRAPH : graph;
 
-  if (loading) return <section className="pathway-page" role="status"><h1>Academic pathway</h1><p>Loading your curriculum map…</p></section>;
+  if (loading && !showDemo) return <section className="pathway-page" role="status"><h1>Academic pathway</h1><p>Loading your curriculum map…</p></section>;
 
-  if (error) {
+  if (error && !showDemo) {
     return (
       <section className="pathway-page">
         <h1>Academic pathway</h1>
         <p role="alert">{error instanceof PathwayApiError ? error.message : 'Unable to load your academic pathway. Please retry.'}</p>
-        <button type="button" onClick={() => setAttempt(n => n + 1)}>Retry</button>
+        <div className="pathway-actions">
+          <button type="button" onClick={() => setAttempt(n => n + 1)}>Retry</button>
+          <button type="button" onClick={() => setShowDemo(true)}>Preview demo</button>
+        </div>
         <p className="pathway-note">Advisory roadmap — future offerings and graduation dates are not guaranteed.</p>
       </section>
     );
@@ -67,7 +70,7 @@ export const PathwayPage: ComponentType<StudentPageProps> = ({ getToken }) => {
           <button type="button" onClick={() => setView(view === 'graph' ? 'list' : 'graph')}>
             {view === 'graph' ? 'Switch to list view' : 'Switch to graph view'}
           </button>
-          <button type="button" onClick={() => setShowDemo(value => !value)}>
+          <button type="button" aria-pressed={showDemo} onClick={() => setShowDemo(value => !value)}>
             {showDemo ? 'Show my real pathway' : 'Preview demo'}
           </button>
         </div>
@@ -86,7 +89,7 @@ export const PathwayPage: ComponentType<StudentPageProps> = ({ getToken }) => {
           <p>You can also <AppLink href="/student/records">add subject records</AppLink> to reflect your academic history.</p>
         </section>
       ) : view === 'graph' ? (
-        <TalentTree graph={displayed} />
+        <TalentTree key={`${displayed.demo}-${displayed.curriculumId}-${displayed.curriculumVersion}`} graph={displayed} />
       ) : (
         <PathwayList graph={displayed} />
       )}
@@ -127,7 +130,7 @@ function PrerequisiteSummary({ node, graph, byId }: { node: PathwaySubjectNode; 
         const source = byId.get(edge.source);
         return (
           <li key={edge.id}>
-            {edge.requirementType.toLowerCase()} prerequisite: {source ? `${source.subjectCode} ${source.subjectName}` : edge.source}
+            {edge.requirementType === 'COREQUISITE' ? 'Corequisite' : edge.requirementType === 'RECOMMENDED' ? 'Recommended prior knowledge' : 'Mandatory prerequisite'}: {source ? `${source.subjectCode} ${source.subjectName}` : edge.source}
           </li>
         );
       })}
