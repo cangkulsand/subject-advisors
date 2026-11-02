@@ -1,6 +1,6 @@
 import type { AuthDependencies } from '../auth/contracts';
 import type { ForecastScope, ImportedStudentSummary, ImportSummary, ImportValidationReport, SemesterOption, StoredValidationInternals } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
 import type { OfferingsRepository } from './offerings-contracts';
 import type { ForecastRunsRepository } from './runs-contracts';
 import type { CatalogueCurriculum, ImportCatalogue, RecordToStore, StudentToStore } from './validation';

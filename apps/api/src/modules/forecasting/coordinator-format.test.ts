@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { IMPORT_CSV_HEADER, IMPORT_LIMITS } from '../../../../../packages/shared/src/forecasting/contracts';
-import { INTERIM_CENTRE_ALIASES, INTERIM_PROGRAMME_ALIASES } from '../../config/interim-scope';
+import { IMPORT_CENTRE_ALIASES, IMPORT_PROGRAMME_ALIASES } from '../../config/import-aliases';
 import { COORDINATOR_HEADER, COORDINATOR_TEMPLATE_ROWS, detectCoordinatorHeader, semesterOrder, type ImportFormatContext } from './coordinator-format';
 import { csvLine } from './csv';
 import { validateImportCsv, type ImportCatalogue } from './validation';
@@ -14,7 +14,7 @@ const catalogue = (overrides: Partial<ImportCatalogue> = {}): ImportCatalogue =>
   semesterIds: new Set([1, 2, 3]),
   ...overrides,
 });
-const context: ImportFormatContext = { programmeCode: 'SECJ', centreCode: 'KL', programmeAliases: INTERIM_PROGRAMME_ALIASES, centreAliases: INTERIM_CENTRE_ALIASES };
+const context: ImportFormatContext = { programmeCode: 'SECJ', centreCode: 'KL', programmeAliases: IMPORT_PROGRAMME_ALIASES, centreAliases: IMPORT_CENTRE_ALIASES };
 const header = COORDINATOR_HEADER.join(',');
 /** course, subj, centre, name, matric, email, semester, grade, status */
 const line = (...v: string[]) => csvLine([...v, ...Array(9 - v.length).fill('')]);

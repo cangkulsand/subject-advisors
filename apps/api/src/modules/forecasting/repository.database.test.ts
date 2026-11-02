@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IMPORT_CSV_HEADER } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
 import { csvLine } from './csv';
 import type { ForecastingDependencies } from './contracts';
 import { createForecastingRepository, type ForecastingStatement } from './repository';

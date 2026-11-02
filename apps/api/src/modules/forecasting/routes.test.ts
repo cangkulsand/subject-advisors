@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IMPORT_CSV_HEADER, IMPORT_LIMITS } from '../../../../../packages/shared/src/forecasting/contracts';
-import { interimScopeProvider, type ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
+import { assignedTo, testScopeProvider } from './scope-provider.test-support';
 import { csvLine } from './csv';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow, ProgrammeCatalogue, StoreImportInput } from './contracts';
 import { ForecastingError } from './errors';
@@ -74,7 +75,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
     repository: fake.repository,
     runs: {} as ForecastingDependencies["runs"],
     offerings: {} as ForecastingDependencies["offerings"],
-    scopes: options.scopes ?? interimScopeProvider,
+    scopes: options.scopes ?? testScopeProvider,
     now: () => new Date('2026-11-01T12:00:00.000Z'),
   };
   return { deps, ...fake };
@@ -97,7 +98,7 @@ const accept = (deps: ForecastingDependencies, validationId: string, revision: s
     headers: { 'Content-Type': 'application/json', ...(ifMatch === null ? {} : { 'If-Match': ifMatch }) },
     body: JSON.stringify({ programmeId: 5, learningCentreId: 1, targetSemesterId: 2, validationRevision: revision, acknowledgeRejectedRows: true, ...bodyOverrides }),
   });
-const denyScope: ScopeProvider = { ...interimScopeProvider, isScopeAssigned: vi.fn(async () => false) };
+const denyScope: ScopeProvider = { ...assignedTo(), isScopeAssigned: vi.fn(async () => false) };
 
 describe('role and ownership checks', () => {
   it.each([['STUDENT'], ['SYSTEM_ADMIN']] as const)('denies %s on every route before touching data', async (role) => {
@@ -137,7 +138,7 @@ describe('template and context', () => {
     expect((await response.text()).trim()).toBe(header);
   });
   it('lists only assigned scopes and the target semester after the current one', async () => {
-    const scopes: ScopeProvider = { ...interimScopeProvider, isScopeAssigned: vi.fn(async (_user: string, programmeId: number, centreId: number) => programmeId === 5 && centreId === 2) };
+    const scopes: ScopeProvider = assignedTo([5, 2]);
     const { deps } = fixture({ scopes });
     const body = await (await send(deps, 'forecast-context', { method: 'GET' })).json();
     expect(body.data.programmes.map((p: { programmeId: number }) => p.programmeId)).toEqual([5]);
@@ -162,8 +163,28 @@ describe('template and context', () => {
     const { deps } = fixture();
     for (const query of ['programmeId=0', 'programmeId=abc', 'programmeId=1&programmeId=2', 'other=1']) expect((await send(deps, 'forecast-context?' + query, { method: 'GET' })).status).toBe(400);
   });
+  it('returns no scopes for a coordinator without assignments and still reports the semesters', async () => {
+    const { deps } = fixture({ scopes: assignedTo() });
+    const body = await (await send(deps, 'forecast-context', { method: 'GET' })).json();
+    expect(body.data).toMatchObject({ programmes: [], learningCentres: [], assignedScopes: [], currentSemesterId: 1, targetSemesterId: 2 });
+    expect((await send(deps, 'forecast-context?programmeId=5', { method: 'GET' })).status).toBe(403);
+  });
+  it('lists scopes for the verified actor only and applies a revocation on the very next request', async () => {
+    let live = assignedTo([5, 1]);
+    const scopes: ScopeProvider = { ...live, listScopes: (user) => live.listScopes(user), isScopeAssigned: (...args) => live.isScopeAssigned(...args) };
+    const listScopes = vi.spyOn(scopes, 'listScopes');
+    const { deps } = fixture({ scopes, actor: 'user_other' });
+    const before = await (await send(deps, 'forecast-context', { method: 'GET' })).json();
+    expect(before.data.assignedScopes).toEqual([{ programmeId: 5, learningCentreId: 1 }]);
+    expect(listScopes).toHaveBeenCalledWith('user_other');
+    live = assignedTo(); // assignment ended
+    expect((await send(deps, 'forecast-context', { method: 'GET' })).status).toBe(200);
+    expect((await upload(deps, validCsv)).status).toBe(403);
+    expect((await send(deps, 'forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2', { method: 'GET' })).status).toBe(403);
+    expect((await send(deps, 'forecast-context?programmeId=5', { method: 'GET' })).status).toBe(403);
+  });
   it('reports an empty target when no current semester is marked', async () => {
-    const scopes: ScopeProvider = { ...interimScopeProvider, currentSemesterId: vi.fn(async () => null) };
+    const scopes: ScopeProvider = { ...testScopeProvider, currentSemesterId: vi.fn(async () => null) };
     const body = await (await send(fixture({ scopes }).deps, 'forecast-context', { method: 'GET' })).json();
     expect(body.data).toMatchObject({ targetSemesters: [], targetSemesterId: null, currentSemesterId: null });
   });
@@ -241,7 +262,7 @@ describe('upload', () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ error: { code: 'TARGET_SEMESTER_NOT_ALLOWED' } });
     expect(repository.storeImport).not.toHaveBeenCalled();
-    const scopes: ScopeProvider = { ...interimScopeProvider, currentSemesterId: vi.fn(async () => null) };
+    const scopes: ScopeProvider = { ...testScopeProvider, currentSemesterId: vi.fn(async () => null) };
     expect((await upload(fixture({ scopes }).deps, validCsv)).status).toBe(409);
   });
   it('reports an unconfigured programme as not found', async () => {
