@@ -31,6 +31,16 @@
       "migration": "0006",
       "tables": ["admin_user_invitation"],
       "purpose": "P004 pending admin user invitations (roles are re-checked at redemption); excluded from the frozen 26-entity SRS baseline"
+    },
+    {
+      "migration": "0008",
+      "tables": ["faculty", "coordinator_assignment", "academic_setup_audit_log"],
+      "columns": [
+        { "table": "learning_centre", "name": "is_active", "sqlType": "boolean", "nullable": false, "default": true, "purpose": "Soft deactivation of existing learning centres" },
+        { "table": "programme", "name": "faculty_id", "sqlType": "integer", "nullable": true, "purpose": "Optional reviewed faculty link for existing programmes" },
+        { "table": "academic_semester", "name": "is_current", "sqlType": "boolean", "nullable": false, "default": false, "purpose": "Explicit system current-semester marker" }
+      ],
+      "purpose": "P004 academic reference administration, coordinator scope and immutable audit; excluded from the frozen SRS baseline"
     }
   ]
 }

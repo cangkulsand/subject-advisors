@@ -270,3 +270,7 @@
   .admin-reason-dialog { padding: 20px; }
   .admin-dialog-actions > button { flex: 1 1 140px; }
 }
+
+/* Academic setup uses the existing card and modal system. */
+.admin-setup-fields { display: grid; gap: 16px; min-width: 0; }
+.admin-card > h2 { margin-top: 28px; }

@@ -1,10 +1,13 @@
 erDiagram
+  %% Frozen source baseline plus the separately registered 0008 academic setup extension.
+  %% Other engineering extensions are documented outside this focused domain diagram.
   programme {
     integer programme_id PK
     varchar programme_code UK
     varchar programme_name
     varchar level
     varchar status
+    integer faculty_id FK
   }
   curriculum {
     integer curriculum_id PK
@@ -58,6 +61,7 @@ erDiagram
     smallint max_credits
     date start_date
     date end_date
+    boolean is_current
   }
   student_profile {
     integer student_id PK
@@ -126,6 +130,34 @@ erDiagram
     integer learning_centre_id PK
     varchar centre_code UK
     varchar centre_name
+    boolean is_active
+  }
+  %% Migration 0008 engineering tables; not additions to the frozen source dictionary.
+  faculty {
+    integer faculty_id PK
+    varchar faculty_code UK
+    varchar faculty_name
+    boolean is_active
+  }
+  coordinator_assignment {
+    integer assignment_id PK
+    integer access_assignment_id FK
+    integer faculty_id FK
+    integer programme_id FK
+    integer learning_centre_id FK
+    timestamptz started_at
+    timestamptz ended_at
+  }
+  academic_setup_audit_log {
+    bigint audit_id PK
+    varchar entity_type
+    integer entity_id
+    varchar action
+    varchar actor
+    text reason
+    jsonb before_data
+    jsonb after_data
+    timestamptz created_at
   }
   academic_import_batch {
     integer import_batch_id PK
@@ -223,6 +255,11 @@ erDiagram
     timestamptz recorded_at
   }
   programme ||--o{ curriculum : "programme_id"
+  faculty |o--o{ programme : "faculty_id (0008 extension)"
+  user_access_assignment ||--o{ coordinator_assignment : "access_assignment_id"
+  faculty ||--o{ coordinator_assignment : "faculty_id"
+  programme ||--o{ coordinator_assignment : "programme_id"
+  learning_centre ||--o{ coordinator_assignment : "learning_centre_id"
   curriculum ||--o{ curriculum_subject : "curriculum_id"
   subject ||--o{ curriculum_subject : "subject_id"
   curriculum ||--o{ curriculum_requirement : "curriculum_id"

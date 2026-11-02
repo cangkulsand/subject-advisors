@@ -37,4 +37,4 @@ export interface AdminIdentities {
   createInvitation(email: string, redirectUrl?: string, expiresInDays?: number): Promise<{ clerkInvitationId: string }>;
   revokeInvitation(clerkInvitationId: string): Promise<void>;
 }
-export interface AdminDependencies { auth: AuthDependencies; repository: AdminRepository; identities: AdminIdentities }
+export interface AdminDependencies { auth: AuthDependencies; repository: AdminRepository; identities: AdminIdentities; academicRepository?: import('./academic-contracts').AcademicSetupRepository }

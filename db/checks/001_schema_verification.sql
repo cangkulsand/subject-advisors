@@ -18,7 +18,8 @@ FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
  -- one student_profile field (0003) and exactly two curriculum_subject fields (0005).
  IF actual_count<>(jsonb_array_length(t->'columns')
    + CASE WHEN t->>'table'='student_profile' THEN 1 ELSE 0 END
-   + CASE WHEN t->>'table'='curriculum_subject' THEN 2 ELSE 0 END)
+   + CASE WHEN t->>'table'='curriculum_subject' THEN 2 ELSE 0 END
+   + CASE WHEN t->>'table' IN ('programme','learning_centre','academic_semester') THEN 1 ELSE 0 END)
    THEN RAISE EXCEPTION 'Unexpected columns in %',t->>'table'; END IF;
  FOR c IN SELECT * FROM jsonb_array_elements(t->'columns') LOOP
    SELECT a.attnum,a.attnotnull,format_type(a.atttypid,a.atttypmod) AS type,a.attidentity
@@ -40,7 +41,7 @@ SELECT count(*) INTO actual_count FROM pg_constraint c JOIN pg_namespace n ON n.
 WHERE n.nspname='public' AND c.contype='f'
   AND c.conrelid IN (SELECT to_regclass('public.'||(value->>'table')) FROM jsonb_array_elements(expected));
 -- The one additional 0003 FK is checked by the explicit extension check. 0005 adds no FK on a source-contract table.
-IF actual_count<>40 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK'; END IF;
+IF actual_count<>41 THEN RAISE EXCEPTION 'Expected 39 source FKs plus registered 0003 profile semester and 0008 faculty FKs'; END IF;
 END $verify$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.student_profile'::regclass AND tgname='touch_student_profile' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_student_profile'; END IF; END $v$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.academic_plan'::regclass AND tgname='touch_academic_plan' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_academic_plan'; END IF; END $v$;

@@ -37,6 +37,11 @@
       "version": "0006",
       "file": "0006_admin_user_management.sql",
       "description": "Audit access-status changes and add the pending admin user invitation table"
+    },
+    {
+      "version": "0008",
+      "file": "0008_admin_academic_setup.sql",
+      "description": "Add audited academic reference setup, coordinator scopes and explicit current-semester selection"
     }
   ],
   "historicalExcluded": [
