@@ -73,7 +73,7 @@
           "Imports"
         ],
         "operationId": "downloadForecastImportTemplate",
-        "summary": "Download the single-file CSV template",
+        "summary": "Download a CSV template (standard or coordinator export format)",
         "responses": {
           "200": {
             "description": "UTF-8 CSV header in the defined field order.",
@@ -87,9 +87,22 @@
                 "schema": {
                   "type": "string"
                 },
-                "example": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic"
+                "example": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic",
+                "examples": {
+                  "native": {
+                    "summary": "format=native",
+                    "value": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n"
+                  },
+                  "coordinator": {
+                    "summary": "format=coordinator",
+                    "value": "courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status\nSECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A\nSECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A\n"
+                  }
+                }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -97,7 +110,23 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "native (default) returns the standard template header; coordinator returns the coordinator export header plus two synthetic example rows (S2-P004-010).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "native",
+                "coordinator"
+              ],
+              "default": "native"
+            }
+          }
+        ]
       }
     },
     "/api/coordinator/forecast-imports": {
@@ -149,7 +178,7 @@
         ],
         "operationId": "submitForecastImport",
         "summary": "Validate one CSV and accept it when all rows are valid",
-        "description": "Fully valid uploads are accepted directly, including warnings. Row errors return a 422 correction report without accepting rejected history. Valid roster metadata is retained when a subject-history row is invalid. The file is bound to programme, centre and target semester; the server verifies all IDs against configured catalogue rows. The caller actor is derived from the verified active Coordinator session. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. CSV v1 accepts optional UTF-8 BOM, comma/double-quote escaping and LF/CRLF; trims fields, treats trimmed-empty as blank, compares opaque external references case-sensitively (1-128 Unicode characters), allows int32 positive semester IDs and nonnegative integer credits, and limits uploads to 5 MiB/10,000 data rows. A successful accepted-import response includes the complete validation report, including nonblocking warnings; warnings remain retrievable from import detail. No raw CSV is returned. MT3 implementation notes: multipart/form-data (file + scope fields) or a raw text/csv body with the same fields in the query string; the target semester must be the one after the current semester; the optional student_name column is stored; the earlier nine-column header is still accepted. Idempotency-Key is validated (1-128 characters) but not persisted; instead, the same file bytes (sha256 source fingerprint) for the same scope that are already accepted replay the original snapshot with 200. A 422 correction report whose rows are partly valid is stored as a VALIDATED batch awaiting subset acknowledgement; a file rejection or a report with no usable students is stored as REJECTED.",
+        "description": "Fully valid uploads are accepted directly, including warnings. Row errors return a 422 correction report without accepting rejected history. Valid roster metadata is retained when a subject-history row is invalid. The file is bound to programme, centre and target semester; the server verifies all IDs against configured catalogue rows. The caller actor is derived from the verified active Coordinator session. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. CSV v1 accepts optional UTF-8 BOM, comma/double-quote escaping and LF/CRLF; trims fields, treats trimmed-empty as blank, compares opaque external references case-sensitively (1-128 Unicode characters), allows int32 positive semester IDs and nonnegative integer credits, and limits uploads to 5 MiB/10,000 data rows (20,000 raw rows for the coordinator export format). Coordinator export format (S2-P004-010, decided 2026-11-02): a header with courseCode, subjCode, centerName, stuname, stuMetricNo and grade (case-insensitive, any order; SemesterMohon and status optional; eMail and other columns are ignored and never stored) is detected automatically and normalised into the standard model before validation (external_reference = stuMetricNo, student_name = stuname, curriculum_version blank, cohort ACTIVE, history COMPLETE). Rows of other programmes (exact programme_code or a configured alias), other learning centres (configured aliases), inactive students (status belongs to the student: any N row skips ALL rows of that student in the file, including exemption rows with a blank status; a status other than A, N or blank counts as active with a COORDINATOR_STATUS_UNKNOWN warning) and in-progress rows (blank or NULL grade) are skipped and counted, subjects outside the curriculum are skipped with a COORDINATOR_SUBJECTS_SKIPPED warning, grades A+ to D+ complete, EX and PENGECUALIAN exempt, every other non-blank grade fails, and only the latest SemesterMohon attempt per student and subject is kept. The report carries format and coordinatorExport counts. A successful accepted-import response includes the complete validation report, including nonblocking warnings; warnings remain retrievable from import detail. No raw CSV is returned. MT3 implementation notes: multipart/form-data (file + scope fields) or a raw text/csv body with the same fields in the query string; the target semester must be the one after the current semester; the optional student_name column is stored; the earlier nine-column header is still accepted. Idempotency-Key is validated (1-128 characters) but not persisted; instead, the same file bytes (sha256 source fingerprint) for the same scope that are already accepted replay the original snapshot with 200. A 422 correction report whose rows are partly valid is stored as a VALIDATED batch awaiting subset acknowledgement; a file rejection or a report with no usable students is stored as REJECTED.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -1720,7 +1749,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "UTF-8 CSV with optional BOM, comma delimiting, doubled-quote escaping, LF or CRLF. Trim surrounding spaces; trimmed-empty is blank. At most 5 MiB and 10,000 data rows. Header: the template header including the optional student_name column, or the earlier nine-column header."
+            "description": "UTF-8 CSV with optional BOM, comma delimiting, doubled-quote escaping, LF or CRLF. Trim surrounding spaces; trimmed-empty is blank. At most 5 MiB and 10,000 data rows (20,000 for the coordinator export). Header: the template header including the optional student_name column, the earlier nine-column header, or the coordinators' own export header (courseCode, subjCode, centerName, stuname, stuMetricNo, eMail, SemesterMohon, grade, status), detected automatically."
           }
         }
       },
@@ -1914,6 +1943,12 @@
           },
           "combined": {
             "$ref": "#/components/schemas/CombinedSnapshotCoverage"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ImportFileFormat"
+          },
+          "coordinatorExport": {
+            "$ref": "#/components/schemas/CoordinatorExportSummary"
           }
         }
       },
@@ -4846,6 +4881,119 @@
                   "items": {
                     "type": "string"
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ImportFileFormat": {
+        "type": "string",
+        "enum": [
+          "NATIVE",
+          "COORDINATOR"
+        ],
+        "description": "Detected from the CSV header row. Absent on standard-template reports (read as NATIVE)."
+      },
+      "CoordinatorExportSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Counts only (no personal data) of what the coordinator-export reader did with the file. Skipped rows are not errors.",
+        "required": [
+          "rowsRead",
+          "skippedOtherProgramme",
+          "skippedOtherCentre",
+          "skippedInactive",
+          "skippedInProgress",
+          "olderAttemptsDropped",
+          "skippedSubjectNotInCurriculum",
+          "subjectsNotInCurriculum",
+          "skippedInactiveStudents",
+          "unknownStatusRows",
+          "unknownStatusValues"
+        ],
+        "properties": {
+          "rowsRead": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Data rows read from the file."
+          },
+          "skippedOtherProgramme": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "courseCode does not map to the selected programme (exact programme_code or a configured alias such as SECJH to SECJ)."
+          },
+          "skippedOtherCentre": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "centerName does not map to the selected learning centre (configured aliases such as KUALA LUMPUR to KL, or the centre code)."
+          },
+          "skippedInactive": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows of inactive students: a student with any status N row is inactive and all their rows are skipped (including blank-status exemption rows). Blank or A is active."
+          },
+          "skippedInProgress": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with a blank or NULL grade (current short semester); not used yet."
+          },
+          "olderAttemptsDropped": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Older attempts (and repeated exemptions) replaced by the latest attempt per student and subject."
+          },
+          "skippedSubjectNotInCurriculum": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows skipped because the subject code is unknown or not in the programme curriculum. Reported by the COORDINATOR_SUBJECTS_SKIPPED warning."
+          },
+          "subjectsNotInCurriculum": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "count"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "skippedInactiveStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Distinct inactive students behind skippedInactive."
+          },
+          "unknownStatusRows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with a status other than A, N or blank; treated as active."
+          },
+          "unknownStatusValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "count"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }

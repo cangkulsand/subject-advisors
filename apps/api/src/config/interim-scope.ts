@@ -23,7 +23,10 @@ export interface ScopeProvider {
   currentSemesterId(): Promise<number | null>;
   /** Mirrors `student_profile.learning_centre_id`; null when the student has none. */
   studentLearningCentreId(studentId: number): Promise<number | null>;
+  /** Coordinator-export vocabulary (S2-P004-010): export programme code -> system programme_code, centre name -> system centre code. */
+  importAliases(): Promise<ImportAliases>;
 }
+export interface ImportAliases { programmes: Readonly<Record<string, string>>; centres: Readonly<Record<string, string>> }
 
 export const INTERIM_PROGRAMMES: readonly ProgrammeOption[] = [
   { programmeId: 5, programmeCode: 'SECJ', programmeName: 'Ijazah Sarjana Muda Sains Komputer (Kejuruteraan Perisian)' },
@@ -36,6 +39,14 @@ export const INTERIM_CENTRES: readonly CentreOption[] = [
   { learningCentreId: 2, centreCode: 'JB', centreName: 'UTMSPACE Johor Bahru' },
   { learningCentreId: 3, centreCode: 'PENANG', centreName: 'UTMSPACE Penang' },
 ];
+
+/**
+ * Coordinator export programme codes that map to a system programme (S2-P004-010). A code equal to a programme_code always maps
+ * to itself (SECRH). Other export programmes (SCSEH, SCSJ, SCSR, SCSV ...) are skipped until the subject/degree/faculty registration module exists.
+ */
+export const INTERIM_PROGRAMME_ALIASES: Readonly<Record<string, string>> = { SECJH: 'SECJ' };
+/** Coordinator export centre names -> centre code (the code itself is accepted too). */
+export const INTERIM_CENTRE_ALIASES: Readonly<Record<string, string>> = { 'KUALA LUMPUR': 'KL', 'JOHOR BAHRU': 'JB', 'PULAU PINANG': 'PENANG' };
 
 /** 2026/2027 semester 1 (dev semester_id 1); dates are null so this is a deliberate choice. */
 export const INTERIM_CURRENT_SEMESTER_ID = 1;
@@ -57,6 +68,9 @@ export const interimScopeProvider: ScopeProvider = {
   },
   async studentLearningCentreId() {
     return INTERIM_DEFAULT_STUDENT_CENTRE_ID;
+  },
+  async importAliases() {
+    return { programmes: INTERIM_PROGRAMME_ALIASES, centres: INTERIM_CENTRE_ALIASES };
   },
 };
 

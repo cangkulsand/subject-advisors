@@ -103,7 +103,7 @@ function addRun(state, importBatchId) {
   };
   if (state.seed === 'review' || state.bulkAudit) for (let i = 0; i < 24; i++) run.audit.push(auditEntry(state, run, 'REVIEW', 102, `Earlier note ${24 - i}`));
   // `manySubjects`: 21 reviewed filler subjects listed before the real ones, so the subjects table has two pages and the pending subjects sit on page 2.
-  if (state.manySubjects) { run.subjects.unshift(...Array.from({ length: 21 }, (_, i) => subject(200 + i, `FILL${String(1001 + i)}`, `Filler subject ${i + 1}`, 'LECTURE', 20, 0, [], 0, [section(100 + i, 1, 20, lec, 'APPROVED')]))); run.nextSection = 300; }
+  if (state.manySubjects) { run.subjects.unshift(...Array.from({ length: 21 }, (_, i) => subject(200 + i, `FILL${String(1001 + i)}`, `Advanced filler ${String(i + 1).padStart(2, '0')}`, 'LECTURE', 20, 0, [], 0, [section(100 + i, 1, 20, lec, 'APPROVED')]))); run.nextSection = 300; }
   state.runs.set(id, run);
   return run;
 }
@@ -155,6 +155,7 @@ export function handle(state, request) {
   if (!url.pathname.startsWith('/api/coordinator/')) return null;
   if (method !== 'GET') state.bodies.push({ method, path: url.pathname, headers, body: headers['content-type']?.startsWith('multipart') ? '[multipart]' : safeJson(body) });
   if (route === 'forecast-context') return ok({ programmes, learningCentres, targetSemesters: [target], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
+  if (route === 'forecast-import-template' && url.searchParams.get('format') === 'coordinator') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template-coordinator.csv"' }, text: ['courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A', ''].join('\n') };
   if (route === 'forecast-import-template') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template.csv"' }, text: 'external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n' };
   if (route === 'forecast-imports/system-snapshots' && method === 'POST') return systemSnapshot(state, headers, safeJson(body));
   if (route === 'forecast-imports/combined-snapshots' && method === 'POST') return upload(state, headers, body, true);
@@ -188,6 +189,8 @@ export function handle(state, request) {
 }
 function safeJson(text) { try { return text ? JSON.parse(text) : {}; } catch { return {}; } }
 
+const coordinatorExport = { rowsRead: 11204, skippedOtherProgramme: 8120, skippedOtherCentre: 2450, skippedInactive: 31, skippedInactiveStudents: 12, unknownStatusRows: 0, unknownStatusValues: [], skippedInProgress: 212, olderAttemptsDropped: 164, skippedSubjectNotInCurriculum: 187, subjectsNotInCurriculum: [{ code: 'ULRS1022', count: 120 }, { code: 'ULRF2XX2', count: 67 }] };
+const coordinatorWarning = { severity: 'WARNING', code: 'COORDINATOR_SUBJECTS_SKIPPED', row: null, field: 'subjCode', message: '187 row(s) were skipped because the subject is not in the curriculum: ULRS1022 (120), ULRF2XX2 (67).', correctiveAction: 'No action needed unless a listed subject should be in the curriculum; those rows were not used.' };
 const COMBINED_FINGERPRINT = 'c'.repeat(64);
 const combinedCoverage = { csv: { rows: 12, students: 9, rejectedRows: 0 }, students: 59, csvSkippedAlreadyInSystem: ['A100234', 'A100777'], possibleDuplicates: [{ csvReference: 'EXT-0042', systemReferences: ['PORTAL-17'] }] };
 const combinedCounts = { studentRows: 64, uniqueStudents: 59, validAttempts: 312, rejectedRows: 0, partialStudents: 0, unknownHistoryStudents: 3 };
@@ -205,6 +208,11 @@ function upload(state, headers, body, combined = false) {
   if (state.pendingValidation) state.pendingValidation = null;
   const label = /name="sourceLabel"\r?\n\r?\n([^\r\n]*)/.exec(body)?.[1] ?? 'Upload';
   if (body.includes('REJECTME')) return { status: 422, payload: { error: { code: 'IMPORT_FILE_REJECTED', message: 'The file could not be read. Correct it and upload again.', report: reportOf({ status: 'FILE_REJECTED', counts: { ...counts, uniqueStudents: 0, rejectedRows: 0 }, issues: [{ severity: 'ERROR', code: 'CSV_HEADER_INVALID', row: 1, field: null, message: 'The header row does not match the template.', correctiveAction: 'Download the template and copy your data into it.' }] }) } } };
+  if (body.includes('COORDEXPORT')) {
+    state.pendingValidation = { label, combined };
+    const extra = combined ? { source: 'COMBINED', coverage, combined: { ...combinedCoverage, csv: { rows: 12, students: 9, rejectedRows: 2 } } } : {};
+    return { status: 422, headers: { ETag: '"sha256:rev1"' }, payload: { error: { code: 'IMPORT_CORRECTION_REQUIRED', message: 'Correct the rejected rows, or explicitly acknowledge them to accept the remaining valid rows.', report: reportOf({ status: 'CORRECTION_REQUIRED', counts: { ...(combined ? combinedCounts : counts), rejectedRows: 2 }, issues: [...errorIssues, coordinatorWarning], subsetAcknowledgementRequired: true, format: 'COORDINATOR', coordinatorExport, ...extra }) } } };
+  }
   if (body.includes('BADROWS')) {
     state.pendingValidation = { label, combined };
     const extra = combined ? { source: 'COMBINED', coverage, combined: { ...combinedCoverage, csv: { rows: 12, students: 9, rejectedRows: 2 } } } : {};

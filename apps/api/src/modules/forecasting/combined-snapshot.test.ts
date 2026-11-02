@@ -257,3 +257,18 @@ describe('POST forecast-imports/combined-snapshots', () => {
     expect(get.headers.get('Allow')).toBe('POST');
   });
 });
+
+describe('combined snapshot with a coordinator export (S2-P004-010)', () => {
+  const head = 'courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status';
+  const crow = (matric: string, name: string, grade = 'A', course = 'SECJH') => [course, 'DEMO101', 'KUALA LUMPUR', name, matric, 'x@example.org', '2024/2025 1', grade, 'A'].join(',');
+  it('matches coordinator matrics against system matric numbers and reports the format', async () => {
+    const { deps, stored } = fixture();
+    const response = await combined(deps, [head, crow('A100', 'ALYA R'), crow('NEW1', 'BRAND NEW'), crow('NEW2', 'ANOTHER', 'A', 'SCSJ')].join('\n'));
+    expect(response.status).toBe(201);
+    const { data } = await body(response);
+    expect(data.source).toBe('COMBINED');
+    expect(data.validationReport).toMatchObject({ format: 'COORDINATOR', coordinatorExport: { rowsRead: 3, skippedOtherProgramme: 1 }, combined: { csvSkippedAlreadyInSystem: ['A100'] } });
+    expect(stored[0]!.students.map((s) => s.externalReference)).toEqual(['PORTAL-1', 'PORTAL-3', 'PORTAL-4', 'PORTAL-5', 'PORTAL-6', 'NEW1']);
+    expect(JSON.stringify(data)).not.toContain('example.org');
+  });
+});

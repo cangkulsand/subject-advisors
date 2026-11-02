@@ -35,6 +35,12 @@ it('downloads the template as text and takes the file name from Content-Disposit
   expect(await client().template()).toEqual({ filename: 'uc20-import-template.csv', text: 'a,b\n' });
 });
 
+it('asks for the coordinator template with the format query', async () => {
+  const fetcher = vi.fn<Fetch>(async () => new Response('courseCode\n', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="uc20-import-template-coordinator.csv"' } })); vi.stubGlobal('fetch', fetcher);
+  expect(await client().template('coordinator')).toEqual({ filename: 'uc20-import-template-coordinator.csv', text: 'courseCode\n' });
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/forecast-import-template?format=coordinator');
+});
+
 it('uploads multipart without a JSON content type and returns accepted/replayed imports', async () => {
   const fetcher = vi.fn<Fetch>(async () => reply(accepted, { status: 201 })); vi.stubGlobal('fetch', fetcher);
   const input = { ...scope, sourceDate: '2026-10-30', sourceLabel: 'Cohort', file: new File(['x'], 'cohort.csv', { type: 'text/csv' }) };

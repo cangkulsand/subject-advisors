@@ -111,6 +111,7 @@ export async function combinedSummary(system: BuiltSystemSnapshot, csv: Validati
   return {
     validationId, validationRevision: revision, status: csv.report.status, counts, issues: [...csv.report.issues, ...extra], completenessChanges,
     subsetAcknowledgementRequired: hasErrors && merge.students.length > 0, source: 'COMBINED', coverage: system.coverage, combined,
+    ...(csv.report.format ? { format: csv.report.format, coordinatorExport: csv.report.coordinatorExport } : {}),
     internal: { schemaVersion: 1, csvVersion: 1, source: 'COMBINED', dataRows: csv.dataRows, rejectedRowsByStudent, sourceByReference: merge.sourceByReference },
   };
 }

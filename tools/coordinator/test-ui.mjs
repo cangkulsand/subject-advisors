@@ -106,7 +106,12 @@ else {
       const download = page.waitForEvent('download');
       await page.getByRole('button', { name: 'Download CSV template' }).click();
       assert.equal((await download).suggestedFilename(), 'uc20-import-template.csv');
-      assert.ok(state.requests.some(request => request.path === '/api/coordinator/forecast-import-template'));
+      assert.ok(state.requests.some(request => request.path === '/api/coordinator/forecast-import-template' && request.search === ''));
+      const coordinatorDownload = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Download coordinator template' }).click();
+      assert.equal((await coordinatorDownload).suggestedFilename(), 'uc20-import-template-coordinator.csv');
+      assert.ok(state.requests.some(request => request.path === '/api/coordinator/forecast-import-template' && request.search === '?format=coordinator'));
+      await page.getByText('Both formats are accepted', { exact: false }).waitFor();
     });
 
     await check('imports: client validation, valid upload is accepted and listed', async page => {
@@ -211,6 +216,18 @@ else {
       assert.deepEqual(post.body, { programmeId: 5, learningCentreId: 1, targetSemesterId: 2, validationRevision: 'sha256:rev1', acknowledgeRejectedRows: true });
     });
 
+    await check('imports: a coordinator export report shows the detected format and skip counts', async page => {
+      await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped); await page.getByLabel('Source label', { exact: true }).waitFor();
+      await upload(page, 'COORDEXPORT', 'Coordinator export');
+      await page.getByRole('heading', { name: 'Validation report' }).waitFor();
+      const section = page.getByRole('region', { name: 'Coordinator export' }); await section.waitFor();
+      const text = await section.innerText();
+      for (const expected of ['Detected format: coordinator export', 'Rows read', '11204', 'Skipped: other programme', '8120', 'Skipped: other learning centre', '2450', 'Skipped: inactive students (status N)', 'Skipped: rows of inactive students', 'Skipped: in progress, not used yet', 'Older attempts dropped', 'Skipped: subject not in curriculum', 'ULRS1022 (120)', 'ULRF2XX2 (67)']) assert.ok(text.includes(expected), 'missing ' + expected);
+      assert.ok(!text.includes('@'), 'no e-mail address is shown');
+      await page.getByRole('region', { name: 'Warnings table' }).getByText('COORDINATOR_SUBJECTS_SKIPPED').waitFor();
+      await page.screenshot({ path: shots + 'imports-coordinator-report-desktop.png', fullPage: true });
+    });
+
     await check('imports: a rejected file shows the report with no subset option', async page => {
       await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped); await page.getByLabel('Source label', { exact: true }).waitFor();
       await upload(page, 'REJECTME', 'Wrong header');
@@ -287,6 +304,15 @@ else {
       assert.equal(await page.getByRole('heading', { name: 'Not offered in this semester type' }).count(), 0, 'the not-offered card is gone');
       assert.equal(await page.getByText('SECJ4118').count(), 0); assert.equal(await page.getByText('SECD3761').count(), 0);
       assert.equal(await page.locator('.admin-pagination').count(), 0, 'no pager when the subjects fit on one page');
+      const sizes = await page.locator('.coordinator-subjects').evaluate(table => {
+        const small = [...table.querySelectorAll('*')].filter(node => [...node.childNodes].some(child => child.nodeType === 3 && child.textContent.trim()) && parseFloat(getComputedStyle(node).fontSize) < 12).map(node => node.textContent.trim().slice(0, 30));
+        return { small, body: [...table.querySelectorAll('tbody td')].map(cell => parseFloat(getComputedStyle(cell).fontSize)), header: [...table.querySelectorAll('thead th')].map(cell => parseFloat(getComputedStyle(cell).fontSize)) };
+      });
+      assert.deepEqual(sizes.small, [], 'no text below 12px in the subjects table'); assert.ok(sizes.body.every(size => size >= 14), 'body cells are at least 14px'); assert.ok(sizes.header.every(size => size >= 13), 'header labels are at least 13px');
+      const controls = await page.getByRole('search', { name: 'Filter and sort subjects' }).evaluate(bar => ({ labels: [...bar.querySelectorAll('label')].map(item => parseFloat(getComputedStyle(item).fontSize)), fields: [...bar.querySelectorAll('input, select')].map(item => [parseFloat(getComputedStyle(item).fontSize), item.getBoundingClientRect().height]) }));
+      assert.ok(controls.labels.every(size => size >= 13), 'filter labels are at least 13px'); assert.ok(controls.fields.every(([size, height]) => size >= 14 && height >= 44), 'filter inputs and selects are at least 14px and 44px tall');
+      const first = await page.locator('tr[data-subject="SECJ1013"] th[scope="row"]').evaluate(cell => [...cell.children].map(child => child.textContent.trim()));
+      assert.deepEqual(first, ['Programming Technique I', 'SECJ1013', '3 credit hours'], 'subject name first, then the code, then credit hours');
       assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '4', 'the Subjects tile counts the subjects in the table, not the hidden ones');
       await page.getByRole('link', { name: /Newer forecast available: version 2/ }).first().waitFor();
       assert.equal(await page.getByRole('button', { name: 'Start review' }).count(), 1);
@@ -328,6 +354,7 @@ else {
       const tile = page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd');
       const codes = async () => rows.evaluateAll(items => items.map(item => item.getAttribute('data-subject')));
       await bar.waitFor(); assert.equal(await bar.getByRole('button', { name: 'Clear filters' }).count(), 0, 'no clear button while nothing is filtered');
+      assert.equal(await bar.getByLabel('Sort by').inputValue(), 'name', 'name A–Z is the default sort'); assert.equal(await bar.getByLabel('Sort by').locator('option').first().innerText(), 'Subject name (A–Z)');
       await page.screenshot({ path: shots + 'forecast-subjects-filters-desktop.png', fullPage: true });
       await bar.getByLabel('Search subjects').fill('DATABASE'); // case-insensitive, matches the name
       assert.deepEqual(await codes(), ['SECD2523']); assert.equal(await pager.count(), 0); assert.equal(await tile.innerText(), '25', 'the summary tile stays unfiltered');
@@ -354,7 +381,10 @@ else {
       await bar.getByLabel('Sort by').selectOption('demand'); await pager.getByText('Page 1 of 2').waitFor();
       assert.deepEqual((await codes()).slice(0, 3), ['SCSJ1013', 'SECJ1013', 'SECD2523']); // 71, 46, 30
       await bar.getByLabel('Sort by').selectOption('uncertain'); assert.deepEqual((await codes()).slice(0, 2), ['SCSJ1013', 'SECJ1013']);
-      await bar.getByLabel('Sort by').selectOption('code'); assert.equal((await codes())[0], 'FILL1001');
+      await bar.getByLabel('Sort by').selectOption('name'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
+      await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ1023'], 'page 2 in name order: Database, Discrete, Programming I, Programming II');
+      await bar.getByLabel('Sort by').selectOption('code'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
+      await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SCSJ1013', 'SECD2523', 'SECJ1013', 'SECJ1023'], 'page 2 in code order');
       await bar.getByLabel('Search subjects').fill('zzz-no-match');
       await page.getByText('No subjects match these filters.').waitFor(); assert.equal(await rows.count(), 0);
       await page.getByRole('status').getByRole('button', { name: 'Clear filters' }).click(); await pager.getByText('25 subjects · Page 1 of 2').waitFor();

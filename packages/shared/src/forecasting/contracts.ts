@@ -16,6 +16,8 @@ export const IMPORT_CSV_LEGACY_HEADER = IMPORT_CSV_HEADER.slice(0, 9);
 export const IMPORT_LIMITS = {
   maxBytes: 5 * 1024 * 1024,
   maxDataRows: 10_000,
+  /** Raw row limit for the coordinator export format (the real export holds every programme and centre). */
+  maxCoordinatorDataRows: 20_000,
   maxExternalReferenceLength: 100,
   maxCohortStatusLength: 20,
   maxStudentNameLength: 255,
@@ -150,6 +152,27 @@ export interface SystemSnapshotCoverage {
   /** Documents the interim centre rule while student profiles have no learning centre. */
   centreNote: string;
 }
+/** Import file format, detected from the header row. Absent on reports of the standard template (read as NATIVE). */
+export type ImportFileFormat = 'NATIVE' | 'COORDINATOR';
+/** What the coordinator export reader did with the rows of the file (S2-P004-010). Counts only; no personal data. */
+export interface CoordinatorExportSummary {
+  rowsRead: number;
+  skippedOtherProgramme: number;
+  skippedOtherCentre: number;
+  /** Rows of inactive students: a student is inactive when any of their rows has status N, and then all their rows are skipped (also rows with a blank status). */
+  skippedInactive: number;
+  /** Distinct inactive students behind `skippedInactive`. */
+  skippedInactiveStudents: number;
+  /** Rows with a status other than A, N or blank (treated as active) and the values seen. */
+  unknownStatusRows: number;
+  unknownStatusValues: Array<{ value: string; count: number }>;
+  /** Rows with a blank or NULL grade (current short semester; not used yet). */
+  skippedInProgress: number;
+  /** Earlier attempts (and repeated exemptions) replaced by the latest attempt of the same student and subject. */
+  olderAttemptsDropped: number;
+  skippedSubjectNotInCurriculum: number;
+  subjectsNotInCurriculum: Array<{ code: string; count: number }>;
+}
 export interface ImportValidationReport {
   validationId: string;
   validationRevision: string;
@@ -165,6 +188,9 @@ export interface ImportValidationReport {
   coverage?: SystemSnapshotCoverage;
   /** Present only on combined snapshots. */
   combined?: CombinedSnapshotCoverage;
+  /** Present only when a coordinator export was detected. */
+  format?: ImportFileFormat;
+  coordinatorExport?: CoordinatorExportSummary;
 }
 /** Stable validation issue codes produced by the UC20 CSV validator (file, group, attempt and warning findings). */
 export const IMPORT_FILE_ERROR_CODES = [
@@ -181,8 +207,7 @@ export const IMPORT_ROW_ERROR_CODES = [
 export const IMPORT_WARNING_CODES = [
   'RETAKE_OUTCOME_UNRESOLVED', 'HISTORY_UNKNOWN', 'HISTORY_PARTIAL', 'SYNTHETIC_ATTEMPT', 'SEMESTER_UNKNOWN',
   'CREDIT_EVIDENCE_MISSING', 'STALE_SOURCE_THRESHOLD_NOT_CONFIGURED', 'ISSUES_TRUNCATED',
-  'POSSIBLE_DUPLICATE_STUDENT', 'CSV_STUDENTS_ALREADY_IN_SYSTEM',
-  'POSSIBLE_DUPLICATE_STUDENT', 'CSV_STUDENTS_ALREADY_IN_SYSTEM',
+  'POSSIBLE_DUPLICATE_STUDENT', 'CSV_STUDENTS_ALREADY_IN_SYSTEM', 'COORDINATOR_SUBJECTS_SKIPPED', 'COORDINATOR_STATUS_UNKNOWN',
 ] as const;
 export type ImportIssueCode = (typeof IMPORT_FILE_ERROR_CODES)[number] | (typeof IMPORT_ROW_ERROR_CODES)[number] | (typeof IMPORT_WARNING_CODES)[number];
 /**

@@ -125,10 +125,10 @@ function SectionList({ sections }: { sections: RunSection[] }) {
 
 type Dialog = null | { kind: 'start' } | { kind: 'finalize' } | { kind: 'decide'; action: Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>; subject: RunSubject } | { kind: 'allocate'; subject: RunSubject };
 
-const SORT_LABELS = { code: 'Subject code (A–Z)', demand: 'Potential demand (high to low)', uncertain: 'Uncertain (high to low)', near: 'Near graduation (high to low)', sections: 'Proposed sections (high to low)' } as const;
+const SORT_LABELS = { name: 'Subject name (A–Z)', code: 'Subject code (A–Z)', demand: 'Potential demand (high to low)', uncertain: 'Uncertain (high to low)', near: 'Near graduation (high to low)', sections: 'Proposed sections (high to low)' } as const;
 type SubjectSort = keyof typeof SORT_LABELS;
 interface SubjectFilters { q: string; type: string; decision: string; flag: string; sort: SubjectSort }
-const NO_FILTERS: SubjectFilters = { q: '', type: '', decision: '', flag: '', sort: 'code' };
+const NO_FILTERS: SubjectFilters = { q: '', type: '', decision: '', flag: '', sort: 'name' };
 function matchesFilters(subject: RunSubject, { q, type, decision, flag }: SubjectFilters) {
   const term = q.trim().toLowerCase();
   if (term && !subject.subjectCode.toLowerCase().includes(term) && !subject.subjectName.toLowerCase().includes(term)) return false;
@@ -141,7 +141,8 @@ function matchesFilters(subject: RunSubject, { q, type, decision, flag }: Subjec
 }
 function sortSubjects(list: RunSubject[], sort: SubjectSort) {
   const value = (subject: RunSubject) => sort === 'demand' ? subject.supportedEligibleCount : sort === 'uncertain' ? subject.uncertainStudentCount : sort === 'near' ? subject.nearGraduationCount : subject.sections.length;
-  return [...list].sort((left, right) => (sort === 'code' ? 0 : value(right) - value(left)) || left.subjectCode.localeCompare(right.subjectCode));
+  const alpha = sort === 'name' || sort === 'code';
+  return [...list].sort((left, right) => (alpha ? 0 : value(right) - value(left)) || (sort === 'code' ? 0 : left.subjectName.localeCompare(right.subjectName, undefined, { sensitivity: 'base' })) || left.subjectCode.localeCompare(right.subjectCode));
 }
 const SUBJECT_PAGE_SIZE = 20;
 function SubjectTable({ run, editable, pendingIds, onDecide, onAllocate }: { run: ForecastRunDetail; editable: boolean; pendingIds: number[]; onDecide: (action: Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>, subject: RunSubject) => void; onAllocate: (subject: RunSubject) => void }) {
@@ -173,7 +174,7 @@ function SubjectTable({ run, editable, pendingIds, onDecide, onAllocate }: { run
         const expanded = open.includes(subject.subjectId), reasonsId = `${idBase}-r${subject.subjectId}`, highlight = pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING';
         const decidable = editable && subject.configurationStatus === 'CONFIGURED' && subject.sections.length > 0;
         return <tr key={subject.subjectId} className={highlight ? 'coordinator-row-pending' : undefined} data-subject={subject.subjectCode}>
-          <th scope="row"><strong>{subject.subjectCode}</strong><span>{subject.subjectName}</span><span className="admin-audit-id">{subject.creditHours} credit hours</span></th>
+          <th scope="row"><strong>{subject.subjectName}</strong><span className="coordinator-subject-code">{subject.subjectCode}</span><span className="admin-audit-id">{subject.creditHours} credit hours</span></th>
           <td>{subject.classType === 'LAB' ? 'Lab' : subject.classType === 'LECTURE' ? 'Lecture' : 'Not set'}</td>
           <td><strong className="coordinator-number">{subject.supportedEligibleCount}</strong></td>
           <td>{subject.uncertainStudentCount === 0 ? '0' : <>

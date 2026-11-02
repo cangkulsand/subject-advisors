@@ -63,7 +63,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
     ids = { programme, centre, current: semesters[0]!, target: semesters[1]!, later: semesters[2]!, curriculum, s101: a.subjectId, s102: b.subjectId };
     const scopes: ScopeProvider = {
       listScopes: async () => [], isScopeAssigned: async (_user, p, c) => p === programme && c === centre,
-      currentSemesterId: async () => ids.current, studentLearningCentreId: async () => null,
+      currentSemesterId: async () => ids.current, studentLearningCentreId: async () => null, importAliases: async () => ({ programmes: {}, centres: {} }),
     };
     let savepoints = 0;
     const query = async (text: string, values: unknown[]) => (await client.query(text, values)).rows;

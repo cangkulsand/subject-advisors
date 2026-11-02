@@ -30,7 +30,7 @@ export interface ConfirmOfferingsInput { scope: ForecastScope; forecastRunId: nu
 
 export interface CoordinatorClient {
   context(programmeId?: number, signal?: AbortSignal): Promise<ForecastContext>;
-  template(signal?: AbortSignal): Promise<{ filename: string; text: string }>;
+  template(format?: 'native' | 'coordinator', signal?: AbortSignal): Promise<{ filename: string; text: string }>;
   uploadImport(input: UploadInput, signal?: AbortSignal): Promise<UploadOutcome>;
   /** "Both": the students in the system plus the CSV students not already there, one snapshot. Same outcomes as `uploadImport`; subset acceptance uses `acceptSubset`. */
   uploadCombined(input: UploadInput, signal?: AbortSignal): Promise<UploadOutcome>;
@@ -167,10 +167,10 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
       const data = requireKeys((await request(prefix + 'forecast-context' + query({ programmeId }), { method: 'GET' }, signal)).data, [], [], ['programmes', 'learningCentres', 'targetSemesters']);
       return data as unknown as ForecastContext;
     },
-    template: async signal => {
-      const raw = await request(prefix + 'forecast-import-template', { method: 'GET', text: true }, signal);
+    template: async (format, signal) => {
+      const raw = await request(prefix + 'forecast-import-template' + (format === 'coordinator' ? '?format=coordinator' : ''), { method: 'GET', text: true }, signal);
       const name = /filename="?([^";]+)"?/.exec(raw.disposition ?? '')?.[1];
-      return { filename: name ?? 'uc20-import-template.csv', text: String(raw.data) };
+      return { filename: name ?? (format === 'coordinator' ? 'uc20-import-template-coordinator.csv' : 'uc20-import-template.csv'), text: String(raw.data) };
     },
     uploadImport: (input, signal) => upload('forecast-imports', input, signal),
     uploadCombined: (input, signal) => upload('forecast-imports/combined-snapshots', input, signal),

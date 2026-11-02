@@ -12,6 +12,8 @@ import { handleRunRoute, RUN_ROUTE } from './runs-routes';
 import { combinedFingerprint, combinedSummary, mergeCombined } from './combined-snapshot';
 import { sourceOf, studentSourceOf } from './import-source';
 import { buildSystemSnapshot, readSystemSnapshotRequest, systemSummary } from './system-snapshot';
+import { COORDINATOR_TEMPLATE_ROWS, type ImportFormatContext } from './coordinator-format';
+import { csvLine } from './csv';
 import { validateImportCsv } from './validation';
 
 export { sha256Hex };
@@ -152,6 +154,16 @@ async function forecastContext(deps: ForecastingDependencies, actor: string, pro
   return context;
 }
 
+/** Coordinator-export vocabulary for the selected scope: programme / centre codes and the configured aliases. */
+async function formatContext(deps: ForecastingDependencies, scope: Pick<ForecastScope, 'programmeId' | 'learningCentreId'>): Promise<ImportFormatContext> {
+  const [scopes, aliases] = await Promise.all([deps.scopes.listScopes(), deps.scopes.importAliases()]);
+  return {
+    programmeCode: scopes.find((s) => s.programme.programmeId === scope.programmeId)?.programme.programmeCode ?? '',
+    centreCode: scopes.find((s) => s.centre.learningCentreId === scope.learningCentreId)?.centre.centreCode ?? '',
+    programmeAliases: aliases.programmes, centreAliases: aliases.centres,
+  };
+}
+
 async function upload(request: Request, url: URL, deps: ForecastingDependencies, actor: string): Promise<Response> {
   const now = (deps.now ?? (() => new Date()))();
   const input = await readUpload(request, url, now);
@@ -166,7 +178,7 @@ async function upload(request: Request, url: URL, deps: ForecastingDependencies,
   const existing = await deps.repository.findAcceptedByFingerprint(input, sourceFingerprint);
   if (existing) return authJson({ data: acceptedOf(existing) }, 200);
 
-  const outcome = validateImportCsv(input.bytes, catalogue);
+  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, input));
   const validationRevision = 'sha256:' + await sha256Hex(JSON.stringify([sourceFingerprint, input.programmeId, input.learningCentreId, input.targetSemesterId, outcome.report]));
   const validationId = crypto.randomUUID();
   const status = outcome.report.status === 'VALID' ? 'ACCEPTED' : outcome.report.status === 'CORRECTION_REQUIRED' && outcome.students.length ? 'VALIDATED' : 'REJECTED';
@@ -226,7 +238,7 @@ async function combinedSnapshot(request: Request, url: URL, deps: ForecastingDep
   const existing = await deps.repository.findAcceptedByFingerprint(input, fingerprint);
   if (existing) return authJson({ data: acceptedOf(existing) }, 200);
 
-  const outcome = validateImportCsv(input.bytes, catalogue);
+  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, input));
   const rejectedFile = outcome.report.status === 'FILE_REJECTED';
   const merge = mergeCombined(system, rejectedFile ? { ...outcome, students: [], records: [] } : outcome);
   const validationId = crypto.randomUUID();
@@ -290,8 +302,11 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
     }
     if (route === 'forecast-import-template') {
       if (method !== 'GET') return methodNotAllowed(['GET']);
-      onlyParameters(url, []);
-      return noStore(new Response(IMPORT_CSV_HEADER.join(',') + '\n', { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template.csv"' } }));
+      onlyParameters(url, ['format']);
+      const format = url.searchParams.get('format') ?? 'native';
+      if (format !== 'native' && format !== 'coordinator') bad('format must be native or coordinator.');
+      const body = format === 'coordinator' ? COORDINATOR_TEMPLATE_ROWS.map(csvLine).join('\n') + '\n' : IMPORT_CSV_HEADER.join(',') + '\n';
+      return noStore(new Response(body, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="' + (format === 'coordinator' ? 'uc20-import-template-coordinator.csv' : 'uc20-import-template.csv') + '"' } }));
     }
     if (route === 'forecast-imports/system-snapshots') {
       if (method !== 'POST') return methodNotAllowed(['POST']);

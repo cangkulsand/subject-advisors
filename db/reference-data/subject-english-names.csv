@@ -1,0 +1,97 @@
+subject_code,english_name,previous_name,programmes,source
+SECD2523,Database,Pangkalan Data,"SECJ,SECRH",manifest
+SECD2613,System Analysis and Design,Analisa dan Rekabentuk Sistem,"SECJ,SECRH",manifest
+SECD3761,IT Entrepreneurship Seminar,Seminar Keusahawanan Teknologi Maklumat,"SECJ,SECRH",manifest
+SECI1013,Discrete Structures,Struktur Diskrit,"SECJ,SECRH","manifest, edited"
+SECI1113,Computational Mathematics,Matematik Komputan,"SECJ,SECRH",manifest
+SECI2143,Probability and Statistical Data Analysis,Keberangkalian dan Analisa Data Statistik,"SECJ,SECRH","manifest, edited"
+SECJ1013,Programming Technique I,Teknik Pengaturcaraan I,"SECJ,SECRH",manifest
+SECJ1023,Programming Technique II,Teknik Pengaturcaraan II,"SECJ,SECRH",manifest
+SECJ2013,Data Structures and Algorithms,Struktur Data dan Algoritma,"SECJ,SECRH","manifest, edited"
+SECJ2154,Object-Oriented Programming,Pengaturcaraan Berorentasikan Objek,"SECJ,SECRH","manifest, edited"
+SECJ2203,Software Engineering,Kejuruteraan Perisian,"SECJ,SECRH",manifest
+SECJ2253,Requirements Engineering and Software Modelling,Kejuruteraan Keperluan dan Permodelan Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ2363,Software Project Management,Pengurusan Projek Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3032,Software Engineering Project I,Projek I Kejuruteraan Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3104,Application Development,Pembangunan Aplikasi,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3203,Theory of Computer Science,Teori Sains Komputer,"SECJ,SECRH",manifest
+SECJ3303,Internet Programming,Pengaturcaraan Internet,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3323,Software Design and Architecture,Rekabentuk dan Senibina Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3343,Software Quality Assurance,Jaminan Kualiti Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3403,Special Topics in Software Engineering,Topik Khas Kejuruteraan Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3483,Web Technology,Teknologi Web,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3553,Artificial Intelligence,Kepintaran Buatan,"SECJ,SECRH",manifest
+SECJ3563,Computational Intelligence,Kepintaran Komputer,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3603,Knowledge-Based Expert Systems,Sistem Pakar Berasaskan Pengetahuan,SECJ,"translated (SECJ only, not in manifest)"
+SECJ3623,Mobile Application Programming,Pengaturcaraan Aplikasi Mobil,SECJ,"translated (SECJ only, not in manifest)"
+SECJ4114,Industrial Training (Report),Laporan Latihan Industri,SECJ,"translated (SECJ only, not in manifest)"
+SECJ4118,Industrial Training,Latihan Industri,SECJ,"translated (SECJ only, not in manifest)"
+SECJ4134,Software Engineering Project II,Projek II Kejuruteraan Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ4383,Software Construction,Pembinaan Perisian,SECJ,"translated (SECJ only, not in manifest)"
+SECJ4423,Real-Time Software Engineering,Kejuruteraan Perisian Masa Nyata,SECJ,"translated (SECJ only, not in manifest)"
+SECP1513,Technology and Information Systems,Teknologi dan Sistem Maklumat,"SECJ,SECRH","manifest, edited"
+SECR1013,Digital Logic,Logik Digital,"SECJ,SECRH",manifest
+SECR1213,Network Communications,Komunikasi Rangkaian,"SECJ,SECRH",manifest
+SECR2033,Computer Organisation and Architecture,Organisasi dan Senibina Komputer,"SECJ,SECRH","manifest, edited"
+SECR2043,Operating Systems,Sistem Pengoperasian,"SECJ,SECRH",manifest
+SECR2242,Computer Networks,COMPUTER NETWORKS,SECRH,manifest
+SECR2941,Computer Networks Lab,COMPUTER NETWORKS LAB,SECRH,"manifest, edited"
+SECR3032,Project I,PROJECT I,SECRH,manifest
+SECR3104,Application Development,APPLICATIONS DEVELOPMENT,SECRH,"manifest, edited"
+SECR3223,High Performance and Parallel Programming,HIGH PERFORMANCE & PARALLEL PROGRAMMING,SECRH,"manifest, edited"
+SECR3242,Internetworking Technology,INTERNETWORKING TECHNOLOGY,SECRH,manifest
+SECR3253,Network Programming,NETWORK PROGRAMMING,SECRH,manifest
+SECR3413,Computer Security,COMPUTER SECURITY,SECRH,manifest
+SECR3443,Cryptography,CRYPTOGRAPHY,SECRH,manifest
+SECR3941,Internetworking Technology Lab,INTERNETWORKING TECHNOLOGY (LAB),SECRH,"manifest, edited"
+SECR4114,Industrial Training (Report),INDUSTRIAL TRAINING (REPORT),SECRH,manifest
+SECR4118,Industrial Training,INDUSTRIAL TRAINING (HW),SECRH,"manifest, edited"
+SECR4134,Project II,PROJECT II,SECRH,manifest
+SECR4453,Network Security,NETWORK SECURITY,SECRH,manifest
+SECR4473,Security Management,SECURITY MANAGEMENT,SECRH,manifest
+SECR4483,Security Programming,SECURITY PROGRAMMING,SECRH,manifest
+SECR4493,Computer Forensics,COMPUTER FORENSICS,SECRH,manifest
+SECR4973,Special Topics in Computer Networks and Security,SPECIAL TOPICS COMPUTER NETWORK & SECURITY,SECRH,"manifest, edited"
+SECV1223,Web Programming,Pengaturcaraan Web,"SECJ,SECRH",manifest
+SECV2113,Human Computer Interaction,Interaksi Komputer Manusia,"SECJ,SECRH",manifest
+UBSS1032,Fundamentals of Entrepreneurship,Pengenalan Kepada Keusahawanan,"SECJ,SECRH","manifest, edited"
+UBSS2072,Fundamentals of Intellectual Property Law,Asas Undang-Undang Harta Intelek,"SECJ,SECRH",manifest
+UBSS2082,Law for Entrepreneurs,Undang-Undang Usahawan,"SECJ,SECRH",manifest
+UBSS2092,Entrepreneurship and Business Development,Keusahawanan dan Pembangunan Perniagaan,"SECJ,SECRH",manifest
+UBSS2102,Social Entrepreneurship,Keusahawanan Sosial,"SECJ,SECRH",manifest
+UHII2012,Al-Qur'an and Human Civilisation,Al-Qur'an dan Ketamadunan Manusia,"SECJ,SECRH","manifest, edited"
+UHII2092,Philosophy of Islamic Art,Falsafah Kesenian Islam,"SECJ,SECRH",manifest
+UHII2102,Islam and Health,Islam dan Kesihatan,"SECJ,SECRH",manifest
+UHII2132,Islamic Entrepreneurship,Keusahawanan Islam,"SECJ,SECRH",manifest
+UHIS1022,Philosophy and Current Issues,Falsafah dan Isu Semasa,"SECJ,SECRH",manifest
+UHIS2072,Sustainable Economy,Ekonomi Lestari,"SECJ,SECRH",manifest
+UHIS2082,Practice and Concept of Halal Management,Amalan dan Konsep Pengurusan Halal,"SECJ,SECRH",manifest
+UHIT2032,Life Institutions and Sustainable Development,Institusi Kehidupan dan Pembangunan Lestari,"SECJ,SECRH",manifest
+UHIT2052,Family Law,Undang-Undang Keluarga,"SECJ,SECRH",manifest
+UHIT2302,Science and Technology Thinking,Pemikiran Sains dan Teknologi,"SECJ,SECRH","manifest, edited"
+UHIZ2042,Future Studies,Kajian Masa Hadapan,"SECJ,SECRH",manifest
+UHIZ2062,World Science,Sains Dunia,"SECJ,SECRH",manifest
+UHLA1112,Arabic Language,Bahasa Arab,"SECJ,SECRH",manifest
+UHLB1112,English Communication Skills,English Communication Skills,"SECJ,SECRH","manifest, edited"
+UHLB2122,Academic Communication Skills,Academic Communication Skills,"SECJ,SECRH",manifest
+UHLB3132,Professional Communication Skills,Professional Communication Skills,"SECJ,SECRH",manifest
+UHLC1112,Mandarin Language I,Bahasa Mandarin I,"SECJ,SECRH",manifest
+UHLF1112,French Language,Bahasa Perancis,"SECJ,SECRH",manifest
+UHLJ1112,Japanese Language I,Bahasa Jepun I,"SECJ,SECRH",manifest
+UHLJ1122,Japanese Communication Language I,Bahasa Jepun Komunikasi I,"SECJ,SECRH",manifest
+UHLK1112,Korean Language,Bahasa Korea,"SECJ,SECRH",manifest
+UHLN1112,Persian Language,Bahasa Parsi,"SECJ,SECRH",manifest
+UHMS1182,Appreciation of Ethics and Civilisation,Penghayatan Etika dan Peradaban,"SECJ,SECRH","manifest, edited"
+UHMS2022,Critical and Creative Thinking,Pemikiran Kritis dan Kreatif,"SECJ,SECRH",manifest
+UHMS2032,Human Side of Knowledge Management,Aspek Kemanusiaan Pengurusan Pengetahuan,"SECJ,SECRH",manifest
+UHMS2042,Development and Global Issues,Pembangunan dan Isu Global,"SECJ,SECRH",manifest
+UHMS2112,Engineering Communication,Komunikasi Kejuruteraan,"SECJ,SECRH",manifest
+UHMS2122,Interpersonal Communication,Komunikasi Antara Manusia,"SECJ,SECRH",manifest
+UHMT1012,Graduate Success Attributes,Atribut Kejayaan Graduan,"SECJ,SECRH",manifest
+UHMT2012,Leadership,Kepimpinan,"SECJ,SECRH",manifest
+UHMT2052,Guidance and Counselling,Bimbingan dan Kaunseling,"SECJ,SECRH",manifest
+UHMT2062,Psychology of Adjustment,Psikologi Penyesuaian,"SECJ,SECRH",manifest
+UHMT2132,Professional Ethics,Etika Profesional,"SECJ,SECRH",manifest
+UKQT3001,Extracurricular Experiential Learning,Pengalaman Pembelajaran Luar Kurikulum,"SECJ,SECRH","manifest, edited"
+UKXQ2022,Co-Curriculum,Ko-Kurikulum,"SECJ,SECRH",manifest
+UMJT2142,"Professional Ethics, Safety and Health (Ningen Ryoku)","Etika Profesional, Keselamatan dan Kesihatan (Ningen Ryoku)","SECJ,SECRH",manifest

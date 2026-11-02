@@ -64,7 +64,24 @@ function CombinedCoverageSummary({ combined }: { combined: CombinedSnapshotCover
   </section>;
 }
 
-type SnapshotResultData = { replay: boolean; data: AcceptedImport };
+/** Plain-English summary of what the coordinator export reader did with the file (S2-P004-010). */
+function CoordinatorExportSummaryList({ report }: { report: Pick<ImportValidationReport, 'format' | 'coordinatorExport'> }) {
+  const summary = report.coordinatorExport;
+  if (report.format !== 'COORDINATOR' || !summary) return null;
+  const rows: Array<[string, number]> = [
+    ['Rows read', summary.rowsRead], ['Skipped: other programme', summary.skippedOtherProgramme], ['Skipped: other learning centre', summary.skippedOtherCentre],
+    ['Skipped: inactive students (status N)', summary.skippedInactiveStudents], ['Skipped: rows of inactive students', summary.skippedInactive], ['Skipped: in progress, not used yet', summary.skippedInProgress],
+    ['Older attempts dropped', summary.olderAttemptsDropped], ['Skipped: subject not in curriculum', summary.skippedSubjectNotInCurriculum],
+  ];
+  return <section className="coordinator-combined" aria-label="Coordinator export">
+    <h3 className="coordinator-subheading">Coordinator export</h3>
+    <p className="admin-muted">Detected format: coordinator export. Only the latest attempt of each subject is used. The e-mail column is ignored.</p>
+    <dl className="coordinator-counts" aria-label="Coordinator export counts">{rows.map(([text, value]) => <div key={text}><dt>{text}</dt><dd>{value}</dd></div>)}</dl>
+    {summary.subjectsNotInCurriculum.length > 0 && <p className="admin-muted">Subjects not in the curriculum (rows skipped): <span className="admin-wrap">{summary.subjectsNotInCurriculum.map(item => `${item.code} (${item.count})`).join(', ')}</span>.</p>}
+  </section>;
+}
+
+type SnapshotResultData ={ replay: boolean; data: AcceptedImport };
 function SystemCard({ client, scope, onCreated }: { client: CoordinatorClient; scope: ChosenScope; onCreated: (result: SnapshotResultData) => void }) {
   const [busy, setBusy] = useState(false), [failure, setFailure] = useState('');
   async function create() {
@@ -92,6 +109,7 @@ function SnapshotResult({ result, scope, mode, onGenerate, onDismiss }: { result
       <SourceBadge source={data.source}/></div>
     {coverage ? <CoverageSummary coverage={coverage}/> : <Counts counts={data.counts} label="Snapshot summary"/>}
     {data.validationReport.combined && <CombinedCoverageSummary combined={data.validationReport.combined}/>}
+    <CoordinatorExportSummaryList report={data.validationReport}/>
     <div className="admin-dialog-actions coordinator-report-actions">
       <button type="button" onClick={onDismiss}>Dismiss</button>
       <AppLink className="coordinator-link-button" href={scopeHref('/coordinator/imports', scope, { ...modeExtra(mode), import: data.importBatchId })}>View roster</AppLink>
@@ -123,6 +141,7 @@ function ReportCard({ outcome, onAccept, onDismiss }: { outcome: Exclude<UploadO
       <span className={'admin-pill ' + (rejected ? 'coordinator-pill-danger' : 'coordinator-pill-warning')}>{rejected ? 'File rejected' : 'Correction required'}</span></div>
     <Counts counts={report.counts} label="Validation summary"/>
     {report.combined && <CombinedCoverageSummary combined={report.combined}/>}
+    <CoordinatorExportSummaryList report={report}/>
     {report.completenessChanges.length > 0 && <p className="admin-muted">{report.completenessChanges.length} {report.completenessChanges.length === 1 ? 'student has' : 'students have'} incomplete history because of rejected rows.</p>}
     <Findings issues={report.issues} severity="ERROR"/>
     <Findings issues={report.issues} severity="WARNING"/>
@@ -163,9 +182,9 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
     } catch (error) { setFailure(errorText(error, 'The upload failed. Please retry.')); }
     finally { setBusy(false); }
   }
-  async function template() {
+  async function template(format: 'native' | 'coordinator') {
     try {
-      const { filename, text } = await client.template();
+      const { filename, text } = await client.template(format);
       const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
       const link = document.createElement('a'); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -178,7 +197,8 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
         ? <p className="admin-muted">One snapshot made of the students in the system for {scope.programmeLabel} at {scope.centreLabel}, plus the students in your CSV who are not already in the system. The CSV is validated exactly like a normal CSV import.</p>
         : <p className="admin-muted">Upload one CSV of your students' academic history for {scope.programmeLabel} at {scope.centreLabel}. The optional student_name column lets you recognise students later.</p>}
       {combined && <p className="admin-muted">If a student is in both, the system record is used and the CSV student is skipped. A CSV external_reference that equals a system student's matric number counts as the same student. Same name with a different reference is kept and flagged as a possible duplicate.</p>}</div>
-      <button type="button" onClick={template}>Download CSV template</button></div>
+      <div className="coordinator-row-actions"><button type="button" onClick={() => void template('coordinator')}>Download coordinator template</button>
+        <button type="button" onClick={() => void template('native')}>Download CSV template</button></div></div>
     <form className="coordinator-upload-grid" onSubmit={submit} noValidate>
       <div className="admin-field"><label htmlFor={ids.date}>Source date</label>
         <input id={ids.date} ref={element => { first.current.date = element; }} type="date" value={date} max={today()} aria-invalid={!!errors.date || undefined} aria-describedby={errors.date ? ids.date + '-error' : undefined} onChange={event => setDate(event.target.value)}/>{message('date')}</div>
@@ -186,7 +206,7 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
         <input id={ids.label} ref={element => { first.current.label = element; }} type="text" value={label} maxLength={IMPORT_LIMITS.maxSourceLabelLength} placeholder="Example: September cohort export" aria-invalid={!!errors.label || undefined} aria-describedby={errors.label ? ids.label + '-error' : undefined} onChange={event => setLabel(event.target.value)}/>{message('label')}</div>
       <div className="admin-field coordinator-upload-file"><label htmlFor={ids.file}>CSV file</label>
         <input key={fileKey} id={ids.file} ref={element => { first.current.file = element; }} type="file" accept=".csv,text/csv" aria-invalid={!!errors.file || undefined} aria-describedby={ids.help + (errors.file ? ' ' + ids.file + '-error' : '')} onChange={event => pick(event.currentTarget.files?.[0])}/>
-        <small id={ids.help} className="admin-counter">.csv up to 5 MiB, at most {IMPORT_LIMITS.maxDataRows.toLocaleString()} data rows.</small>{message('file')}</div>
+        <small id={ids.help} className="admin-counter">Both formats are accepted: the standard template (at most {IMPORT_LIMITS.maxDataRows.toLocaleString()} data rows) or your own coordinator export with the columns courseCode, subjCode, centerName, stuname, stuMetricNo and grade (at most {IMPORT_LIMITS.maxCoordinatorDataRows.toLocaleString()} rows; other programmes, other learning centres, inactive and in-progress rows are skipped). .csv up to 5 MiB.</small>{message('file')}</div>
       {failure && <p className="admin-form-error coordinator-upload-error" role="alert">{failure}</p>}
       <div className="coordinator-upload-submit"><button type="submit" className="admin-primary" disabled={busy} aria-busy={busy}>{busy ? 'Validating…' : combined ? 'Create combined snapshot' : 'Upload and validate'}</button></div>
     </form>
@@ -233,6 +253,7 @@ function ImportDetail({ client, scope, mode, importId, onGenerate }: { client: C
         <button type="button" className="admin-primary" onClick={() => onGenerate(item)}>Generate forecast</button></div>
       {item.validationReport.coverage ? <CoverageSummary coverage={item.validationReport.coverage}/> : <Counts counts={item.counts} label="Import summary"/>}
       {item.validationReport.combined && <CombinedCoverageSummary combined={item.validationReport.combined}/>}
+      <CoordinatorExportSummaryList report={item.validationReport}/>
       <h3 className="coordinator-subheading">Student roster</h3>
       <p className="admin-muted">Student names are personal data. They are shown only to the coordinators assigned to this scope.</p>
       <Panel error={roster.error} retry={roster.retry} label="roster">{roster.data && (roster.items.length === 0 ? <p className="admin-empty">No students were retained in this import.</p> :

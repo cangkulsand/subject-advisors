@@ -405,3 +405,61 @@ describe('list and get', () => {
     expect((await send(deps, 'forecast-imports/1/students?limit=101', { method: 'GET' })).status).toBe(400);
   });
 });
+
+describe('coordinator export format (S2-P004-010)', () => {
+  const coordinatorHeader = 'courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status';
+  const crow = (course: string, subj: string, centre: string, matric: string, grade: string, status = 'A', semester = '2024/2025 1') =>
+    csvLine([course, subj, centre, "'ALYA " + matric, matric, 'private@example.org', semester, grade, status]);
+  const coordinatorCsv = [coordinatorHeader,
+    crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M1', 'B+'), crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M2', 'E', 'A', '2023/2024 1'), crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M2', 'EX', 'A', ''),
+    crow('SCSJ', 'DEMO101', 'KUALA LUMPUR', 'M3', 'A'), crow('SECJH', 'DEMO101', 'JOHOR BAHRU', 'M4', 'A'), crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M5', 'A', 'N'),
+    crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M6', 'NULL'), crow('SECJH', 'ULRS1022', 'KUALA LUMPUR', 'M1', 'A')].join('\n');
+
+  it('serves a coordinator template (header plus two synthetic rows) next to the native one', async () => {
+    const response = await send(fixture().deps, 'forecast-import-template?format=coordinator', { method: 'GET' });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain('uc20-import-template-coordinator.csv');
+    const lines = (await response.text()).trim().split('\n');
+    expect(lines[0]).toBe(coordinatorHeader);
+    expect(lines).toHaveLength(3);
+    expect((await send(fixture().deps, 'forecast-import-template?format=other', { method: 'GET' })).status).toBe(400);
+  });
+  it('accepts a coordinator export upload, skips what does not belong and reports the counts without the e-mail', async () => {
+    const { deps, stored } = fixture();
+    const response = await upload(deps, coordinatorCsv);
+    expect(response.status).toBe(201);
+    const { data } = await response.json();
+    expect(data.validationReport).toMatchObject({ format: 'COORDINATOR', coordinatorExport: {
+      rowsRead: 8, skippedOtherProgramme: 1, skippedOtherCentre: 1, skippedInactive: 1, skippedInProgress: 1, olderAttemptsDropped: 1, skippedSubjectNotInCurriculum: 1,
+      subjectsNotInCurriculum: [{ code: 'ULRS1022', count: 1 }],
+    } });
+    expect(data.counts).toMatchObject({ uniqueStudents: 2, validAttempts: 2 });
+    expect(stored[0]!.students.map((s) => [s.externalReference, s.studentName, s.cohortStatus])).toEqual([['M1', 'ALYA M1', 'ACTIVE'], ['M2', 'ALYA M2', 'ACTIVE']]);
+    expect(stored[0]!.records.map((r) => r.subjectStatus)).toEqual(['COMPLETED', 'EXEMPTED']);
+    expect(JSON.stringify(data)).not.toContain('example.org');
+    expect(JSON.stringify(stored)).not.toContain('example.org');
+  });
+  it('replays the same coordinator file and keeps native uploads unchanged', async () => {
+    const { deps } = fixture();
+    expect((await upload(deps, coordinatorCsv)).status).toBe(201);
+    expect((await upload(deps, coordinatorCsv)).status).toBe(200);
+    const native = await (await upload(fixture().deps, validCsv)).json();
+    expect(native.data.validationReport).not.toHaveProperty('format');
+  });
+  it('returns the usual 422 correction report for coordinator rows with errors', async () => {
+    const { deps } = fixture();
+    const csv = [coordinatorHeader, crow('SECJH', 'DEMO101', 'KUALA LUMPUR', 'M1', 'A'), crow('SECJH', 'DEMO101', 'KUALA LUMPUR', '', 'A')].join('\n');
+    const response = await upload(deps, csv);
+    expect(response.status).toBe(422);
+    const { error } = await response.json();
+    expect(error.code).toBe('IMPORT_CORRECTION_REQUIRED');
+    expect(error.report).toMatchObject({ format: 'COORDINATOR', subsetAcknowledgementRequired: true });
+    expect(error.report.issues.find((i: { severity: string }) => i.severity === 'ERROR')).toMatchObject({ code: 'EXTERNAL_REFERENCE_REQUIRED', row: 3 });
+  });
+  it('uses only the selected programme and centre aliases', async () => {
+    const { deps } = fixture();
+    const response = await upload(deps, coordinatorCsv, { learningCentreId: '2' });
+    expect(response.status).toBe(201);
+    expect((await response.json()).data.validationReport.coordinatorExport).toMatchObject({ skippedOtherCentre: 6 });
+  });
+});

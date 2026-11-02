@@ -4,7 +4,10 @@ import {
 import type {
   ClassType, CompletenessChange, HistoryCompleteness, ImportCounts, ImportIssueCode, ImportValidationReport, ValidationIssue,
 } from '../../../../../packages/shared/src/forecasting/contracts';
+import type { CoordinatorExportSummary } from '../../../../../packages/shared/src/forecasting/contracts';
 import { CsvFileError, decodeCsvBytes, parseCsv } from './csv';
+import { detectCoordinatorHeader, NO_FORMAT_CONTEXT, normaliseCoordinatorRows } from './coordinator-format';
+import type { ImportFormatContext, ImportRow } from './coordinator-format';
 
 export interface CatalogueSubject {
   curriculumSubjectId: number; subjectId: number; subjectCode: string; subjectName: string;
@@ -38,9 +41,9 @@ const ACTIONS: Record<ImportIssueCode, string> = {
   CSV_ENCODING_INVALID: 'Save the file as UTF-8 CSV and upload it again.',
   CSV_MALFORMED: 'Fix the quoting or line endings at this row and upload again.',
   CSV_EMPTY: 'Upload the CSV template filled with data.',
-  CSV_HEADER_INVALID: 'Use the downloaded template header exactly, in the same column order.',
-  CSV_COLUMN_COUNT: 'Give every row exactly nine columns (quote values that contain commas).',
-  CSV_TOO_MANY_ROWS: 'Split the file so it has at most 10,000 data rows.',
+  CSV_HEADER_INVALID: 'Use the downloaded template header exactly, or the coordinator export header (courseCode, subjCode, centerName, stuname, stuMetricNo, grade ...).',
+  CSV_COLUMN_COUNT: 'Give every row exactly as many columns as the header (quote values that contain commas).',
+  CSV_TOO_MANY_ROWS: 'Split the file so it has at most 10,000 data rows (20,000 for the coordinator export format).',
   CSV_NO_DATA_ROWS: 'Add at least one student row below the header.',
   EXTERNAL_REFERENCE_REQUIRED: 'Provide the opaque external reference for this row.',
   EXTERNAL_REFERENCE_TOO_LONG: 'Use an external reference of at most 100 characters.',
@@ -72,6 +75,8 @@ const ACTIONS: Record<ImportIssueCode, string> = {
   ISSUES_TRUNCATED: 'Fix the listed findings and upload again to see the rest.',
   POSSIBLE_DUPLICATE_STUDENT: 'Check whether this is the same person as the system student; if so, remove the CSV row and create the snapshot again.',
   CSV_STUDENTS_ALREADY_IN_SYSTEM: 'No action needed; the system record is used for these students.',
+  COORDINATOR_STATUS_UNKNOWN: 'Use A (active) or N (inactive) in the status column; these rows were used as active.',
+  COORDINATOR_SUBJECTS_SKIPPED: 'No action needed unless a listed subject should be in the curriculum; those rows were not used.',
 };
 
 export function emptyCounts(): ImportCounts {
@@ -80,21 +85,25 @@ export function emptyCounts(): ImportCounts {
 export const issue = (severity: 'ERROR' | 'WARNING', code: ImportIssueCode, row: number | null, field: string | null, message: string): ValidationIssue =>
   ({ severity, code, row, field, message, correctiveAction: ACTIONS[code] });
 
-function fileRejected(code: ImportIssueCode, message: string, row: number | null = null, studentRows = 0): ValidationOutcome {
+function fileRejected(code: ImportIssueCode, message: string, row: number | null = null, studentRows = 0, extra: Partial<ValidationReportBody> = {}): ValidationOutcome {
   return {
-    report: { status: 'FILE_REJECTED', counts: { ...emptyCounts(), studentRows }, issues: [issue('ERROR', code, row, null, message)], completenessChanges: [], subsetAcknowledgementRequired: false },
+    report: { status: 'FILE_REJECTED', counts: { ...emptyCounts(), studentRows }, issues: [issue('ERROR', code, row, null, message)], completenessChanges: [], subsetAcknowledgementRequired: false, ...extra },
     students: [], records: [], rejectedRowsByStudent: {}, dataRows: studentRows,
   };
 }
 
-interface Row { row: number; ref: string; version: string; cohort: string; history: string; code: string; status: string; semester: string; credits: string; synthetic: string; name: string }
+type Row = ImportRow;
 
-/** Validates one CSV upload against the programme catalogue. Pure and deterministic. */
-export function validateImportCsv(bytes: Uint8Array, catalogue: ImportCatalogue): ValidationOutcome {
+/**
+ * Validates one CSV upload against the programme catalogue. Pure and deterministic. The format is detected from the header: the native
+ * template (or its nine-column predecessor), or the coordinator export, which is normalised into native rows first (`coordinator-format.ts`).
+ */
+export function validateImportCsv(bytes: Uint8Array, catalogue: ImportCatalogue, context: ImportFormatContext = NO_FORMAT_CONTEXT): ValidationOutcome {
   let records;
+  let truncated = false;
   try {
-    const parsed = parseCsv(decodeCsvBytes(bytes), IMPORT_LIMITS.maxDataRows + 1);
-    if (parsed.truncated) return fileRejected('CSV_TOO_MANY_ROWS', 'The file has more than 10,000 data rows.');
+    const parsed = parseCsv(decodeCsvBytes(bytes), IMPORT_LIMITS.maxCoordinatorDataRows + 1);
+    truncated = parsed.truncated;
     records = parsed.records;
   } catch (error) {
     if (error instanceof CsvFileError) return fileRejected(error.code, error.message, error.row);
@@ -103,22 +112,44 @@ export function validateImportCsv(bytes: Uint8Array, catalogue: ImportCatalogue)
   const header = records[0];
   if (!header) return fileRejected('CSV_EMPTY', 'The file is empty.');
   const names = header.fields.map((field) => field.trim());
-  // The current template, or the earlier nine-column header (student names then stay blank).
+  // The current template, or the earlier nine-column header (student names then stay blank), or the coordinator export.
   const expected = [IMPORT_CSV_HEADER, IMPORT_CSV_LEGACY_HEADER].find((candidate) => names.length === candidate.length && names.every((name, index) => name === candidate[index]));
-  if (!expected) return fileRejected('CSV_HEADER_INVALID', 'The header must be exactly: ' + IMPORT_CSV_HEADER.join(',') + '.', 1);
+  const coordinator = expected ? null : detectCoordinatorHeader(names);
+  if (!expected && !coordinator) return fileRejected('CSV_HEADER_INVALID', 'The header must be exactly: ' + IMPORT_CSV_HEADER.join(',') + ', or a coordinator export with the columns courseCode, subjCode, centerName, stuname, stuMetricNo and grade.', 1);
   const body = records.slice(1);
+  const limit = coordinator ? IMPORT_LIMITS.maxCoordinatorDataRows : IMPORT_LIMITS.maxDataRows;
+  if (truncated || body.length > limit) return fileRejected('CSV_TOO_MANY_ROWS', 'The file has more than ' + limit.toLocaleString('en-US') + ' data rows.');
   if (!body.length) return fileRejected('CSV_NO_DATA_ROWS', 'The file has a header but no data rows.');
-  const rows: Row[] = [];
   for (const record of body) {
-    if (record.fields.length !== expected.length) {
-      return fileRejected('CSV_COLUMN_COUNT', 'Expected ' + expected.length + ' columns but found ' + record.fields.length + '.', record.row, body.length);
+    if (record.fields.length !== names.length) return fileRejected('CSV_COLUMN_COUNT', 'Expected ' + names.length + ' columns but found ' + record.fields.length + '.', record.row, body.length);
+  }
+  const rows: Row[] = [];
+  let exportSummary: CoordinatorExportSummary | undefined;
+  const formatFields: Partial<ValidationReportBody> = {};
+  if (coordinator) {
+    const normalised = normaliseCoordinatorRows(body, coordinator, catalogue, context);
+    exportSummary = normalised.summary;
+    rows.push(...normalised.rows);
+    Object.assign(formatFields, { format: 'COORDINATOR', coordinatorExport: exportSummary });
+    if (!rows.length) return fileRejected('CSV_NO_DATA_ROWS', 'No usable rows were found for this programme and learning centre (see the skipped-row counts).', null, 0, formatFields);
+  } else {
+    for (const record of body) {
+      const [ref, version, cohort, history, code, status, semester, credits, synthetic, name = ''] = record.fields.map((field) => field.trim()) as [string, string, string, string, string, string, string, string, string, string?];
+      rows.push({ row: record.row, ref, version, cohort, history, code, status, semester, credits, synthetic, name });
     }
-    const [ref, version, cohort, history, code, status, semester, credits, synthetic, name = ''] = record.fields.map((field) => field.trim()) as [string, string, string, string, string, string, string, string, string, string?];
-    rows.push({ row: record.row, ref, version, cohort, history, code, status, semester, credits, synthetic, name });
   }
 
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
+  if (exportSummary?.skippedSubjectNotInCurriculum) {
+    const listed = exportSummary.subjectsNotInCurriculum;
+    warnings.push(issue('WARNING', 'COORDINATOR_SUBJECTS_SKIPPED', null, 'subjCode', exportSummary.skippedSubjectNotInCurriculum + ' row(s) were skipped because the subject is not in the curriculum: '
+      + listed.slice(0, 30).map((item) => item.code + ' (' + item.count + ')').join(', ') + (listed.length > 30 ? ', ... (' + (listed.length - 30) + ' more codes)' : '') + '.'));
+  }
+  if (exportSummary?.unknownStatusRows) {
+    warnings.push(issue('WARNING', 'COORDINATOR_STATUS_UNKNOWN', null, 'status', exportSummary.unknownStatusRows + ' row(s) have a status other than A or N and were treated as active: '
+      + exportSummary.unknownStatusValues.slice(0, 20).map((item) => item.value + ' (' + item.count + ')').join(', ') + '.'));
+  }
   const rejectedRows = new Set<number>();
   const reject = (row: number, code: ImportIssueCode, field: string | null, message: string) => { rejectedRows.add(row); errors.push(issue('ERROR', code, row, field, message)); };
 
@@ -272,6 +303,7 @@ export function validateImportCsv(bytes: Uint8Array, catalogue: ImportCatalogue)
       counts: { studentRows: rows.length, uniqueStudents: students.length, validAttempts: stored.length, rejectedRows: rejectedRows.size, partialStudents, unknownHistoryStudents: unknownStudents },
       issues, completenessChanges: changes,
       subsetAcknowledgementRequired: hasErrors && students.length > 0,
+      ...formatFields,
     },
     students, records: stored, rejectedRowsByStudent, dataRows: rows.length,
   };

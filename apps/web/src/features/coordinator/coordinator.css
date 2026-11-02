@@ -138,3 +138,30 @@
 .coordinator-segmented small { grid-column: 2; color: var(--color-muted); font-size: 11px; overflow-wrap: anywhere; }
 .coordinator-combined { margin-top: 8px; }
 .admin-shell .coordinator-subject-filters { margin: 18px 0 16px; }
+
+/* Readable coordinator tables (S2-P004-009 UI revision): scoped to .coordinator-table so the admin tables keep their look. */
+.admin-shell .coordinator-table table { font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.admin-shell .coordinator-table th { padding: 14px 16px; font-size: 13px; line-height: 1.4; color: var(--color-heading); }
+.admin-shell .coordinator-table td, .admin-shell .coordinator-table th[scope="row"] { padding: 18px 16px; }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):not(.coordinator-row-disabled):nth-child(even) { background: rgba(0, 0, 0, 0.022); }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):hover { background: rgba(0, 0, 0, 0.045); }
+.admin-shell .coordinator-table th[scope="row"] { font-size: 14px; }
+.admin-shell .coordinator-table th[scope="row"] strong { display: block; color: var(--color-heading); font-size: 15px; font-weight: 600; line-height: 1.4; }
+.admin-shell .coordinator-table th[scope="row"] span { display: block; font-weight: 400; }
+.admin-shell .coordinator-table .coordinator-subject-code { margin-top: 2px; color: var(--color-muted); font-size: 13px; letter-spacing: 0.02em; }
+.admin-shell .coordinator-table .admin-audit-id { margin-top: 3px; font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill, .admin-shell .coordinator-table .coordinator-needed { font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill { padding: 3px 10px; }
+.admin-shell .coordinator-table button.admin-row-action, .admin-shell .coordinator-table a.coordinator-link-button { font-size: 13px; }
+.admin-shell .coordinator-table .coordinator-expander, .admin-shell .coordinator-table .coordinator-reasons { font-size: 13px; }
+.coordinator-reasons { text-align: left; }
+.coordinator-number { font-size: 20px; }
+.coordinator-audit-details { font-size: 12px; }
+.coordinator-audit-details pre { font-size: 12px; }
+.admin-shell .coordinator-subjects :is(th, td):nth-child(n+3):nth-child(-n+5) { text-align: right; }
+.admin-shell .coordinator-subjects .coordinator-reasons { text-align: left; }
+/* Coordinator filter bars: readable labels and controls (admin filter bars keep their size). */
+.admin-shell .coordinator-subject-filters label { font-size: 13px; }
+.admin-shell .coordinator-subject-filters :is(input, select) { min-height: 46px; font-size: 14px; }
+.admin-shell .coordinator-subject-filters button { min-height: 46px; font-size: 14px; }
+
