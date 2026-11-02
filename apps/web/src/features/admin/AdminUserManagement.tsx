@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { AdminApiError, type AdminClient } from './client';
-import { ADMIN_REASON_MAX_LENGTH, ADMIN_ROLES, normaliseReason, validateCreateAccountRequest, validateCreateInvitationRequest } from '../../../../../packages/shared/src/admin/admin';
+import { ADMIN_REASON_MAX_LENGTH, ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE, normaliseReason, validateCreateAccountRequest, validateCreateInvitationRequest } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminRole } from '../../../../../packages/shared/src/admin/admin';
 
 export const roleLabels: Record<AdminRole, string> = { STUDENT: 'Student', COORDINATOR: 'Coordinator', SYSTEM_ADMIN: 'System Admin' };
@@ -60,6 +60,7 @@ export function ReasonDialog({ title, description, confirmLabel, danger, onSubmi
 function RoleChecks({ roles, onChange, disabled }: { roles: AdminRole[]; onChange: (roles: AdminRole[]) => void; disabled: boolean }) {
   return <fieldset className="admin-checks" disabled={disabled}><legend>Roles</legend>
     {ADMIN_ROLES.map(item => <label key={item} className="admin-check"><input type="checkbox" checked={roles.includes(item)} onChange={event => onChange(event.target.checked ? [...roles, item] : roles.filter(role => role !== item))}/>{roleLabels[item]}</label>)}
+    <p className="admin-muted">Student: verified @graduate.utm.my. Coordinator: verified @utm.my. {SYSTEM_ADMIN_EMAIL_RULE}.</p>
   </fieldset>;
 }
 

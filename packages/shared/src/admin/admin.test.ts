@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ADMIN_REASON_MAX_LENGTH, normaliseEmail, normaliseReason, validateChangeAccessRequest,
+  ADMIN_REASON_MAX_LENGTH, SYSTEM_ADMIN_EMAIL_DOMAINS, isSystemAdminEmailDomain, normaliseEmail, normaliseReason, validateChangeAccessRequest,
   validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest,
   validateRevokeRoleRequest,
 } from './admin';
@@ -11,6 +11,16 @@ describe('normaliseReason', () => {
   it.each(['', '   ', 'a'.repeat(ADMIN_REASON_MAX_LENGTH + 1), null, 5, undefined])('rejects %j', v => {
     expect(normaliseReason(v)).toBeNull();
   });
+});
+
+describe('isSystemAdminEmailDomain', () => {
+  it('accepts exactly utm.my, graduate.utm.my and gmail.com, case-insensitively', () => {
+    for (const address of ['a@utm.my', 'a@graduate.utm.my', 'a@gmail.com', 'A@GMAIL.COM', ' a@Gmail.Com ']) expect(isSystemAdminEmailDomain(address)).toBe(true);
+  });
+  it('rejects subdomains, lookalikes and malformed addresses', () => {
+    for (const address of ['a@sub.gmail.com', 'a@evil-gmail.com', 'a@gmail.com.evil.io', 'a@utm.my.evil', 'a@mail.utm.my', 'a@gmail.com@x.io', '@gmail.com', 'gmail.com', 'a b@gmail.com', '']) expect(isSystemAdminEmailDomain(address)).toBe(false);
+  });
+  it('keeps the single source list', () => { expect([...SYSTEM_ADMIN_EMAIL_DOMAINS]).toEqual(['utm.my', 'graduate.utm.my', 'gmail.com']); });
 });
 
 describe('normaliseEmail', () => {

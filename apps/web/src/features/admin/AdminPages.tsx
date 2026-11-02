@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
 import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
-import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
+import { ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 
 const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pending', ACCEPTED: 'Accepted', REVOKED: 'Revoked', EXPIRED: 'Expired' };
@@ -130,7 +130,7 @@ export function AdminAuditView({ client, accountId }: { client: AdminClient; acc
 type PendingAction = { kind: 'revoke'; role: AdminRole } | { kind: 'grant'; role: AdminRole } | { kind: 'access'; status: 'ACTIVE' | 'SUSPENDED' };
 function dialogCopy(pending: PendingAction) {
   if (pending.kind === 'revoke') return { title: `Remove ${labels[pending.role]} role`, confirm: 'Remove role', danger: true, text: `This account loses the ${labels[pending.role]} role immediately. An account must keep at least one role.` };
-  if (pending.kind === 'grant') return { title: `Add ${labels[pending.role]} role`, confirm: 'Add role', danger: false, text: 'The role is added only if the verified email address of the account is eligible for it.' };
+  if (pending.kind === 'grant') return { title: `Add ${labels[pending.role]} role`, confirm: 'Add role', danger: false, text: pending.role === 'SYSTEM_ADMIN' ? 'The role is added only if the verified email address of the account is eligible for it. ' + SYSTEM_ADMIN_EMAIL_RULE + '.' : 'The role is added only if the verified email address of the account is eligible for it.' };
   return pending.status === 'SUSPENDED'
     ? { title: 'Suspend account', confirm: 'Suspend account', danger: true, text: 'The account holder is blocked from using the application until access is reactivated. Roles are kept.' }
     : { title: 'Reactivate account', confirm: 'Reactivate account', danger: false, text: 'The account holder can use the application again with their existing roles.' };

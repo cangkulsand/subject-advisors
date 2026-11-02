@@ -1,5 +1,13 @@
 export const ADMIN_ROLES = ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'] as const;
 export type AdminRole = typeof ADMIN_ROLES[number];
+/** Exact (case-insensitive) email domains that may hold SYSTEM_ADMIN. The single source for API, runtime policy and UI. */
+export const SYSTEM_ADMIN_EMAIL_DOMAINS = ['utm.my', 'graduate.utm.my', 'gmail.com'] as const;
+export const SYSTEM_ADMIN_EMAIL_RULE = 'System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com';
+export function isSystemAdminEmailDomain(address: string): boolean {
+  const parts = address.trim().split('@');
+  if (parts.length !== 2 || !parts[0] || /\s/.test(parts[0])) return false;
+  return (SYSTEM_ADMIN_EMAIL_DOMAINS as readonly string[]).includes(parts[1]!.toLowerCase());
+}
 export type AdminStatus = 'ACTIVE' | 'SUSPENDED';
 export interface AdminIdentity {
   state: 'available' | 'not_found' | 'unavailable';
