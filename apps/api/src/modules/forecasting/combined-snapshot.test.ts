@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IMPORT_CSV_HEADER } from '../../../../../packages/shared/src/forecasting/contracts';
-import { interimScopeProvider, type ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
+import { testScopeProvider } from './scope-provider.test-support';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow, PortalStudentSelection, ProgrammeCatalogue, StoreImportInput } from './contracts';
 import { normaliseMatric, normaliseName } from './combined-snapshot';
 import { handleForecastingRequest } from './routes';
@@ -76,7 +77,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
       access: { find: vi.fn(async (id: string) => ({ clerkUserId: id, appRole: roles[0]!, roles, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
     },
     repository, runs: {} as ForecastingDependencies['runs'], offerings: {} as ForecastingDependencies['offerings'],
-    scopes: options.scopes ?? interimScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
+    scopes: options.scopes ?? testScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
   };
   return { deps, repository, batches, stored, setData: (next: PortalStudentSelection) => { data = next; } };
 }
@@ -243,7 +244,7 @@ describe('POST forecast-imports/combined-snapshots', () => {
   });
 
   it('refuses unassigned scopes, enforces the target semester and the POST method', async () => {
-    const closed = fixture({ scopes: { ...interimScopeProvider, isScopeAssigned: vi.fn(async () => false) } });
+    const closed = fixture({ scopes: { ...testScopeProvider, isScopeAssigned: vi.fn(async () => false) } });
     const denied = await combined(closed.deps, overlapCsv);
     expect(denied.status).toBe(403);
     expect(closed.repository.systemStudents).not.toHaveBeenCalled();

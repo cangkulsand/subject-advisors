@@ -1,7 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import type { AuthBindings } from '../auth';
 import type { AuthDependencies } from '../auth/contracts';
-import { getScopeProvider } from '../../config/interim-scope';
+import { createAcademicSetupRepository } from '../admin/academic-repository';
+import { createDbScopeProvider } from './scope-provider';
 import { createForecastingRepository } from './repository';
 import { createOfferingsRepository } from './offerings-repository';
 import { createForecastRunsRepository } from './runs-repository';
@@ -17,5 +18,7 @@ export function createForecastingHandler(env: Pick<AuthBindings, 'DATABASE_URL'>
   const repository = createForecastingRepository(query, transaction);
   const runs = createForecastRunsRepository(query, transaction);
   const offerings = createOfferingsRepository(query, transaction);
-  return (request: Request) => handleForecastingRequest(request, { auth, repository, runs, offerings, scopes: getScopeProvider() });
+  // Live, uncached reads of the admin academic setup (migration 0008): assignments, current semester, active centres.
+  const scopes = createDbScopeProvider(createAcademicSetupRepository(query, transaction));
+  return (request: Request) => handleForecastingRequest(request, { auth, repository, runs, offerings, scopes });
 }

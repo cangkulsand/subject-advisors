@@ -120,17 +120,12 @@ async function resolveTarget(deps: ForecastingDependencies): Promise<{ currentSe
   return { currentSemesterId, target };
 }
 
-async function assignedScopes(deps: ForecastingDependencies, actor: string) {
-  const all = await deps.scopes.listScopes();
-  const flags = await Promise.all(all.map((scope) => deps.scopes.isScopeAssigned(actor, scope.programme.programmeId, scope.centre.learningCentreId)));
-  return all.filter((_, index) => flags[index]);
-}
 async function requireScope(deps: ForecastingDependencies, actor: string, scope: Pick<ForecastScope, 'programmeId' | 'learningCentreId'>) {
   if (!(await deps.scopes.isScopeAssigned(actor, scope.programmeId, scope.learningCentreId))) throw new ForecastingError('SCOPE_NOT_ASSIGNED');
 }
 
 async function forecastContext(deps: ForecastingDependencies, actor: string, programmeId: number | null): Promise<ForecastContext> {
-  const scopes = await assignedScopes(deps, actor);
+  const scopes = await deps.scopes.listScopes(actor);
   const programmes = [...new Map(scopes.map((s) => [s.programme.programmeId, s.programme])).values()];
   const learningCentres = [...new Map(scopes.map((s) => [s.centre.learningCentreId, s.centre])).values()];
   const { currentSemesterId, target } = await resolveTarget(deps);
@@ -155,8 +150,8 @@ async function forecastContext(deps: ForecastingDependencies, actor: string, pro
 }
 
 /** Coordinator-export vocabulary for the selected scope: programme / centre codes and the configured aliases. */
-async function formatContext(deps: ForecastingDependencies, scope: Pick<ForecastScope, 'programmeId' | 'learningCentreId'>): Promise<ImportFormatContext> {
-  const [scopes, aliases] = await Promise.all([deps.scopes.listScopes(), deps.scopes.importAliases()]);
+async function formatContext(deps: ForecastingDependencies, actor: string, scope: Pick<ForecastScope, 'programmeId' | 'learningCentreId'>): Promise<ImportFormatContext> {
+  const [scopes, aliases] = await Promise.all([deps.scopes.listScopes(actor), deps.scopes.importAliases()]);
   return {
     programmeCode: scopes.find((s) => s.programme.programmeId === scope.programmeId)?.programme.programmeCode ?? '',
     centreCode: scopes.find((s) => s.centre.learningCentreId === scope.learningCentreId)?.centre.centreCode ?? '',
@@ -178,7 +173,7 @@ async function upload(request: Request, url: URL, deps: ForecastingDependencies,
   const existing = await deps.repository.findAcceptedByFingerprint(input, sourceFingerprint);
   if (existing) return authJson({ data: acceptedOf(existing) }, 200);
 
-  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, input));
+  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, actor, input));
   const validationRevision = 'sha256:' + await sha256Hex(JSON.stringify([sourceFingerprint, input.programmeId, input.learningCentreId, input.targetSemesterId, outcome.report]));
   const validationId = crypto.randomUUID();
   const status = outcome.report.status === 'VALID' ? 'ACCEPTED' : outcome.report.status === 'CORRECTION_REQUIRED' && outcome.students.length ? 'VALIDATED' : 'REJECTED';
@@ -238,7 +233,7 @@ async function combinedSnapshot(request: Request, url: URL, deps: ForecastingDep
   const existing = await deps.repository.findAcceptedByFingerprint(input, fingerprint);
   if (existing) return authJson({ data: acceptedOf(existing) }, 200);
 
-  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, input));
+  const outcome = validateImportCsv(input.bytes, catalogue, await formatContext(deps, actor, input));
   const rejectedFile = outcome.report.status === 'FILE_REJECTED';
   const merge = mergeCombined(system, rejectedFile ? { ...outcome, students: [], records: [] } : outcome);
   const validationId = crypto.randomUUID();

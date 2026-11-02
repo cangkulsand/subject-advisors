@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { interimScopeProvider, type ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
+import { testScopeProvider } from './scope-provider.test-support';
 import type { EngineCapacityRule, EngineCurriculum, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { ConfirmedOfferingAuditEntry, ConfirmedOfferingSet, OfferingPickCountSummary } from '../../../../../packages/shared/src/forecasting/confirmed-offerings';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow } from './contracts';
@@ -64,7 +65,7 @@ function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINAT
     repository: { getBatch: vi.fn(async (id: number) => batches.find((entry) => entry.importBatchId === id) ?? null), semesters: vi.fn(async () => semesters) } as unknown as ForecastingRepository,
     runs: fakeRuns.repository,
     offerings: fakeOfferings.repository,
-    scopes: options.scopes ?? interimScopeProvider,
+    scopes: options.scopes ?? testScopeProvider,
     now: () => new Date('2026-11-01T12:00:00.000Z'),
   };
   return { deps, fakeRuns, fakeOfferings };
@@ -112,7 +113,7 @@ describe('coordinator offering confirmation API', () => {
     it('is coordinator only and respects the scope provider', async () => {
       expect((await get(fixture({ roles: ['STUDENT'] }).deps, 'confirmed-offerings?' + QUERY)).status).toBe(403);
       expect((await get(fixture({ roles: ['SYSTEM_ADMIN'] }).deps, 'offering-pick-counts?' + QUERY)).status).toBe(403);
-      const closed: ScopeProvider = { ...interimScopeProvider, isScopeAssigned: async () => false };
+      const closed: ScopeProvider = { ...testScopeProvider, isScopeAssigned: async () => false };
       const { deps } = fixture({ scopes: closed });
       for (const path of ['confirmed-offerings?' + QUERY, 'confirmed-offerings/audit?' + QUERY, 'offering-pick-counts?' + QUERY]) {
         expect(await errorOf(await get(deps, path))).toMatchObject({ code: 'SCOPE_NOT_ASSIGNED' });

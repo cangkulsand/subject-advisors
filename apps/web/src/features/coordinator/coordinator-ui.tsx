@@ -126,8 +126,10 @@ export function ScopeFields({ context, path, programmeId, learningCentreId, keep
         <output id={semesterField} aria-labelledby={semesterField + '-label'} className="coordinator-readonly-value">{semesterLabel(target)}</output>
         <small>Set by the system: the semester after the current one.</small></div>
     </div>
-    {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet.</p>}
-    {context.targetSemesterId == null && <p className="admin-notice" role="status">No target semester is configured yet, so imports are unavailable.</p>}
+    {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.</p>}
+    {context.currentSemesterId == null
+      ? <p className="admin-notice" role="status">No current semester is set. Ask a system administrator to set it in Academic Semesters.</p>
+      : context.targetSemesterId == null && <p className="admin-notice" role="status">No target semester is configured yet, so imports are unavailable.</p>}
   </>;
 }
 

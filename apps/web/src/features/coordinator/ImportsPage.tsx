@@ -306,7 +306,7 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
           ? <SystemCard key={resetKey} client={client} scope={scope} onCreated={result => { setSnapshot(result); setOutcome(null); setNotice(null); setVersion(value => value + 1); }}/>
           : <UploadCard key={resetKey} client={client} scope={scope} combined={mode === 'both'} onOutcome={onOutcome} onTemplateError={text => setNotice({ kind: 'warning', text })}/>}</>}
     </section>
-    {scope === null && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to upload data and see accepted imports.</p></section>}
+    {scope === null && context.programmes.length > 0 && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to upload data and see accepted imports.</p></section>}
     {scope && importId === null && snapshot && (snapshot.data.source === 'COMBINED' ? mode === 'both' : mode === 'system') && <SnapshotResult result={snapshot} scope={scope} mode={mode} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })} onDismiss={() => { setSnapshot(null); document.getElementById(snapshot.data.source === 'COMBINED' ? 'coordinator-upload-heading' : 'coordinator-system-heading')?.focus(); }}/>}
     {scope && importId === null && outcome && <ReportCard outcome={outcome} onAccept={() => setSubset(true)} onDismiss={() => { setOutcome(null); document.getElementById('coordinator-upload-heading')?.focus(); }}/>}
     {scope && (importId === null

@@ -964,6 +964,31 @@ else {
       await page.keyboard.press('Escape');
     }, width);
 
+    const noAssignmentText = 'You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.';
+    const noSemesterText = 'No current semester is set. Ask a system administrator to set it in Academic Semesters.';
+    for (const [path, heading, shot] of [['/coordinator/imports', 'Data Imports', 'imports'], ['/coordinator/forecasts', 'Class Offering Forecast', 'forecasts'], ['/coordinator/decisions', 'Offering Decisions', 'decisions']]) {
+      await check(`${shot}: a coordinator without assignments sees the empty state and no actions`, async page => {
+        const state = await mock(page, { noAssignments: true }); await page.goto(base + path);
+        await page.getByRole('heading', { name: heading, exact: true }).first().waitFor();
+        await page.getByRole('status').filter({ hasText: noAssignmentText }).waitFor();
+        assert.deepEqual(await page.getByLabel('Programme', { exact: true }).locator('option').allInnerTexts(), ['Select a programme']);
+        assert.equal(await page.getByLabel('Learning centre', { exact: true }).isDisabled(), true);
+        assert.equal(await page.getByRole('button', { name: /Upload and validate|Create combined snapshot|Generate forecast|Create confirmation/ }).count(), 0);
+        assert.ok(!state.requests.some(request => request.path.startsWith('/api/coordinator/forecast-imports') || request.path.includes('forecast-runs') || request.path.includes('confirmed-offerings')), 'no scoped request without a scope');
+        assert.equal(await page.getByText('Choose a scope', { exact: true }).count(), 0, 'no misleading scope prompt');
+        assert.equal(await page.getByText(/Select a programme and a learning centre to/).count(), 0);
+        await page.screenshot({ path: shots + `${shot}-no-assignments-desktop.png`, fullPage: true });
+      });
+      await check(`${shot}: no current semester shows the administrator hint and does not crash`, async page => {
+        await mock(page, { noCurrentSemester: true }); await page.goto(base + path + scoped);
+        await page.getByRole('heading', { name: heading, exact: true }).first().waitFor();
+        await page.getByRole('status').filter({ hasText: noSemesterText }).waitFor();
+        assert.equal(await page.getByRole('status').filter({ hasText: noAssignmentText }).count(), 0);
+        assert.equal(await page.locator('output.coordinator-readonly-value').innerText(), 'Not configured');
+        await page.screenshot({ path: shots + `${shot}-no-current-semester-desktop.png`, fullPage: true });
+      });
+    }
+
     console.log('PASS ' + passed + ' coordinator browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }
 }

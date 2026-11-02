@@ -289,7 +289,7 @@ export function DecisionsPage({ client, search }: { client: CoordinatorClient; s
     <Panel error={context.error} retry={context.retry} label="decision scope">{context.data && <>
       <ScopePicker context={context.data} path="/coordinator/decisions" programmeId={programmeId} learningCentreId={learningCentreId}/>
       {scope ? <Decisions key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope}/>
-        : <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to confirm its offerings.</p></section>}
+        : context.data.programmes.length > 0 && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to confirm its offerings.</p></section>}
     </>}</Panel>
   </>;
 }

@@ -154,7 +154,12 @@ export function handle(state, request) {
   const route = url.pathname.replace('/api/coordinator/', '');
   if (!url.pathname.startsWith('/api/coordinator/')) return null;
   if (method !== 'GET') state.bodies.push({ method, path: url.pathname, headers, body: headers['content-type']?.startsWith('multipart') ? '[multipart]' : safeJson(body) });
-  if (route === 'forecast-context') return ok({ programmes, learningCentres, targetSemesters: [target], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
+  if (route === 'forecast-context') {
+    // `noAssignments` / `noCurrentSemester` mirror the live DB-backed context (S2-P004-011): no scopes, and no semesters when none is marked current.
+    if (state.noAssignments) return ok({ programmes: [], learningCentres: [], targetSemesters: state.noCurrentSemester ? [] : [target], assignedScopes: [], currentSemesterId: state.noCurrentSemester ? null : 1, targetSemesterId: state.noCurrentSemester ? null : 2, curricula: [], subjects: [] });
+    if (state.noCurrentSemester) return ok({ programmes, learningCentres, targetSemesters: [], assignedScopes, currentSemesterId: null, targetSemesterId: null, curricula: [], subjects: [] });
+    return ok({ programmes, learningCentres, targetSemesters: [target], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
+  }
   if (route === 'forecast-import-template' && url.searchParams.get('format') === 'coordinator') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template-coordinator.csv"' }, text: ['courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A', ''].join('\n') };
   if (route === 'forecast-import-template') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template.csv"' }, text: 'external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n' };
   if (route === 'forecast-imports/system-snapshots' && method === 'POST') return systemSnapshot(state, headers, safeJson(body));

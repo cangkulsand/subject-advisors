@@ -45,7 +45,7 @@
         ],
         "operationId": "getForecastContext",
         "summary": "Read configured programme, centre, semester and curriculum options",
-        "description": "Requires an active Coordinator. Returns configured programmes, centres and semesters. With programmeId, also returns that programme's configured curriculum versions, curriculum_subject -> subject catalogue, exclusions and prerequisite expressions/conditions. This endpoint never calls student/profile/options APIs.",
+        "description": "Requires an active Coordinator. Returns configured programmes, centres and semesters. With programmeId, also returns that programme's configured curriculum versions, curriculum_subject -> subject catalogue, exclusions and prerequisite expressions/conditions. This endpoint never calls student/profile/options APIs. Scopes are read live from the administrator's academic setup on every request (S2-P004-011, no caching): only the caller's unended coordinator assignments with active programme, faculty and learning centre are returned; a coordinator without assignments gets empty programmes, learningCentres and assignedScopes. When no semester is marked current, currentSemesterId and targetSemesterId are null and targetSemesters is empty; scoped mutations then return 409 TARGET_SEMESTER_UNAVAILABLE.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ProgrammeQuery"

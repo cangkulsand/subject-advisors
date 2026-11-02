@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { interimScopeProvider, type ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
+import { testScopeProvider } from './scope-provider.test-support';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow, PortalStudentSelection, ProgrammeCatalogue, StoreImportInput } from './contracts';
 import { handleForecastingRequest } from './routes';
 
@@ -60,7 +61,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
       access: { find: vi.fn(async (id: string) => ({ clerkUserId: id, appRole: roles[0]!, roles, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
     },
     repository, runs: {} as ForecastingDependencies['runs'], offerings: {} as ForecastingDependencies['offerings'],
-    scopes: options.scopes ?? interimScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
+    scopes: options.scopes ?? testScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
   };
   return { deps, repository, batches, stored, setSelection: (next: PortalStudentSelection) => { selection = next; } };
 }
@@ -94,7 +95,7 @@ describe('POST forecast-imports/system-snapshots', () => {
   });
 
   it('uses the scope provider for assignment and the target semester (next after current)', async () => {
-    const closed = fixture({ scopes: { ...interimScopeProvider, isScopeAssigned: vi.fn(async () => false) } });
+    const closed = fixture({ scopes: { ...testScopeProvider, isScopeAssigned: vi.fn(async () => false) } });
     expect((await post(closed.deps)).status).toBe(403);
     expect(closed.repository.systemStudents).not.toHaveBeenCalled();
     const { deps, repository } = fixture();
@@ -102,12 +103,12 @@ describe('POST forecast-imports/system-snapshots', () => {
     expect(wrong.status).toBe(422);
     expect(await wrong.json()).toMatchObject({ error: { code: 'TARGET_SEMESTER_NOT_ALLOWED' } });
     expect(repository.systemStudents).not.toHaveBeenCalled();
-    const none = fixture({ scopes: { ...interimScopeProvider, currentSemesterId: async () => null } });
+    const none = fixture({ scopes: { ...testScopeProvider, currentSemesterId: async () => null } });
     expect((await post(none.deps)).status).toBe(409);
   });
 
   it('selects ACTIVE student-role students of the programme and centre, with a coverage report and the source marker', async () => {
-    const scopes: ScopeProvider = { ...interimScopeProvider, studentLearningCentreId: vi.fn(async (id: number) => id === 4 ? 2 : 1) };
+    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentreId: vi.fn(async (id: number) => id === 4 ? 2 : 1) };
     const { deps, stored } = fixture({ scopes });
     const response = await post(deps);
     expect(response.status).toBe(201);

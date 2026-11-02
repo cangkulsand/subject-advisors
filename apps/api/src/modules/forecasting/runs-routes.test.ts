@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { interimScopeProvider, type ScopeProvider } from '../../config/interim-scope';
+import type { ScopeProvider } from './scope-provider';
+import { testScopeProvider } from './scope-provider.test-support';
 import type { EngineCapacityRule, EngineCurriculum, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { ForecastRunDetail, ForecastRunSummary } from '../../../../../packages/shared/src/forecasting/runs';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow } from './contracts';
@@ -58,7 +59,7 @@ function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINAT
     repository: { getBatch: vi.fn(async (id: number) => batches.find((entry) => entry.importBatchId === id) ?? null) } as unknown as ForecastingRepository,
     runs: fake.repository,
     offerings: {} as ForecastingDependencies['offerings'],
-    scopes: options.scopes ?? interimScopeProvider,
+    scopes: options.scopes ?? testScopeProvider,
     now: () => new Date('2026-11-01T12:00:00.000Z'),
   };
   return { deps, ...fake };
@@ -118,7 +119,7 @@ describe('UC20 forecast run API', () => {
     it('uses the scope provider: unassigned scopes are forbidden for lists and generation and hidden for runs', async () => {
       const open = fixture();
       const { id } = await newRun(open.deps);
-      const closed: ScopeProvider = { ...interimScopeProvider, isScopeAssigned: async () => false };
+      const closed: ScopeProvider = { ...testScopeProvider, isScopeAssigned: async () => false };
       const deps = { ...open.deps, scopes: closed };
       expect(await errorOf(await get(deps, 'forecast-runs?programmeId=5&learningCentreId=1&targetSemesterId=2'))).toMatchObject({ code: 'SCOPE_NOT_ASSIGNED' });
       expect(await errorOf(await generate(deps))).toMatchObject({ code: 'SCOPE_NOT_ASSIGNED' });

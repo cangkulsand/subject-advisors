@@ -300,7 +300,7 @@ export function ForecastsPage({ client, search }: { client: CoordinatorClient; s
           <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
           <div className="coordinator-setup-section"><ScopeFields context={context.data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/></div>
           {scope ? <RunList key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope}/>
-            : <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecasts.</p></div>}
+            : context.data.programmes.length > 0 && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecasts.</p></div>}
         </section>
       </>}</Panel>}
   </>;
