@@ -1,6 +1,6 @@
 # S2-P004-008 — Admin academic setup
 
-- **Status:** READY_FOR_REVIEW (local implementation; shared development verification pending).
+- **Status:** READY_FOR_REVIEW — `main` (with 0007) merged into the branch; 0008 applied and verified on Neon development 2026-11-02; human peer review pending.
 - **Date:** 2026-11-01
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -166,6 +166,16 @@ No forecasting implementation, coordinator offering confirmation, profile learni
 - Accepted worker evidence: admin browser44, client28, database tooling21, backend focused318, real repository13, structural SQL plus135 behavior assertions and16 lock-observed races; all PASS. Visual inspection covered desktop semester/faculty screens, mobile tables and coordinator modal/footer. Documentation/ERD source diff reviewed and accepted.
 - `git diff --check`: PASS. Frozen schema contract, historical migrations and other owners' feature files unchanged. Preview/database test services stopped. No commit, push, deployment or Neon connection.
 - Final local status READY_FOR_REVIEW. Shared development apply/verify/test is pending the exact0007 integration and private target identity gate; human peer approval pending.
+
+### Integration with `main` and shared development (2026-11-02)
+
+- Committed the Package A work on `feature/admin-setup-module` and merged `main` (S2-P004-007/009/010, P003, P001 Sprint 2; migration 0007) into it.
+- Resolved conflicts in `db/migrations/manifest.json` and `db/engineering-extensions.json` (0007 then 0008), `tools/db/cli.mjs` and `tools/db/review.mjs` (verify 010+012, behaviour 011+013), `tools/db/migrations.test.mjs` (versions 0000-0008; 21 extension columns; the isolated-gap test replaced by an exact 0007-prefix test), `db/checks/001_schema_verification.sql` (column cases for both; 44 FKs = 39 + 0003 + three 0007 + one 0008) and `db/checks/005_multi_role_access.sql` (36 tables).
+- 0007 checks assumed Package A/B objects never exist. `010` and section G of `011` now allow 0008 objects once 0008 is recorded in `migration_meta.schema_migrations` (and 0009 objects once 0009 is recorded). `011` sets the audited `app.access_actor`/`app.access_reason` context that 0008 requires for its learning centre and semester fixtures. `tools/admin/test-academic-database.mjs` now also runs 010 and 011.
+- Disposable PostgreSQL (0000-0008): ordered apply + repeated no-op PASS; structural checks PASS; behaviour 59 + 9 + 19 + 38 + 79 (UC20) + 10 (academic) PASS; 13 real repository tests PASS; 16 lock-observed races PASS.
+- Combined app checks: typecheck PASS; lint PASS; `npm test` 67 files / 1329 tests passed, 59 skipped; integration 9/9; db tooling 22/22; `db:review` PASS; browser admin 44, coordinator 41, integration 35, pathway 9; `build:cloudflare` PASS (fictional public test key).
+- **Neon development** (branch `br-shy-cherry-azuzy9v5`, through the existing target/branch gates over the Neon WebSocket client): status showed 0000-0007 applied with matching checksums and only 0008 pending; applied 0008; read-only verify PASS (schema, admin user management, UC20, academic setup structure). Rollback-only behaviour tests were not run on Neon because the target does not allow them (`allowRollbackOnlyTests=false`).
+- Not yet done: forecasting still uses the interim `ScopeProvider`; no current semester is marked and no faculty or coordinator assignment exists until an administrator sets them up. No production action or deployment.
 
 ## Earlier checkpoint history
 

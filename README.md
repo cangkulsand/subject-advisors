@@ -73,6 +73,16 @@ Use the branch for your assigned owner:
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing shared files. Open feature PRs
 against `main`; keep each PR within its selected owner scope.
 
+## Sprint 2 on `main` (2026-11-02)
+
+| Owner | Feature | Record |
+| --- | --- | --- |
+| P004 | UC20 coordinator forecast: data source toggle (system / CSV / both), coordinator export CSV format, forecast review and offering confirmation (`/coordinator/*`) | S2-P004-007, S2-P004-009, S2-P004-010 |
+| P003 | UC17 graduation eligibility, projected pathway, flowchart layout and highlighting | S2-INT-001 (S2-P003-001..004) |
+| P001 | UC05 progress and UC06 curriculum mapping, as a separate overlay launched with `node tools/p001-sprint2/dev.mjs` (not yet in the shared router) | S2-INT-002 (S2-P001-001..002) |
+
+Subject names are English; see `db/reference-data/subject-english-names.csv`.
+
 ## Current integration boundaries
 
 - Shared auth identity and role checks: apps/api/src/modules/auth and middleware/auth.ts.

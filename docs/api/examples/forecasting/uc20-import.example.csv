@@ -1,6 +1,6 @@
-external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic
-DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,COMPLETED,1001,3,true
-DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,FAILED,1002,,true
-DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO102,WITHDRAWN,1002,,true
-DEMO-002,,ACTIVE,UNKNOWN,,,,,
-DEMO-003,2024-DEMO,ACTIVE,UNKNOWN,DEMO103,WITHDRAWN,1001,,true
+external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name
+DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,COMPLETED,1001,3,true,Demo Student One
+DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,FAILED,1002,,true,Demo Student One
+DEMO-001,2024-DEMO,ACTIVE,COMPLETE,DEMO102,WITHDRAWN,1002,,true,Demo Student One
+DEMO-002,,ACTIVE,UNKNOWN,,,,,,Demo Student Two
+DEMO-003,2024-DEMO,ACTIVE,UNKNOWN,DEMO103,WITHDRAWN,1001,,true,Demo Student Three

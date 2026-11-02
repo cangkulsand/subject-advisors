@@ -3,7 +3,7 @@
   "info": {
     "title": "Subject Advisors UC20 Forecast Planning API",
     "version": "0.1.0",
-    "description": "PLANNED contract only. These endpoints are not implemented. Uploaded people are external-reference cohorts and are never linked to portal students or profiles. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
+    "description": "PLANNED contract only. These endpoints are not implemented. Decided 2026-11-02 (MT8): data provision has two sources. The main source snapshots the current students in the system (student_profile / academic_record, read-only; student-entered records count as COMPLETE history, students without records are UNKNOWN); a CSV upload is the other source. Decided 2026-11-02 (MT9): the Coordinator chooses the data source PER FORECAST on the Imports screen (students in the system, CSV import, or Both); it is not an admin setting. Both builds ONE combined snapshot (system students plus the CSV students not already in the system, system record wins on a matric match; see createCombinedSnapshot). Each forecast is based on one snapshot. This replaces the earlier rule that UC20 never queries student profiles. CSV people remain external-reference cohorts and are never linked to portal students. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
   },
   "servers": [
     {
@@ -73,7 +73,7 @@
           "Imports"
         ],
         "operationId": "downloadForecastImportTemplate",
-        "summary": "Download the single-file CSV template",
+        "summary": "Download a CSV template (standard or coordinator export format)",
         "responses": {
           "200": {
             "description": "UTF-8 CSV header in the defined field order.",
@@ -87,9 +87,22 @@
                 "schema": {
                   "type": "string"
                 },
-                "example": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic"
+                "example": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic",
+                "examples": {
+                  "native": {
+                    "summary": "format=native",
+                    "value": "external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n"
+                  },
+                  "coordinator": {
+                    "summary": "format=coordinator",
+                    "value": "courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status\nSECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A\nSECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A\n"
+                  }
+                }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -97,7 +110,23 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "native (default) returns the standard template header; coordinator returns the coordinator export header plus two synthetic example rows (S2-P004-010).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "native",
+                "coordinator"
+              ],
+              "default": "native"
+            }
+          }
+        ]
       }
     },
     "/api/coordinator/forecast-imports": {
@@ -149,7 +178,7 @@
         ],
         "operationId": "submitForecastImport",
         "summary": "Validate one CSV and accept it when all rows are valid",
-        "description": "Fully valid uploads are accepted directly, including warnings. Row errors return a 422 correction report without accepting rejected history. Valid roster metadata is retained when a subject-history row is invalid. The file is bound to programme, centre and target semester; the server verifies all IDs against configured catalogue rows. The caller actor is derived from the verified active Coordinator session. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. CSV v1 accepts optional UTF-8 BOM, comma/double-quote escaping and LF/CRLF; trims fields, treats trimmed-empty as blank, compares opaque external references case-sensitively (1-128 Unicode characters), allows int32 positive semester IDs and nonnegative integer credits, and limits uploads to 5 MiB/10,000 data rows. A successful accepted-import response includes the complete validation report, including nonblocking warnings; warnings remain retrievable from import detail. No raw CSV is returned.",
+        "description": "Fully valid uploads are accepted directly, including warnings. Row errors return a 422 correction report without accepting rejected history. Valid roster metadata is retained when a subject-history row is invalid. The file is bound to programme, centre and target semester; the server verifies all IDs against configured catalogue rows. The caller actor is derived from the verified active Coordinator session. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. CSV v1 accepts optional UTF-8 BOM, comma/double-quote escaping and LF/CRLF; trims fields, treats trimmed-empty as blank, compares opaque external references case-sensitively (1-128 Unicode characters), allows int32 positive semester IDs and nonnegative integer credits, and limits uploads to 5 MiB/10,000 data rows (20,000 raw rows for the coordinator export format). Coordinator export format (S2-P004-010, decided 2026-11-02): a header with courseCode, subjCode, centerName, stuname, stuMetricNo and grade (case-insensitive, any order; SemesterMohon and status optional; eMail and other columns are ignored and never stored) is detected automatically and normalised into the standard model before validation (external_reference = stuMetricNo, student_name = stuname, curriculum_version blank, cohort ACTIVE, history COMPLETE). Rows of other programmes (exact programme_code or a configured alias), other learning centres (configured aliases), inactive students (status belongs to the student: any N row skips ALL rows of that student in the file, including exemption rows with a blank status; a status other than A, N or blank counts as active with a COORDINATOR_STATUS_UNKNOWN warning) and in-progress rows (blank or NULL grade) are skipped and counted, subjects outside the curriculum are skipped with a COORDINATOR_SUBJECTS_SKIPPED warning, grades A+ to D+ complete, EX and PENGECUALIAN exempt, every other non-blank grade fails, and only the latest SemesterMohon attempt per student and subject is kept. The report carries format and coordinatorExport counts. A successful accepted-import response includes the complete validation report, including nonblocking warnings; warnings remain retrievable from import detail. No raw CSV is returned. MT3 implementation notes: multipart/form-data (file + scope fields) or a raw text/csv body with the same fields in the query string; the target semester must be the one after the current semester; the optional student_name column is stored; the earlier nine-column header is still accepted. Idempotency-Key is validated (1-128 characters) but not persisted; instead, the same file bytes (sha256 source fingerprint) for the same scope that are already accepted replay the original snapshot with 200. A 422 correction report whose rows are partly valid is stored as a VALIDATED batch awaiting subset acknowledgement; a file rejection or a report with no usable students is stored as REJECTED.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -171,6 +200,9 @@
           }
         },
         "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
           "201": {
             "$ref": "#/components/responses/ImportAcceptedResponse"
           },
@@ -194,6 +226,67 @@
           },
           "422": {
             "$ref": "#/components/responses/ImportValidationResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-imports/system-snapshots": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "createSystemStudentsSnapshot",
+        "summary": "Snapshot the students in the system (main data source)",
+        "description": "Decided 2026-11-02: the Coordinator can build the forecast from the CURRENT STUDENTS IN THE SYSTEM instead of uploading a CSV (the Coordinator chooses the source per forecast; see also the CSV and combined snapshot operations). The server stores one ACCEPTED, immutable snapshot of the students whose curriculum belongs to the programme, whose learning centre equals the requested centre (resolved through the scope provider; interim: every student counts under KL until profiles record a centre) and whose access is ACTIVE with the STUDENT role. Student-entered academic records count as COMPLETE history (source: student-entered); a student with no academic record is UNKNOWN history. COMPLETED, EXEMPTED and FAILED map as-is; WITHDRAWN is stored as FAILED; records whose subject is not in the student's curriculum are skipped and counted. External reference is PORTAL-<student_id>. The response is the accepted import with source SYSTEM and a coverage report. The same fingerprint in the same scope replays the existing snapshot with 200; changed data creates a new snapshot (201). student_profile and academic_record are never written. Target semester must be the one after the current semester. 422 SYSTEM_SNAPSHOT_EMPTY when no student matches.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemSnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "201": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "description": "The target semester is not allowed, or SYSTEM_SNAPSHOT_EMPTY.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
@@ -240,7 +333,7 @@
         ],
         "operationId": "acceptValidImportSubset",
         "summary": "Accept remaining valid rows after explicit acknowledgement",
-        "description": "Only available for a validation with row errors and valid rows remaining. If-Match binds acknowledgement to the validation report/fingerprint revision; the validation may be accepted once. This is the uploading Coordinator's acknowledgement, not a second-person policy approval. After authentication, an idempotent replay resolves to the original receipt before current validation state is checked. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "description": "Only available for a validation with row errors and valid rows remaining. If-Match binds acknowledgement to the validation report/fingerprint revision; the validation may be accepted once. This is the uploading Coordinator's acknowledgement, not a second-person policy approval. After authentication, an idempotent replay resolves to the original receipt before current validation state is checked. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. MT3 implementation notes: only the uploading Coordinator may acknowledge (anyone else gets 404); If-Match must be the quoted validation revision and match the body; a retry after success replays the receipt; Idempotency-Key is not persisted.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ValidationId"
@@ -338,7 +431,7 @@
         ],
         "operationId": "generateInitialForecast",
         "summary": "Generate the version 1 advisory baseline",
-        "description": "Requires an accepted import matching all three scope IDs. Creates version 1 with parent null. Supported eligible-pool demand is advisory, not registration. Missing evidence creates per-student/subject uncertainty; missing capacity creates CONFIGURATION_REQUIRED on affected sections. Neither blocks unrelated supported rows. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "description": "Requires an ACCEPTED import snapshot matching all three scope IDs and an assigned Coordinator. Runs the deterministic UC20 engine and, in one transaction, stores the DRAFT run (next version number in the programme + centre + semester namespace; parent = the previous version), subject demand rows and proposed sections, together with the rule snapshot, engine version, original recommendations and per-subject near-graduation/breakdown/reason counts. Supported eligible-pool demand is advisory, not registration. Missing evidence creates per-student/subject uncertainty; missing capacity creates CONFIGURATION_REQUIRED for the affected subject only. Idempotency (MT5a): an import snapshot yields exactly one forecast, so a repeat for the same importBatchId returns the existing run receipt with 200; Idempotency-Key is validated (1-128 characters) but not persisted. A newer accepted snapshot of the same scope creates version N+1 (UC23 owns comparison); the older run then reports newerForecastAvailable. Deviates from the planned \"version 1 only\" rule so a corrected re-import can be forecast.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -355,6 +448,9 @@
           }
         },
         "responses": {
+          "200": {
+            "$ref": "#/components/responses/ForecastOperationResponse"
+          },
           "201": {
             "$ref": "#/components/responses/ForecastOperationResponse"
           },
@@ -407,7 +503,8 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "description": "Subjects with demand, uncertain counts and reasons, nearGraduationCount, configuration status, sections and recomputed flags, the run revision (body and ETag), the newerForecastAvailable indicator and the newest audit entries. Unassigned scopes are indistinguishable from absent runs (404)."
       }
     },
     "/api/coordinator/forecast-runs/{forecastRunId}/decisions": {
@@ -417,7 +514,7 @@
         ],
         "operationId": "recordForecastDecisions",
         "summary": "Review or adjust sections and append audit entries",
-        "description": "Request carries all three scope IDs; server verifies them against the stored run. Requires If-Match and Idempotency-Key. Actor, before/after values and timestamp are server-derived. Changes and append-only audits commit atomically. An idempotent replay returns the original receipt after authentication, before the current revision is checked. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "description": "Request carries all three scope IDs; server verifies them against the stored run. Requires If-Match and Idempotency-Key. Actor, before/after values and timestamp are server-derived. Changes and append-only audits commit atomically. An idempotent replay returns the original receipt after authentication, before the current revision is checked. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. MT5a: decisions are allowed in DRAFT and UNDER_REVIEW, are validated against the current run and applied all-or-nothing (a transaction guard re-checks the revision under a row lock). Errors: 409 RUN_FINALIZED, 412 RUN_REVISION_MISMATCH, 422 DECISION_REASON_REQUIRED, DECISION_DUPLICATE_SUBJECT, DECISION_SUBJECT_NOT_FOUND, DECISION_NO_SECTIONS, SUBJECT_NOT_CONFIGURED, ALLOCATION_INVALID, ALLOCATION_TOTAL_MISMATCH, ALLOCATION_EXCEEDS_CAPACITY.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ForecastRunId"
@@ -477,7 +574,7 @@
         ],
         "operationId": "finalizeForecastRun",
         "summary": "Finalize a reviewed baseline",
-        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. Finalization is advisory and does not itself publish or confirm any offering; the Coordinator confirms offerings as a separate, later step (see Offering confirmation operations). Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run.",
+        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. Finalization is advisory and does not itself publish or confirm any offering; the Coordinator confirms offerings as a separate, later step (see Offering confirmation operations). Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run. MT5a: every proposed section must be REVIEWED, APPROVED or DEFERRED (422 REVIEWS_INCOMPLETE with details.pendingSubjectIds); 409 RUN_STATE_CONFLICT unless UNDER_REVIEW, 409 RUN_FINALIZED when already frozen. reason is optional (default \"Forecast finalized.\").",
         "parameters": [
           {
             "$ref": "#/components/parameters/ForecastRunId"
@@ -564,7 +661,8 @@
           "503": {
             "$ref": "#/components/responses/Unavailable"
           }
-        }
+        },
+        "description": "Append-only decision history, newest first, cursor-paged. Entries carry subjectId (null for FINALIZE) and full before/after section states; proposedSectionId is always null because an entry covers all sections of a subject."
       }
     },
     "/api/admin/forecasting/configuration": {
@@ -650,7 +748,7 @@
         ],
         "operationId": "startForecastReview",
         "summary": "Move an initial draft into review",
-        "description": "Explicit DRAFT to UNDER_REVIEW transition. Scope must match the stored run. Requires If-Match and Idempotency-Key. Replay lookup follows authentication and precedes current state/revision checks. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts.",
+        "description": "Explicit DRAFT to UNDER_REVIEW transition. Scope must match the stored run. Requires If-Match and Idempotency-Key. Replay lookup follows authentication and precedes current state/revision checks. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Errors: 400 IF_MATCH_REQUIRED, 404 RUN_NOT_FOUND, 409 RUN_STATE_CONFLICT (not DRAFT) or RUN_FINALIZED, 412 RUN_REVISION_MISMATCH. Idempotency-Key is validated but not persisted; a retry after success sees a stale revision (412). The transition writes a run-level START_REVIEW audit entry (subjectId null, actor, reason defaulting to \"Review started.\", before {status: DRAFT}, after {status: UNDER_REVIEW}) in the same transaction; the database allows it only from DRAFT and once per run. It increments the revision audit count (DRAFT revision fr<id>.DRAFT.0 becomes fr<id>.UNDER_REVIEW.1).",
         "parameters": [
           {
             "$ref": "#/components/parameters/ForecastRunId"
@@ -743,7 +841,7 @@
         ],
         "operationId": "confirmOfferings",
         "summary": "PLANNED: confirm (or re-confirm) offered subjects",
-        "description": "Active Coordinator only. A deliberate action, never automatic. Requires a FINALIZED forecast run for the same programme + centre + target semester (recorded as provenance); excluded subjects (FYP, Industrial Training, non-classroom) cannot be confirmed; a WITHDRAWN subject may be re-confirmed. A non-blank reason is required and a pick deadline (pickDeadline, future date-time; send the current one on re-confirmation) is part of the confirmation: students can pick and change picks only until it, after which picks are closed (read-only). Actor and time are derived server-side and appended to the audit atomically with the state change. The request carries baseRevision (null when no confirmation exists); a stale revision returns 412. Idempotency-Key replays return the original receipt. Students then see these subjects as 'Confirmed by coordinator'; this is not official registration and not a guaranteed timetable. Forecasts and pick counts are not changed by this operation. A new forecast run/version never changes, invalidates or requires re-confirmation of existing confirmations (decided); the confirmation only keeps forecastRunId as provenance. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
+        "description": "Active Coordinator only. A deliberate action, never automatic. Requires a FINALIZED forecast run for the same programme + centre + target semester (recorded as provenance); excluded subjects (Projek Sarjana Muda 1/2, Latihan Industri, UKQT3001 and other non-classroom subjects) cannot be confirmed (422 SUBJECT_EXCLUDED); a subject that does not run in the forecast's semester type under the Normal/Short offering rule cannot be confirmed (422 SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE, details.subjectIds); a WITHDRAWN subject may be re-confirmed. A non-blank reason is required and a pick deadline (pickDeadline, future date-time; send the current one on re-confirmation) is part of the confirmation: students can pick and change picks only until it, after which picks are closed (read-only). Actor and time are derived server-side and appended to the audit atomically with the state change. The request carries baseRevision (null when no confirmation exists); a stale revision returns 412. Idempotency-Key replays return the original receipt. Students then see these subjects as 'Confirmed by coordinator'; this is not official registration and not a guaranteed timetable. Forecasts and pick counts are not changed by this operation. A new forecast run/version never changes, invalidates or requires re-confirmation of existing confirmations (decided); the confirmation only keeps forecastRunId as provenance. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -993,6 +1091,109 @@
           }
         }
       }
+    },
+    "/api/coordinator/forecast-imports/{importBatchId}/students": {
+      "get": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "listForecastImportStudents",
+        "summary": "List the retained roster of an accepted import",
+        "description": "Active assigned Coordinator. Returns the retained students (external reference, optional name, curriculum version, cohort status, final history completeness), keyset-paged by importedStudentId. Unassigned, unknown and non-accepted imports return 404. Never returns attempts or raw CSV.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ImportBatchId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportStudentListResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/forecast-imports/combined-snapshots": {
+      "post": {
+        "tags": [
+          "Imports"
+        ],
+        "operationId": "createCombinedSnapshot",
+        "summary": "Snapshot the students in the system plus a CSV (data source: Both)",
+        "description": "Decided 2026-11-02: the Coordinator chooses the data source per forecast (students in the system, CSV import, or both). \"Both\" builds ONE snapshot, therefore one forecast, made of the system students (same selection and mapping as the system snapshot) PLUS the students of the uploaded CSV who are not already in the system. Duplicates: the SYSTEM record wins and the CSV student is skipped when the CSV external_reference equals the system student's matric_no (trimmed, case-insensitive, only when matric_no is non-empty and unique among the selected system students) or the system PORTAL-<id> reference. A CSV student whose student_name equals a system student name (normalised) but whose reference differs is included and reported as a POSSIBLE_DUPLICATE_STUDENT warning; records are never merged on name. Matric numbers are used in memory only and are never stored. The CSV part is validated exactly like POST /forecast-imports. Rows to correct give 422 IMPORT_CORRECTION_REQUIRED with an ETag; the valid part (system students plus the valid CSV students) is stored as a VALIDATED batch and accepted with the existing POST /forecast-imports/{validationId}/subset-acceptances (If-Match). A valid CSV gives 201 with an ACCEPTED batch whose source is COMBINED. The fingerprint covers the CSV bytes and the system data; the same inputs in the same scope replay the existing snapshot with 200. History: system students COMPLETE (with records) or UNKNOWN (none); CSV students as given. validation_summary.internal keeps a per-student source map; GET .../students returns source per student. Generate run, review, finalize and confirm are unchanged.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUploadRequest"
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "text/csv"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "201": {
+            "$ref": "#/components/responses/ImportAcceptedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImportValidationResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1086,7 +1287,7 @@
           "minLength": 1,
           "maxLength": 128
         },
-        "description": "Server namespaces by authenticated actor, operation and programme/centre/semester scope."
+        "description": "Server namespaces by authenticated actor, operation and programme/centre/semester scope. MT5a: validated (1-128 characters) but not persisted (no receipt table); retries are covered by the same-snapshot replay for generation and by revision checks for mutations."
       },
       "IfMatch": {
         "name": "If-Match",
@@ -1138,6 +1339,11 @@
           },
           "message": {
             "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional safe identifiers for the failure, e.g. pendingSubjectIds for REVIEWS_INCOMPLETE. Never SQL or provider text."
           }
         }
       },
@@ -1177,12 +1383,15 @@
           },
           "row": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "nullable": true,
+            "description": "Record number in the file; the header is record 1. Null for findings that span rows."
           },
           "field": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
-          "action": {
+          "correctiveAction": {
             "type": "string"
           }
         }
@@ -1474,6 +1683,36 @@
             "items": {
               "$ref": "#/components/schemas/ForecastSubjectOption"
             }
+          },
+          "assignedScopes": {
+            "type": "array",
+            "description": "Programme x centre pairs the Coordinator is assigned to.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "programmeId",
+                "learningCentreId"
+              ],
+              "properties": {
+                "programmeId": {
+                  "$ref": "#/components/schemas/Int32Id"
+                },
+                "learningCentreId": {
+                  "$ref": "#/components/schemas/Int32Id"
+                }
+              }
+            }
+          },
+          "currentSemesterId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "System current semester; null when none is marked."
+          },
+          "targetSemesterId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The only semester an import may target: the one after the current semester (targetSemesters holds it); null when unavailable."
           }
         }
       },
@@ -1510,7 +1749,7 @@
           "file": {
             "type": "string",
             "format": "binary",
-            "description": "UTF-8 CSV with optional BOM, comma delimiting, doubled-quote escaping, LF or CRLF. Trim surrounding spaces; trimmed-empty is blank. At most 5 MiB and 10,000 data rows."
+            "description": "UTF-8 CSV with optional BOM, comma delimiting, doubled-quote escaping, LF or CRLF. Trim surrounding spaces; trimmed-empty is blank. At most 5 MiB and 10,000 data rows (20,000 for the coordinator export). Header: the template header including the optional student_name column, the earlier nine-column header, or the coordinators' own export header (courseCode, subjCode, centerName, stuname, stuMetricNo, eMail, SemesterMohon, grade, status), detected automatically."
           }
         }
       },
@@ -1532,8 +1771,8 @@
           "external_reference": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 128,
-            "description": "Opaque case-sensitive source reference, 1 to 128 Unicode characters; never a portal identity."
+            "maxLength": 100,
+            "description": "Opaque case-sensitive source reference, 1 to 100 Unicode characters (the stored column is varchar(100)); never a portal identity."
           },
           "curriculum_version": {
             "type": "string",
@@ -1580,6 +1819,11 @@
               "false"
             ],
             "description": "Blank only for a no-history row."
+          },
+          "student_name": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "OPTIONAL display name so the Coordinator can tell managed students apart (product owner decision 2026-11-01). Blank allowed; identical on every row of a student; no control characters. Never a portal ID or credential. The earlier nine-column header without this column is still accepted."
           }
         }
       },
@@ -1689,6 +1933,22 @@
                 "type": "string"
               }
             }
+          },
+          "source": {
+            "$ref": "#/components/schemas/ImportSource"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/SystemSnapshotCoverage",
+            "description": "Present on system-students and COMBINED snapshots (the system part)."
+          },
+          "combined": {
+            "$ref": "#/components/schemas/CombinedSnapshotCoverage"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ImportFileFormat"
+          },
+          "coordinatorExport": {
+            "$ref": "#/components/schemas/CoordinatorExportSummary"
           }
         }
       },
@@ -1804,7 +2064,8 @@
           "counts",
           "snapshotStatus",
           "sourceFingerprint",
-          "validationReport"
+          "validationReport",
+          "source"
         ],
         "properties": {
           "importBatchId": {
@@ -1845,6 +2106,9 @@
           },
           "validationReport": {
             "$ref": "#/components/schemas/ImportValidationReport"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ImportSource"
           }
         }
       },
@@ -2177,7 +2441,8 @@
               "$ref": "#/components/schemas/OriginalSubjectRecommendation"
             }
           }
-        }
+        },
+        "x-superseded-by": "ForecastRunDetail (MT5a, S2-P004-007): runs are versioned per programme + centre + semester and carry the engine rule snapshot."
       },
       "ForecastRunEnvelope": {
         "type": "object",
@@ -2271,7 +2536,7 @@
                 "type": "string"
               }
             },
-            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id."
+            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. REVIEW, APPROVE and DEFER set every current section of the subject to REVIEWED, APPROVED or DEFERRED; a subject without sections cannot be decided. A reason of 1-500 characters is required for every decision."
           },
           {
             "type": "object",
@@ -2307,7 +2572,7 @@
                 "description": "Full replacement allocation for the subject. Omitted existing section IDs retire those sections from the current allocation; historical section/audit rows are retained."
               }
             },
-            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id."
+            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. The replacement must keep section numbers 1..n, may change the number and sizes of sections, but the sizes must add up to the subject forecastCount (a replacement redistributes demand, it never creates or removes it). Each size is 1..exceptionMaximum (or normalMaximum when none is configured); a size above normalMaximum is an exception and stores its justification (falling back to the decision reason). Subjects that are EXCLUDED or CONFIGURATION_REQUIRED cannot be replaced. Retired sections are removed from the editable allocation; their details stay in the audit before-state and in originalRecommendations."
           }
         ]
       },
@@ -2429,7 +2694,8 @@
             "nullable": true
           },
           "actionType": {
-            "type": "string"
+            "type": "string",
+            "description": "REVIEW, APPROVE, DEFER, REPLACE_ALLOCATION, REOPEN, START_REVIEW (run-level, subjectId null) or FINALIZE (run-level, subjectId null)."
           },
           "recordedBy": {
             "type": "string"
@@ -3120,7 +3386,8 @@
           "acceptedAt",
           "counts",
           "snapshotStatus",
-          "sourceFingerprint"
+          "sourceFingerprint",
+          "source"
         ],
         "properties": {
           "importBatchId": {
@@ -3158,6 +3425,9 @@
           "sourceFingerprint": {
             "type": "string",
             "minLength": 1
+          },
+          "source": {
+            "$ref": "#/components/schemas/ImportSource"
           }
         }
       },
@@ -3272,6 +3542,15 @@
           },
           "reason": {
             "type": "string"
+          },
+          "withdrawnBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -3306,8 +3585,39 @@
             "format": "date-time"
           },
           "newerForecastAvailable": {
-            "type": "boolean",
-            "description": "Informational display aid: a newer forecast run exists for the same programme + centre + semester. No automatic effect on the confirmation."
+            "$ref": "#/components/schemas/NewerForecastAvailable"
+          },
+          "forecastRunId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Source FINALIZED run (provenance); null before the first confirmation."
+          },
+          "pickWindow": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSED"
+            ],
+            "nullable": true,
+            "description": "Derived from pickDeadline and the server clock."
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -3579,6 +3889,10 @@
             "description": "Picks are closed (read-only) after this time.",
             "type": "string",
             "format": "date-time"
+          },
+          "picksAvailable": {
+            "type": "boolean",
+            "description": "False until student picks exist (P002): counts are zero and pickers empty."
           }
         },
         "description": "Pick counts and the list of pickers per subject, for an assigned Coordinator only. Display only; not an input to the forecast calculation; no automatic allocation."
@@ -3618,6 +3932,10 @@
           },
           "baseRevision": {
             "type": "string"
+          },
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id",
+            "description": "Optional: switch the source run to another FINALIZED run of the same scope."
           }
         }
       },
@@ -3701,6 +4019,986 @@
             "description": "Sum of recognized credits of COMPLETED/EXEMPTED academic records toward the curriculum; null when unavailable."
           }
         }
+      },
+      "ImportedStudentSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "importedStudentId",
+          "externalReference",
+          "studentName",
+          "curriculumVersion",
+          "cohortStatus",
+          "historyCompleteness",
+          "source"
+        ],
+        "properties": {
+          "importedStudentId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "externalReference": {
+            "type": "string"
+          },
+          "studentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "cohortStatus": {
+            "type": "string"
+          },
+          "historyCompleteness": {
+            "$ref": "#/components/schemas/HistoryCompleteness"
+          },
+          "source": {
+            "$ref": "#/components/schemas/StudentSource"
+          }
+        }
+      },
+      "ImportStudentList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedStudentSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ImportStudentListEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ImportStudentList"
+          }
+        }
+      },
+      "NewerForecastAvailable": {
+        "type": "object",
+        "additionalProperties": false,
+        "nullable": true,
+        "required": [
+          "forecastRunId",
+          "versionNumber",
+          "status"
+        ],
+        "description": "OP1, informational only: a later version exists for the same programme + centre + semester.",
+        "properties": {
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "UNDER_REVIEW",
+              "FINALIZED"
+            ]
+          }
+        }
+      },
+      "RunSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjects",
+          "excludedSubjects",
+          "notOfferedInSemesterTypeSubjects",
+          "configurationRequiredSubjects",
+          "totalSupportedDemand",
+          "totalUncertain",
+          "totalSections",
+          "pendingSections",
+          "sectionsBelowMinimum",
+          "sectionsBelowOptimal"
+        ],
+        "properties": {
+          "subjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "excludedSubjects": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Subjects excluded in the catalogue (include_in_offering_forecast = false). Does not include notOfferedInSemesterTypeSubjects."
+          },
+          "notOfferedInSemesterTypeSubjects": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Subjects that do not run in the run's semester type (Normal/Short offering rule from subject_semester_rule). No demand, no sections, not counted in totals."
+          },
+          "configurationRequiredSubjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalSupportedDemand": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalUncertain": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalSections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pendingSections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sectionsBelowMinimum": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sectionsBelowOptimal": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ForecastRunSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "forecastRunId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "importBatchId",
+          "versionNumber",
+          "parentForecastRunId",
+          "status",
+          "revision",
+          "demandAssumption",
+          "engineVersion",
+          "generatedBy",
+          "generatedAt",
+          "finalizedBy",
+          "finalizedAt",
+          "newerForecastAvailable",
+          "summary"
+        ],
+        "properties": {
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "parentForecastRunId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "UNDER_REVIEW",
+              "FINALIZED"
+            ]
+          },
+          "revision": {
+            "type": "string",
+            "description": "Optimistic-concurrency token (also the quoted ETag). Changes on every lifecycle step and decision."
+          },
+          "demandAssumption": {
+            "$ref": "#/components/schemas/SupportedDemandAssumption"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedBy": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finalizedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "newerForecastAvailable": {
+            "$ref": "#/components/schemas/NewerForecastAvailable"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RunSummary"
+          }
+        }
+      },
+      "RunSection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposedSectionId",
+          "sectionNumber",
+          "expectedStudents",
+          "capacityRuleId",
+          "minimumEnrollment",
+          "breakEvenTarget",
+          "normalMaximum",
+          "exceptionMaximum",
+          "reviewStatus",
+          "justification",
+          "reviewedBy",
+          "reviewedAt",
+          "flags"
+        ],
+        "properties": {
+          "proposedSectionId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sectionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capacityRuleId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "minimumEnrollment": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "breakEvenTarget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "normalMaximum": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "exceptionMaximum": {
+            "type": "integer",
+            "nullable": true
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "REVIEWED",
+              "APPROVED",
+              "DEFERRED"
+            ]
+          },
+          "justification": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "BELOW_MINIMUM",
+                "BELOW_OPTIMAL",
+                "ABOVE_NORMAL_MAXIMUM"
+              ]
+            },
+            "description": "Recomputed on every read from the stored capacity rule values."
+          }
+        }
+      },
+      "RunSubject": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "creditHours",
+          "classType",
+          "excluded",
+          "exclusionReason",
+          "semesterTypeExcluded",
+          "semesterTypeExclusionReason",
+          "supportedEligibleCount",
+          "forecastCount",
+          "uncertainStudentCount",
+          "uncertaintyReasons",
+          "uncertaintyReasonCounts",
+          "nearGraduationCount",
+          "qualityStatus",
+          "configurationStatus",
+          "configurationIssue",
+          "configurationMessage",
+          "breakdown",
+          "decisionStatus",
+          "allocatedStudents",
+          "sections"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "creditHours": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "classType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "LECTURE",
+              "LAB",
+              null
+            ]
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "exclusionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "semesterTypeExcluded": {
+            "type": "boolean",
+            "description": "Normal/Short offering rule: every curriculum containing the subject has subject_semester_rule rows for it and none is the run's semester type. Stored as configurationStatus EXCLUDED with forecastCount null; no demand, no sections, not in totals; cannot be confirmed (422 SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE). A subject with no rule rows is unrestricted. Never true together with excluded."
+          },
+          "semesterTypeExclusionReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"Runs only in Short semesters\" or \"Runs only in Normal semesters\"; null unless semesterTypeExcluded."
+          },
+          "supportedEligibleCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Potential demand: the supported eligible pool."
+          },
+          "forecastCount": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Null for excluded subjects; never zero for unknown."
+          },
+          "uncertainStudentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uncertaintyReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UncertaintyReason"
+            }
+          },
+          "uncertaintyReasonCounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "count"
+              ],
+              "properties": {
+                "reason": {
+                  "$ref": "#/components/schemas/UncertaintyReason"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "nearGraduationCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Information only; never part of the demand count."
+          },
+          "qualityStatus": {
+            "type": "string",
+            "enum": [
+              "SUPPORTED",
+              "PRELIMINARY",
+              "INSUFFICIENT_DATA"
+            ]
+          },
+          "configurationStatus": {
+            "type": "string",
+            "enum": [
+              "CONFIGURED",
+              "CONFIGURATION_REQUIRED",
+              "EXCLUDED"
+            ]
+          },
+          "configurationIssue": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CLASS_TYPE_MISSING",
+              "NO_ACTIVE_CAPACITY_RULE",
+              "AMBIGUOUS_CAPACITY_RULE",
+              "INVALID_CAPACITY_RULE",
+              null
+            ]
+          },
+          "configurationMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "breakdown": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "inCurriculum, alreadyPassed, notOfferedInSemesterType, prerequisiteNotMet, supported, uncertain, retakeResolvedAsPassed."
+          },
+          "decisionStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "PENDING",
+              "REVIEWED",
+              "APPROVED",
+              "DEFERRED",
+              "MIXED"
+            ]
+          },
+          "allocatedStudents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunSection"
+            }
+          }
+        }
+      },
+      "ForecastRunDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "forecastRunId",
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId",
+          "importBatchId",
+          "versionNumber",
+          "parentForecastRunId",
+          "status",
+          "revision",
+          "demandAssumption",
+          "engineVersion",
+          "generatedBy",
+          "generatedAt",
+          "finalizedBy",
+          "finalizedAt",
+          "newerForecastAvailable",
+          "assumptionNote",
+          "summary",
+          "subjects",
+          "ruleSnapshot",
+          "originalRecommendations",
+          "audit",
+          "auditTruncated",
+          "dataSource"
+        ],
+        "description": "A forecast run with its subjects, sections, saved rule snapshot and newest audit entries. The same revision is returned as the ETag.",
+        "properties": {
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "importBatchId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "parentForecastRunId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "UNDER_REVIEW",
+              "FINALIZED"
+            ]
+          },
+          "revision": {
+            "type": "string",
+            "description": "Optimistic-concurrency token (also the quoted ETag). Changes on every lifecycle step and decision."
+          },
+          "demandAssumption": {
+            "$ref": "#/components/schemas/SupportedDemandAssumption"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "generatedBy": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finalizedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "newerForecastAvailable": {
+            "$ref": "#/components/schemas/NewerForecastAvailable"
+          },
+          "assumptionNote": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunSubject"
+            }
+          },
+          "ruleSnapshot": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Engine rule/capacity snapshot (EngineRuleSnapshot in packages/shared); immutable."
+          },
+          "originalRecommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "The engine output per subject, kept beside every later adjustment."
+          },
+          "audit": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastAuditEntry"
+            },
+            "description": "Newest first, at most 100; page all entries from /audit."
+          },
+          "auditTruncated": {
+            "type": "boolean"
+          },
+          "dataSource": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportSource"
+              }
+            ],
+            "description": "Source of the import snapshot the forecast is based on. SYSTEM means student-entered portal records; COMBINED means student-entered records plus a CSV import (Combined: student-entered records + CSV import)."
+          }
+        }
+      },
+      "ForecastRunDetailEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastRunDetail"
+          }
+        }
+      },
+      "ForecastRunSummaryList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastRunSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "ForecastRunSummaryListEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastRunSummaryList"
+          }
+        }
+      },
+      "ImportSource": {
+        "type": "string",
+        "enum": [
+          "CSV",
+          "SYSTEM",
+          "COMBINED"
+        ],
+        "description": "Where the snapshot came from: an uploaded CSV, the students in the system (portal snapshot, MT8), or both in one COMBINED snapshot (MT9). The Coordinator chooses per forecast. Snapshots written before MT8 read as CSV."
+      },
+      "SystemSnapshotCoverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Coverage of a system-students snapshot. Student-entered academic records count as COMPLETE history; students with no academic record at all are UNKNOWN history and so uncertain.",
+        "required": [
+          "studentsFound",
+          "studentsWithRecords",
+          "studentsWithoutRecords",
+          "recordsMapped",
+          "recordsUnmapped",
+          "withdrawnStoredAsFailed",
+          "excluded",
+          "centreNote"
+        ],
+        "properties": {
+          "studentsFound": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "studentsWithRecords": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "studentsWithoutRecords": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Stored with UNKNOWN history."
+          },
+          "recordsMapped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recordsUnmapped": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Skipped: the subject is not part of the student's curriculum."
+          },
+          "withdrawnStoredAsFailed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "WITHDRAWN is not a passed status; it is stored as FAILED."
+          },
+          "excluded": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "otherProgramme",
+              "otherCentre",
+              "inactiveAccess"
+            ],
+            "properties": {
+              "otherProgramme": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "otherCentre": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inactiveAccess": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "centreNote": {
+            "type": "string",
+            "description": "Documents the interim centre rule: until student profiles record a learning centre every student counts under KL."
+          }
+        }
+      },
+      "SystemSnapshotRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "programmeId",
+          "learningCentreId",
+          "targetSemesterId"
+        ],
+        "properties": {
+          "programmeId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "learningCentreId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "targetSemesterId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "sourceLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Defaults to \"System students\"."
+          }
+        }
+      },
+      "StudentSource": {
+        "type": "string",
+        "enum": [
+          "SYSTEM",
+          "CSV"
+        ],
+        "description": "Where one retained student came from. In a COMBINED snapshot the system record always wins over a CSV record of the same student."
+      },
+      "CombinedSnapshotCoverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "csv",
+          "students",
+          "csvSkippedAlreadyInSystem",
+          "possibleDuplicates"
+        ],
+        "description": "Coverage of a COMBINED snapshot. The system part is the report coverage (SystemSnapshotCoverage).",
+        "properties": {
+          "csv": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rows",
+              "students",
+              "rejectedRows"
+            ],
+            "properties": {
+              "rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "students": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rejectedRows": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "students": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Students in the snapshot: system students plus the CSV students not already in the system."
+          },
+          "csvSkippedAlreadyInSystem": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "CSV references skipped because the external_reference equals the matric number (trimmed, case-insensitive, non-empty and unique among the selected system students) or the PORTAL reference of a system student. The system record is used."
+          },
+          "possibleDuplicates": {
+            "type": "array",
+            "description": "CSV students whose student_name equals a system student name (normalised: trimmed, whitespace collapsed, case-folded) but whose reference differs. Both are included; never merged on name.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "csvReference",
+                "systemReferences"
+              ],
+              "properties": {
+                "csvReference": {
+                  "type": "string"
+                },
+                "systemReferences": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ImportFileFormat": {
+        "type": "string",
+        "enum": [
+          "NATIVE",
+          "COORDINATOR"
+        ],
+        "description": "Detected from the CSV header row. Absent on standard-template reports (read as NATIVE)."
+      },
+      "CoordinatorExportSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Counts only (no personal data) of what the coordinator-export reader did with the file. Skipped rows are not errors.",
+        "required": [
+          "rowsRead",
+          "skippedOtherProgramme",
+          "skippedOtherCentre",
+          "skippedInactive",
+          "skippedInProgress",
+          "olderAttemptsDropped",
+          "skippedSubjectNotInCurriculum",
+          "subjectsNotInCurriculum",
+          "skippedInactiveStudents",
+          "unknownStatusRows",
+          "unknownStatusValues"
+        ],
+        "properties": {
+          "rowsRead": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Data rows read from the file."
+          },
+          "skippedOtherProgramme": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "courseCode does not map to the selected programme (exact programme_code or a configured alias such as SECJH to SECJ)."
+          },
+          "skippedOtherCentre": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "centerName does not map to the selected learning centre (configured aliases such as KUALA LUMPUR to KL, or the centre code)."
+          },
+          "skippedInactive": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows of inactive students: a student with any status N row is inactive and all their rows are skipped (including blank-status exemption rows). Blank or A is active."
+          },
+          "skippedInProgress": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with a blank or NULL grade (current short semester); not used yet."
+          },
+          "olderAttemptsDropped": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Older attempts (and repeated exemptions) replaced by the latest attempt per student and subject."
+          },
+          "skippedSubjectNotInCurriculum": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows skipped because the subject code is unknown or not in the programme curriculum. Reported by the COORDINATOR_SUBJECTS_SKIPPED warning."
+          },
+          "subjectsNotInCurriculum": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "count"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "skippedInactiveStudents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Distinct inactive students behind skippedInactive."
+          },
+          "unknownStatusRows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with a status other than A, N or blank; treated as active."
+          },
+          "unknownStatusValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "count"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -3777,7 +5075,7 @@
         }
       },
       "ForecastRunResponse": {
-        "description": "Forecast and saved assumptions; no-store; ETag identifies its revision.",
+        "description": "Forecast run detail (subjects, sections, saved assumptions, newest audit); no-store; ETag identifies its revision.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"
@@ -3789,13 +5087,13 @@
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ForecastRunEnvelope"
+              "$ref": "#/components/schemas/ForecastRunDetailEnvelope"
             }
           }
         }
       },
       "ForecastRunListResponse": {
-        "description": "Bounded forecast page; no-store.",
+        "description": "Bounded page of run summaries, newest first; no-store.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"
@@ -3804,7 +5102,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ForecastRunListEnvelope"
+              "$ref": "#/components/schemas/ForecastRunSummaryListEnvelope"
             }
           }
         }
@@ -4039,6 +5337,21 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/OfferingPickCountEnvelope"
+            }
+          }
+        }
+      },
+      "ImportStudentListResponse": {
+        "description": "Bounded page of the retained roster, including optional student names; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ImportStudentListEnvelope"
             }
           }
         }

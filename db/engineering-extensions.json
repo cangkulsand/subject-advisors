@@ -33,6 +33,130 @@
       "purpose": "P004 pending admin user invitations (roles are re-checked at redemption); excluded from the frozen 26-entity SRS baseline"
     },
     {
+      "migration": "0007",
+      "tables": [
+        "forecast_adjustment_audit",
+        "offering_confirmation",
+        "confirmed_offering",
+        "confirmed_offering_audit"
+      ],
+      "columns": [
+        {
+          "table": "academic_import_batch",
+          "name": "programme_id",
+          "sqlType": "int4",
+          "nullable": true,
+          "purpose": "Selected programme of the import; required on new UC20 batches by trigger, NULL for legacy rows"
+        },
+        {
+          "table": "academic_import_batch",
+          "name": "target_semester_id",
+          "sqlType": "int4",
+          "nullable": true,
+          "purpose": "Target semester captured with the import; required to accept"
+        },
+        {
+          "table": "academic_import_batch",
+          "name": "source_fingerprint",
+          "sqlType": "varchar(64)",
+          "nullable": true,
+          "purpose": "SHA-256 of the uploaded CSV"
+        },
+        {
+          "table": "academic_import_batch",
+          "name": "validation_summary",
+          "sqlType": "jsonb",
+          "nullable": true,
+          "purpose": "Validation report summary frozen at acceptance"
+        },
+        {
+          "table": "academic_import_batch",
+          "name": "accepted_at",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "purpose": "Database-clock acceptance time"
+        },
+        {
+          "table": "academic_import_batch",
+          "name": "accepted_by",
+          "sqlType": "varchar(255)",
+          "nullable": true,
+          "purpose": "Accepting coordinator"
+        },
+        {
+          "table": "imported_student",
+          "name": "history_completeness",
+          "sqlType": "varchar(20)",
+          "nullable": true,
+          "purpose": "COMPLETE, PARTIAL or UNKNOWN history quality flag"
+        },
+        {
+          "table": "imported_student",
+          "name": "student_name",
+          "sqlType": "varchar(255)",
+          "nullable": true,
+          "purpose": "Optional student display name supplied by the coordinator import (no portal identifiers)"
+        },
+        {
+          "table": "imported_subject_record",
+          "name": "recognized_credits",
+          "sqlType": "int4",
+          "nullable": true,
+          "purpose": "Recognized-credit evidence where prerequisite rules need it"
+        },
+        {
+          "table": "forecast_run",
+          "name": "programme_id",
+          "sqlType": "int4",
+          "nullable": true,
+          "purpose": "Programme namespace of the run; required on new runs by trigger"
+        },
+        {
+          "table": "forecast_run",
+          "name": "rule_snapshot",
+          "sqlType": "jsonb",
+          "nullable": true,
+          "purpose": "Curriculum, prerequisite, exclusion and capacity rules used by the run"
+        },
+        {
+          "table": "forecast_run",
+          "name": "engine_version",
+          "sqlType": "varchar(50)",
+          "nullable": true,
+          "purpose": "Forecast engine version that produced the run"
+        },
+        {
+          "table": "forecast_run",
+          "name": "original_recommendations",
+          "sqlType": "jsonb",
+          "nullable": true,
+          "purpose": "Original section recommendations before coordinator adjustments"
+        },
+        {
+          "table": "forecast_subject_demand",
+          "name": "uncertain_count",
+          "sqlType": "int4",
+          "nullable": true,
+          "purpose": "Students whose eligibility could not be decided"
+        },
+        {
+          "table": "forecast_subject_demand",
+          "name": "uncertainty_reasons",
+          "sqlType": "jsonb",
+          "nullable": true,
+          "purpose": "Reason codes for uncertain demand"
+        },
+        {
+          "table": "forecast_subject_demand",
+          "name": "configuration_status",
+          "sqlType": "varchar(30)",
+          "nullable": true,
+          "purpose": "CONFIGURED, CONFIGURATION_REQUIRED or EXCLUDED"
+        }
+      ],
+      "purpose": "P004 UC20 forecast persistence and coordinator offering confirmation; excluded from the frozen 26-entity SRS baseline"
+    },
+    {
       "migration": "0008",
       "tables": ["faculty", "coordinator_assignment", "academic_setup_audit_log"],
       "columns": [

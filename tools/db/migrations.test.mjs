@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0008']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -58,7 +58,7 @@ test('0005 is additive only and registers the approved nullable curriculum metad
  assert.match(migration.sql,/REVOKE ALL ON migration_meta\.reference_data_imports FROM PUBLIC/i);
  assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
- const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,5);
+ const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,21);
 });
 test('0006 audits access-status changes and adds a protected pending-invitation table',async()=>{
  const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0006');
@@ -71,6 +71,21 @@ test('0006 audits access-status changes and adds a protected pending-invitation 
  assert.match(migration.sql,/REVOKE ALL ON public\.admin_user_invitation FROM PUBLIC/);
  assert.doesNotMatch(migration.sql,/\bprotected_owner\s+boolean|\bDROP\s+(?:TABLE|TRIGGER)|UPDATE\s+public\./i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.admin_user_invitation']);
+});
+test('0007 adds programme-scoped forecast persistence and protected offering confirmation',async()=>{
+ const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0007');
+ assert.ok(migration);assert.equal(migration.file,'0007_uc20_forecast_and_confirmation.sql');
+ assert.match(migration.sql,/CREATE UNIQUE INDEX forecast_run_programme_scope_version_key[^;]+WHERE programme_id IS NOT NULL/);
+ assert.match(migration.sql,/CREATE UNIQUE INDEX forecast_run_legacy_centre_version_key[^;]+WHERE programme_id IS NULL/);
+ assert.match(migration.sql,/CREATE TRIGGER imported_student_freeze/);
+ assert.match(migration.sql,/Confirmation requires a FINALIZED forecast run/);
+ assert.match(migration.sql,/Subject is excluded from offering confirmation/);
+ assert.match(migration.sql,/app\.offering_actor/);
+ assert.match(migration.sql,/BEFORE UPDATE OR DELETE ON public\.confirmed_offering_audit/);
+ assert.match(migration.sql,/REVOKE ALL ON public\.confirmed_offering_audit FROM PUBLIC/);
+ assert.doesNotMatch(migration.sql.replace(/--.*$/gm,''),/coordinator_assignment|public\.faculty|is_current|ALTER TABLE public\.student_profile|student_offering_pick|DROP\s+(?:TABLE|COLUMN)|DELETE\s+FROM|INSERT\s+INTO/i);
+ assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.forecast_adjustment_audit','public.offering_confirmation','public.confirmed_offering','public.confirmed_offering_audit']);
+ const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,21);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));
@@ -146,14 +161,12 @@ for(const [label,file,replace,expected] of [
   await rm(cleanupRoot,{recursive:true,force:true});
  }
 });
-test('0008 isolated gap and shared exact-prefix history remain enforced',async()=>{
- const isolated=await loadMigrations();assert.equal(isolated.at(-1).version,'0008');
- assert.doesNotMatch(isolated.at(-1).sql,/confirmed_offering|forecast_configuration|confirmed_semester/i);
- const seven={version:'0007',file:'0007_forecast.sql',sha256:'7'.repeat(64),sql:'-- synthetic shared prefix'};
- const shared=[...isolated.slice(0,-1),seven,isolated.at(-1)];
- const applied=shared.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
- assert.deepEqual((await migrationStatus(client({applied}),shared)).pending.map(m=>m.version),['0008']);
- await assert.rejects(migrationStatus(client({applied}),isolated),/HISTORY_OR_CHECKSUM/);
- await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0007').concat([{version:'0008',filename:isolated.at(-1).file,sha256:isolated.at(-1).sha256}])}),shared),/NOT_A_PREFIX/);
- await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0007'?{...m,sha256:'0'.repeat(64)}:m)}),shared),/HISTORY_OR_CHECKSUM/);
+test('0008 follows the exact 0007 prefix and shared history remains enforced',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0007','0008']);
+ assert.doesNotMatch(entries.at(-1).sql,/confirmed_offering|forecast_configuration|confirmed_semester/i);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0008']);
+ const eight=entries.at(-1);
+ await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0007').concat([{version:'0008',filename:eight.file,sha256:eight.sha256}])}),entries),/NOT_A_PREFIX/);
+ await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0007'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });

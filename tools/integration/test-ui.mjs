@@ -67,7 +67,7 @@ try{
  await check('a coordinator-only account has no student or admin choices',async page=>{
   const coordinator=await mock(page,{role:'COORDINATOR'});await page.goto(base+'/coordinator');await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
   await page.getByRole('link',{name:'Data Imports',exact:true}).click();await page.getByRole('heading',{name:'Data Imports',exact:true}).waitFor();
-  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me']);
+  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me','/api/coordinator/forecast-context']);
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
  await check('a revoked role cannot be selected using an older account snapshot',async page=>{

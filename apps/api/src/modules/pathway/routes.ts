@@ -2,6 +2,8 @@ import { authorize } from '../../middleware/auth';
 import type { AuthDependencies } from '../auth/contracts';
 import { AuthError, authErrorResponse, authJson } from '../auth/errors';
 import { buildPathwayGraph } from './adapter';
+import { buildGraduationEligibility } from './graduation';
+import { buildProjectedPathway } from './scheduler';
 import type { PathwayRepository } from './repository';
 
 /**
@@ -15,7 +17,7 @@ export async function handlePathwayRequest(
   repository: PathwayRepository,
 ): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.pathname !== '/api/pathway/graph') return null;
+  if (url.pathname !== '/api/pathway/graph' && url.pathname !== '/api/pathway/graduation' && url.pathname !== '/api/pathway/projection') return null;
   try {
     if (request.method !== 'GET') {
       const response = authErrorResponse(new AuthError(405, 'METHOD_NOT_ALLOWED', 'Use GET for this endpoint.'));
@@ -24,6 +26,8 @@ export async function handlePathwayRequest(
     }
     const me = await authorize(request, auth, { roles: ['STUDENT'], requireProfile: true });
     const raw = await repository.load(me.clerkUserId);
+    if (url.pathname === '/api/pathway/graduation') return authJson({ data: buildGraduationEligibility(raw) });
+    if (url.pathname === '/api/pathway/projection') return authJson({ data: buildProjectedPathway(raw) });
     return authJson({ data: buildPathwayGraph(raw) });
   } catch (error) {
     return authErrorResponse(error);

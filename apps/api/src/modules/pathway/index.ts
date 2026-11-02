@@ -4,7 +4,9 @@ import { handlePathwayRequest } from './routes';
 
 export { handlePathwayRequest } from './routes';
 export { buildPathwayGraph } from './adapter';
-export type { PathwayGraph, PathwaySubjectNode, PathwayPrerequisiteEdge, PathwayNodeStatus, PrerequisiteType } from './contracts';
+export { buildGraduationEligibility } from './graduation';
+export { buildProjectedPathway } from './scheduler';
+export type { PathwayGraph, PathwaySubjectNode, PathwayPrerequisiteEdge, PathwayNodeStatus, PrerequisiteType, GraduationEligibility, GraduationRequirementStatus, ProjectedPathway, ProjectedSemester, ProjectedSubject } from './contracts';
 
 /** A subset consumed from FOUNDATION's generated Worker bindings. */
 export interface PathwayBindings {

@@ -1,0 +1,167 @@
+/* Coordinator forecasting screens (S2-P004-007 MT5b). Builds on admin.css tokens, cards, tables and dialogs. */
+.admin-shell .coordinator-scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+.coordinator-readonly > span { display: grid; gap: 7px; font-size: 11px; font-weight: 600; color: var(--color-body); }
+.coordinator-readonly { display: grid; gap: 7px; align-content: start; }
+.coordinator-readonly small { color: var(--color-muted); font-size: 11px; }
+.admin-shell output.coordinator-readonly-value { display: flex; align-items: center; min-height: 44px; padding: 9px 11px; border: 1px dashed var(--color-outline); border-radius: 7px; background: var(--color-surface-subtle); color: var(--color-heading); font-size: 14px; }
+.admin-shell .coordinator-upload-grid { display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; margin-top: 18px; }
+.coordinator-upload-error, .coordinator-upload-submit { grid-column: 1 / -1; }
+.coordinator-upload-submit { display: flex; justify-content: flex-end; }
+.admin-shell input[type="file"] { padding: 8px; }
+.coordinator-field-error { color: #991b1b; font-size: 12px; font-weight: 600; }
+.admin-shell .coordinator-warning { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin-bottom: 18px !important; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.coordinator-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 18px 0 8px; }
+.coordinator-counts > div { padding: 12px 14px; border: 1px solid var(--color-outline); border-radius: 9px; background: var(--color-app-bg); }
+.coordinator-counts dt { color: var(--color-muted); font-size: 11px; font-weight: 600; }
+.coordinator-counts dd { margin: 2px 0 0; color: var(--color-heading); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.admin-shell .coordinator-findings h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 22px 0 10px; font-size: 14px; }
+.admin-shell .coordinator-subheading { margin: 26px 0 4px; font-size: 15px; }
+.coordinator-table table { min-width: 640px; }
+.coordinator-subjects table { min-width: 1060px; }
+.coordinator-table th[scope="row"] { text-align: left; background: transparent; font-size: 12px; border-bottom: 1px solid var(--color-surface-subtle); }
+.coordinator-subjects th[scope="row"] strong, .coordinator-subjects th[scope="row"] span { display: block; }
+.coordinator-subjects th[scope="row"] span { font-weight: 400; color: var(--color-body); }
+.coordinator-subjects td { vertical-align: top; }
+.coordinator-number { font-size: 18px; font-variant-numeric: tabular-nums; }
+.admin-shell .coordinator-expander { min-height: 44px; padding: 4px 10px; font-size: 12px; }
+.coordinator-reasons { margin: 8px 0 0; padding: 0 0 0 16px; font-size: 12px; color: var(--color-body); }
+.coordinator-reasons[hidden] { display: none; }
+.coordinator-sections { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.coordinator-sections li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.coordinator-sections .admin-audit-id { flex-basis: 100%; }
+.coordinator-config-issue { display: block; margin-top: 6px; color: #92400e; font-size: 12px; overflow-wrap: anywhere; }
+.coordinator-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.coordinator-table .coordinator-row-actions { margin-top: 0; }
+.admin-shell a.coordinator-link-button { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 12px; border: 1.5px solid var(--color-brand); border-radius: 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-shell a.coordinator-link-button:hover { background: var(--color-surface-subtle); text-decoration: none; }
+.admin-shell a.coordinator-newer { display: inline-block; margin-top: 6px; padding: 3px 9px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 11px; font-weight: 650; }
+.coordinator-newer-wrap { margin: 4px 0 !important; }
+.coordinator-pill-success { color: #166534; background: #f0fdf4; }
+.coordinator-pill-warning { color: #92400e; background: #fffbeb; }
+.coordinator-pill-danger { color: #991b1b; background: #fef2f2; }
+.coordinator-pill-info { color: #1e40af; background: #eff6ff; }
+.coordinator-pill-muted { color: #57534e; background: #f5f5f4; }
+.coordinator-row-pending { background: #fffbeb; box-shadow: inset 4px 0 #d97706; }
+.coordinator-row-pending th[scope="row"] { background: #fffbeb; }
+.coordinator-needed { display: block; margin-top: 6px; color: #92400e; font-size: 12px; font-weight: 700; }
+.admin-shell .coordinator-assumption { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #bfdbfe; border-left: 4px solid #1d4ed8; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: 13px; }
+.coordinator-assumption strong { color: #1e3a8a; }
+.coordinator-assumption .admin-audit-id { color: #1e3a8a; font-size: 11px; margin-top: 4px; }
+.admin-shell .coordinator-readonly-note { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 13px; }
+.coordinator-head-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.admin-card-title { flex-wrap: wrap; }
+.admin-shell h2 .admin-pill { vertical-align: middle; margin-left: 8px; font-size: 11px; }
+.coordinator-more { display: flex; justify-content: center; padding: 14px 0 2px; }
+.coordinator-audit-details { margin-top: 6px; font-size: 11px; }
+.coordinator-audit-details summary { cursor: pointer; min-height: 24px; color: var(--color-brand); }
+.coordinator-audit-details pre { max-width: 340px; max-height: 220px; margin: 6px 0 0; padding: 8px; overflow: auto; background: var(--color-surface-subtle); border-radius: 6px; font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.coordinator-report-actions { margin-top: 20px; }
+.admin-shell .coordinator-wide-dialog { width: min(680px, calc(100vw - 32px)); }
+.admin-shell .coordinator-allocation { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.coordinator-allocation legend { padding: 0; margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--color-body); }
+.coordinator-allocation-row { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.coordinator-allocation-row > button { grid-column: 3; }
+.coordinator-allocation-row > .admin-field:first-child + button { grid-column: 3; }
+.coordinator-allocation-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.coordinator-total-ok { color: #166534; font-weight: 650; font-size: 13px; }
+.coordinator-total-bad { color: #92400e; font-weight: 650; font-size: 13px; }
+.coordinator-problems { margin: 0; padding-left: 18px; color: #991b1b; font-size: 12px; }
+@media (max-width: 1050px) {
+  .admin-shell .coordinator-scope-grid { grid-template-columns: 1fr 1fr; }
+  .admin-shell .coordinator-upload-grid { grid-template-columns: 1fr 1fr; }
+  .coordinator-upload-file { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-grid { grid-template-columns: 1fr; }
+  .admin-card-title > button, .coordinator-head-actions { width: 100%; }
+  .coordinator-head-actions > button { flex: 1 1 140px; }
+  .coordinator-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .coordinator-allocation-row { grid-template-columns: 1fr auto; }
+  .coordinator-allocation-row > .admin-field:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .coordinator-allocation-row > button { grid-column: 2; grid-row: 1; }
+  .coordinator-upload-submit button { width: 100%; }
+}
+.coordinator-subjects th[scope="row"] { vertical-align: top; }
+.admin-card > .coordinator-table { margin-top: 18px; }
+.admin-shell .coordinator-scope-grid select { height: 44px; }
+
+/* Offering decisions (MT6) */
+.coordinator-pick-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 18px; }
+.coordinator-picker table { min-width: 860px; }
+.coordinator-offerings table { min-width: 1080px; }
+.coordinator-picker td, .coordinator-offerings td { vertical-align: top; }
+.coordinator-picker th[scope="row"] strong, .coordinator-picker th[scope="row"] span, .coordinator-offerings th[scope="row"] strong, .coordinator-offerings th[scope="row"] span { display: block; }
+.coordinator-picker th[scope="row"] span, .coordinator-offerings th[scope="row"] span { font-weight: 400; color: var(--color-body); }
+.admin-shell input.coordinator-check { width: 22px; height: 22px; min-height: 22px; padding: 0; margin: 0; accent-color: var(--color-brand); }
+.coordinator-row-disabled { background: var(--color-surface-subtle); color: var(--color-muted); }
+.coordinator-row-disabled th[scope="row"] { background: var(--color-surface-subtle); }
+.coordinator-disabled-reason { margin-top: 4px; color: #92400e !important; font-size: 12px; overflow-wrap: anywhere; }
+.coordinator-confirm-bar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--color-outline); }
+.coordinator-deadline-field { flex: 1 1 280px; max-width: 420px; }
+.coordinator-run-select { max-width: 460px; margin-top: 18px; }
+.admin-shell .coordinator-run-select select { height: 44px; }
+.admin-shell .coordinator-newer-notice { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #c7d2fe; border-left: 4px solid #4338ca; border-radius: 8px; background: #eef2ff; color: #312e81; font-size: 13px; }
+.coordinator-newer-notice strong { color: #312e81; }
+.coordinator-no-picks { color: var(--color-muted); font-size: 12px; }
+.coordinator-picks-note { margin: 14px 0 0 !important; font-size: 12px; }
+.coordinator-dialog-list { margin: 8px 0; padding-left: 20px; max-height: 180px; overflow: auto; font-size: 13px; }
+.admin-shell .admin-danger-action { color: #991b1b; border-color: #fecaca; }
+@media (max-width: 760px) {
+  .coordinator-confirm-bar { flex-direction: column; align-items: stretch; }
+  .coordinator-deadline-field { max-width: none; }
+  .coordinator-confirm-bar > button { width: 100%; }
+  .coordinator-pick-tools > button { flex: 1 1 140px; }
+}
+
+.coordinator-pill-neutral { color: var(--color-body); background: var(--color-surface-subtle); }
+.coordinator-scope-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0 8px; }
+.coordinator-scope-facts > div { padding: 10px 14px; border: 1px solid var(--color-outline); border-radius: 9px; background: var(--color-app-bg); }
+.coordinator-scope-facts dt { color: var(--color-muted); font-size: 11px; font-weight: 600; }
+.coordinator-scope-facts dd { margin: 2px 0 0; color: var(--color-heading); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+/* Setup card (one card per page) and radio-tile groups (S2-P004-009 MT9): native radios drawn as tiles with a large visible circle. */
+.coordinator-setup-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-outline); }
+.admin-shell .coordinator-setup-section > .coordinator-scope-grid { margin-top: 0; }
+.coordinator-setup-section > .admin-card-title + p, .coordinator-setup-section > h3 + p { margin-top: 6px; }
+.admin-shell .coordinator-setup-section > h3, .admin-shell .coordinator-setup-section .admin-card-title h3 { margin: 0; font-size: 15px; }
+.admin-shell fieldset.coordinator-radio-group { min-width: 0; margin: 0 0 16px; padding: 0; border: 0; }
+.coordinator-setup-section > fieldset.coordinator-radio-group:last-child { margin-bottom: 0; }
+.coordinator-radio-group legend { float: left; width: 100%; padding: 0; margin: 0 0 4px; color: var(--color-heading); font-size: 14px; font-weight: 600; }
+.coordinator-radio-group > p { clear: both; margin: 0 0 4px; }
+.coordinator-segmented { clear: both; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 10px; margin-top: 10px; }
+.coordinator-segmented label { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; min-height: 56px; padding: 10px 14px; border: 1px solid var(--color-outline); border-radius: 9px; background: var(--color-app-bg); cursor: pointer; }
+.coordinator-segmented label.is-selected { border-color: var(--color-brand); background: var(--color-surface-subtle); box-shadow: inset 0 0 0 1px var(--color-brand); }
+.admin-shell .coordinator-segmented input[type="radio"] { appearance: none; -webkit-appearance: none; grid-row: 1 / span 2; width: 22px; height: 22px; min-height: 22px; margin: 0; padding: 0; border: 2px solid var(--color-muted); border-radius: 50%; background: #fff; cursor: pointer; }
+.admin-shell .coordinator-segmented input[type="radio"]:checked { border-color: var(--color-brand); background: radial-gradient(circle, var(--color-brand) 0 5px, #fff 6px); }
+.coordinator-segmented label:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.coordinator-segmented-label { color: var(--color-heading); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.coordinator-segmented small { grid-column: 2; color: var(--color-muted); font-size: 11px; overflow-wrap: anywhere; }
+.coordinator-combined { margin-top: 8px; }
+.admin-shell .coordinator-subject-filters { margin: 18px 0 16px; }
+
+/* Readable coordinator tables (S2-P004-009 UI revision): scoped to .coordinator-table so the admin tables keep their look. */
+.admin-shell .coordinator-table table { font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.admin-shell .coordinator-table th { padding: 14px 16px; font-size: 13px; line-height: 1.4; color: var(--color-heading); }
+.admin-shell .coordinator-table td, .admin-shell .coordinator-table th[scope="row"] { padding: 18px 16px; }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):not(.coordinator-row-disabled):nth-child(even) { background: rgba(0, 0, 0, 0.022); }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):hover { background: rgba(0, 0, 0, 0.045); }
+.admin-shell .coordinator-table th[scope="row"] { font-size: 14px; }
+.admin-shell .coordinator-table th[scope="row"] strong { display: block; color: var(--color-heading); font-size: 15px; font-weight: 600; line-height: 1.4; }
+.admin-shell .coordinator-table th[scope="row"] span { display: block; font-weight: 400; }
+.admin-shell .coordinator-table .coordinator-subject-code { margin-top: 2px; color: var(--color-muted); font-size: 13px; letter-spacing: 0.02em; }
+.admin-shell .coordinator-table .admin-audit-id { margin-top: 3px; font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill, .admin-shell .coordinator-table .coordinator-needed { font-size: 12px; }
+.admin-shell .coordinator-table .admin-pill { padding: 3px 10px; }
+.admin-shell .coordinator-table button.admin-row-action, .admin-shell .coordinator-table a.coordinator-link-button { font-size: 13px; }
+.admin-shell .coordinator-table .coordinator-expander, .admin-shell .coordinator-table .coordinator-reasons { font-size: 13px; }
+.coordinator-reasons { text-align: left; }
+.coordinator-number { font-size: 20px; }
+.coordinator-audit-details { font-size: 12px; }
+.coordinator-audit-details pre { font-size: 12px; }
+.admin-shell .coordinator-subjects :is(th, td):nth-child(n+3):nth-child(-n+5) { text-align: right; }
+.admin-shell .coordinator-subjects .coordinator-reasons { text-align: left; }
+/* Coordinator filter bars: readable labels and controls (admin filter bars keep their size). */
+.admin-shell .coordinator-subject-filters label { font-size: 13px; }
+.admin-shell .coordinator-subject-filters :is(input, select) { min-height: 46px; font-size: 14px; }
+.admin-shell .coordinator-subject-filters button { min-height: 46px; font-size: 14px; }
+

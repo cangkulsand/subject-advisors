@@ -4,6 +4,7 @@
  * table or UI exists yet. See docs/api/forecasting-uc20.openapi.json.
  */
 import type { ForecastScope, Int32Id, ClassType, Paginated, Envelope, OperationReceipt, SemesterOption } from './contracts';
+import type { NewerForecastAvailable } from './runs';
 
 /** Wording shown to students. Must never imply official registration or a guaranteed timetable. */
 export const CONFIRMED_OFFERING_LABEL = 'Confirmed by coordinator';
@@ -28,19 +29,34 @@ export interface ConfirmedOffering extends ForecastScope {
   forecastRunId: Int32Id | null;
   confirmedBy: string;
   confirmedAt: string;
+  /** Set when status is WITHDRAWN. */
+  withdrawnBy?: string | null;
+  withdrawnAt?: string | null;
+  /** Reason of the latest CONFIRM or WITHDRAW of this subject. */
   reason: string;
 }
+/** Pick window state at read time: OPEN until the pick deadline, then CLOSED (picks read-only). */
+export type PickWindowState = 'OPEN' | 'CLOSED';
 export interface ConfirmedOfferingSet {
   scope: ForecastScope;
   /** Pick deadline set by the coordinator for this scope; null before the first confirmation. */
   pickDeadline: string | null;
   /** Opaque revision of the whole set for this scope; null before the first confirmation. */
   revision: string | null;
+  /** Source FINALIZED forecast run of the confirmation (provenance); null before the first confirmation. */
+  forecastRunId?: Int32Id | null;
+  /** OPEN or CLOSED from the pick deadline and the server clock; null before the first confirmation. */
+  pickWindow?: PickWindowState | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
   /**
-   * Informational only: a newer forecast run exists for this programme + centre + semester.
-   * A new forecast never changes, invalidates or requires re-confirmation of a confirmation.
+   * Informational only: a newer forecast run exists for this programme + centre + semester
+   * (later version than the source run; any status). A new forecast never changes, invalidates
+   * or requires re-confirmation of a confirmation. Null when there is none.
    */
-  newerForecastAvailable?: boolean;
+  newerForecastAvailable?: NewerForecastAvailable | null;
   offerings: ConfirmedOffering[];
 }
 /** Confirm (or re-confirm) subjects. Requires a FINALIZED run for the same scope. */
@@ -64,6 +80,8 @@ export interface SetPickDeadlineRequest {
   pickDeadline: string;
   reason: string;
   baseRevision: string;
+  /** Optional: switch the source (provenance) run to another FINALIZED run of the same scope. */
+  forecastRunId?: Int32Id;
 }
 export interface WithdrawOfferingsRequest {
   scope: ForecastScope;
@@ -135,6 +153,11 @@ export interface OfferingPickCountSummary {
   asOf: string;
   /** Deadline after which picks are closed (read-only). */
   pickDeadline: string | null;
+  /**
+   * False until student picks exist (P002 student offerings page): counts are then zero and
+   * pickers empty, which is not the same as "nobody picked".
+   */
+  picksAvailable?: boolean;
   counts: OfferingPickCount[];
 }
 
