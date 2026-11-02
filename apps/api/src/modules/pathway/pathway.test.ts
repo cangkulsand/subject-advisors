@@ -9,6 +9,7 @@ function raw(overrides: Partial<RawPathwayData> = {}): RawPathwayData {
     curriculumId: 1,
     curriculumVersion: '2026',
     programmeName: 'Bachelor of Test',
+    totalCreditRequired: 0,
     subjects: [
       { curriculumSubjectId: 10, isCompulsory: 1, subjectCategory: 'CORE', subjectId: 100, subjectCode: 'SECJ1013', subjectName: 'Programming 1', creditHours: 3 },
       { curriculumSubjectId: 11, isCompulsory: 1, subjectCategory: 'CORE', subjectId: 101, subjectCode: 'SECJ1023', subjectName: 'Programming 2', creditHours: 3 },
@@ -19,6 +20,9 @@ function raw(overrides: Partial<RawPathwayData> = {}): RawPathwayData {
       { prerequisiteId: 2, requirementType: 'RECOMMENDED', curriculumSubjectId: 12, requiredCurriculumSubjectId: 10 },
     ],
     records: [],
+    requirements: [],
+    semesterRules: [],
+    semesters: [],
     ...overrides,
   };
 }

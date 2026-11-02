@@ -49,3 +49,47 @@ export interface PathwayGraph {
 }
 
 export type PathwayApiResult = ApiResult<PathwayGraph>;
+
+export interface GraduationRequirementStatus {
+  requirementType: string;
+  requiredCredits: number | null;
+  requiredSubjects: number | null;
+  satisfiedCredits: number;
+  satisfiedSubjects: number;
+  met: boolean;
+}
+
+export interface GraduationEligibility {
+  eligible: boolean;
+  totalCreditsRequired: number;
+  totalCreditsRecognized: number;
+  requirements: GraduationRequirementStatus[];
+  outstanding: string[];
+}
+
+export type GraduationApiResult = ApiResult<GraduationEligibility>;
+
+export interface ProjectedSubject {
+  curriculumSubjectId: number;
+  subjectCode: string;
+  subjectName: string;
+  creditHours: number;
+  isCompulsory: boolean;
+}
+
+export interface ProjectedSemester {
+  semesterNo: number;
+  semesterType: 'NORMAL' | 'SHORT';
+  subjects: ProjectedSubject[];
+  totalCredits: number;
+}
+
+export interface ProjectedPathway {
+  remainingSubjects: number;
+  remainingCredits: number;
+  semesters: ProjectedSemester[];
+  estimatedCompletionSemesters: number;
+  assumptions: string[];
+}
+
+export type ProjectionApiResult = ApiResult<ProjectedPathway>;
