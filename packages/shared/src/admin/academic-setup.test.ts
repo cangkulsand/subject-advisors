@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+import {
+  isAcademicSetupId, validateCreateLearningCentreRequest, validateUpdateLearningCentreRequest,
+  validateCreateFacultyRequest, validateSetProgrammeFacultyRequest, validateCreateSemesterRequest,
+  validateUpdateSemesterRequest, validateMergedSemester, validateSetCurrentSemesterRequest,
+  validateCreateCoordinatorAssignmentRequest, validateEndCoordinatorAssignmentRequest,
+  type AcademicSemester,
+} from './academic-setup';
+
+const semester: AcademicSemester = {
+  semesterId: 1, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL',
+  maxSubjects: 5, maxCredits: 20, startDate: '2026-10-01', endDate: '2027-02-01', isCurrent: false,
+};
+const createSemester = { academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL',
+  maxSubjects: 5, maxCredits: 20, startDate: null, endDate: null, reason: ' calendar ' };
+const assignment = { accountId: 2, facultyId: 3, programmeId: 4, learningCentreId: 5, reason: ' appointment ' };
+
+describe('academic setup reference requests', () => {
+  it('normalises centre fields and requires an explicit reason', () => {
+    expect(validateCreateLearningCentreRequest({ centreCode: '  JB ', centreName: ' Johor Bahru ', reason: ' setup ' }))
+      .toEqual({ ok: true, value: { centreCode: 'JB', centreName: 'Johor Bahru', reason: 'setup' } });
+    expect(validateCreateLearningCentreRequest({ centreCode: 'JB', centreName: 'Johor Bahru', reason: ' ' }).ok).toBe(false);
+  });
+  it('rejects invalid lengths, unknown fields and empty updates', () => {
+    expect(validateCreateLearningCentreRequest({ centreCode: 'x'.repeat(11), centreName: 'x', reason: 'r' }).ok).toBe(false);
+    expect(validateCreateLearningCentreRequest({ centreCode: 'x', centreName: 'x'.repeat(101), reason: 'r' }).ok).toBe(false);
+    expect(validateCreateFacultyRequest({ facultyCode: 'F', facultyName: 'Faculty', reason: 'r', surprise: true }).ok).toBe(false);
+    expect(validateUpdateLearningCentreRequest({ reason: 'r' }).ok).toBe(false);
+    expect(validateUpdateLearningCentreRequest({ isActive: 'false', reason: 'r' }).ok).toBe(false);
+    expect(validateUpdateLearningCentreRequest({ isActive: false, reason: 'r' }).ok).toBe(true);
+  });
+  it('allows an explicit null faculty but rejects absent or invalid IDs', () => {
+    expect(validateSetProgrammeFacultyRequest({ facultyId: null, reason: ' clear ' }))
+      .toEqual({ ok: true, value: { facultyId: null, reason: 'clear' } });
+    for (const facultyId of [undefined, 0, -1, 1.5, 2147483648, '1']) {
+      expect(validateSetProgrammeFacultyRequest({ facultyId, reason: 'r' }).ok).toBe(false);
+    }
+  });
+});
+describe('academic semester requests', () => {
+  it('accepts exact baseline ranges and nullable dates', () => {
+    expect(validateCreateSemesterRequest({ ...createSemester, maxSubjects: 0, maxCredits: 32767 }).ok).toBe(true);
+    expect(validateCreateSemesterRequest(createSemester)).toEqual({ ok: true, value: { ...createSemester, reason: 'calendar' } });
+  });
+  it.each([
+    { academicYear: '2026-2027' }, { semesterNo: 0 }, { semesterNo: 4 },
+    { semesterNo: 3 }, { semesterType: 'SHORT' },
+    { maxSubjects: -1 }, { maxSubjects: 32768 }, { maxCredits: 2.5 },
+    { startDate: '2026-02-30' }, { startDate: '0000-01-01' }, { endDate: '2027-13-01' }, { startDate: '2026-1-01' },
+    { startDate: '2027-02-02', endDate: '2027-02-01' }, { isCurrent: true },
+  ])('rejects invalid create fields %j', patch => {
+    expect(validateCreateSemesterRequest({ ...createSemester, ...patch }).ok).toBe(false);
+  });
+  it('checks merged PATCH invariants against the stored row', () => {
+    const typePatch = validateUpdateSemesterRequest({ semesterNo: 3, reason: 'r' });
+    expect(typePatch.ok).toBe(true);
+    if (typePatch.ok) expect(validateMergedSemester(semester, typePatch.value).ok).toBe(false);
+    const datePatch = validateUpdateSemesterRequest({ startDate: '2027-02-02', reason: 'r' });
+    expect(datePatch.ok).toBe(true);
+    if (datePatch.ok) expect(validateMergedSemester(semester, datePatch.value).ok).toBe(false);
+    expect(validateUpdateSemesterRequest({ semesterNo: 3, semesterType: 'SHORT', reason: 'r' }).ok).toBe(true);
+    expect(validateUpdateSemesterRequest({ reason: 'r' }).ok).toBe(false);
+  });
+});
+describe('current semester and coordinator assignment requests', () => {
+  it('requires an explicit current semester ID', () => {
+    expect(validateSetCurrentSemesterRequest({ semesterId: 1, reason: ' select ' }))
+      .toEqual({ ok: true, value: { semesterId: 1, reason: 'select' } });
+    expect(validateSetCurrentSemesterRequest({ semesterId: null, reason: 'r' }).ok).toBe(false);
+    expect(validateSetCurrentSemesterRequest({ semesterId: 1, reason: 'r', isCurrent: true }).ok).toBe(false);
+  });
+  it('rejects bad assignment IDs and accepts a valid appointment', () => {
+    expect(validateCreateCoordinatorAssignmentRequest(assignment)).toEqual({
+      ok: true, value: { ...assignment, reason: 'appointment' },
+    });
+    for (const field of ['accountId', 'facultyId', 'programmeId', 'learningCentreId']) {
+      expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, [field]: 0 }).ok).toBe(false);
+    }
+    expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, endedAt: null }).ok).toBe(false);
+    expect(validateEndCoordinatorAssignmentRequest({ reason: ' end ' }))
+      .toEqual({ ok: true, value: { reason: 'end' } });
+    expect(validateEndCoordinatorAssignmentRequest({ reason: '' }).ok).toBe(false);
+    expect(isAcademicSetupId(2147483647)).toBe(true);
+    expect(isAcademicSetupId(2147483648)).toBe(false);
+  });
+});

@@ -1,6 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
+import {mkdtemp,cp,readFile,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve,relative,isAbsolute} from 'node:path';
 import {loadMigrations,validateTarget,verifyConnectedTarget,migrationStatus,applyMigrations} from './migrations.mjs';
 import {reviewSchema} from './review.mjs';
 
@@ -25,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -55,7 +58,7 @@ test('0005 is additive only and registers the approved nullable curriculum metad
  assert.match(migration.sql,/REVOKE ALL ON migration_meta\.reference_data_imports FROM PUBLIC/i);
  assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
- const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,18);
+ const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,21);
 });
 test('0006 audits access-status changes and adds a protected pending-invitation table',async()=>{
  const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0006');
@@ -82,7 +85,7 @@ test('0007 adds programme-scoped forecast persistence and protected offering con
  assert.match(migration.sql,/REVOKE ALL ON public\.confirmed_offering_audit FROM PUBLIC/);
  assert.doesNotMatch(migration.sql.replace(/--.*$/gm,''),/coordinator_assignment|public\.faculty|is_current|ALTER TABLE public\.student_profile|student_offering_pick|DROP\s+(?:TABLE|COLUMN)|DELETE\s+FROM|INSERT\s+INTO/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.forecast_adjustment_audit','public.offering_confirmation','public.confirmed_offering','public.confirmed_offering_audit']);
- const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,18);
+ const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,21);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));
@@ -135,4 +138,35 @@ test('DDL failure rolls back and never commits partial migration state',async()=
 test('CLI refuses migration without an explicit target even if DATABASE_URL exists',()=>{
  const result=spawnSync(process.execPath,['tools/db/cli.mjs','migrate'],{encoding:'utf8',env:{...process.env,DATABASE_URL:'postgresql://test:test@production.invalid/db'},timeout:10000,windowsHide:true});
  assert.equal(result.status,1);assert.match(result.stderr,/EXPLICIT_TARGET_FILE_REQUIRED/);
+});
+
+// Mutate isolated copies so a checker regression cannot damage the checkout.
+for(const [label,file,replace,expected] of [
+ ['nonboolean NULL default','db/migrations/0008_admin_academic_setup.sql',s=>s.replace('is_current boolean NOT NULL DEFAULT false','is_current boolean NOT NULL DEFAULT NULL'),/COLUMN_SHAPE_MISMATCH/],
+ ['nonliteral boolean default','db/migrations/0008_admin_academic_setup.sql',s=>s.replace('is_current boolean NOT NULL DEFAULT false',"is_current boolean NOT NULL DEFAULT (1=0)"),/COLUMN_SHAPE_MISMATCH/],
+ ['nullable default','db/migrations/0008_admin_academic_setup.sql',s=>s.replace('faculty_id integer NULL REFERENCES','faculty_id integer NULL DEFAULT NULL REFERENCES'),/COLUMN_SHAPE_MISMATCH/],
+ ['wrong required default','db/engineering-extensions.json',s=>s.replace('"default": false','"default": true'),/INVALID_ENGINEERING_EXTENSION_COLUMN/],
+ ['unregistered required column','db/engineering-extensions.json',s=>s.replace('"name": "is_current"','"name": "unexpected"'),/INVALID_ENGINEERING_EXTENSION_COLUMN/],
+ ['baseline type drift','db/migrations/0001_initial_schema.sql',s=>s.replace('programme_code varchar(20)','programme_code varchar(21)'),/COLUMN_MAPPING_MISMATCH/]
+])test('schema review rejects '+label,async()=>{
+ const root=await mkdtemp(join(tmpdir(),'academic-checker-'));
+ try{
+  await cp('db',join(root,'db'),{recursive:true});
+  const path=join(root,file);const original=await readFile(path,'utf8');const changed=replace(original);
+  assert.notEqual(changed,original,'fixture mutation must match');await writeFile(path,changed);
+  await assert.rejects(reviewSchema(root),expected);
+ }finally{
+  const cleanupRoot=resolve(root);const parent=resolve(tmpdir());const boundary=relative(parent,cleanupRoot);
+  assert.ok(boundary&&!boundary.startsWith('..')&&!isAbsolute(boundary)&&boundary.startsWith('academic-checker-'),'cleanup must stay in its generated temporary directory');
+  await rm(cleanupRoot,{recursive:true,force:true});
+ }
+});
+test('0008 follows the exact 0007 prefix and shared history remains enforced',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0007','0008']);
+ assert.doesNotMatch(entries.at(-1).sql,/confirmed_offering|forecast_configuration|confirmed_semester/i);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0008']);
+ const eight=entries.at(-1);
+ await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0007').concat([{version:'0008',filename:eight.file,sha256:eight.sha256}])}),entries),/NOT_A_PREFIX/);
+ await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0007'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });

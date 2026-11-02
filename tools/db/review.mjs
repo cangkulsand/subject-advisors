@@ -46,7 +46,10 @@ export async function reviewSchema(root=process.cwd()){
   }
   const extensionColumnsByMigration=new Map();
   for(const column of extensionColumns){
-    if(column.nullable!==true||!column.purpose||!column.migration||!column.table||!column.name||!column.sqlType)
+    const supportedRequiredBoolean=column.nullable===false&&column.sqlType==='boolean'&&typeof column.default==='boolean'&&
+      column.migration==='0008'&&[['learning_centre','is_active',true],['academic_semester','is_current',false]]
+        .some(([table,name,value])=>column.table===table&&column.name===name&&column.default===value);
+    if(!(column.nullable===true&&column.default===undefined||supportedRequiredBoolean)||!column.purpose||!column.migration||!column.table||!column.name||!column.sqlType)
       throw new GateError('INVALID_ENGINEERING_EXTENSION_COLUMN');
     const migration=migrations.find(item=>item.version===column.migration);
     if(!migration)throw new GateError('ENGINEERING_EXTENSION_MIGRATION_MISSING');
@@ -72,18 +75,24 @@ export async function reviewSchema(root=process.cwd()){
     for(const expected of expectedColumns){
       const item=additions.find(candidate=>candidate.table===expected.table&&candidate.column.colname===expected.name);
       const column=item.column;const typeName=column.typeName.names.at(-1).String.sval;
-      const normalizedType=expected.sqlType.startsWith('varchar(')?'varchar':expected.sqlType;
+      const normalizedType=expected.sqlType.startsWith('varchar(')?'varchar':sqlTypes[expected.sqlType]??expected.sqlType;
       const typeLength=column.typeName.typmods?.[0]?.A_Const?.ival?.ival;
       const expectedLength=Number(expected.sqlType.match(/\((\d+)\)/)?.[1]);
       const constraints=column.constraints?.map(c=>c.Constraint)??[];
+      const notNull=constraints.some(c=>c.contype==='CONSTR_NOTNULL');
+      const defaults=constraints.filter(c=>c.contype==='CONSTR_DEFAULT');
+      // Protobuf JSON omits the scalar false inside the present boolval node.
+      const booleanNode=defaults[0]?.raw_expr?.A_Const?.boolval;
+      const defaultBoolean=booleanNode===undefined?undefined:(booleanNode.boolval??false);
       if(typeName!==normalizedType||(expectedLength&&typeLength!==expectedLength)||
-         constraints.some(c=>c.contype==='CONSTR_NOTNULL')||column.raw_default)
+         notNull===(expected.nullable===true)||defaults.length!==(expected.nullable?0:1)||
+         (expected.nullable===false&&defaultBoolean!==expected.default))
         throw new GateError('ENGINEERING_EXTENSION_COLUMN_SHAPE_MISMATCH_'+expected.table+'.'+expected.name);
     }
     extensionColumnCount+=expectedColumns.length;
   }
   const plpgsql=await parsePlPgSQL(sql);
-  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql','004_profile_current_semester.sql','005_multi_role_access.sql','006_multi_role_behavior_tests.sql','007_network_security_reference.sql','008_admin_user_management.sql','009_admin_user_management_behavior_tests.sql','010_uc20_forecast_and_confirmation.sql','011_uc20_forecast_and_confirmation_behavior_tests.sql']){
+  for(const name of ['001_schema_verification.sql','002_behavior_tests.sql','003_role_boundary_tests.sql','004_profile_current_semester.sql','005_multi_role_access.sql','006_multi_role_behavior_tests.sql','007_network_security_reference.sql','008_admin_user_management.sql','009_admin_user_management_behavior_tests.sql','010_uc20_forecast_and_confirmation.sql','011_uc20_forecast_and_confirmation_behavior_tests.sql','012_admin_academic_setup.sql','013_admin_academic_setup_behavior.sql']){
     const checkSql=await readFile(root+'/db/checks/'+name,'utf8');
     await parse(checkSql);await parsePlPgSQL(checkSql);
   }

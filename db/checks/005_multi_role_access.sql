@@ -5,8 +5,8 @@ DECLARE membership oid := 'public.user_role_assignment'::regclass;
 DECLARE audit_log oid := 'public.user_role_audit_log'::regclass;
 BEGIN
   IF (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='public' AND c.relkind IN ('r','p')) <> 33 THEN
-    RAISE EXCEPTION 'Expected 26 baseline tables, two multi-role tables, the admin invitation table and four UC20 forecast/confirmation tables';
+      WHERE n.nspname='public' AND c.relkind IN ('r','p')) <> 36 THEN
+    RAISE EXCEPTION 'Expected 26 baseline tables, two multi-role tables, the admin invitation table, four UC20 forecast/confirmation tables and three academic setup tables';
   END IF;
   IF (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='user_role_assignment') <> 8 THEN
     RAISE EXCEPTION 'Unexpected user_role_assignment columns';

@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { fixtureMutation, fixtureResponse } from './fixtures.mjs';
+import { academicUiChecks } from './academic-ui-checks.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
 const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', loader: { '.png': 'dataurl' }, alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
@@ -24,7 +25,7 @@ const server = createServer(async (req, res) => {
       res.statusCode = result?.status ?? 405; res.end(JSON.stringify(result?.payload ?? { error: { code: 'METHOD_NOT_ALLOWED', message: 'Not supported.' } }));
     } else {
       const data = fixtureResponse(url, serveState);
-      res.statusCode = data ? 200 : 404; res.end(JSON.stringify({ data }));
+      res.statusCode = data !== null || url.pathname === '/api/admin/academic-setup/current-semester' ? 200 : 404; res.end(JSON.stringify({ data }));
     }
   } else {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -50,7 +51,7 @@ else {
         return;
       }
       const data = fixtureResponse(url, state);
-      await route.fulfill({ status: failed ? 503 : data ? 200 : 404, contentType: 'application/json', body: JSON.stringify(failed ? { error: { code: 'ADMIN_UNAVAILABLE', message: 'Fixture service unavailable. Please retry.' } } : { data }) });
+      await route.fulfill({ status: failed ? 503 : data !== null || url.pathname === '/api/admin/academic-setup/current-semester' ? 200 : 404, contentType: 'application/json', body: JSON.stringify(failed ? { error: { code: 'ADMIN_UNAVAILABLE', message: 'Fixture service unavailable. Please retry.' } } : { data }) });
     });
     return state;
   }
@@ -72,8 +73,8 @@ else {
       assert.equal(await page.getByRole('link', { name: 'Academic Semesters', exact: true, includeHidden: true }).count(), 2); // Desktop and mobile dialog.
       await page.getByRole('link', { name: 'Academic Semesters', exact: true }).click();
       await page.getByRole('heading', { name: 'Academic Semesters', exact: true }).waitFor();
-      await page.getByText('This workspace is planned.', { exact: false }).waitFor();
-      assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview']);
+      await page.getByText('Not configured', { exact: true }).waitFor();
+      assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/admin/academic-setup/semesters', '/api/admin/academic-setup/current-semester']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
       await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/admin-review/overview-desktop.png', fullPage: true });
@@ -86,7 +87,7 @@ else {
       await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/staff-menu-review/admin-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Administration navigation' });
-      for (const [label, title] of [['Academic Semesters', 'Academic Semesters'], ['Curriculum & Prerequisites', 'Curriculum & Prerequisites'], ['Graduation Requirements', 'Graduation Requirements']]) {
+      for (const [label, title] of [['Curriculum & Prerequisites', 'Curriculum & Prerequisites'], ['Graduation Requirements', 'Graduation Requirements']]) {
         await navigation.getByRole('link', { name: label, exact: true }).click();
         await page.getByRole('heading', { name: title, exact: true }).waitFor();
         await page.getByText('This workspace is planned.', { exact: false }).waitFor();
@@ -459,6 +460,7 @@ else {
       if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/account-mobile.png', fullPage: true });
       assert.ok(state.requests.length > 0);
     }, width);
+    await academicUiChecks({ check, mock, base });
     console.log('PASS ' + passed + ' administration browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }
 }

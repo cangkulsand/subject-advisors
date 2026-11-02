@@ -1,6 +1,8 @@
 -- SYNTHETIC / DEMO / NOT OFFICIAL UTMSPACE DATA.
 -- No persistent fixtures: the entire script ends with ROLLBACK.
 BEGIN;
+SELECT set_config('app.access_actor','__DB_ACADEMIC_COMPAT_TEST__',true),
+       set_config('app.access_reason','Synthetic rollback-only baseline fixtures.',true);
 CREATE TEMP TABLE db_foundation_results(test_name text,status text) ON COMMIT DROP;
 CREATE FUNCTION pg_temp.assert_rejected(label text,statement text) RETURNS void LANGUAGE plpgsql AS $test$
 DECLARE rejected boolean:=false; code text;

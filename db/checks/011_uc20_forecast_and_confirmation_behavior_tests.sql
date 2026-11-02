@@ -1,5 +1,8 @@
 -- DEVELOPMENT ONLY. Synthetic fixtures; everything is rolled back.
 BEGIN;
+-- 0008 requires an audited academic-setup context for reference fixtures (learning_centre, academic_semester).
+SELECT set_config('app.access_actor','__DB_UC20_TEST__',true),
+       set_config('app.access_reason','Synthetic rollback-only UC20 fixtures.',true);
 CREATE TEMP TABLE db_uc20_results(test_name text,status text) ON COMMIT DROP;
 CREATE FUNCTION pg_temp.assert_uc20_rejected(label text,statement text) RETURNS void LANGUAGE plpgsql AS $test$
 DECLARE rejected boolean:=false; code text;
@@ -233,12 +236,14 @@ SELECT pg_temp.assert_uc20_rejected('direct audit insert with mismatched actor',
 SELECT pg_temp.assert_uc20_rejected('direct audit insert with invalid action',
   $q$INSERT INTO public.confirmed_offering_audit(confirmation_id,subject_id,action,after_state,reason,recorded_by) VALUES(-1900000111,-1900000021,'DELETE','{}','Move deadline.','__UC20_COORD')$q$);
 
--- G. Package A/B objects stay absent
-SELECT pg_temp.assert_uc20_true('no Package A/B objects were introduced',
-  NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
-    AND ((table_name='academic_semester' AND column_name='is_current') OR (table_name='student_profile' AND column_name='learning_centre_id')))
-  AND to_regclass('public.coordinator_assignment') IS NULL AND to_regclass('public.faculty') IS NULL
-  AND to_regclass('public.student_offering_pick') IS NULL);
+-- G. Package A/B objects exist only once their own migration (0008 / 0009) is recorded
+SELECT pg_temp.assert_uc20_true('no Package A/B objects were introduced by 0007',
+  (EXISTS (SELECT 1 FROM migration_meta.schema_migrations WHERE version='0008')
+    OR (NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='academic_semester' AND column_name='is_current')
+        AND to_regclass('public.coordinator_assignment') IS NULL AND to_regclass('public.faculty') IS NULL))
+  AND (EXISTS (SELECT 1 FROM migration_meta.schema_migrations WHERE version='0009')
+    OR (NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='student_profile' AND column_name='learning_centre_id')
+        AND to_regclass('public.student_offering_pick') IS NULL)));
 
 SELECT test_name,status FROM db_uc20_results ORDER BY test_name;
 ROLLBACK;

@@ -49,10 +49,13 @@ BEGIN
         AND conrelid IN ('public.forecast_adjustment_audit'::regclass,'public.offering_confirmation'::regclass,'public.confirmed_offering'::regclass,'public.confirmed_offering_audit'::regclass)) THEN
     RAISE EXCEPTION '0007 foreign keys must be ON DELETE RESTRICT';
   END IF;
-  IF to_regclass('public.coordinator_assignment') IS NOT NULL OR to_regclass('public.faculty') IS NOT NULL
-     OR to_regclass('public.student_offering_pick') IS NOT NULL
-     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
-        AND ((table_name='academic_semester' AND column_name='is_current') OR (table_name='student_profile' AND column_name='learning_centre_id'))) THEN
+  -- Package A (0008) and Package B (0009) objects may exist only once their own migration is recorded.
+  IF (NOT EXISTS (SELECT 1 FROM migration_meta.schema_migrations WHERE version='0008')
+        AND (to_regclass('public.coordinator_assignment') IS NOT NULL OR to_regclass('public.faculty') IS NOT NULL
+          OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='academic_semester' AND column_name='is_current')))
+     OR (NOT EXISTS (SELECT 1 FROM migration_meta.schema_migrations WHERE version='0009')
+        AND (to_regclass('public.student_offering_pick') IS NOT NULL
+          OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='student_profile' AND column_name='learning_centre_id'))) THEN
     RAISE EXCEPTION 'Package A/B objects must not be created by 0007';
   END IF;
 

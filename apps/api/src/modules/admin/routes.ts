@@ -4,6 +4,7 @@ import type { AdminIdentity, AdminInvitationStatus, AdminUsersQuery, AdminAuditQ
 import type { AccountDetailRow, AccountRow, AdminDependencies } from './contracts';
 import { AdminMutationError } from './errors';
 import { checkRoleEligibility } from './eligibility';
+import { handleAcademicSetupRequest } from './academic-routes';
 
 function invalid(message: string): never { throw new AuthError(400, 'INVALID_ADMIN_QUERY', message); }
 function positive(value: string, label: string) {
@@ -82,6 +83,11 @@ async function detail(account: AccountDetailRow, deps: AdminDependencies) {
 export async function handleAdminRequest(request: Request, deps: AdminDependencies): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return null;
+  // Academic routes must run before the user-management catchall. Old fixture dependencies remain compatible.
+  if (deps.academicRepository) {
+    const response = await handleAcademicSetupRequest(request, { auth: deps.auth, repository: deps.academicRepository });
+    if (response) return response;
+  }
   try {
     // The actor is always the authorized administrator's own verified Clerk ID, never a value from the request.
     const actor = (await authorize(request, deps.auth, { roles: ['SYSTEM_ADMIN'] })).clerkUserId;

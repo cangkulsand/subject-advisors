@@ -1,3 +1,4 @@
+import { academicMutation, academicResponse } from './academic-fixtures.mjs';
 // Fictional test/preview data only. Never imported by an application entry point.
 export const generatedAt = '2026-10-28T10:00:00.000Z';
 const accounts = Array.from({ length: 23 }, (_, i) => ({
@@ -36,6 +37,8 @@ function paged(items, url) {
   return { items: items.slice((page - 1) * 20, page * 20), total: items.length, page, pageSize: 20, generatedAt };
 }
 export function fixtureResponse(url, state = {}) {
+  const academic = academicResponse(url, state);
+  if (academic !== undefined) return academic;
   if (url.pathname === '/api/me') {
     const roles = state.roles ?? ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'];
     const appRole = roles.includes('SYSTEM_ADMIN') ? 'SYSTEM_ADMIN' : roles[0];
@@ -67,6 +70,8 @@ export function fixtureResponse(url, state = {}) {
 /** Mutation endpoints. Returns { status, payload } mirroring the API envelope, or null when the route is unknown. */
 export function fixtureMutation(method, url, body, state = {}) {
   const data = store(state), now = new Date().toISOString();
+  const academic = academicMutation(method, url, body, state, data.accounts);
+  if (academic !== undefined) return academic;
   const audit = (account, action, role, before, after, reason) => data.events.unshift({ eventId: 'mutation:' + data.events.length, accountId: account.accountId, target: account.clerkUserId, actor: 'user_test', kind: action === 'ACCESS_STATUS_CHANGE' ? 'ACCESS' : 'ROLE', action, role, before, after, reason, occurredAt: now });
   if (typeof body?.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 500) return failure(400, 'INVALID_REQUEST', 'Reason is required (1-500 characters).');
   const reason = body.reason.trim();
