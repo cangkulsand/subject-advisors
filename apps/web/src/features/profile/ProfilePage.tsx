@@ -3,6 +3,7 @@ import type { Profile, ProfileOptions } from '../../../../api/src/modules/profil
 import { type AcademicClient, errorMessage } from './client';
 import { resolveProgrammeCurriculum } from './programme-resolution';
 import { navigateApp, registerUnsavedChanges } from '../../app/navigation';
+import '../../app/typography.css';
 import './profile.css';
 const empty = { studentName: '', matricNo: '', curriculumId: '', academicYear: '', currentSemesterId: '', weeklyWorkingHours: '', availableStudyHours: '' };
 type Draft = typeof empty;

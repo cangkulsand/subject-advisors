@@ -1,0 +1,17 @@
+/* Typography tokens (S2-INT-003): the ONE place the type scale is defined. Feature CSS only consumes these variables.
+   Rules and rationale: docs/themeguide.md "Typography and readability (mandatory)". Imported by every shell/entry; bundlers de-duplicate it. */
+:root {
+  --font-size-small:12px;        /* absolute minimum: badges, pills, captions, hints */
+  --font-size-label:13px;        /* form labels, legends, fact terms */
+  --font-size-table-head:13px;   /* table column headers (minimum) */
+  --font-size-table:14px;        /* table body cells (minimum) */
+  --font-size-control:14px;      /* inputs, selects, buttons, compact body text */
+  --font-size-body:15px;         /* default reading text, card paragraphs */
+  --font-size-subject-name:15px; /* subject name in tables and lists (primary) */
+  --font-size-subject-code:13px; /* subject code (secondary, muted) */
+  --font-size-metric:20px;       /* numbers in tables and metric tiles */
+  --line-height-table:1.5;
+  --line-height-body:1.55;
+  --control-min-height:44px;
+  --color-muted-text:#555555;    /* readable muted text: 6.2:1 or better on every surface (WCAG AA needs 4.5:1) */
+}

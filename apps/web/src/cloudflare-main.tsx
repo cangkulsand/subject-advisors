@@ -2,6 +2,7 @@ import { Component, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuthProvider } from './features/auth';
 import { AppRoutes } from './app/AppRoutes';
+import './app/typography.css';
 import '../../../tools/auth/local/preview.css';
 
 class ProviderBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

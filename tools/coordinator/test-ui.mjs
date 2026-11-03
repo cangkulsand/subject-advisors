@@ -7,6 +7,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 import { createState, handle } from './fixtures.mjs';
 
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
@@ -54,7 +55,7 @@ else {
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => { for (const fn of ['alert', 'confirm', 'prompt']) window[fn] = () => { throw new Error('window.' + fn + ' must not be used'); }; });
     page.on('dialog', async dialog => { errors.push('Unexpected window dialog: ' + dialog.type() + ' ' + dialog.message()); await dialog.dismiss(); });
-    try { await body(page); assert.deepEqual(errors, []); passed++; console.log('PASS ' + name); }
+    try { await body(page); await assertReadable(page, name); assert.deepEqual(errors, []); passed++; console.log('PASS ' + name); }
     catch (error) { console.error(name, errors, await page.locator('body').innerText().catch(() => '')); await page.screenshot({ path: shots + 'failure-' + passed + '.png', fullPage: true }).catch(() => {}); throw error; }
     finally { await page.close(); }
   }
@@ -309,8 +310,8 @@ else {
         return { small, body: [...table.querySelectorAll('tbody td')].map(cell => parseFloat(getComputedStyle(cell).fontSize)), header: [...table.querySelectorAll('thead th')].map(cell => parseFloat(getComputedStyle(cell).fontSize)) };
       });
       assert.deepEqual(sizes.small, [], 'no text below 12px in the subjects table'); assert.ok(sizes.body.every(size => size >= 14), 'body cells are at least 14px'); assert.ok(sizes.header.every(size => size >= 13), 'header labels are at least 13px');
-      const controls = await page.getByRole('search', { name: 'Filter and sort subjects' }).evaluate(bar => ({ labels: [...bar.querySelectorAll('label')].map(item => parseFloat(getComputedStyle(item).fontSize)), fields: [...bar.querySelectorAll('input, select')].map(item => [parseFloat(getComputedStyle(item).fontSize), item.getBoundingClientRect().height]) }));
-      assert.ok(controls.labels.every(size => size >= 13), 'filter labels are at least 13px'); assert.ok(controls.fields.every(([size, height]) => size >= 14 && height >= 44), 'filter inputs and selects are at least 14px and 44px tall');
+      const controls = await page.getByRole('search', { name: 'Filter and sort subjects' }).evaluate(bar => ({ labels: [...bar.querySelectorAll('label')].map(item => parseFloat(getComputedStyle(item).fontSize)), fields: [...bar.querySelectorAll('.tt-search, .tt-menu-button')].map(item => [parseFloat(getComputedStyle(item.querySelector('input') ?? item).fontSize), item.getBoundingClientRect().height]) }));
+      assert.ok(controls.labels.every(size => size >= 13) && controls.fields.length === 3, 'filter controls are readable'); assert.ok(controls.fields.every(([size, height]) => size >= 14 && height >= 44), 'filter inputs and selects are at least 14px and 44px tall');
       const first = await page.locator('tr[data-subject="SECJ1013"] th[scope="row"]').evaluate(cell => [...cell.children].map(child => child.textContent.trim()));
       assert.deepEqual(first, ['Programming Technique I', 'SECJ1013', '3 credit hours'], 'subject name first, then the code, then credit hours');
       assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '4', 'the Subjects tile counts the subjects in the table, not the hidden ones');
@@ -353,8 +354,13 @@ else {
       const rows = page.locator('.coordinator-subjects tbody tr'), pager = page.locator('.admin-pagination'), bar = page.getByRole('search', { name: 'Filter and sort subjects' });
       const tile = page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd');
       const codes = async () => rows.evaluateAll(items => items.map(item => item.getAttribute('data-subject')));
+      const choose = async (menu, group, option) => { await bar.locator('button[aria-haspopup="menu"]').nth(menu).click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
+      const tab = name => bar.getByRole('group', { name: 'Decision' }).getByRole('button', { name, exact: true });
       await bar.waitFor(); assert.equal(await bar.getByRole('button', { name: 'Clear filters' }).count(), 0, 'no clear button while nothing is filtered');
-      assert.equal(await bar.getByLabel('Sort by').inputValue(), 'name', 'name A–Z is the default sort'); assert.equal(await bar.getByLabel('Sort by').locator('option').first().innerText(), 'Subject name (A–Z)');
+      assert.equal(await bar.locator('button[aria-haspopup="menu"]').nth(1).innerText(), 'Sort: Subject name (A–Z)', 'name A–Z is the default sort'); assert.equal(await tab('All').getAttribute('aria-pressed'), 'true');
+      await bar.locator('button[aria-haspopup="menu"]').nth(0).click(); await page.getByRole('menu', { name: 'Filter' }).waitFor();
+      const toolbarDesktop = shots + 'forecast-subjects-menu-open-desktop.png'; await page.screenshot({ path: toolbarDesktop, fullPage: false });
+      await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' }); assert.ok(await bar.locator('button[aria-haspopup="menu"]').nth(0).evaluate(el => el === document.activeElement), 'Escape returns focus to the menu button');
       await page.screenshot({ path: shots + 'forecast-subjects-filters-desktop.png', fullPage: true });
       await bar.getByLabel('Search subjects').fill('DATABASE'); // case-insensitive, matches the name
       assert.deepEqual(await codes(), ['SECD2523']); assert.equal(await pager.count(), 0); assert.equal(await tile.innerText(), '25', 'the summary tile stays unfiltered');
@@ -362,28 +368,28 @@ else {
       await bar.getByRole('button', { name: 'Clear filters' }).click();
       await pager.getByText('25 subjects · Page 1 of 2').waitFor(); assert.equal(await bar.getByLabel('Search subjects').inputValue(), '');
       await pager.getByRole('button', { name: 'Next' }).click(); await pager.getByText('Page 2 of 2').waitFor();
-      await bar.getByLabel('Class type').selectOption('LAB');
+      await choose(0, 'Class type', 'Lab');
       assert.deepEqual(await codes(), ['SECJ1013', 'SECJ1023']); assert.equal(await pager.count(), 0, 'filtering returns to page 1 and hides the pager when one page is enough');
-      await bar.getByLabel('Class type').selectOption('NONE'); assert.deepEqual(await codes(), ['SECD2523']);
-      await bar.getByLabel('Class type').selectOption(''); await bar.getByLabel('Flags').selectOption('CONFIG'); assert.deepEqual(await codes(), ['SECD2523']);
-      await bar.getByLabel('Flags').selectOption('UNCERTAIN'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013']);
-      await bar.getByLabel('Flags').selectOption(''); await bar.getByLabel('Decision').selectOption('PENDING'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013', 'SECJ1023']);
-      await pager.count(); await bar.getByLabel('Decision').selectOption('APPROVED'); await pager.getByText('21 of 25 subjects · Page 1 of 2').waitFor();
+      await choose(0, 'Class type', 'Not set'); assert.deepEqual(await codes(), ['SECD2523']);
+      await choose(0, 'Class type', 'All'); await choose(0, 'Flags', 'Configuration required'); assert.deepEqual(await codes(), ['SECD2523']);
+      await choose(0, 'Flags', 'Has uncertain students'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013']);
+      await choose(0, 'Flags', 'All'); await tab('Pending').click(); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013', 'SECJ1023']);
+      await pager.count(); await tab('Approved').click(); await pager.getByText('21 of 25 subjects · Page 1 of 2').waitFor();
       // Finalize while a filter hides every pending subject: the filters are cleared and the table jumps to their page.
       await page.getByRole('button', { name: 'Finalize forecast' }).click();
       const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
       await pager.getByText('25 subjects · Page 2 of 2').waitFor();
-      assert.equal(await bar.getByLabel('Decision').inputValue(), ''); assert.equal(await page.locator('.coordinator-row-pending').count(), 3);
-      await bar.getByLabel('Decision').selectOption('NONE'); assert.deepEqual(await codes(), ['SECD2523']);
-      await bar.getByLabel('Decision').selectOption('');
-      await bar.getByLabel('Sort by').selectOption('demand'); await pager.getByText('Page 1 of 2').waitFor();
+      assert.equal(await tab('All').getAttribute('aria-pressed'), 'true'); assert.equal(await page.locator('.coordinator-row-pending').count(), 3);
+      await choose(0, 'Other decisions', 'No sections'); assert.deepEqual(await codes(), ['SECD2523']);
+      await tab('All').click();
+      await choose(1, 'Sort by', 'Potential demand (high to low)'); await pager.getByText('Page 1 of 2').waitFor();
       assert.deepEqual((await codes()).slice(0, 3), ['SCSJ1013', 'SECJ1013', 'SECD2523']); // 71, 46, 30
-      await bar.getByLabel('Sort by').selectOption('uncertain'); assert.deepEqual((await codes()).slice(0, 2), ['SCSJ1013', 'SECJ1013']);
-      await bar.getByLabel('Sort by').selectOption('name'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
+      await choose(1, 'Sort by', 'Uncertain (high to low)'); assert.deepEqual((await codes()).slice(0, 2), ['SCSJ1013', 'SECJ1013']);
+      await choose(1, 'Sort by', 'Subject name (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
       await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ1023'], 'page 2 in name order: Database, Discrete, Programming I, Programming II');
-      await bar.getByLabel('Sort by').selectOption('code'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
+      await choose(1, 'Sort by', 'Subject code (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
       await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SCSJ1013', 'SECD2523', 'SECJ1013', 'SECJ1023'], 'page 2 in code order');
       await bar.getByLabel('Search subjects').fill('zzz-no-match');
       await page.getByText('No subjects match these filters.').waitFor(); assert.equal(await rows.count(), 0);
@@ -396,6 +402,9 @@ else {
       await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       const bar = page.getByRole('search', { name: 'Filter and sort subjects' }); await bar.waitFor();
       await bar.getByLabel('Search subjects').fill('FILL'); assert.ok(await noOverflow(page));
+      await bar.locator('button[aria-haspopup="menu"]').nth(0).click(); await page.getByRole('menu', { name: 'Filter' }).waitFor(); assert.ok(await noOverflow(page), 'open filter menu does not overflow at ' + width);
+      const menuBox = await page.getByRole('menu', { name: 'Filter' }).boundingBox(); assert.ok(menuBox.x >= 0 && menuBox.x + menuBox.width <= width, 'menu inside viewport');
+      await page.screenshot({ path: shots + 'forecast-subjects-menu-open-mobile-' + width + '.png' });
       const box = await bar.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width);
       if (width === 320) await page.screenshot({ path: shots + 'forecast-subjects-filters-mobile-320.png', fullPage: true });
     });
@@ -498,7 +507,7 @@ else {
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Forecast finalized. It is now read-only.' }).waitFor();
       await page.getByText('Finalized', { exact: true }).first().waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
       await page.getByRole('link', { name: 'Confirm offerings' }).waitFor();
       const post = state.bodies.filter(item => item.path.endsWith('/finalizations')).at(-1);
       assert.deepEqual(post.body, { scope: { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 }, reason: 'Ready for confirmation.' });
@@ -510,7 +519,7 @@ else {
       await mock(page, { seed: 'finalized' }); await page.goto(base + runUrl);
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       await page.getByText('This forecast is finalized and read-only.').waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
     });
 
     await check('forecasts: 412 RUN_REVISION_MISMATCH reloads the forecast and says so', async page => {

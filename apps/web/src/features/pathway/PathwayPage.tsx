@@ -5,6 +5,7 @@ import type { PathwayGraph, PathwaySubjectNode } from './contracts';
 import { PathwayApiError, loadPathwayGraph } from './client';
 import { DEMO_PATHWAY_GRAPH } from './demo';
 import { Legend, TalentTree } from './TalentTree';
+import '../../app/typography.css';
 import './pathway.css';
 
 type ViewMode = 'graph' | 'list';

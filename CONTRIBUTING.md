@@ -69,3 +69,8 @@ AUTH_TEST_DATABASE_URL is configured. Label mocked and live test results separat
 Review git diff and staged paths. Stage your own files explicitly; do not include
 another programmer's uncommitted work. Update the associated change record and list
 integration dependencies. A teammate/integration lead should review before merging.
+
+UI changes must follow the "Typography and readability (mandatory)" section of docs/themeguide.md:
+use the tokens from apps/web/src/app/typography.css, never hard-code font sizes below the minimums,
+and call assertReadable from tools/ui/readability.mjs in UI tests.
+Tables with filtering, search or sorting must use the shared table toolbar (see "Table toolbar (mandatory)" in docs/themeguide.md).

@@ -1,3 +1,4 @@
+import '../../app/typography.css';
 import './landing.css';
 import frontpageImage from './assets/frontpageimg.png';
 

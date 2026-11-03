@@ -1,4 +1,5 @@
 import type { AnimationEvent } from 'react';
+import '../../app/typography.css';
 import './toast-stack.css';
 
 export type ToastKind = 'success' | 'info' | 'warning' | 'danger';

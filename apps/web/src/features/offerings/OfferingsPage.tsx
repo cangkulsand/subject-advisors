@@ -1,3 +1,4 @@
+import { SearchField, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import { useEffect, useRef, useState } from 'react';
 import type { OfferingPageData, OfferingSubject, OfferingsClient } from '../../../../../packages/shared/src/offerings/offerings';
 import { OfferingApiError } from './client';
@@ -8,6 +9,7 @@ import { PrerequisiteDisplay } from './PrerequisiteDisplay';
 import { ToastStack } from '../../components/feedback/ToastStack';
 import { useToastNotifications } from '../../components/feedback/useToastNotifications';
 import { registerUnsavedChanges } from '../../app/navigation';
+import '../../app/typography.css';
 import './offerings.css';
 
 function sameSet(left: string[], right: string[]): boolean {
@@ -145,8 +147,7 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
               <p>You can return to edit this semester’s list whenever you need.</p></div>}
             {mode === 'select' ? <>
               <div className="offerings-filters">
-                <div className="offerings-search"><label htmlFor="offerings-search">Find a subject</label>
-                  <input type="search" id="offerings-search" placeholder="Search by subject code or name" value={query} onChange={event => setQuery(event.target.value)} />
+                <div className="offerings-search"><TableToolbar label="Subject search"><SearchField label="Find a subject" value={query} onChange={setQuery} placeholder="Search by subject code or name"/></TableToolbar>
                   <div className="offerings-search-count"><span>{remaining.length} matching subjects shown</span>{query && <button type="button" onClick={() => setQuery('')}>Clear search</button>}</div></div>
                 {/* <div className="offerings-field"><label htmlFor="offerings-category">Category</label>
                   <select id="offerings-category" value={category} onChange={event => setCategory(event.target.value)}>
@@ -166,7 +167,7 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
                 const state = offeringHistoryState(subject, data.academicHistory);
                 return <tr key={subject.curriculumSubjectId} className={(checked ? 'is-selected ' : '') + (state === 'ambiguous' ? 'is-ambiguous' : '')}>
                   <td><input type="checkbox" checked={checked} disabled={saving} onChange={() => toggle(subject.curriculumSubjectId)} aria-label={`${subject.code} ${subject.name}`} /></td>
-                  <td><div className="offerings-subject-copy"><strong>{subject.code}</strong><span>{subject.name}</span>
+                  <td><div className="offerings-subject-copy"><strong>{subject.name}</strong><span className="offerings-subject-code">{subject.code}</span>
                     {state === 'ambiguous' && <small>History ambiguous</small>}
                     <div className="offerings-prerequisite-inline"><PrerequisiteDisplay subject={subject} catalogue={data.subjects} /></div>
                   </div></td>

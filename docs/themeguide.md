@@ -244,6 +244,79 @@ Create one web-app global CSS entry (for example `apps/web/src/styles/global.css
 
 Use short action labels: **Save profile**, **Update records**, **View offerings**, **Explore pathway**, **Sign out**. Error messages should state what happened and what the student can do next.
 
+### 5.1 Typography and readability (mandatory)
+
+Added by S2-INT-003 after users reported eye strain on dense tables. **This section is binding for every screen** (student, coordinator, admin, auth, landing, toasts, dialogs and module pages). The Tailwind classes in the table above are illustrative; where they differ from the minimums below, the minimums win.
+
+**Single source of truth:** the tokens live once in `apps/web/src/app/typography.css` (`:root`). Feature CSS only consumes them with `var(--font-size-...)`. Never redefine a token in a feature stylesheet, and never type a raw `font-size` below the minimums.
+
+| Token | Value | Applies to |
+| --- | --- | --- |
+| `--font-size-small` | 12px | Absolute minimum. Badges, pills, ids, captions, hints, `kbd`. Never body or table text |
+| `--font-size-label` | 13px | Form labels, legends, definition terms (`dt`), secondary table actions |
+| `--font-size-table-head` | 13px | Table column headers (`thead th`) - minimum |
+| `--font-size-table` | 14px | Table body cells and row headers (`td`, `tbody th`) - minimum |
+| `--font-size-control` | 14px | Inputs, selects, textareas, buttons, compact body text |
+| `--font-size-body` | 15px | Default reading text, card paragraphs |
+| `--font-size-subject-name` | 15px | Subject name (primary line) in tables and lists |
+| `--font-size-subject-code` | 13px | Subject code (secondary line, muted) |
+| `--font-size-metric` | 20px | Numbers in tables and metric tiles |
+| `--line-height-table` | 1.5 | Table text |
+| `--line-height-body` | 1.55 | Reading text |
+| `--control-min-height` | 44px | Minimum height of every input, select and button |
+| `--color-muted-text` | #555555 (dark theme: #bca2ac) | Muted text. 6.2:1 or better on every surface; WCAG AA needs 4.5:1 |
+
+**Rules**
+
+1. Nothing renders below 12px, including badges and pills. Table body text is at least 14px, table headers at least 13px, labels at least 13px, form controls at least 14px and 44px tall.
+2. Inline chips inside table cells (pills, ids, `code`, buttons) may use `--font-size-small` (12px) but no less.
+3. Subjects show the **name first** (`--font-size-subject-name`, heading colour) and the **code second** (`--font-size-subject-code`, `--color-muted-text`). Never lead with the code.
+4. Numbers (credits, counts, percentages) are right-aligned with `font-variant-numeric: tabular-nums`.
+5. Table line-height is `var(--line-height-table)`; cell padding is at least 14px vertical for dense data tables.
+6. Muted text uses `--color-muted-text`, never a lighter grey. Do not lower contrast with opacity on text.
+7. Wide tables scroll inside their own region (`overflow-x: auto`); the page must not scroll horizontally at 320px or 375px.
+8. The interactive pathway graph may scale with its zoom control, but text that stays at a fixed size must respect the 12px minimum.
+
+**Do / don't**
+
+```css
+/* Do */
+.my-table td { font-size: var(--font-size-table); line-height: var(--line-height-table); }
+.my-table th { font-size: var(--font-size-table-head); }
+.my-field input { min-height: var(--control-min-height); font-size: var(--font-size-control); }
+.my-code { font-size: var(--font-size-subject-code); color: var(--color-muted-text); }
+
+/* Don't */
+.my-table td { font-size: 11px; }              /* below the minimum */
+.my-badge { font-size: .7rem; }                /* small rem/em hide the same mistake */
+.my-note { color: #999; }                      /* fails AA contrast */
+:root { --font-size-table: 12px; }             /* redefining a token in a feature file */
+```
+
+**New screens must use the tokens; never hard-code font sizes below the minimums.** Automated guard: `tools/ui/readability.mjs` (`assertReadable(page, label)`) fails a UI test if any visible text has a computed size below 12px, table body cells below 14px or table headers below 13px. It runs inside the admin, coordinator, integration, pathway and P001 Sprint 2 UI harnesses; call it in any new UI test. Set `READABILITY_COLLECT=1` to list all offenders instead of stopping at the first failure.
+
+### 5.2 Table toolbar (mandatory)
+
+Every data table that is filtered, searched or sorted uses the shared toolbar in `apps/web/src/components/table-toolbar/TableToolbar.tsx` (`TableToolbar`, `SegmentedFilter`, `SearchField`, `FilterMenu`, `ClearFilters`). Do not build a one-off filter bar; new tables must use the shared component. It follows the TailAdmin table toolbar in light mode with the burgundy brand. Record: S2-INT-004.
+
+**Anatomy** (one row, `flex flex-wrap items-center gap-3`, order: tabs, menus, search)
+
+| Part | Spec |
+| --- | --- |
+| Segmented tabs | The one primary status of the table, 2 to 4 options (All / Active / Suspended). Grey track (`#f3f4f6`, rounded 8px, 2px padding, 2px gap), equal-width buttons 40px tall, rounded 6px, 14px medium. Selected: white, dark text, subtle shadow. Unselected: muted text, darker on hover. Grows (`flex: 1`). `role="group"` with `aria-pressed` buttons |
+| Search | Leading magnifier icon, 44px tall, rounded 8px, 1px `#d1d5db` border, white, subtle shadow. Focus: burgundy border and 3px burgundy 20% ring. About 280px from 641px wide; full width on its own last row on mobile. The visible label is the placeholder; the accessible label is a screen-reader span (`getByLabel` works) |
+| Filter menu | Button with sliders icon and label, 44px tall, rounded 10px, `#d1d5db` border, 14px medium. Shows the selected value instead of "Filter" when one filter is set ("Filter: 2 selected" for several). Popover is 12rem wide, rounded 12px, border, large shadow, 6px padding, never wider than the viewport minus 32px. Group heading is uppercase muted text at 12px (the typography minimum); option rows are 40px tall, rounded 8px, hover and selected `#f3f4f6`, selected is medium weight |
+| Sort menu | Same dropdown (`icon="sort"`, `showValue`, `noAll`) showing "Sort: value" |
+| Clear filters | Underlined burgundy link, shown only while a filter or search is active |
+
+**Behaviour and accessibility.** The menu button has `aria-haspopup="menu"` and `aria-expanded`; options are `menuitemradio` with `aria-checked` inside labelled groups. Arrow keys, Home and End move between options; Escape closes and returns focus to the button; Tab closes; an outside click or a selection closes. Selecting a filter resets the table to page 1. Server-side filters map straight onto the controls (do not change query semantics); filter client-side only when the whole data set is already loaded.
+
+**Tabs or menu?** Tabs are for the single primary status with at most four options. Secondary filters (role, class type, flags) and sorting go in menus. If the primary status has more than four values, put the four most common in the tabs and the rest in a menu group (see the coordinator subjects table, "Other decisions").
+
+**Guard.** `assertReadable` in `tools/ui/readability.mjs` also fails when a `.tt-search` or `.tt-menu-button` is under 44px or a `.tt-segment` is under 40px.
+
+**Tables that currently use it:** admin Users & Access (tabs by access, role and invitation-status menu, search) and Audit Log (event-type tabs plus date fields), coordinator forecast Subjects (decision tabs, Filter and Sort menus, search) and the student offerings subject search. Tables with no filters today (semesters, faculties, learning centres, coordinator assignments, forecast list, accepted imports, offering decisions, records) adopt the component the moment they gain filtering.
+
 ---
 
 ## 6. Spacing, shape, and elevation

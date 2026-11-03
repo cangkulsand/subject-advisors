@@ -2,6 +2,7 @@ import { useEffect,useState } from 'react';
 import type { Progress } from '../../../../api/src/modules/p001-sprint2/contracts';
 import { errorMessage } from '../profile/client';
 import type { Sprint2Client } from './client';
+import '../../app/typography.css';
 import './sprint2.css';
 export function ProgressPage({api}:{api:Sprint2Client}) {
   const [data,setData]=useState<Progress>(),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);

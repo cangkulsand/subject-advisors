@@ -3,6 +3,7 @@ import { navigateApp, useAppLocation } from '../../app/navigation';
 import { CoordinatorApiError } from './client';
 import type { ForecastContext, ForecastScope } from '../../../../../packages/shared/src/forecasting/contracts';
 import { RUN_LIMITS } from '../../../../../packages/shared/src/forecasting/runs';
+import '../../app/typography.css';
 import './coordinator.css';
 
 export const STATUS_REGION_ID = 'coordinator-action-status';

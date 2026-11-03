@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type FocusEvent, type ReactNode } from 'react';
+import '../../app/typography.css';
 import './subject-records-table.css';
 
 export type SubjectRecordSelection = 'TAKEN' | 'EXEMPTED' | null;

@@ -1,0 +1,39 @@
+/* Shared table toolbar (S2-INT-004). Light mode, burgundy brand. See docs/themeguide.md "Table toolbar (mandatory)". Sizes come from typography.css tokens. */
+.table-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0 16px; min-width: 0; }
+.table-toolbar .tt-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.table-toolbar .tt-icon { flex: none; }
+/* (1) Segmented tabs: grey track, equal-width 40px buttons */
+.table-toolbar .tt-segmented { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: #f3f4f6; flex: 1 1 280px; min-width: 0; max-width: 100%; }
+.table-toolbar .tt-segment { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--color-muted-text); font: inherit; font-size: var(--font-size-control); font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.table-toolbar .tt-segment:hover { background: transparent; color: var(--color-heading); }
+.table-toolbar .tt-segment[aria-pressed="true"] { background: #fff; color: var(--color-heading); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1), 0 1px 3px rgba(16, 24, 40, 0.08); }
+/* (2) Search with leading magnifier */
+.table-toolbar .tt-search { position: relative; display: flex; align-items: center; order: 3; flex: 0 1 280px; min-width: 200px; height: var(--control-min-height); padding: 0 12px; gap: 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05); color: var(--color-muted-text); }
+.table-toolbar .tt-search:focus-within { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(107, 29, 47, 0.2); }
+.table-toolbar .tt-search input[type="search"] { flex: 1; width: 100%; min-width: 0; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--color-heading); font: inherit; font-size: var(--font-size-control); box-shadow: none; outline: none; }
+.table-toolbar .tt-search input[type="search"]::placeholder { color: var(--color-muted-text); opacity: 1; }
+/* (3) Filter / sort dropdown button + popover */
+.table-toolbar .tt-menu { position: relative; }
+.table-toolbar .tt-menu-button { display: inline-flex; align-items: center; gap: 8px; height: var(--control-min-height); min-height: var(--control-min-height); padding: 0 14px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; color: var(--color-heading); font: inherit; font-size: var(--font-size-control); font-weight: 500; cursor: pointer; white-space: nowrap; max-width: 100%; }
+.table-toolbar .tt-menu-button > span { overflow: hidden; text-overflow: ellipsis; }
+.table-toolbar .tt-menu-button:hover { background: #f9fafb; }
+.table-toolbar .tt-menu-button.is-active { border-color: var(--color-brand); }
+.table-toolbar .tt-popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; box-sizing: border-box; width: 12rem; max-width: calc(100vw - 32px); max-height: min(70vh, 26rem); overflow-y: auto; padding: 6px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 12px 16px -4px rgba(16, 24, 40, 0.1), 0 4px 6px -2px rgba(16, 24, 40, 0.05); }
+.table-toolbar .tt-menu-end .tt-popover { left: auto; right: 0; }
+.table-toolbar .tt-group + .tt-group { margin-top: 6px; padding-top: 6px; border-top: 1px solid #f3f4f6; }
+.table-toolbar .tt-group-heading { margin: 0; padding: 6px 12px 4px; color: var(--color-muted-text); font-size: var(--font-size-small); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.table-toolbar .tt-option { display: block; width: 100%; height: auto; min-height: 40px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--color-body); font: inherit; font-size: var(--font-size-control); font-weight: 400; text-align: left; cursor: pointer; }
+.table-toolbar .tt-option:hover, .table-toolbar .tt-option:focus-visible { background: #f3f4f6; }
+.table-toolbar .tt-option[aria-checked="true"] { background: #f3f4f6; color: var(--color-heading); font-weight: 500; }
+.table-toolbar .tt-clear { min-height: var(--control-min-height); padding: 0 6px; border: 0; background: transparent; color: var(--color-brand); font: inherit; font-size: var(--font-size-control); font-weight: 500; text-decoration: underline; cursor: pointer; order: 4; }
+.table-toolbar :is(.tt-segment, .tt-menu-button, .tt-option, .tt-clear):focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .table-toolbar .tt-segmented { flex-basis: 100%; }
+  .table-toolbar .tt-segment { padding: 0 4px; }
+  .table-toolbar .tt-search { order: 5; flex: 1 1 100%; min-width: 0; }
+  .table-toolbar .tt-menu-button { max-width: calc(100vw - 32px); }
+}
+/* Optional date fields next to the tabs (audit log): same height and type as the other toolbar controls. */
+.table-toolbar .tt-date { display: flex; align-items: center; gap: 8px; color: var(--color-body); font-size: var(--font-size-label); font-weight: 500; }
+.table-toolbar .tt-date input { width: auto; min-height: var(--control-min-height); border-radius: 8px; border: 1px solid #d1d5db; font-size: var(--font-size-control); }
+@media (max-width: 640px) { .table-toolbar .tt-date { flex: 1 1 100%; justify-content: space-between; } .table-toolbar .tt-date input { flex: 1; max-width: 220px; } }

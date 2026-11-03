@@ -6,6 +6,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 import { fixtureMutation, fixtureResponse } from './fixtures.mjs';
 import { academicUiChecks } from './academic-ui-checks.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
@@ -55,12 +56,14 @@ else {
     });
     return state;
   }
+  const tabAccess = (page, name) => page.getByRole('group', { name: 'Access', exact: true }).getByRole('button', { name, exact: true }).click();
+  const chooseFilter = async (page, group, option) => { await page.getByRole('search', { name: 'Search and filter users' }).locator('button[aria-haspopup="menu"]').click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
   async function check(name, body, width = 1440) {
     const page = await browser.newPage({ viewport: { width, height: 960 } }); const errors = []; page.setDefaultTimeout(10000);
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => { for (const name of ['alert', 'confirm', 'prompt']) window[name] = () => { throw new Error('window.' + name + ' must not be used'); }; });
     page.on('dialog', async dialog => { errors.push('Unexpected window dialog: ' + dialog.type() + ' ' + dialog.message()); await dialog.dismiss(); });
-    try { await body(page); assert.deepEqual(errors, []); passed++; console.log('PASS ' + name); }
+    try { await body(page); await assertReadable(page, name); assert.deepEqual(errors, []); passed++; console.log('PASS ' + name); }
     catch (error) { console.error(name, errors, await page.locator('body').innerText()); throw error; }
     finally { await page.close(); }
   }
@@ -79,7 +82,7 @@ else {
       await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/admin-review/overview-desktop.png', fullPage: true });
       await page.getByRole('link', { name: /Suspended accounts/ }).click(); await page.getByRole('heading', { name: 'Users & Access', exact: true }).waitFor();
-      assert.equal(await page.getByLabel('Access', { exact: true }).inputValue(), 'SUSPENDED');
+      assert.equal(await page.getByRole('group', { name: 'Access', exact: true }).getByRole('button', { name: 'Suspended', exact: true }).getAttribute('aria-pressed'), 'true');
       await page.getByText('Fictional Account 3', { exact: true }).waitFor();
     });
     await check('all admin planned destinations are navigable and data-free', async page => {
@@ -216,7 +219,7 @@ else {
     await check('search, overlapping roles, pagination, account details and audit', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users'); await page.getByText('Fictional Administrator', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Next', exact: true }).click(); await page.getByText('Fictional Account 23', { exact: true }).waitFor();
-      await page.getByLabel('Search users', { exact: true }).fill('fixture1@example.invalid'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByLabel('Search users', { exact: true }).fill('fixture1@example.invalid'); await page.keyboard.press('Enter');
       await page.getByText('1 result · Page 1 of 1', { exact: true }).waitFor();
       await page.getByRole('link', { name: /View details for Fictional Administrator/ }).click(); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
       assert.equal(await page.locator('.admin-memberships article').count(), 3);
@@ -229,12 +232,12 @@ else {
     await check('same-path overview links update role filter', async page => {
       await mock(page); await page.goto(base + '/admin/users?role=SYSTEM_ADMIN'); await page.getByText('1 result · Page 1 of 1').waitFor();
       await page.evaluate(() => { history.pushState({}, '', '/admin/users?role=COORDINATOR'); dispatchEvent(new PopStateEvent('popstate')); });
-      await page.getByText('2 results · Page 1 of 1').waitFor(); assert.equal(await page.getByLabel('Role', { exact: true }).inputValue(), 'COORDINATOR');
+      await page.getByText('2 results · Page 1 of 1').waitFor(); assert.equal(await page.getByRole('button', { name: 'Coordinator', exact: true }).getAttribute('aria-haspopup'), 'menu');
     });
     await check('audit kind and date filters plus literal untrusted text', async page => {
       const state = await mock(page); await page.goto(base + '/admin/audit'); await page.getByRole('region', { name: 'Access audit table' }).waitFor();
       assert.ok((await page.locator('.admin-reason').first().innerText()).includes('<script>')); assert.equal(await page.evaluate(() => window.untrustedExecuted), undefined);
-      await page.getByLabel('Event type', { exact: true }).selectOption('ACCESS'); await page.getByText('1 result · Page 1 of 1').waitFor();
+      await page.getByRole('group', { name: 'Event type', exact: true }).getByRole('button', { name: 'Account access', exact: true }).click(); await page.getByText('1 result · Page 1 of 1').waitFor();
       await page.getByLabel('From', { exact: true }).fill('2026-10-28'); await page.getByLabel('To', { exact: true }).fill('2026-10-28'); await page.getByRole('button', { name: 'Apply filters' }).click();
       await page.getByText('1 result · Page 1 of 1').waitFor(); assert.ok(state.requests.some(request => request.search.includes('from=2026-10-28') && request.search.includes('to=2026-10-28')));
     });
@@ -330,16 +333,16 @@ else {
       const row = table.getByRole('row').filter({ hasText: 'pending.one@utm.my' });
       assert.ok((await row.innerText()).includes('Invitation')); assert.ok((await row.innerText()).includes('Pending'));
       assert.equal(await table.getByText('accepted@utm.my').count(), 0); // only pending invitations in the combined view
-      await page.getByLabel('Search users', { exact: true }).fill('pending.two'); await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.getByLabel('Search users', { exact: true }).fill('pending.two'); await page.keyboard.press('Enter');
       await table.getByText('Invitations (1)', { exact: true }).waitFor(); assert.equal(await table.getByText('pending.one@utm.my').count(), 0);
-      await page.getByLabel('Search users', { exact: true }).fill(''); await page.getByRole('button', { name: 'Search', exact: true }).click();
-      await page.getByLabel('Role', { exact: true }).selectOption('STUDENT'); await table.getByText('Invitations (1)', { exact: true }).waitFor();
-      await page.getByLabel('Role', { exact: true }).selectOption('');
-      await page.getByLabel('Access', { exact: true }).selectOption('ACTIVE'); await table.getByText(/^Accounts \(/).waitFor();
+      await page.getByLabel('Search users', { exact: true }).fill(''); await page.keyboard.press('Enter');
+      await chooseFilter(page, 'Role', 'Student'); await table.getByText('Invitations (1)', { exact: true }).waitFor();
+      await chooseFilter(page, 'Role', 'All roles');
+      await tabAccess(page, 'Active'); await table.getByText(/^Accounts \(/).waitFor();
       assert.equal(await table.getByText(/^Invitations \(/).count(), 0);
-      await page.getByLabel('Access', { exact: true }).selectOption('INVITED'); await table.getByText('Invitations (2)', { exact: true }).waitFor();
+      await tabAccess(page, 'Invited'); await table.getByText('Invitations (2)', { exact: true }).waitFor();
       assert.equal(await table.getByText(/^Accounts \(/).count(), 0);
-      await page.getByLabel('Invitation status', { exact: true }).selectOption('');
+      await chooseFilter(page, 'Invitation status', 'All statuses');
       await table.getByText('Invitations (4)', { exact: true }).waitFor(); await table.getByText('accepted@utm.my').waitFor();
     });
     await check('send invitation: CLERK_USER_EXISTS, success, then revoke with an in-page reason', async page => {
@@ -369,8 +372,8 @@ else {
       await page.getByRole('status').filter({ hasText: 'Invitation for pending.one@utm.my revoked.' }).waitFor();
       await table.getByText('pending.one@utm.my', { exact: true }).waitFor({ state: 'detached' });
       assert.deepEqual(state.bodies.find(item => item.method === 'DELETE').body, { reason: 'Fictional: sent to the wrong address.' });
-      await page.getByLabel('Access', { exact: true }).selectOption('INVITED');
-      await page.getByLabel('Invitation status', { exact: true }).selectOption('REVOKED');
+      await tabAccess(page, 'Invited');
+      await chooseFilter(page, 'Invitation status', 'Revoked');
       await table.getByText('pending.one@utm.my', { exact: true }).waitFor();
     });
     await check('account actions: grant, error, remove with reason, LAST_ROLE, suspend, reactivate and no window dialogs', async page => {
