@@ -1,3 +1,4 @@
+import { ClearFilters, FilterMenu, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
@@ -79,13 +80,16 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
     <section className="admin-card admin-users-card" aria-labelledby="admin-users-title">
       <div className="admin-card-title"><div><h2 id="admin-users-title">Users and invitations</h2><p className="admin-muted">Invitations are valid for 7 days. Roles apply only if the verified email still qualifies at first sign-in.</p></div>
         <button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>
-      <form className="admin-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>
-        <label className="admin-search-field">Search users<input type="search" maxLength={100} value={term} onChange={event => setTerm(event.target.value)} placeholder="Name, email or Clerk account ID"/></label>
-        <label>Role<select aria-label="Role" value={filters.role} onChange={event => { setFilters(old => ({ ...old, role: event.target.value as AdminUsersQuery['role'], page: 1 })); setInvitationFilter(old => ({ ...old, page: 1 })); }}><option value="">All roles</option>{Object.entries(labels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-        <label>Access<select aria-label="Access" value={invited ? 'INVITED' : filters.status} onChange={event => { const value = event.target.value; setInvited(value === 'INVITED'); setFilters(old => ({ ...old, status: value === 'INVITED' ? '' : value as AdminUsersQuery['status'], page: 1 })); setInvitationFilter({ page: 1, status: 'PENDING' }); }}><option value="">All</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INVITED">Invited</option></select></label>
-        {invited && <label>Invitation status<select aria-label="Invitation status" value={invitationFilter.status} onChange={event => setInvitationFilter({ page: 1, status: event.target.value as AdminInvitationStatus | '' })}><option value="">All</option>{Object.entries(invitationLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
-        <button className="admin-primary" type="submit">Search</button>
-      </form>
+      <TableToolbar label="Search and filter users" onSubmit={() => { setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>
+        <SegmentedFilter label="Access" value={invited ? 'INVITED' : filters.status} onChange={value => { setInvited(value === 'INVITED'); setFilters(old => ({ ...old, status: value === 'INVITED' ? '' : value as AdminUsersQuery['status'], page: 1 })); setInvitationFilter({ page: 1, status: 'PENDING' }); }}
+          options={[{ value: '', label: 'All' }, { value: 'ACTIVE', label: 'Active' }, { value: 'SUSPENDED', label: 'Suspended' }, { value: 'INVITED', label: 'Invited' }]}/>
+        <FilterMenu groups={[
+          { id: 'role', heading: 'Role', allLabel: 'All roles', value: filters.role, onChange: role => { setFilters(old => ({ ...old, role: role as AdminUsersQuery['role'], page: 1 })); setInvitationFilter(old => ({ ...old, page: 1 })); }, options: Object.entries(labels).map(([value, label]) => ({ value, label })) },
+          ...(invited ? [{ id: 'invitation', heading: 'Invitation status', allLabel: 'All statuses', value: invitationFilter.status, onChange: (status: string) => setInvitationFilter({ page: 1, status: status as AdminInvitationStatus | '' }), options: Object.entries(invitationLabels).map(([value, label]) => ({ value, label })) }] : []),
+        ]}/>
+        <SearchField label="Search users" maxLength={100} value={term} onChange={setTerm} placeholder="Search name, email or account ID"/>
+        {(term !== '' || filters.q !== '' || filters.role !== '' || filters.status !== '' || invited) && <ClearFilters onClear={reset}/>}
+      </TableToolbar>
       <Panel error={accounts.error ?? invitations.error} retry={retry}>{loaded && <>
         {accountRows.some(item => item.identity.state !== 'available') && <p className="admin-notice" role="status">Some Clerk identity details are unavailable. Application roles and access status are shown below.</p>}
         {!invitationRows.length && !accountRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll" role="region" aria-label="Users and invitations table" tabIndex={0}><table><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
@@ -115,10 +119,10 @@ export function AdminAuditView({ client, accountId }: { client: AdminClient; acc
   return <section className="admin-card">
     <h2>{accountId ? 'Account access history' : 'Access change history'}</h2>
     <p className="admin-muted">Date filters use UTC. Event times are shown in your local time.</p>
-    <form className="admin-filters admin-audit-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, from: from || undefined, to: to || undefined, page: 1 })); }}>
-      <label>Event type<select aria-label="Event type" value={filters.kind} onChange={event => setFilters(old => ({ ...old, kind: event.target.value as AdminAuditQuery['kind'], page: 1 }))}><option value="ALL">All changes</option><option value="ROLE">Role changes</option><option value="ACCESS">Account access</option></select></label>
-      <label>From<input type="date" value={from} onChange={event => setFrom(event.target.value)}/></label><label>To<input type="date" min={from || undefined} value={to} onChange={event => setTo(event.target.value)}/></label><button type="submit" className="admin-primary">Apply filters</button>
-    </form>
+    <TableToolbar label="Filter access history" onSubmit={() => setFilters(old => ({ ...old, from: from || undefined, to: to || undefined, page: 1 }))}>
+      <SegmentedFilter label="Event type" value={filters.kind} onChange={kind => setFilters(old => ({ ...old, kind: kind as AdminAuditQuery['kind'], page: 1 }))} options={[{ value: 'ALL', label: 'All changes' }, { value: 'ROLE', label: 'Role changes' }, { value: 'ACCESS', label: 'Account access' }]}/>
+      <label className="tt-date">From<input type="date" value={from} onChange={event => setFrom(event.target.value)}/></label><label className="tt-date">To<input type="date" min={from || undefined} value={to} onChange={event => setTo(event.target.value)}/></label><button type="submit" className="admin-primary">Apply filters</button>
+    </TableToolbar>
     <Panel error={result.error} retry={result.retry}>{result.data && <>
       {!result.data.items.length ? <p className="admin-empty">No access changes match these filters.</p> : <div className="admin-table-scroll" role="region" aria-label="Access audit table" tabIndex={0}><table><thead><tr><th>When</th><th>Change</th>{!accountId && <th>Account</th>}<th>Administrator / actor</th><th>Previous → New</th><th>Reason</th></tr></thead><tbody>{result.data.items.map(event => <tr key={event.eventId}>
         <td><time dateTime={event.occurredAt}>{when(event.occurredAt)}</time></td><td>{eventLabel(event)}</td>{!accountId && <td><AppLink href={'/admin/users/' + event.accountId}>Account #{event.accountId}</AppLink><code className="admin-audit-id">{event.target}</code></td>}<td className="admin-actor">{event.actor === '__MIGRATION_0004__' ? 'System migration' : event.actor}</td><td>{event.before ?? '—'} → {event.after ?? '—'}</td><td className="admin-reason">{event.reason ?? '—'}</td>

@@ -4,6 +4,7 @@ import { AuthRedirect } from './navigation';
 import { AuthApiError } from './client';
 import { ACCOUNT_CACHE_CHANGED, accountSessionStamp, clearAccountCache, keepAccountSession, loadSessionAccount, readAccountCache } from './account-cache';
 import type { AppRole, Me } from './contracts';
+import '../../app/typography.css';
 import './auth.css';
 import { AccountContext, AccountApiBaseContext } from './account-context';
 import { RoleSwitcher } from './RoleSwitcher';

@@ -1,3 +1,4 @@
+import { ClearFilters, FilterMenu, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import { useEffect, useId, useRef, useState } from 'react';
 import { AppLink } from '../../app/navigation';
 import { CoordinatorApiError, type CoordinatorClient, type MutationResult } from './client';
@@ -159,14 +160,18 @@ function SubjectTable({ run, editable, pendingIds, onDecide, onAllocate }: { run
     const first = sortSubjects(subjects, NO_FILTERS.sort).findIndex(subject => pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING');
     if (first >= 0) { setFilters(NO_FILTERS); setPage(Math.floor(first / SUBJECT_PAGE_SIZE) + 1); }
   }, [pendingIds]);
-  const toolbar = <form className="admin-filters coordinator-subject-filters" role="search" aria-label="Filter and sort subjects" onSubmit={event => event.preventDefault()}>
-    <label className="admin-search-field">Search subjects<input type="search" value={filters.q} placeholder="Subject code or name" onChange={event => change({ q: event.target.value })}/></label>
-    <label>Class type<select value={filters.type} onChange={event => change({ type: event.target.value })}><option value="">All</option><option value="LECTURE">Lecture</option><option value="LAB">Lab</option><option value="NONE">Not set</option></select></label>
-    <label>Decision<select value={filters.decision} onChange={event => change({ decision: event.target.value })}><option value="">All</option>{(['PENDING', 'APPROVED', 'REVIEWED', 'DEFERRED', 'MIXED', 'NONE'] as const).map(status => <option key={status} value={status}>{decisionLabels[status]}</option>)}</select></label>
-    <label>Flags<select value={filters.flag} onChange={event => change({ flag: event.target.value })}><option value="">All</option><option value="BELOW_MINIMUM">Below minimum</option><option value="BELOW_OPTIMAL">Below optimal</option><option value="CONFIG">Configuration required</option><option value="UNCERTAIN">Has uncertain students</option></select></label>
-    <label>Sort by<select value={filters.sort} onChange={event => change({ sort: event.target.value as SubjectSort })}>{Object.entries(SORT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    {filtering && <button type="button" onClick={clear}>Clear filters</button>}
-  </form>;
+  const decisionTabs = ['PENDING', 'APPROVED', 'REVIEWED'] as const, otherDecisions = ['DEFERRED', 'MIXED', 'NONE'] as const;
+  const toolbar = <TableToolbar label="Filter and sort subjects">
+    <SegmentedFilter label="Decision" value={filters.decision} onChange={decision => change({ decision })} options={[{ value: '', label: 'All' }, ...decisionTabs.map(status => ({ value: status, label: decisionLabels[status] }))]}/>
+    <FilterMenu groups={[
+      { id: 'type', heading: 'Class type', value: filters.type, onChange: type => change({ type }), options: [{ value: 'LECTURE', label: 'Lecture' }, { value: 'LAB', label: 'Lab' }, { value: 'NONE', label: 'Not set' }] },
+      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'BELOW_MINIMUM', label: 'Below minimum' }, { value: 'BELOW_OPTIMAL', label: 'Below optimal' }, { value: 'CONFIG', label: 'Configuration required' }, { value: 'UNCERTAIN', label: 'Has uncertain students' }] },
+      { id: 'decision', heading: 'Other decisions', allLabel: 'Any', value: (otherDecisions as readonly string[]).includes(filters.decision) ? filters.decision : '', onChange: decision => change({ decision }), options: otherDecisions.map(status => ({ value: status, label: decisionLabels[status] })) },
+    ]}/>
+    <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', noAll: true, value: filters.sort, onChange: sort => change({ sort: sort as SubjectSort }), options: Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label })) }]}/>
+    <SearchField label="Search subjects" value={filters.q} placeholder="Search subject code or name" onChange={q => change({ q })}/>
+    {filtering && <ClearFilters onClear={clear}/>}
+  </TableToolbar>;
   if (matching.length === 0) return <>{toolbar}<div className="admin-empty" role="status"><p>No subjects match these filters.</p><button type="button" onClick={clear}>Clear filters</button></div></>;
   return <>{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects" role="region" aria-label="Subjects table" tabIndex={0}>
     <table><thead><tr><th scope="col">Subject</th><th scope="col">Class type</th><th scope="col">Potential demand</th><th scope="col">Uncertain</th><th scope="col">Near graduation</th><th scope="col">Quality</th><th scope="col">Proposed sections</th><th scope="col">Decision</th></tr></thead>

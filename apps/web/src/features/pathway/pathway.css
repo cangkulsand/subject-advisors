@@ -4,7 +4,7 @@
   max-width: none; min-width: 0;
 }
 .pathway-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.pathway-subtitle { margin: -4px 0 0; color: var(--color-muted); overflow-wrap: anywhere; }
+.pathway-subtitle { margin: -4px 0 0; color: var(--color-muted-text); overflow-wrap: anywhere; }
 .pathway-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pathway-actions button,
 .pathway-toolbar button,
@@ -23,7 +23,7 @@
   margin: 0 0 16px; padding: 10px 14px; border-radius: 8px;
   background: var(--color-warning-bg); color: var(--color-warning-text);
 }
-.pathway-note { margin-top: 16px; color: var(--color-muted); font-size: 13px; }
+.pathway-note { margin-top: 16px; color: var(--color-muted-text); font-size: var(--font-size-label); }
 .pathway-empty { border: 1px dashed var(--color-outline); border-radius: 16px; padding: 24px; background: var(--color-surface); }
 
 /* Status palette */
@@ -38,17 +38,17 @@
 
 /* Legend */
 .pathway-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; margin: 0 0 16px; padding: 0; }
-.pathway-legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-body); }
+.pathway-legend-item { display: inline-flex; align-items: center; gap: 8px; font-size: var(--font-size-label); color: var(--color-body); }
 .pathway-legend-swatch { width: 14px; height: 14px; border-radius: 4px; background: var(--status-color); border: 1px solid var(--color-outline); }
 
 /* Toolbar */
 .pathway-tree { min-width: 0; border: 1px solid var(--color-outline); border-radius: 16px; background: var(--color-surface); overflow: hidden; }
 .pathway-map-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 20px 14px; border-bottom: 1px solid var(--color-outline); }
 .pathway-map-heading h2 { margin: 0 0 4px; color: var(--color-heading); font-size: 18px; font-weight: 600; }
-.pathway-map-heading p { margin: 0; font-size: 13px; color: var(--color-muted); }
-.pathway-map-heading > span { flex-shrink: 0; font-size: 12px; color: var(--color-muted); padding-top: 4px; }
+.pathway-map-heading p { margin: 0; font-size: var(--font-size-label); color: var(--color-muted-text); }
+.pathway-map-heading > span { flex-shrink: 0; font-size: var(--font-size-small); color: var(--color-muted-text); padding-top: 4px; }
 .pathway-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
-.pathway-toolbar output { min-width: 44px; text-align: center; color: var(--color-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pathway-toolbar output { min-width: 44px; text-align: center; color: var(--color-muted-text); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
 
 /* Canvas */
 .pathway-canvas {
@@ -60,10 +60,10 @@
 }
 .pathway-canvas.is-panning { cursor: grabbing; user-select: none; }
 .pathway-canvas svg { display: block; max-width: none; margin: 0 auto; font-family: inherit; }
-.pathway-canvas-help { margin: 10px 20px 16px; color: var(--color-muted); font-size: 12px; }
+.pathway-canvas-help { margin: 10px 20px 16px; color: var(--color-muted-text); font-size: var(--font-size-small); }
 .pathway-map-legend { padding: 16px 20px; border-bottom: 1px solid var(--color-outline); background: var(--color-app-bg); }
 .pathway-map-legend .pathway-legend { margin: 12px 0 0; gap: 8px 14px; }
-.pathway-link-legend { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 12px; }
+.pathway-link-legend { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: var(--font-size-small); }
 .pathway-link-legend > span { display: inline-flex; align-items: center; gap: 8px; }
 .pathway-link-sample { display: inline-block; width: 28px; border-top: 2px solid var(--pathway-link); }
 .pathway-link-sample.is-recommended { border-top-style: dashed; }
@@ -71,8 +71,8 @@
 .pathway-link-sample.is-completed { border-color: var(--pathway-completed); }
 .pathway-link-sample.is-highlighted { border-top-width: 3px; }
 .pathway-category-panel rect { fill: var(--color-app-bg); stroke: var(--color-outline); stroke-width: 1; }
-.pathway-category-title { fill: var(--color-heading); font-size: 13px; font-weight: 600; }
-.pathway-category-note { fill: var(--color-muted); font-size: 10px; }
+.pathway-category-title { fill: var(--color-heading); font-size: var(--font-size-label); font-weight: 600; }
+.pathway-category-note { fill: var(--color-muted); font-size: var(--font-size-small); }
 
 /* Edges */
 .pathway-edge-halo { fill: none; stroke: var(--color-surface); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
@@ -97,23 +97,23 @@ marker .pathway-edge-completed { fill: var(--pathway-completed); stroke: none; }
 .pathway-node:hover .pathway-node-box { filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18)); }
 .pathway-node.is-selected .pathway-node-box { stroke: var(--pathway-selection); stroke-width: 3; filter: drop-shadow(0 4px 10px rgba(107, 29, 47, 0.35)); }
 .pathway-node.is-dimmed { opacity: 0.3; }
-.pathway-node-code { fill: var(--status-color); font-size: 14px; font-weight: 700; letter-spacing: 0.3px; }
+.pathway-node-code { fill: var(--status-color); font-size: var(--font-size-control); font-weight: 700; letter-spacing: 0.3px; }
 .pathway-node-status-dot { fill: var(--status-color); }
-.pathway-node-name { fill: var(--color-heading); font-size: 12px; }
-.pathway-node-credits { fill: var(--color-muted); font-size: 11px; }
+.pathway-node-name { fill: var(--color-heading); font-size: var(--font-size-small); }
+.pathway-node-credits { fill: var(--color-muted); font-size: var(--font-size-small); }
 .pathway-node:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 
 /* Selected node details */
 .pathway-node-details { margin: 16px; border: 1px solid var(--color-outline); border-radius: 8px; background: var(--color-surface); padding: 16px; overflow-wrap: anywhere; }
 .pathway-node-details h3 { margin: 0 0 12px; color: var(--color-heading); font-size: 16px; }
 .pathway-node-details dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 12px; }
-.pathway-node-details dt { color: var(--color-muted); }
+.pathway-node-details dt { color: var(--color-muted-text); }
 .pathway-node-details dd { margin: 0; color: var(--color-body); }
-.pathway-node-details p { margin: 0; color: var(--color-muted); font-size: 13px; }
-.pathway-node-details h4 { margin: 16px 0 8px; color: var(--color-heading); font-size: 13px; }
-.pathway-detail-prereqs { margin: 0; padding-left: 18px; font-size: 13px; }
+.pathway-node-details p { margin: 0; color: var(--color-muted-text); font-size: var(--font-size-label); }
+.pathway-node-details h4 { margin: 16px 0 8px; color: var(--color-heading); font-size: var(--font-size-label); }
+.pathway-detail-prereqs { margin: 0; padding-left: 18px; font-size: var(--font-size-label); }
 .pathway-detail-prereqs li { margin: 6px 0; }
-.pathway-detail-prereqs span { display: block; color: var(--color-muted); font-size: 12px; }
+.pathway-detail-prereqs span { display: block; color: var(--color-muted-text); font-size: var(--font-size-small); }
 
 /* Accessible list fallback */
 .pathway-list { border: 1px solid var(--color-outline); border-radius: 16px; background: var(--color-surface); padding: 16px; }
@@ -122,9 +122,9 @@ marker .pathway-edge-completed { fill: var(--pathway-completed); stroke: none; }
 .pathway-list-item-head { display: flex; justify-content: space-between; gap: 12px; }
 .pathway-list-item { overflow-wrap: anywhere; }
 .pathway-list-item-head strong { color: var(--color-heading); }
-.pathway-list-item-head span { color: var(--color-muted); }
-.pathway-list-item-status { margin-top: 4px; color: var(--status-color); font-weight: 600; font-size: 13px; }
-.pathway-list-prereqs { list-style: none; margin: 8px 0 0; padding: 0; color: var(--color-muted); font-size: 13px; }
+.pathway-list-item-head span { color: var(--color-muted-text); }
+.pathway-list-item-status { margin-top: 4px; color: var(--status-color); font-weight: 600; font-size: var(--font-size-label); }
+.pathway-list-prereqs { list-style: none; margin: 8px 0 0; padding: 0; color: var(--color-muted-text); font-size: var(--font-size-label); }
 .pathway-list-prereqs li { padding: 2px 0; }
 
 @media (max-width: 720px) {

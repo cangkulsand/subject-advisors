@@ -1,5 +1,6 @@
 // Real shared app with fictional, read-only Clerk/API fixtures. No live services.
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
@@ -84,6 +85,7 @@ if (serve) {
     await page.route('https://**/*', route => route.abort());
     try {
       await body(page);
+      await assertReadable(page, name);
       assert.deepEqual(errors, []);
       assert.deepEqual(writes, []);
       passed += 1;

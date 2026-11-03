@@ -2,6 +2,7 @@
 import { LogoutButton } from '../features/auth';
 import { AppLink } from './navigation';
 import type { StudentArea } from './StudentRoutes';
+import './typography.css';
 import './student-shell.css';
 import { RoleSwitcher } from '../features/auth/RoleSwitcher';
 const links = [

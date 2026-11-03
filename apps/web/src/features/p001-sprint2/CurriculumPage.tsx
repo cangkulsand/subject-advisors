@@ -2,6 +2,7 @@ import { useEffect,useRef,useState,type FormEvent } from 'react';
 import type { Catalogue,CurriculumSnapshot,CurriculumSubject,Dependency,LinkKind,SemesterType } from '../../../../api/src/modules/p001-sprint2/contracts';
 import { errorMessage } from '../profile/client';
 import type { Sprint2Client } from './client';
+import '../../app/typography.css';
 import './sprint2.css';
 const blankSubject={existingSubjectId:'',code:'',name:'',credits:'',category:'',compulsory:false,semesterTypes:[] as SemesterType[],confirmSharedChanges:false};
 const blankLink={from:'',required:'',kind:'MANDATORY' as LinkKind};

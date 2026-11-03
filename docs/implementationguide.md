@@ -126,6 +126,7 @@ Codex MUST:
 - [ ] **Migrations:** Any schema change has a safe upgrade path; rollback/recovery is considered.
 - [ ] **Security/privacy:** No committed secrets, unexpected sensitive logs, exposed student records or unsafe auth bypasses.
 - [ ] **UX/accessibility:** Relevant loading/empty/error states, labels and keyboard behavior are considered.
+- [ ] **Typography/readability:** UI changes use the tokens from `docs/themeguide.md` section 5.1 (table body >=14px, headers >=13px, nothing <12px, controls >=14px and 44px tall, subject name before code) and pass `tools/ui/readability.mjs`; filterable tables use the shared table toolbar (section 5.2).
 - [ ] **Tests:** Run relevant unit/integration checks and practical repo lint/typecheck/build; record real outcomes.
 - [ ] **Diff quality:** Remove debug statements, accidental generated files and unrelated edits.
 - [ ] **Documentation:** API/setup/test instructions and the per-change record reflect the current implementation.

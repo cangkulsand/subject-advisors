@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 import { prepareIntegration } from './prepare.mjs';
 import { fixtureResponse as adminFixtureResponse } from '../admin/fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
@@ -40,7 +41,7 @@ async function clickStudentLink(page,name){
  if(page.viewportSize().width<1280){const toggle=page.locator('button[aria-controls="student-sidebar"]');await toggle.waitFor();if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();}
  await nav.getByRole('link',{name,exact:true}).click();
 }
-async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
+async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);await assertReadable(page,name);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 try{
  browser=await chromium.launch({headless:true});
  await check('a student-only account has no staff view selector',async page=>{

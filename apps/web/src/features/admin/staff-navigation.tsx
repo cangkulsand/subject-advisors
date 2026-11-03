@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { LogoutButton } from '../auth';
 import { RoleSwitcher } from '../auth/RoleSwitcher';
+import '../../app/typography.css';
 import './admin.css';
 
 export type StaffNavigationLink = { href: string; label: string; icon: string };
