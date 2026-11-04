@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ClassType, ForecastSubjectOption, HistoryCompleteness } from '../contracts';
 import { allocateSections, evenSplit, resolveCapacityRule } from './capacity';
 import { isNearGraduation } from './policy';
-import { ENGINE_VERSION, runForecastEngine } from './forecast';
+import { ENGINE_VERSION, catalogueFingerprint, runForecastEngine } from './forecast';
 import { subjectStudentOutcomes } from './subject-students';
 import type { EngineCapacityRule, EngineCurriculum, EngineRecord, EngineStudent, ForecastEngineInput } from './types';
 
@@ -323,6 +323,11 @@ describe('result shape and determinism', () => {
     const one = runForecastEngine(input([student('a')], [A])).ruleSnapshot.catalogueFingerprint;
     const two = runForecastEngine(input([student('a')], [{ ...A, creditHours: 4 }])).ruleSnapshot.catalogueFingerprint;
     expect(one).not.toBe(two);
+  });
+  it('catalogueFingerprint equals the run fingerprint without running the forecast', () => {
+    const request = input([student('a')], [A]);
+    expect(catalogueFingerprint(request.curricula)).toBe(runForecastEngine(request).ruleSnapshot.catalogueFingerprint);
+    expect(catalogueFingerprint([...request.curricula].reverse())).toBe(catalogueFingerprint(request.curricula));
   });
   it('is deterministic, independent of input order, and does not mutate the input', () => {
     const lab = subject(3, 'LABB1000', 'LAB');

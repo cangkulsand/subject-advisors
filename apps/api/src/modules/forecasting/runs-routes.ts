@@ -1,6 +1,6 @@
 import { authJson } from '../auth';
 import type { ForecastScope, UncertaintyReason } from '../../../../../packages/shared/src/forecasting/contracts';
-import { runForecastEngine, subjectStudentOutcomes } from '../../../../../packages/shared/src/forecasting/engine';
+import { catalogueFingerprint, runForecastEngine, subjectStudentOutcomes } from '../../../../../packages/shared/src/forecasting/engine';
 import type { EngineSubjectDemand } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { OperationReceipt } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { RunSubjectStudents } from '../../../../../packages/shared/src/forecasting/runs';
@@ -174,7 +174,7 @@ async function subjectStudents(forecastRunId: number, subjectId: number, deps: F
   const b = view.breakdown;
   const data: RunSubjectStudents = {
     forecastRunId, subjectId, subjectCode: stored.subjectCode, subjectName: stored.subjectName,
-    catalogueMatchesRun: runForecastEngine(request).ruleSnapshot.catalogueFingerprint === rows.ruleSnapshot.catalogueFingerprint,
+    catalogueMatchesRun: catalogueFingerprint(request.curricula) === rows.ruleSnapshot.catalogueFingerprint,
     summary: {
       inCurriculum: b.inCurriculum, counted: b.supported, uncertain: b.uncertain, nearGraduation: view.nearGraduationCount,
       notCounted: b.alreadyPassed + b.prerequisiteNotMet + b.notOfferedInSemesterType, breakdown: b, uncertaintyReasonCounts: view.uncertaintyReasonCounts,

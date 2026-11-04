@@ -313,22 +313,23 @@ else {
       await page.getByRole('heading', { name: 'No forecasts match' }).waitFor();
       await toolbar.getByLabel('Search forecasts').fill('version 1');
       await table.getByText('Version 1').waitFor();
+      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Version', 'Status', 'Generated', 'Subjects', 'Potential demand', 'Awaiting decision', 'Actions'], 'no Sections column; awaiting counts subjects');
       const open = page.getByRole('link', { name: 'Open forecast version 1' });
       assert.equal(await open.innerText(), '', 'the open action is an icon button');
       assert.ok((await open.boundingBox()).height >= 44, 'icon buttons keep the 44px target');
       await page.getByRole('link', { name: 'Open forecast version 1' }).click();
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       assert.equal(await page.getByText('Potential demand, not registration.').count(), 0, 'the assumption note is not shown');
-      assert.deepEqual(await page.getByLabel('Forecast summary').locator('dt').allInnerTexts(), ['Subjects', 'Potential demand', 'Below minimum', 'Below optimal']);
+      assert.deepEqual(await page.getByLabel('Forecast summary').locator('dt').allInnerTexts(), ['Subjects', 'Potential demand', 'Below minimum']);
       assert.equal(await page.getByText(/registered|enrolled/i).count(), 0);
       const subjects = page.getByRole('region', { name: 'Subjects table', exact: true });
       assert.deepEqual(await subjects.locator('thead th').allInnerTexts(), ['Subject', 'Potential demand', 'Quality', 'Action']);
       assert.ok((await subjects.locator('tr[data-subject="SECJ1013"] th').innerText()).includes('Lab · 3 credit hours'), 'class type sits under the subject');
       assert.equal(await subjects.locator('tbody tr').count(), 4);
       const lab = subjects.locator('tr[data-subject="SECJ1013"]'), second = subjects.locator('tr[data-subject="SECJ1023"]');
-      assert.ok(!(await lab.innerText()).includes('Section 1') && (await lab.innerText()).includes('Below optimal'), 'flags sit under the demand, no section list');
+      assert.ok(!(await lab.innerText()).includes('Section 1') && !(await lab.innerText()).includes('Below optimal'), 'no section list and no Below optimal flag');
       const text2 = await second.innerText();
-      assert.ok(text2.includes('Below minimum') && text2.includes('Below optimal'));
+      assert.ok(text2.includes('Below minimum') && !text2.includes('Below optimal'));
       const view = lab.getByRole('button', { name: 'View students for SECJ1013' });
       assert.equal((await view.innerText()).replace(/\s+/g, ' ').trim(), '3 uncertain · View students');
       assert.equal(await page.locator('.coordinator-reasons, .coordinator-expander[aria-expanded]').count(), 0, 'the inline reasons expander is gone');
@@ -436,6 +437,34 @@ else {
       assert.ok(await noOverflow(page));
     });
 
+    await check('forecast: info icons show a popover on hover and focus, inside the viewport, and Escape closes it', async page => {
+      await mock(page, { seed: 'review' });
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const subjects = page.getByRole('region', { name: 'Subjects table', exact: true });
+      const icon = subjects.getByRole('button', { name: 'About Quality' });
+      const tip = page.getByRole('tooltip').filter({ hasText: 'How sure the count is' });
+      assert.equal(await tip.isVisible(), false, 'hidden until hover');
+      await icon.hover(); await tip.waitFor();
+      assert.ok((await tip.innerText()).startsWith('Quality'), 'popover has a title');
+      assert.equal(await icon.getAttribute('aria-describedby'), await tip.getAttribute('id'));
+      const box = await tip.boundingBox(), viewport = page.viewportSize();
+      assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width, 'popover stays in the viewport');
+      await page.screenshot({ path: shots + 'forecast-info-tip-desktop.png' });
+      await page.mouse.move(0, 0); await tip.waitFor({ state: 'hidden' });
+      await page.getByLabel('Forecast summary').getByRole('button', { name: 'About Potential demand' }).focus();
+      const demand = page.getByRole('tooltip').filter({ hasText: 'not registration' }); await demand.waitFor();
+      await page.keyboard.press('Escape'); await demand.waitFor({ state: 'hidden' });
+      await assertReadable(page, 'info tip');
+      await page.locator('tr[data-subject="SECJ1013"]').getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.getByLabel('Student counts').waitFor();
+      await dialog.getByRole('button', { name: 'About Student' }).hover();
+      await page.getByRole('tooltip').filter({ hasText: 'PORTAL-' }).waitFor();
+      await page.screenshot({ path: shots + 'forecast-students-info-tip-desktop.png' });
+      await dialog.getByRole('button', { name: 'About Near graduation' }).focus();
+      await page.keyboard.press('Escape');
+      assert.ok(await dialog.isVisible(), 'the first Escape closes only the popover, not the dialog');
+    });
+
     await check('forecast: View students opens a read-only dialog with filters, search and the saved counts', async page => {
       const state = await mock(page, { seed: 'review' });
       await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
@@ -497,6 +526,16 @@ else {
       await second.getByLabel('Student counts').waitFor();
       assert.deepEqual(await second.getByLabel('Student counts').locator('dd').allInnerTexts(), ['14', '0', '0', '5']);
       assert.equal(await second.getByLabel('Why students are uncertain').count(), 0);
+      await second.getByRole('button', { name: 'Close' }).click();
+      const listCalls = () => state.requests.filter(r => /\/subjects\/\d+\/students$/.test(r.path)).length, before = listCalls();
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByLabel('Student counts').waitFor();
+      assert.equal(listCalls(), before, 'reopening a subject uses the page cache, no new request');
+      await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByRole('button', { name: 'Close' }).click();
+      await page.getByRole('button', { name: 'Refresh' }).click(); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByLabel('Student counts').waitFor();
+      assert.equal(listCalls(), before + 1, 'Refresh clears the cache');
     });
 
     for (const width of [320, 375]) await check('mobile: the students dialog fits without page overflow at ' + width, async page => {
@@ -567,7 +606,7 @@ else {
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       await pickStatus(page, 'Finalized');
       const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.waitFor();
-      assert.ok((await dialog.innerText()).includes('6 sections still pending'));
+      assert.ok((await dialog.innerText()).includes('subjects still pending'));
       await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       const alert = page.getByRole('alert').filter({ hasText: '3 subjects still need a decision before this forecast can be finalized: SECJ1013, SECJ1023, SCSJ1013.' }); await alert.waitFor();

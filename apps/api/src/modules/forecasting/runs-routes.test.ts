@@ -277,7 +277,7 @@ describe('UC20 forecast run API', () => {
       expect(lecture.sections[0]).toMatchObject({ minimumEnrollment: 15, breakEvenTarget: 25, normalMaximum: 45, exceptionMaximum: 50, reviewStatus: 'PENDING' });
       expect(run.subjects.find((s) => s.subjectId === C)).toMatchObject({ configurationStatus: 'CONFIGURATION_REQUIRED', configurationIssue: 'CLASS_TYPE_MISSING', sections: [], decisionStatus: 'NONE' });
       expect(run.subjects.find((s) => s.subjectId === X)).toMatchObject({ excluded: true, forecastCount: null, configurationStatus: 'EXCLUDED', sections: [] });
-      expect(run.summary).toMatchObject({ subjects: 4, excludedSubjects: 1, notOfferedInSemesterTypeSubjects: 0, configurationRequiredSubjects: 1, totalSections: 4, pendingSections: 4, sectionsBelowOptimal: 4, sectionsBelowMinimum: 0 });
+      expect(run.summary).toMatchObject({ subjects: 4, excludedSubjects: 1, notOfferedInSemesterTypeSubjects: 0, configurationRequiredSubjects: 1, totalSections: 4, pendingSections: 4, sectionsBelowOptimal: 4, sectionsBelowMinimum: 0, pendingSubjects: 2, subjectsBelowMinimum: 0 });
       expect(run.ruleSnapshot.engineVersion).toBe('uc20-engine-1.1.0');
       expect(run.originalRecommendations).toHaveLength(2);
     });
@@ -287,7 +287,7 @@ describe('UC20 forecast run API', () => {
       await newRun(deps, 1); await newRun(deps, 2);
       const first = await readData<{ items: ForecastRunSummary[]; nextCursor?: string }>(await get(deps, 'forecast-runs?programmeId=5&learningCentreId=1&targetSemesterId=2&limit=1'));
       expect(first.items).toHaveLength(1);
-      expect(first.items[0]).toMatchObject({ versionNumber: 2, status: 'DRAFT', summary: { pendingSections: 4 } });
+      expect(first.items[0]).toMatchObject({ versionNumber: 2, status: 'DRAFT', summary: { pendingSections: 4, pendingSubjects: 2 } });
       const next = await readData<{ items: ForecastRunSummary[]; nextCursor?: string }>(await get(deps, `forecast-runs?programmeId=5&learningCentreId=1&targetSemesterId=2&limit=1&cursor=${first.nextCursor}`));
       expect(next.items.map((item) => item.versionNumber)).toEqual([1]);
       expect(next.nextCursor).toBeUndefined();

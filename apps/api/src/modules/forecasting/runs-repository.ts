@@ -255,7 +255,7 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
 
     listRuns: (scope, limit, beforeRunId) => read(async () => (await query(`SELECT ${RUN_COLUMNS},
         dm.subjects, dm.excluded, dm.not_offered, dm.config_required, dm.total_supported, dm.total_uncertain,
-        sc.total_sections, sc.pending_sections, sc.below_minimum, sc.below_optimal
+        sc.total_sections, sc.pending_sections, sc.below_minimum, sc.below_optimal, sc.pending_subjects, sc.subjects_below_minimum
       FROM public.forecast_run r
       CROSS JOIN LATERAL (SELECT count(*) AS subjects,
           count(*) FILTER (WHERE d.configuration_status = 'EXCLUDED' AND COALESCE(r.scenario_assumptions->'subjects'->(d.subject_id::text)->>'semesterTypeExcluded', 'false') <> 'true') AS excluded,
@@ -267,7 +267,9 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
       CROSS JOIN LATERAL (SELECT count(*) AS total_sections,
           count(*) FILTER (WHERE ps.review_status = 'PENDING') AS pending_sections,
           count(*) FILTER (WHERE ps.expected_students < cr.minimum_enrollment) AS below_minimum,
-          count(*) FILTER (WHERE ps.expected_students < cr.break_even_target) AS below_optimal
+          count(*) FILTER (WHERE ps.expected_students < cr.break_even_target) AS below_optimal,
+          count(DISTINCT d.demand_id) FILTER (WHERE ps.review_status = 'PENDING') AS pending_subjects,
+          count(DISTINCT d.demand_id) FILTER (WHERE ps.expected_students < cr.minimum_enrollment) AS subjects_below_minimum
         FROM public.proposed_class_section ps JOIN public.forecast_subject_demand d ON d.demand_id = ps.demand_id
         JOIN public.class_capacity_rule cr ON cr.capacity_rule_id = ps.capacity_rule_id WHERE d.forecast_run_id = r.forecast_run_id) sc
       WHERE r.programme_id = $1 AND r.learning_centre_id = $2 AND r.target_semester_id = $3 AND ($5::integer IS NULL OR r.forecast_run_id < $5::integer)
@@ -278,6 +280,7 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
           subjects: integer(row.subjects), excludedSubjects: integer(row.excluded), notOfferedInSemesterTypeSubjects: integer(row.not_offered), configurationRequiredSubjects: integer(row.config_required),
           totalSupportedDemand: integer(row.total_supported), totalUncertain: integer(row.total_uncertain), totalSections: integer(row.total_sections),
           pendingSections: integer(row.pending_sections), sectionsBelowMinimum: integer(row.below_minimum), sectionsBelowOptimal: integer(row.below_optimal),
+          pendingSubjects: integer(row.pending_subjects), subjectsBelowMinimum: integer(row.subjects_below_minimum),
         },
       }))),
 

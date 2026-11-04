@@ -6,7 +6,8 @@ import {
   ActionDialog, ActionIcon, LoadMore, PageHeading, Panel, ScopeFields, StatusRegion, chooseScope, readScope, scopeHref, usePagedList, useRead, when,
   type ChosenScope, type Notice,
 } from './coordinator-ui';
-import { SubjectStudentsDialog } from './SubjectStudentsDialog';
+import { SubjectStudentsDialog, type StudentListCache } from './SubjectStudentsDialog';
+import { HELP, Help } from './coordinator-help';
 import type { ForecastAuditEntry, ForecastScope } from '../../../../../packages/shared/src/forecasting/contracts';
 import {
   type ForecastRunDetail, type ForecastRunStatus, type ForecastRunSummary, type NewerForecastAvailable, type RunDecisionAction,
@@ -36,8 +37,8 @@ function FlagBadges({ flags }: { flags: RunSectionFlag[] }) {
 const shownSubjects = (summary: ForecastRunSummary['summary']) => summary.subjects - summary.excludedSubjects - summary.notOfferedInSemesterTypeSubjects;
 function SummaryFacts({ run }: { run: Pick<ForecastRunDetail, 'summary'> }) {
   const s = run.summary;
-  const facts: Array<[string, number]> = [['Subjects', shownSubjects(s)], ['Potential demand', s.totalSupportedDemand], ['Below minimum', s.sectionsBelowMinimum], ['Below optimal', s.sectionsBelowOptimal]];
-  return <dl className="coordinator-counts" aria-label="Forecast summary">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
+  const facts: Array<[string, number, string]> = [['Subjects', shownSubjects(s), HELP.subjects], ['Potential demand', s.totalSupportedDemand, HELP.demand], ['Below minimum', s.subjectsBelowMinimum, HELP.belowMinimum]];
+  return <dl className="coordinator-counts" aria-label="Forecast summary">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>;
 }
 function NewerBadge({ newer, scope }: { newer: NewerForecastAvailable; scope: ForecastScope }) {
   return <AppLink className="coordinator-newer" href={scopeHref('/coordinator/forecasts', scope, { run: newer.forecastRunId })}>Newer forecast available: version {newer.versionNumber} ({statusLabels[newer.status].toLowerCase()})</AppLink>;
@@ -50,7 +51,7 @@ const runOrder: Record<RunSort, (a: ForecastRunSummary, b: ForecastRunSummary) =
   newest: (a, b) => b.versionNumber - a.versionNumber || b.forecastRunId - a.forecastRunId,
   oldest: (a, b) => a.versionNumber - b.versionNumber || a.forecastRunId - b.forecastRunId,
   demand: (a, b) => b.summary.totalSupportedDemand - a.summary.totalSupportedDemand || b.versionNumber - a.versionNumber,
-  pending: (a, b) => b.summary.pendingSections - a.summary.pendingSections || b.versionNumber - a.versionNumber,
+  pending: (a, b) => b.summary.pendingSubjects - a.summary.pendingSubjects || b.versionNumber - a.versionNumber,
 };
 const openIcon = <ActionIcon><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></ActionIcon>;
 
@@ -169,13 +170,13 @@ function RunList({ client, scope }: { client: CoordinatorClient; scope: ChosenSc
         {rows.length === 0
           ? <div className="admin-empty"><h3>No forecasts match</h3><p>Change the status or the search to see more forecasts.</p></div>
           : <div className="admin-table-scroll coordinator-table" role="region" aria-label="Forecasts table" tabIndex={0}>
-          <table><thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Generated</th><th scope="col">Subjects</th><th scope="col">Potential demand</th><th scope="col">Sections</th><th scope="col">Awaiting decision</th><th scope="col">Actions</th></tr></thead>
+          <table><thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Generated</th><th scope="col"><Help label="Subjects" text={HELP.subjects}/></th><th scope="col"><Help label="Potential demand" text={HELP.demand}/></th><th scope="col"><Help label="Awaiting decision" text={HELP.awaiting}/></th><th scope="col">Actions</th></tr></thead>
             <tbody>{rows.map(run => <tr key={run.forecastRunId}>
               <td><strong>Version {run.versionNumber}</strong><span className="admin-audit-id">Forecast #{run.forecastRunId} · import #{run.importBatchId}</span>
                 {run.newerForecastAvailable && <NewerBadge newer={run.newerForecastAvailable} scope={run}/>}</td>
               <td><span className={'admin-pill ' + statusClass[run.status]}>{statusLabels[run.status]}</span></td><td>{when(run.generatedAt)}</td>
               <td>{shownSubjects(run.summary)}</td><td>{run.summary.totalSupportedDemand}<span className="admin-audit-id">{run.summary.totalUncertain} uncertain</span></td>
-              <td>{run.summary.totalSections}</td><td>{run.summary.pendingSections}</td>
+              <td>{run.summary.pendingSubjects}</td>
               <td><div className="coordinator-row-actions"><AppLink className="coordinator-icon-button" href={scopeHref('/coordinator/forecasts', run, { run: run.forecastRunId })} aria-label={`Open forecast version ${run.versionNumber}`} title="Open forecast">{openIcon}</AppLink></div></td></tr>)}</tbody></table></div>}
         {filtering && list.cursor && <p className="admin-muted">Filters apply to the forecasts loaded so far. Load more to include older ones.</p>}
         {list.loadMoreError && <p className="admin-form-error" role="alert">{list.loadMoreError}</p>}
@@ -184,8 +185,8 @@ function RunList({ client, scope }: { client: CoordinatorClient; scope: ChosenSc
   </section>;
 }
 
-/** Capacity flags of any proposed section, shown once per subject under its demand (sections are not split in this system: the coordinator works from demand). */
-const subjectFlags = (subject: RunSubject) => [...new Set(subject.sections.flatMap(section => section.flags))];
+/** Capacity flags of any proposed section, shown once per subject under its demand. Below optimal is not shown: it depends on a class split, which is not done in this system. */
+const subjectFlags = (subject: RunSubject) => [...new Set(subject.sections.flatMap(section => section.flags))].filter(flag => flag !== 'BELOW_OPTIMAL');
 
 type Dialog = null | { kind: 'start' } | { kind: 'finalize' } | { kind: 'decide'; action: SubjectAction; subject: RunSubject } | { kind: 'restore'; subject: RunSubject };
 
@@ -198,7 +199,7 @@ function matchesFilters(subject: RunSubject, { q, type, decision, flag }: Subjec
   if (term && !subject.subjectCode.toLowerCase().includes(term) && !subject.subjectName.toLowerCase().includes(term)) return false;
   if (type && (subject.classType ?? 'NONE') !== type) return false;
   if (decision && subject.decisionStatus !== decision) return false;
-  if (flag === 'BELOW_MINIMUM' || flag === 'BELOW_OPTIMAL') return subject.sections.some(section => section.flags.includes(flag));
+  if (flag === 'BELOW_MINIMUM') return subject.sections.some(section => section.flags.includes(flag));
   if (flag === 'CONFIG') return subject.configurationStatus === 'CONFIGURATION_REQUIRED';
   if (flag === 'UNCERTAIN') return subject.uncertainStudentCount > 0;
   return true;
@@ -225,7 +226,7 @@ function RemovedSubjects({ subjects, editable, onRestore }: { subjects: RunSubje
         </tr>)}</tbody></table></div>
   </aside>;
 }
-function SubjectTable({ client, run, editable, pendingIds, onDecide, onRestore }: { client: CoordinatorClient; run: ForecastRunDetail; editable: boolean; pendingIds: number[]; onDecide: (action: SubjectAction, subject: RunSubject) => void; onRestore: (subject: RunSubject) => void }) {
+function SubjectTable({ client, run, studentCache, editable, pendingIds, onDecide, onRestore }: { client: CoordinatorClient; run: ForecastRunDetail; studentCache: StudentListCache; editable: boolean; pendingIds: number[]; onDecide: (action: SubjectAction, subject: RunSubject) => void; onRestore: (subject: RunSubject) => void }) {
   const [studentsFor, setStudentsFor] = useState<RunSubject | null>(null);
   const listed = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded);
   // Removed (deferred) subjects leave the main table and are listed beside it, where they can be added back.
@@ -245,7 +246,7 @@ function SubjectTable({ client, run, editable, pendingIds, onDecide, onRestore }
     <SegmentedFilter label="Decision" value={filters.decision} onChange={decision => change({ decision })} options={[{ value: '', label: 'All' }, ...decisionTabs.map(status => ({ value: status, label: decisionLabels[status] }))]}/>
     <FilterMenu groups={[
       { id: 'type', heading: 'Class type', value: filters.type, onChange: type => change({ type }), options: [{ value: 'LECTURE', label: 'Lecture' }, { value: 'LAB', label: 'Lab' }, { value: 'NONE', label: 'Not set' }] },
-      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'BELOW_MINIMUM', label: 'Below minimum' }, { value: 'BELOW_OPTIMAL', label: 'Below optimal' }, { value: 'CONFIG', label: 'Configuration required' }, { value: 'UNCERTAIN', label: 'Has uncertain students' }] },
+      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'BELOW_MINIMUM', label: 'Below minimum' }, { value: 'CONFIG', label: 'Configuration required' }, { value: 'UNCERTAIN', label: 'Has uncertain students' }] },
       { id: 'decision', heading: 'Other decisions', allLabel: 'Any', value: (otherDecisions as readonly string[]).includes(filters.decision) ? filters.decision : '', onChange: decision => change({ decision }), options: otherDecisions.map(status => ({ value: status, label: decisionLabels[status] })) },
     ]}/>
     <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', noAll: true, value: filters.sort, onChange: sort => change({ sort: sort as SubjectSort }), options: Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label })) }]}/>
@@ -253,10 +254,10 @@ function SubjectTable({ client, run, editable, pendingIds, onDecide, onRestore }
     {filtering && <ClearFilters onClear={clear}/>}
   </TableToolbar>;
   const side = removed.length > 0 && <RemovedSubjects subjects={removed} editable={editable} onRestore={onRestore}/>;
-  const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={run.forecastRunId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} onClose={() => setStudentsFor(null)}/>;
+  const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={run.forecastRunId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} cache={studentCache} onClose={() => setStudentsFor(null)}/>;
   if (matching.length === 0) return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-empty" role="status"><p>{subjects.length === 0 ? 'Every subject has been removed.' : 'No subjects match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div></div>{side}{studentsDialog}</div>;
   return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects" role="region" aria-label="Subjects table" tabIndex={0}>
-    <table><thead><tr><th scope="col">Subject</th><th scope="col">Potential demand</th><th scope="col">Quality</th><th scope="col">Action</th></tr></thead>
+    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Potential demand" text={HELP.demand}/></th><th scope="col"><Help label="Quality" text={HELP.quality}/></th><th scope="col">Action</th></tr></thead>
       <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(subject => {
         const highlight = pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING';
         const decidable = editable && subject.configurationStatus === 'CONFIGURED' && subject.sections.length > 0;
@@ -297,8 +298,9 @@ function AuditTable({ client, run }: { client: CoordinatorClient; run: ForecastR
 function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number }) {
   const read = useRead(signal => client.getRun(runId, signal), 'run|' + runId);
   const [notice, setNotice] = useState<Notice>(null), [dialog, setDialog] = useState<Dialog>(null), [pendingIds, setPendingIds] = useState<number[]>([]);
-  const heading = useRef<HTMLHeadingElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null), studentCache = useRef<StudentListCache>(new Map());
   useEffect(() => { if (read.data) heading.current?.focus(); }, [read.data?.run.forecastRunId]);
+  useEffect(() => { const cache = studentCache.current; cache.clear(); return () => cache.clear(); }, [runId]);
   const loaded = read.data;
   const run = loaded?.run, revision = loaded?.revision ?? '';
   const announce = (next: Notice) => { setNotice(next); requestAnimationFrame(() => document.getElementById('coordinator-action-status')?.focus()); };
@@ -322,7 +324,7 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
         <div className="admin-card-title"><div><h2 id="coordinator-run-heading" tabIndex={-1} ref={heading}>Forecast version {run.versionNumber}</h2>
           <RunMeta run={run}/></div>
           <div className="coordinator-head-actions">
-            <button type="button" onClick={() => void read.reload()}>Refresh</button>
+            <button type="button" onClick={() => { studentCache.current.clear(); void read.reload(); }}>Refresh</button>
             <StatusMenu status={run.status} onChange={next => setDialog({ kind: next === 'UNDER_REVIEW' ? 'start' : 'finalize' })}/>
           </div></div>
         {run.newerForecastAvailable && <p className="coordinator-newer-wrap"><NewerBadge newer={run.newerForecastAvailable} scope={run}/></p>}
@@ -332,7 +334,7 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
       </section>
       <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
         <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Potential demand is the supported eligible pool. Uncertain students are not counted in it.</p></div></div>
-        {shown === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p> : <SubjectTable client={client} run={run} editable={editable} pendingIds={pendingIds} onDecide={(action, subject) => setDialog({ kind: 'decide', action, subject })} onRestore={subject => setDialog({ kind: 'restore', subject })}/>}
+        {shown === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p> : <SubjectTable client={client} run={run} studentCache={studentCache.current} editable={editable} pendingIds={pendingIds} onDecide={(action, subject) => setDialog({ kind: 'decide', action, subject })} onRestore={subject => setDialog({ kind: 'restore', subject })}/>}
       </section>
       <AuditTable client={client} run={run}/>
       {dialog?.kind === 'start' && <ActionDialog title="Start review" confirmLabel="Start review" reasonLabel={null} onCancel={() => setDialog(null)}
@@ -344,7 +346,7 @@ function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number
         description={<>{dialog.subject.subjectName}. Put this subject back in the offering plan. It returns to the Subjects table as pending and needs a new decision.</>}
         onSubmit={async reason => mutate(rev => client.decide(run.forecastRunId, rev, scope, [{ subjectId: dialog.subject.subjectId, action: 'REOPEN', reason }]), `Added back: ${dialog.subject.subjectCode}.`)}/>}
       {dialog?.kind === 'finalize' && <ActionDialog title="Finalize forecast" confirmLabel="Finalize forecast" danger onCancel={() => setDialog(null)}
-        description={<>Finalizing freezes this forecast: no decision can change afterwards. Every proposed section must already be reviewed, approved or deferred ({plural(run.summary.pendingSections, 'section')} still pending).</>}
+        description={<>Finalizing freezes this forecast: no decision can change afterwards. Every subject must already be approved, reviewed or removed ({plural(run.summary.pendingSubjects, 'subject')} still pending).</>}
         onSubmit={async reason => {
           try { await mutate(rev => client.finalize(run.forecastRunId, rev, scope, { reason }), 'Forecast finalized. It is now read-only.'); }
           catch (error) {

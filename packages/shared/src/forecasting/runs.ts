@@ -103,6 +103,10 @@ export interface RunSummary {
   pendingSections: number;
   sectionsBelowMinimum: number;
   sectionsBelowOptimal: number;
+  /** Subjects with at least one PENDING section: the coordinator decides per subject. */
+  pendingSubjects: number;
+  /** Subjects whose potential demand is under the minimum enrolment (any section flagged BELOW_MINIMUM). */
+  subjectsBelowMinimum: number;
 }
 
 /** OP1: informational only. Present when a later version exists for the same programme + centre + semester. */
