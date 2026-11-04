@@ -1,8 +1,9 @@
 import { authJson } from '../auth';
 import type { ForecastScope, UncertaintyReason } from '../../../../../packages/shared/src/forecasting/contracts';
-import { runForecastEngine } from '../../../../../packages/shared/src/forecasting/engine';
+import { runForecastEngine, subjectStudentOutcomes } from '../../../../../packages/shared/src/forecasting/engine';
 import type { EngineSubjectDemand } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { OperationReceipt } from '../../../../../packages/shared/src/forecasting/contracts';
+import type { RunSubjectStudents } from '../../../../../packages/shared/src/forecasting/runs';
 import { RUN_LIMITS } from '../../../../../packages/shared/src/forecasting/runs';
 import type { ForecastingDependencies } from './contracts';
 import { ForecastingError } from './errors';
@@ -13,7 +14,7 @@ import { parseDecisions, parseScope, planDecisions, sameScope } from './runs-dec
 import { detailOf, newerOf, revisionOf, summaryOfList } from './runs-view';
 import type { StoredSubjectAssumptions } from './runs-view';
 
-export const RUN_ROUTE = /^forecast-runs(?:\/([1-9]\d*)(?:\/(audit|reviews|decisions|finalizations))?)?$/;
+export const RUN_ROUTE = /^forecast-runs(?:\/([1-9]\d*)(?:\/(audit|reviews|decisions|finalizations)|\/subjects\/([1-9]\d*)\/students)?)?$/;
 
 function checkIdempotencyKey(request: Request) {
   const key = request.headers.get('idempotency-key');
@@ -152,6 +153,37 @@ async function auditPage(forecastRunId: number, url: URL, deps: ForecastingDepen
   return authJson({ data: { items: page, ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.decisionAuditId) } : {}) } });
 }
 
+/**
+ * Read-only roster behind one subject's numbers. Rebuilds the engine input from the run's frozen import batch and the run's stored target semester,
+ * so the only live input is the curriculum catalogue; `catalogueMatchesRun` says whether that still equals the run's stored fingerprint.
+ */
+async function subjectStudents(forecastRunId: number, subjectId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
+  const run = await loadRun(deps, actor, forecastRunId);
+  const rows = await deps.runs.getDetail(forecastRunId);
+  const stored = rows?.subjects.find((subject) => subject.subjectId === subjectId);
+  if (!rows || !stored) throw new ForecastingError('RUN_SUBJECT_NOT_FOUND');
+  const scope = scopeOf(run);
+  const batch = await deps.repository.getBatch(run.importBatchId);
+  if (!batch) throw new ForecastingError('IMPORT_NOT_FOUND');
+  const inputs = await deps.runs.engineInputs(scope, run.importBatchId);
+  const request = {
+    scope, target: rows.ruleSnapshot.targetSemester, curricula: inputs.curricula, capacityRules: inputs.capacityRules,
+    snapshot: { ...inputs.snapshot, rejectedRowsByStudent: batch.summary.internal.rejectedRowsByStudent ?? {} },
+  };
+  const view = subjectStudentOutcomes(request, subjectId);
+  const b = view.breakdown;
+  const data: RunSubjectStudents = {
+    forecastRunId, subjectId, subjectCode: stored.subjectCode, subjectName: stored.subjectName,
+    catalogueMatchesRun: runForecastEngine(request).ruleSnapshot.catalogueFingerprint === rows.ruleSnapshot.catalogueFingerprint,
+    summary: {
+      inCurriculum: b.inCurriculum, counted: b.supported, uncertain: b.uncertain, nearGraduation: view.nearGraduationCount,
+      notCounted: b.alreadyPassed + b.prerequisiteNotMet + b.notOfferedInSemesterType, breakdown: b, uncertaintyReasonCounts: view.uncertaintyReasonCounts,
+    },
+    students: view.students,
+  };
+  return authJson({ data });
+}
+
 const CONTROL_CHARACTERS = new RegExp('[\u0000-\u001f\u007f]');
 function optional(value: unknown, label: string, max: number): string | null {
   if (value === undefined || value === null) return null;
@@ -205,10 +237,16 @@ export async function handleRunRoute(route: string, request: Request, url: URL, 
   const method = request.method;
   const id = match[1] ? Number(match[1]) : null;
   const leaf = match[2] ?? null;
+  const subjectId = match[3] ? Number(match[3]) : null;
   if (id === null) {
     if (method === 'POST') { onlyParameters(url, []); return await generate(request, deps, actor); }
     if (method !== 'GET') return methodNotAllowed(['GET', 'POST']);
     return await list(url, deps, actor);
+  }
+  if (subjectId !== null) {
+    if (method !== 'GET') return methodNotAllowed(['GET']);
+    onlyParameters(url, []);
+    return await subjectStudents(id, subjectId, deps, actor);
   }
   if (leaf === null) {
     if (method !== 'GET') return methodNotAllowed(['GET']);

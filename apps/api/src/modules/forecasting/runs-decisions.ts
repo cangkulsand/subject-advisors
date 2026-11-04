@@ -63,7 +63,7 @@ export function parseDecisions(body: Record<string, unknown>): { scope: Forecast
     const item = raw as Record<string, unknown>;
     exactKeys(item, ['subjectId', 'action', 'reason', 'approvalReference', 'replacementSections'], 'a decision');
     const action = item.action;
-    if (typeof action !== 'string' || !(RUN_DECISION_ACTIONS as readonly string[]).includes(action)) bad('action must be REVIEW, APPROVE, DEFER or REPLACE_ALLOCATION.');
+    if (typeof action !== 'string' || !(RUN_DECISION_ACTIONS as readonly string[]).includes(action)) bad('action must be REVIEW, APPROVE, DEFER, REOPEN or REPLACE_ALLOCATION.');
     const subjectId = int(item.subjectId, 'subjectId', 1);
     const reason = requiredReason(item.reason);
     const approvalReference = optionalText(item.approvalReference, 'approvalReference', RUN_LIMITS.maxApprovalReferenceLength);
@@ -89,7 +89,7 @@ export function parseDecisions(body: Record<string, unknown>): { scope: Forecast
   return { scope, decisions };
 }
 
-const STATUS_FOR: Record<Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>, SectionReviewStatus> = { REVIEW: 'REVIEWED', APPROVE: 'APPROVED', DEFER: 'DEFERRED' };
+const STATUS_FOR: Record<Exclude<RunDecisionAction, 'REPLACE_ALLOCATION'>, SectionReviewStatus> = { REVIEW: 'REVIEWED', APPROVE: 'APPROVED', DEFER: 'DEFERRED', REOPEN: 'PENDING' };
 const stateOf = (section: RunSectionRow): SectionState => ({
   proposedSectionId: section.proposedSectionId, sectionNumber: section.sectionNumber, expectedStudents: section.expectedStudents,
   reviewStatus: section.reviewStatus, justification: section.justification,

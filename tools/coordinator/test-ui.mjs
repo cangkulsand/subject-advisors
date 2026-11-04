@@ -68,6 +68,15 @@ else {
     await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
     await page.getByRole('button', { name: 'Upload and validate' }).click();
   }
+  // Subject action dropdown: open the row's menu and pick a decision (labels: Approved, Reviewed, Removed).
+  async function pickAction(page, code, label) {
+    await page.getByRole('button', { name: new RegExp(`^Action for ${code}: `) }).click();
+    await page.getByRole('menu', { name: `Action for ${code}` }).getByRole('menuitemradio', { name: label, exact: true }).click();
+  }
+  async function pickStatus(page, label) {
+    await page.getByRole('button', { name: /^Forecast status: / }).click();
+    await page.getByRole('menuitemradio', { name: label }).click();
+  }
   async function uploadBoth(page, marker, label = 'Combined export') {
     await page.getByLabel('Source label', { exact: true }).fill(label);
     await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
@@ -104,15 +113,12 @@ else {
       assert.equal(await target.innerText(), '2026/2027 · Semester 2');
       assert.equal(await page.getByLabel('Target semester').evaluate(element => element.tagName), 'OUTPUT');
       assert.ok(page.url().includes('programmeId=7') && page.url().includes('learningCentreId=1'));
-      const download = page.waitForEvent('download');
-      await page.getByRole('button', { name: 'Download CSV template' }).click();
-      assert.equal((await download).suggestedFilename(), 'uc20-import-template.csv');
-      assert.ok(state.requests.some(request => request.path === '/api/coordinator/forecast-import-template' && request.search === ''));
+      assert.equal(await page.getByRole('button', { name: /template/ }).count(), 1, 'only the coordinator template is offered');
       const coordinatorDownload = page.waitForEvent('download');
-      await page.getByRole('button', { name: 'Download coordinator template' }).click();
+      await page.getByRole('button', { name: 'Download template', exact: true }).click();
       assert.equal((await coordinatorDownload).suggestedFilename(), 'uc20-import-template-coordinator.csv');
       assert.ok(state.requests.some(request => request.path === '/api/coordinator/forecast-import-template' && request.search === '?format=coordinator'));
-      await page.getByText('Both formats are accepted', { exact: false }).waitFor();
+      await page.getByText('CSV up to 5 MiB (maximum 20,000 rows).', { exact: true }).waitFor();
     });
 
     await check('imports: client validation, valid upload is accepted and listed', async page => {
@@ -125,11 +131,11 @@ else {
       await page.getByLabel('CSV file', { exact: true }).setInputFiles({ name: 'cohort.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
       await page.getByText('Choose a file with a .csv extension.').waitFor();
       assert.equal(state.bodies.length, 0);
-      await page.getByRole('heading', { name: 'No accepted imports yet' }).waitFor();
+      await page.getByRole('heading', { name: 'No snapshots yet' }).waitFor();
       await upload(page, 'VALIDFILE');
       await page.getByRole('status').filter({ hasText: 'Import accepted: 55 students from "September cohort".' }).waitFor();
-      await page.getByRole('region', { name: 'Accepted imports table' }).getByText('September cohort').waitFor();
-      assert.equal(await page.getByText('No accepted imports yet').count(), 0);
+      await page.getByRole('region', { name: 'Student data snapshots table' }).getByText('September cohort').waitFor();
+      assert.equal(await page.getByText('No snapshots yet').count(), 0);
       assert.equal(await page.getByLabel('CSV file', { exact: true }).evaluate(element => element.files.length), 0);
       const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-imports');
       assert.ok(post.headers['idempotency-key']); assert.ok(post.headers['content-type'].startsWith('multipart/form-data'));
@@ -143,7 +149,7 @@ else {
       assert.equal(await page.getByLabel('Snapshot scope').count(), 0, 'the scope is not repeated inside the snapshot section');
       assert.equal(await page.getByLabel('Programme', { exact: true }).inputValue(), '5');
       assert.equal(await page.getByLabel('Learning centre', { exact: true }).inputValue(), '1');
-      await page.getByRole('heading', { name: 'No accepted imports yet' }).waitFor();
+      await page.getByRole('heading', { name: 'No snapshots yet' }).waitFor();
       await page.getByRole('button', { name: 'Create snapshot' }).click();
       await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
       const coverage = page.getByLabel('Snapshot coverage');
@@ -152,22 +158,38 @@ else {
       await page.getByText('Interim: student profiles do not record a learning centre yet').waitFor();
       const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-imports/system-snapshots');
       assert.deepEqual(post.body, scopeBody); assert.ok(post.headers['idempotency-key']);
-      const table = page.getByRole('region', { name: 'Accepted imports table' });
+      const table = page.getByRole('region', { name: 'Student data snapshots table' });
       await table.getByText('System students', { exact: true }).first().waitFor();
       assert.equal(await table.getByText('System students', { exact: true }).count(), 2); // label and source badge
       await page.screenshot({ path: shots + 'imports-system-desktop.png', fullPage: true });
-      await page.getByRole('link', { name: 'View roster' }).first().click();
+      const toolbar = page.getByRole('search', { name: 'Filter and sort snapshots' });
+      await toolbar.getByRole('button', { name: 'CSV', exact: true }).click();
+      await page.getByRole('heading', { name: 'No snapshots match' }).waitFor();
+      assert.equal(await table.count(), 0, 'the source filter hides the system snapshot');
+      await toolbar.getByRole('button', { name: 'Clear filters' }).click();
+      await table.getByText('System students', { exact: true }).first().waitFor();
+      await toolbar.getByLabel('Search snapshots').fill('no such snapshot');
+      await page.getByRole('heading', { name: 'No snapshots match' }).waitFor();
+      await toolbar.getByLabel('Search snapshots').fill('system');
+      await table.getByText('System students', { exact: true }).first().waitFor();
+      const actions = page.getByRole('button', { name: /^Generate forecast from / }).first();
+      assert.equal(await actions.innerText(), '', 'row actions are icon buttons');
+      assert.ok((await actions.boundingBox()).height >= 44, 'icon buttons keep the 44px target');
+      await page.getByRole('link', { name: /^View roster for / }).first().click();
       await page.getByRole('heading', { name: 'System students', level: 2 }).waitFor();
       await page.getByText('Based on student-entered records.').waitFor();
       await page.getByRole('heading', { name: 'Student roster' }).waitFor();
-      await page.getByRole('link', { name: '← Back to imports' }).click();
+      await page.getByRole('link', { name: '← Back to snapshots' }).click();
       await page.getByRole('button', { name: 'Create snapshot' }).click();
       await page.getByText('have not changed since this snapshot').waitFor(); // replay (200)
       assert.equal(state.imports.length, 1);
       await page.getByRole('button', { name: 'Generate forecast' }).first().click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await page.getByText('Based on student-entered records.').waitFor();
+      const meta = page.getByRole('list', { name: 'Forecast details' });
+      assert.match(await meta.innerText(), /System students\s*Student-entered records/);
+      assert.ok(!(await meta.innerText()).includes('user_'), 'account IDs are not shown in the header');
+      await meta.getByRole('link', { name: /^Snapshot #\d+$/ }).waitFor();
       await page.screenshot({ path: shots + 'forecast-system-desktop.png', fullPage: true });
     });
 
@@ -180,7 +202,7 @@ else {
       await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
       await upload(page, 'VALIDFILE');
       await page.getByRole('status').filter({ hasText: 'Import accepted: 55 students from "September cohort".' }).waitFor();
-      const table = page.getByRole('region', { name: 'Accepted imports table' });
+      const table = page.getByRole('region', { name: 'Student data snapshots table' });
       await table.getByText('CSV upload', { exact: true }).waitFor();
       assert.equal(state.imports.length, 1);
     });
@@ -210,7 +232,7 @@ else {
       await dialog.getByRole('checkbox').check();
       await dialog.getByRole('button', { name: 'Accept valid subset' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Valid subset accepted' }).waitFor();
-      await page.getByRole('region', { name: 'Accepted imports table' }).getByText('Needs fixes').waitFor();
+      await page.getByRole('region', { name: 'Student data snapshots table' }).getByText('Needs fixes').waitFor();
       assert.equal(await page.getByRole('heading', { name: 'Validation report' }).count(), 0);
       const post = state.bodies.find(item => item.path.endsWith('subset-acceptances'));
       assert.equal(post.headers['if-match'], '"sha256:rev1"');
@@ -238,7 +260,7 @@ else {
       assert.equal(await page.getByRole('button', { name: 'Accept valid subset' }).count(), 0);
       await page.getByRole('button', { name: 'Dismiss report' }).click();
       await page.getByRole('heading', { name: 'Validation report' }).waitFor({ state: 'detached' });
-      await page.getByRole('heading', { name: 'No accepted imports yet' }).waitFor();
+      await page.getByRole('heading', { name: 'No snapshots yet' }).waitFor();
     });
 
     await check('imports: roster shows names as text and loads more students', async page => {
@@ -254,8 +276,8 @@ else {
       await page.waitForFunction(() => document.querySelectorAll('[aria-label="Student roster table"] tbody tr').length === 55);
       assert.equal(await page.getByRole('button', { name: 'Load more students' }).count(), 0);
       await page.screenshot({ path: shots + 'import-roster-desktop.png', fullPage: true });
-      await page.getByRole('link', { name: '← Back to imports' }).click();
-      await page.getByRole('heading', { name: 'Accepted imports' }).waitFor();
+      await page.getByRole('link', { name: '← Back to snapshots' }).click();
+      await page.getByRole('heading', { name: 'Student data snapshots' }).waitFor();
     });
 
     await check('generate forecast from an accepted import opens the new draft; a repeat opens the same one', async page => {
@@ -283,23 +305,34 @@ else {
       const row = table.locator('tbody tr').first(), text = await row.innerText();
       assert.ok(text.includes('Draft') && text.includes('161') && text.includes('Newer forecast available: version 2'));
       await page.screenshot({ path: shots + 'forecasts-list-desktop.png', fullPage: true });
+      const toolbar = page.getByRole('search', { name: 'Filter and sort forecasts' });
+      await toolbar.getByRole('button', { name: 'Finalized', exact: true }).click();
+      await page.getByRole('heading', { name: 'No forecasts match' }).waitFor();
+      await toolbar.getByRole('button', { name: 'Clear filters' }).click();
+      await toolbar.getByLabel('Search forecasts').fill('v9');
+      await page.getByRole('heading', { name: 'No forecasts match' }).waitFor();
+      await toolbar.getByLabel('Search forecasts').fill('version 1');
+      await table.getByText('Version 1').waitFor();
+      const open = page.getByRole('link', { name: 'Open forecast version 1' });
+      assert.equal(await open.innerText(), '', 'the open action is an icon button');
+      assert.ok((await open.boundingBox()).height >= 44, 'icon buttons keep the 44px target');
       await page.getByRole('link', { name: 'Open forecast version 1' }).click();
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      assert.ok((await page.getByRole('note').first().innerText()).includes('Potential demand, not registration.'));
+      assert.equal(await page.getByText('Potential demand, not registration.').count(), 0, 'the assumption note is not shown');
+      assert.deepEqual(await page.getByLabel('Forecast summary').locator('dt').allInnerTexts(), ['Subjects', 'Potential demand', 'Below minimum', 'Below optimal']);
       assert.equal(await page.getByText(/registered|enrolled/i).count(), 0);
-      const subjects = page.getByRole('region', { name: 'Subjects table' });
-      assert.deepEqual(await subjects.locator('thead th').allInnerTexts(), ['Subject', 'Class type', 'Potential demand', 'Uncertain', 'Near graduation', 'Quality', 'Proposed sections', 'Decision']);
+      const subjects = page.getByRole('region', { name: 'Subjects table', exact: true });
+      assert.deepEqual(await subjects.locator('thead th').allInnerTexts(), ['Subject', 'Potential demand', 'Quality', 'Action']);
+      assert.ok((await subjects.locator('tr[data-subject="SECJ1013"] th').innerText()).includes('Lab · 3 credit hours'), 'class type sits under the subject');
       assert.equal(await subjects.locator('tbody tr').count(), 4);
       const lab = subjects.locator('tr[data-subject="SECJ1013"]'), second = subjects.locator('tr[data-subject="SECJ1023"]');
-      assert.ok((await lab.innerText()).includes('Section 1: 23 students') && (await lab.innerText()).includes('Below optimal'));
+      assert.ok(!(await lab.innerText()).includes('Section 1') && (await lab.innerText()).includes('Below optimal'), 'flags sit under the demand, no section list');
       const text2 = await second.innerText();
       assert.ok(text2.includes('Below minimum') && text2.includes('Below optimal'));
-      const toggle = lab.getByRole('button', { name: /3 uncertain students for SECJ1013/ });
-      assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
-      assert.equal(await lab.getByText('Academic history incomplete: 2').isVisible(), false);
-      await toggle.click();
-      assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
-      await lab.getByText('Academic history incomplete: 2').waitFor(); await lab.getByText('Prerequisite not proven: 1').waitFor();
+      const view = lab.getByRole('button', { name: 'View students for SECJ1013' });
+      assert.equal((await view.innerText()).replace(/\s+/g, ' ').trim(), '3 uncertain · View students');
+      assert.equal(await page.locator('.coordinator-reasons, .coordinator-expander[aria-expanded]').count(), 0, 'the inline reasons expander is gone');
+      assert.equal((await subjects.locator('tr[data-subject="SECJ1023"]').getByRole('button', { name: 'View students for SECJ1023' }).innerText()).trim(), 'View students', 'no uncertain students: plain label');
       assert.ok((await subjects.locator('tr[data-subject="SECD2523"]').innerText()).includes('Configuration required: The subject has no class type.'));
       assert.equal(await page.getByRole('heading', { name: 'Excluded subjects' }).count(), 0, 'the excluded subjects card is gone');
       assert.equal(await page.getByRole('heading', { name: 'Not offered in this semester type' }).count(), 0, 'the not-offered card is gone');
@@ -313,11 +346,18 @@ else {
       const controls = await page.getByRole('search', { name: 'Filter and sort subjects' }).evaluate(bar => ({ labels: [...bar.querySelectorAll('label')].map(item => parseFloat(getComputedStyle(item).fontSize)), fields: [...bar.querySelectorAll('.tt-search, .tt-menu-button')].map(item => [parseFloat(getComputedStyle(item.querySelector('input') ?? item).fontSize), item.getBoundingClientRect().height]) }));
       assert.ok(controls.labels.every(size => size >= 13) && controls.fields.length === 3, 'filter controls are readable'); assert.ok(controls.fields.every(([size, height]) => size >= 14 && height >= 44), 'filter inputs and selects are at least 14px and 44px tall');
       const first = await page.locator('tr[data-subject="SECJ1013"] th[scope="row"]').evaluate(cell => [...cell.children].map(child => child.textContent.trim()));
-      assert.deepEqual(first, ['Programming Technique I', 'SECJ1013', '3 credit hours'], 'subject name first, then the code, then credit hours');
+      assert.deepEqual(first, ['Programming Technique I', 'SECJ1013', 'Lab · 3 credit hours'], 'subject name first, then the code, then class type and credit hours');
       assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '4', 'the Subjects tile counts the subjects in the table, not the hidden ones');
       await page.getByRole('link', { name: /Newer forecast available: version 2/ }).first().waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Start review' }).count(), 1);
-      assert.equal(await page.getByRole('button', { name: /Approve SECJ1013/ }).count(), 0);
+      const statusButton = page.getByRole('button', { name: 'Forecast status: Draft' }); await statusButton.click();
+      await page.screenshot({ path: shots + 'forecast-status-menu-desktop.png' });
+      const options = page.getByRole('menu', { name: 'Forecast status' }).getByRole('menuitemradio');
+      await options.first().waitFor({ timeout: 3000 });
+      assert.deepEqual(await options.evaluateAll(list => list.map(item => [item.querySelector('.coordinator-status-label').textContent, item.getAttribute('aria-checked'), item.getAttribute('aria-disabled')])),
+        [['Draft', 'true', null], ['Under review', 'false', null], ['Finalized', 'false', 'true']], 'only the next status can be picked');
+      await options.nth(2).click({ force: true }); assert.equal(await page.getByRole('dialog').count(), 0, 'a status two steps ahead does nothing');
+      await page.keyboard.press('Escape'); assert.equal(await statusButton.evaluate(element => element === document.activeElement), true);
+      assert.equal(await page.getByRole('button', { name: /Approve SECJ1013|Action for SECJ1013/ }).count(), 0, 'no actions before review starts');
       await page.screenshot({ path: shots + 'forecast-draft-desktop.png', fullPage: true });
     });
 
@@ -333,13 +373,13 @@ else {
       await pager.getByText('25 subjects · Page 2 of 2').waitFor();
       assert.equal(await rows.count(), 5); assert.equal(await pager.getByRole('button', { name: 'Next' }).isDisabled(), true);
       await page.locator('tr[data-subject="SECJ1013"]').waitFor();
-      await page.getByRole('button', { name: 'Approve SECJ1013' }).click();
+      await pickAction(page, 'SECJ1013', 'Approved');
       const decide = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await decide.getByLabel(reasonLabel).fill('Checked on page 2');
       await decide.getByRole('button', { name: 'Approve subject' }).click(); await decide.waitFor({ state: 'hidden' });
       await page.locator('tr[data-subject="SECJ1013"]').getByText('Approved', { exact: true }).waitFor();
       await pager.getByText('Page 2 of 2').waitFor();
       await pager.getByRole('button', { name: 'Previous' }).click(); await pager.getByText('Page 1 of 2').waitFor();
-      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      await pickStatus(page, 'Finalized');
       const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
@@ -376,7 +416,7 @@ else {
       await choose(0, 'Flags', 'All'); await tab('Pending').click(); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013', 'SECJ1023']);
       await pager.count(); await tab('Approved').click(); await pager.getByText('21 of 25 subjects · Page 1 of 2').waitFor();
       // Finalize while a filter hides every pending subject: the filters are cleared and the table jumps to their page.
-      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      await pickStatus(page, 'Finalized');
       const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
@@ -386,7 +426,6 @@ else {
       await tab('All').click();
       await choose(1, 'Sort by', 'Potential demand (high to low)'); await pager.getByText('Page 1 of 2').waitFor();
       assert.deepEqual((await codes()).slice(0, 3), ['SCSJ1013', 'SECJ1013', 'SECD2523']); // 71, 46, 30
-      await choose(1, 'Sort by', 'Uncertain (high to low)'); assert.deepEqual((await codes()).slice(0, 2), ['SCSJ1013', 'SECJ1013']);
       await choose(1, 'Sort by', 'Subject name (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
       await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ1023'], 'page 2 in name order: Database, Discrete, Programming I, Programming II');
       await choose(1, 'Sort by', 'Subject code (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
@@ -395,6 +434,83 @@ else {
       await page.getByText('No subjects match these filters.').waitFor(); assert.equal(await rows.count(), 0);
       await page.getByRole('status').getByRole('button', { name: 'Clear filters' }).click(); await pager.getByText('25 subjects · Page 1 of 2').waitFor();
       assert.ok(await noOverflow(page));
+    });
+
+    await check('forecast: View students opens a read-only dialog with filters, search and the saved counts', async page => {
+      const state = await mock(page, { seed: 'review' });
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const lab = page.locator('tr[data-subject="SECJ1013"]'), button = lab.getByRole('button', { name: 'View students for SECJ1013' });
+      await button.click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
+      await dialog.getByLabel('Student counts').waitFor();
+      assert.deepEqual(await dialog.getByLabel('Student counts').locator('dd').allInnerTexts(), ['46', '3', '4', '5'], 'counted, uncertain, near graduation, not counted');
+      await dialog.getByText('Academic history incomplete: 2').waitFor(); await dialog.getByText('Prerequisite not proven: 1').waitFor();
+      assert.equal(await dialog.getByText(/recomputed with the current curriculum/).count(), 0, 'no catalogue note when the catalogue is unchanged');
+      assert.equal(await dialog.locator('textarea, input[type="checkbox"]').count(), 0, 'read only: no reason form');
+      assert.deepEqual(await dialog.getByRole('region', { name: 'Students table' }).locator('thead th').allInnerTexts(), ['Student', 'Status', 'Details']);
+      const rows = dialog.getByRole('region', { name: 'Students table' }).locator('tbody tr');
+      assert.equal(await rows.count(), 20, 'the list is paged at 20 rows');
+      await dialog.getByText('54 students · Page 1 of 3').waitFor();
+      const first = dialog.locator('tr[data-student="A22EC001"]');
+      assert.deepEqual(await first.locator('th').evaluate(cell => [...cell.children].map(child => child.textContent.trim())), ['SECJ1013 Student 001', 'A22EC001']);
+      assert.equal((await first.locator('.admin-pill').innerText()).trim(), 'Counted');
+      assert.ok((await first.innerText()).includes('Near graduation · 12 credits left'));
+      await dialog.getByRole('button', { name: 'Next' }).click(); await dialog.getByText(/Page 2 of 3/).waitFor();
+      await dialog.getByRole('button', { name: 'Previous' }).click();
+      const filters = dialog.getByRole('group', { name: 'Show' });
+      assert.deepEqual(await filters.getByRole('button').allInnerTexts(), ['All', 'Counted', 'Uncertain', 'Near graduation', 'Not counted']);
+      await filters.getByRole('button', { name: 'Uncertain' }).click();
+      assert.equal(await rows.count(), 3);
+      assert.ok((await rows.first().innerText()).includes('Academic history incomplete'));
+      await filters.getByRole('button', { name: 'Near graduation' }).click(); assert.equal(await rows.count(), 4);
+      await filters.getByRole('button', { name: 'Not counted' }).click(); assert.equal(await rows.count(), 5);
+      const texts = (await rows.allInnerTexts()).join('|');
+      for (const label of ['Already passed', 'Prerequisite not met', 'Not offered this semester', 'Passed after a repeat attempt']) assert.ok(texts.includes(label), label);
+      await filters.getByRole('button', { name: 'All', exact: true }).click();
+      const search = dialog.getByLabel('Search students');
+      await search.fill('a22ec010'); assert.equal(await rows.count(), 1);
+      await search.fill('SECJ1013 student 002'); assert.equal(await rows.count(), 1);
+      await search.fill('nobody'); await dialog.getByText('No students match these filters.').waitFor();
+      await dialog.getByRole('status').getByRole('button', { name: 'Clear filters' }).click(); assert.equal(await rows.count(), 20);
+      await page.screenshot({ path: shots + 'forecast-students-dialog-desktop.png' });
+      await page.keyboard.press('Escape');
+      await dialog.waitFor({ state: 'detached' });
+      assert.equal(await button.evaluate(element => element === document.activeElement), true, 'Escape returns focus to the View students button');
+      await button.click(); await dialog.waitFor();
+      await dialog.getByRole('button', { name: 'Close' }).click(); await dialog.waitFor({ state: 'detached' });
+      assert.equal(await button.evaluate(element => element === document.activeElement), true, 'Close returns focus to the button');
+      assert.equal(state.runs.get(1).subjects.find(item => item.subjectCode === 'SECJ1013').supportedEligibleCount, 46, 'viewing students changes nothing');
+    });
+
+    await check('forecast: the students dialog shows an error with retry, the recomputed-catalogue note and an empty reasons list', async page => {
+      const state = await mock(page, { seed: 'review', catalogueChanged: true });
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
+      await dialog.getByRole('alert').getByText('Forecasting data is unavailable. Please retry.').waitFor();
+      await dialog.getByRole('button', { name: 'Retry' }).click();
+      await dialog.getByText(/recomputed with the current curriculum/).waitFor();
+      await dialog.getByRole('button', { name: 'Close' }).click();
+      await page.getByRole('button', { name: 'View students for SECJ1023' }).click();
+      const second = page.getByRole('dialog', { name: 'Students · SECJ1023' }); await second.waitFor();
+      await second.getByLabel('Student counts').waitFor();
+      assert.deepEqual(await second.getByLabel('Student counts').locator('dd').allInnerTexts(), ['14', '0', '0', '5']);
+      assert.equal(await second.getByLabel('Why students are uncertain').count(), 0);
+    });
+
+    for (const width of [320, 375]) await check('mobile: the students dialog fits without page overflow at ' + width, async page => {
+      await mock(page, { seed: 'review' }); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
+      assert.ok(await noOverflow(page), 'page does not overflow with the dialog open');
+      const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 800, 'dialog inside the viewport');
+      const bar = dialog.getByRole('search', { name: 'Filter students' }); const barBox = await bar.boundingBox(); assert.ok(barBox.x >= 0 && barBox.x + barBox.width <= width);
+      await dialog.getByLabel('Search students').fill('A22EC01'); assert.ok(await noOverflow(page));
+      assert.ok(await dialog.getByRole('button', { name: 'Close' }).isVisible());
+      if (width === 375) await page.screenshot({ path: shots + 'forecast-students-dialog-mobile.png' });
+      await dialog.getByRole('button', { name: 'Close' }).focus(); await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
     });
 
     for (const width of [320, 375]) await check('mobile: the subjects filter toolbar wraps without horizontal overflow at ' + width, async page => {
@@ -412,16 +528,22 @@ else {
     await check('forecasts: start review sends the DRAFT revision; a decision needs a reason and records an audit row', async page => {
       const state = await mock(page, { seed: 'run' }); await page.goto(base + runUrl);
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const opener = page.getByRole('button', { name: 'Start review' }); await opener.click();
+      const opener = page.getByRole('button', { name: /^Forecast status: / }); await pickStatus(page, 'Under review');
       const start = page.getByRole('dialog', { name: 'Start review' }); await start.waitFor();
       await page.keyboard.press('Escape'); await start.waitFor({ state: 'hidden' });
       assert.equal(await opener.evaluate(element => element === document.activeElement), true);
-      await opener.click(); await start.getByRole('button', { name: 'Start review' }).click(); await start.waitFor({ state: 'hidden' });
+      await pickStatus(page, 'Under review'); await start.getByRole('button', { name: 'Start review' }).click(); await start.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Review started.' }).waitFor();
-      await page.getByText('Under review', { exact: true }).first().waitFor();
+      await page.getByRole('button', { name: 'Forecast status: Under review' }).waitFor();
       const startPost = state.bodies.find(item => item.path.endsWith('/reviews'));
       assert.equal(startPost.headers['if-match'], '"fr1.DRAFT.0"'); assert.equal(startPost.body.action, 'START_REVIEW');
-      const approve = page.getByRole('button', { name: 'Approve SECJ1013' }); await approve.click();
+      const actionButton = page.getByRole('button', { name: 'Action for SECJ1013: Pending' }); await actionButton.click();
+      const actionMenu = page.getByRole('menu', { name: 'Action for SECJ1013' });
+      assert.deepEqual(await actionMenu.getByRole('menuitemradio').evaluateAll(list => list.map(item => [item.textContent, item.getAttribute('aria-checked'), item.querySelector('.coordinator-status-help') === null])),
+        [['Approved', 'false', true], ['Reviewed', 'false', true], ['Removed', 'false', true]], 'action menu: three choices, no helper text');
+      await page.screenshot({ path: shots + 'forecast-action-menu-desktop.png' });
+      await page.keyboard.press('Escape'); assert.equal(await actionButton.evaluate(element => element === document.activeElement), true);
+      await pickAction(page, 'SECJ1013', 'Approved');
       const dialog = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await dialog.waitFor();
       assert.equal(await dialog.getByLabel(reasonLabel).evaluate(element => element === document.activeElement), true);
       await dialog.getByRole('button', { name: 'Approve subject' }).click();
@@ -440,52 +562,10 @@ else {
       assert.equal(await page.getByText('Review started', { exact: false }).count() > 0, true);
     });
 
-    await check('forecasts: change classes validates total and capacity on the client, then shows server errors, then saves', async page => {
-      const state = await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const opener = page.getByRole('button', { name: 'Change classes SECJ1013' }); await opener.click();
-      const dialog = page.getByRole('dialog', { name: 'Change classes · SECJ1013' }); await dialog.waitFor();
-      assert.ok((await dialog.innerText()).includes('Normal maximum 35'));
-      assert.ok((await dialog.innerText()).includes('Total 46 of 46 students'));
-      await page.screenshot({ path: shots + 'allocation-dialog-desktop.png' });
-      const first = dialog.getByLabel('Section 1 size', { exact: true });
-      await first.fill('30');
-      await dialog.getByText('Total 53 of 46 students · 7 too many').waitFor();
-      await dialog.getByLabel(reasonLabel).fill('Merge the evening group.');
-      await dialog.getByRole('button', { name: 'Save classes' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'The sections add up to 53, but the forecast demand is 46.' }).waitFor();
-      await first.fill('40');
-      await dialog.getByLabel('Section 2 size', { exact: true }).fill('6');
-      await dialog.getByLabel('Section 1 justification (above 35)').waitFor();
-      await dialog.getByRole('button', { name: 'Save classes' }).click();
-      await dialog.getByRole('alert').filter({ hasText: '40 students is above the capacity limit of 35.' }).waitFor();
-      assert.equal(state.bodies.filter(item => item.path.endsWith('/decisions')).length, 0);
-      assert.equal(await first.getAttribute('aria-invalid'), 'true');
-      await first.fill('30'); await dialog.getByLabel('Section 2 size', { exact: true }).fill('16');
-      state.forceAllocationError = { code: 'ALLOCATION_INVALID', message: 'The replacement allocation is not valid.' };
-      await dialog.getByRole('button', { name: 'Save classes' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'The replacement allocation is not valid.' }).waitFor();
-      assert.equal(await dialog.isVisible(), true);
-      await dialog.getByRole('button', { name: 'Add section' }).click();
-      await dialog.getByLabel('Section 3 size', { exact: true }).fill('0');
-      await dialog.getByRole('button', { name: 'Remove section 3' }).click();
-      assert.equal(await dialog.getByLabel('Section 3 size', { exact: true }).count(), 0);
-      await dialog.getByRole('button', { name: 'Save classes' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Classes changed for SECJ1013.' }).waitFor();
-      const row = page.locator('tr[data-subject="SECJ1013"]');
-      await row.getByText('Section 1: 30 students').waitFor(); await row.getByText('Section 2: 16 students').waitFor();
-      assert.ok((await row.innerText()).includes('Reviewed'));
-      const post = state.bodies.filter(item => item.path.endsWith('/decisions')).at(-1);
-      assert.deepEqual(post.body.decisions[0].replacementSections, [{ proposedSectionId: 1, sectionNumber: 1, expectedStudents: 30 }, { proposedSectionId: 2, sectionNumber: 2, expectedStudents: 16 }]);
-      assert.equal(post.body.decisions[0].reason, 'Merge the evening group.');
-      assert.equal(await page.evaluate(() => document.activeElement?.id), 'coordinator-action-status'); // focus moves to the result message
-      assert.equal(await opener.count(), 1);
-    });
-
     await check('forecasts: finalize reports incomplete reviews with highlighted subjects, then succeeds and becomes read-only', async page => {
       const state = await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      await pickStatus(page, 'Finalized');
       const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.waitFor();
       assert.ok((await dialog.innerText()).includes('6 sections still pending'));
       await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
@@ -495,19 +575,33 @@ else {
       assert.equal(await page.getByText('Decision needed').count(), 3);
       assert.equal(await page.locator('tr[data-subject="SECD2523"]').evaluate(element => element.classList.contains('coordinator-row-pending')), false);
       await page.screenshot({ path: shots + 'forecast-finalize-incomplete-desktop.png', fullPage: true });
-      for (const [action, code, label] of [['Approve', 'SECJ1013', 'Approve subject'], ['Defer', 'SECJ1023', 'Defer subject'], ['Mark reviewed', 'SCSJ1013', 'Mark reviewed']]) {
-        await page.getByRole('button', { name: `${action} ${code}` }).click();
+      for (const [action, code, label] of [['Approve', 'SECJ1013', 'Approve subject'], ['Remove', 'SECJ1023', 'Remove subject'], ['Mark reviewed', 'SCSJ1013', 'Mark reviewed']]) {
+        await pickAction(page, code, { Approve: 'Approved', Remove: 'Removed', 'Mark reviewed': 'Reviewed' }[action]);
         const decide = page.getByRole('dialog', { name: `${action} ${code}` }); await decide.getByLabel(reasonLabel).fill('Checked: ' + code);
         await decide.getByRole('button', { name: label }).click(); await decide.waitFor({ state: 'hidden' });
-        await page.locator(`tr[data-subject="${code}"]`).getByText(action === 'Approve' ? 'Approved' : action === 'Defer' ? 'Deferred' : 'Reviewed', { exact: true }).waitFor();
+        if (action === 'Remove') await page.getByRole('region', { name: 'Removed subjects table' }).locator(`tr[data-subject="${code}"]`).waitFor();
+        else await page.getByRole('region', { name: 'Subjects table', exact: true }).locator(`tr[data-subject="${code}"]`).getByText(action === 'Approve' ? 'Approved' : 'Reviewed', { exact: true }).waitFor();
       }
+      assert.equal(await page.getByRole('region', { name: 'Subjects table', exact: true }).locator('tr[data-subject="SECJ1023"]').count(), 0, 'a removed subject leaves the main table');
+      assert.equal(await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1023"]').innerText().then(text => text.replace(/\s+/g, ' ').trim()), 'Programming Technique II SECJ1023', 'name and code only');
+      await page.screenshot({ path: shots + 'forecast-removed-desktop.png', fullPage: true });
+      await page.getByRole('button', { name: 'Add back SECJ1023' }).click();
+      const back = page.getByRole('dialog', { name: 'Add back SECJ1023' }); await back.getByLabel(reasonLabel).fill('Needed after all.');
+      await back.getByRole('button', { name: 'Add back subject' }).click(); await back.waitFor({ state: 'hidden' });
+      const restored = page.getByRole('region', { name: 'Subjects table', exact: true }).locator('tr[data-subject="SECJ1023"]');
+      await restored.getByText('Pending', { exact: true }).waitFor(); await restored.getByText('Decision needed').waitFor();
+      assert.equal(await page.getByRole('region', { name: 'Removed subjects table' }).count(), 0, 'the side table disappears when nothing is removed');
+      await pickAction(page, 'SECJ1023', 'Approved');
+      const again = page.getByRole('dialog', { name: 'Approve SECJ1023' }); await again.getByLabel(reasonLabel).fill('Approved after adding back.');
+      await again.getByRole('button', { name: 'Approve subject' }).click(); await again.waitFor({ state: 'hidden' });
+      await restored.getByText('Approved', { exact: true }).waitFor();
       assert.equal(await page.locator('.coordinator-row-pending').count(), 0);
-      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      await pickStatus(page, 'Finalized');
       await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
       await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Forecast finalized. It is now read-only.' }).waitFor();
-      await page.getByText('Finalized', { exact: true }).first().waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
+      await page.getByRole('button', { name: 'Forecast status: Finalized' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Remove|Add back|Mark reviewed|Action for/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
       await page.getByRole('link', { name: 'Confirm offerings' }).waitFor();
       const post = state.bodies.filter(item => item.path.endsWith('/finalizations')).at(-1);
       assert.deepEqual(post.body, { scope: { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 }, reason: 'Ready for confirmation.' });
@@ -519,13 +613,13 @@ else {
       await mock(page, { seed: 'finalized' }); await page.goto(base + runUrl);
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       await page.getByText('This forecast is finalized and read-only.').waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Defer|Mark reviewed|Change classes/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Remove|Add back|Mark reviewed|Action for/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
     });
 
     await check('forecasts: 412 RUN_REVISION_MISMATCH reloads the forecast and says so', async page => {
       const state = await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await page.getByRole('button', { name: 'Approve SECJ1013' }).click();
+      await pickAction(page, 'SECJ1013', 'Approved');
       const dialog = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await dialog.getByLabel(reasonLabel).fill('Fine.');
       state.staleNext = true; const before = state.requests.filter(request => request.path === '/api/coordinator/forecast-runs/1' && request.method === 'GET').length;
       await dialog.getByRole('button', { name: 'Approve subject' }).click(); await dialog.waitFor({ state: 'hidden' });
@@ -533,7 +627,7 @@ else {
       assert.ok(state.requests.filter(request => request.path === '/api/coordinator/forecast-runs/1' && request.method === 'GET').length > before);
       assert.ok((await page.locator('tr[data-subject="SECJ1013"]').innerText()).includes('Pending'));
       await page.getByRole('region', { name: 'Audit history table' }).getByText('Changed by another session.').waitFor();
-      await page.getByRole('button', { name: 'Approve SECJ1013' }).click();
+      await pickAction(page, 'SECJ1013', 'Approved');
       await dialog.getByLabel(reasonLabel).fill('Retry after reload.'); await dialog.getByRole('button', { name: 'Approve subject' }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Approve: SECJ1013 recorded.' }).waitFor();
     });
@@ -779,14 +873,14 @@ else {
 
     await check('imports: the data source toggle is a keyboard-accessible radio group and each mode shows only its own card', async page => {
       await mock(page, { seed: 'system' }); await page.goto(base + '/coordinator/imports' + scoped);
-      const group = page.getByRole('group', { name: 'Data source for this forecast' }); await group.waitFor();
+      const group = page.getByRole('group', { name: 'Data source' }); await group.waitFor();
       const radios = group.getByRole('radio');
       assert.deepEqual(await radios.evaluateAll(items => items.map(item => item.closest('label').innerText.split('\n')[0])), ['Students in the system', 'CSV import', 'Both']);
       assert.equal(await group.getByRole('radio', { name: /Students in the system/ }).isChecked(), true, 'default is Students in the system');
       const cards = { system: 'Students in the system', csv: 'CSV import', both: 'Students in the system + CSV import' };
       const shown = async () => { const out = []; for (const [key, name] of Object.entries(cards)) if (await page.getByRole('heading', { name, exact: true, level: 3 }).count()) out.push(key); return out; };
       assert.deepEqual(await shown(), ['system']);
-      assert.equal(await page.getByRole('region', { name: 'Accepted imports table' }).count(), 1, 'the accepted imports list is shown in every mode');
+      assert.equal(await page.getByRole('region', { name: 'Student data snapshots table' }).count(), 1, 'the accepted imports list is shown in every mode');
       // Keyboard: focus the checked radio and arrow to the next option (native radio group behaviour).
       await group.getByRole('radio', { name: /Students in the system/ }).focus();
       await page.keyboard.press('ArrowRight');
@@ -796,7 +890,7 @@ else {
       await page.keyboard.press('ArrowRight');
       await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
       assert.deepEqual(await shown(), ['both']); assert.ok(page.url().includes('source=both'));
-      assert.equal(await page.getByRole('region', { name: 'Accepted imports table' }).count(), 1);
+      assert.equal(await page.getByRole('region', { name: 'Student data snapshots table' }).count(), 1);
       // Remembered in the URL: a reload keeps the choice; the scope picker keeps it too.
       await page.reload(); await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
       assert.equal(await group.getByRole('radio', { name: /Both/ }).isChecked(), true);
@@ -811,7 +905,7 @@ else {
     await check('imports: Both builds one combined snapshot with coverage, a source per student, and feeds the forecast', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports' + bothScoped);
       await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
-      await page.getByText('If a student is in both, the system record is used and the CSV student is skipped.').waitFor();
+      await page.getByText('Combines system students with non-duplicate CSV records.', { exact: false }).waitFor();
       await page.getByRole('button', { name: 'Create combined snapshot' }).click();
       await page.getByText('Enter a short label for this data source.').waitFor();
       assert.equal(state.bodies.length, 0);
@@ -825,17 +919,17 @@ else {
       assert.match(text, /Students in the snapshot\s*59/); assert.match(text, /CSV skipped, already in system\s*2/); assert.match(text, /Possible duplicates\s*1/);
       await page.getByText('A100234, A100777').waitFor();
       await page.getByText('EXT-0042 ~ PORTAL-17').waitFor();
-      const table = page.getByRole('region', { name: 'Accepted imports table' });
+      const table = page.getByRole('region', { name: 'Student data snapshots table' });
       await table.getByText('Combined', { exact: true }).waitFor();
       await page.screenshot({ path: shots + 'imports-combined-desktop.png', fullPage: true });
-      await page.getByRole('link', { name: 'View roster' }).first().click();
+      await page.getByRole('link', { name: /^View roster for / }).first().click();
       await page.getByRole('heading', { name: 'Combined export', level: 2 }).waitFor();
       await page.getByText('Combined: student-entered records + CSV import.').first().waitFor();
       await page.getByRole('heading', { name: 'Combined coverage' }).waitFor();
       const roster = page.getByRole('region', { name: 'Student roster table' });
       assert.deepEqual(await roster.locator('thead th').allInnerTexts(), ['Name', 'Reference', 'Curriculum', 'Cohort status', 'History', 'Source']);
       assert.ok(await roster.locator('tbody tr').first().innerText().then(value => value.includes('System students')));
-      await page.getByRole('link', { name: '← Back to imports' }).click();
+      await page.getByRole('link', { name: '← Back to snapshots' }).click();
       await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
       await uploadBoth(page, 'VALIDFILE', 'Again');
       await page.getByText('have not changed since this snapshot').waitFor(); // replay (200)
@@ -843,7 +937,7 @@ else {
       await page.getByRole('button', { name: 'Generate forecast' }).first().click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
       await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await page.getByText('Combined: student-entered records + CSV import.').waitFor();
+      assert.match(await page.getByRole('list', { name: 'Forecast details' }).innerText(), /Combined\s*Student-entered records \+ CSV/);
       await page.screenshot({ path: shots + 'forecast-combined-desktop.png', fullPage: true });
     });
 
@@ -874,7 +968,7 @@ else {
       await mock(page, { seed: 'system' }); await page.setViewportSize({ width, height: 800 });
       await page.goto(base + '/coordinator/imports' + bothScoped); await page.getByRole('heading', { name: 'Students in the system + CSV import' }).waitFor();
       assert.ok(await noOverflow(page));
-      const group = page.getByRole('group', { name: 'Data source for this forecast' });
+      const group = page.getByRole('group', { name: 'Data source' });
       for (const radio of await group.getByRole('radio').all()) { const box = await radio.locator('xpath=..').boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.height >= 44); }
       await uploadBoth(page, 'VALIDFILE'); await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
       assert.ok(await noOverflow(page));
@@ -915,21 +1009,12 @@ else {
       assert.ok(await noOverflow(page));
       await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
       assert.ok(await noOverflow(page));
-      const table = page.getByRole('region', { name: 'Subjects table' });
+      const table = page.getByRole('region', { name: 'Subjects table', exact: true });
       assert.ok(await table.evaluate(element => element.scrollWidth > element.clientWidth)); // local horizontal scrolling only
       await table.focus(); await page.keyboard.press('ArrowRight');
       await page.waitForFunction(() => document.querySelector('[aria-label="Subjects table"]').scrollLeft > 0);
       if (width === 375) await page.screenshot({ path: shots + 'forecast-detail-mobile.png', fullPage: true });
-      await page.getByRole('button', { name: 'Change classes SECJ1013' }).scrollIntoViewIfNeeded();
-      await page.getByRole('button', { name: 'Change classes SECJ1013' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Change classes · SECJ1013' }); await dialog.waitFor();
-      await dialog.getByLabel('Section 1 size', { exact: true }).fill('40');
-      await dialog.getByLabel('Section 1 justification (above 35)').waitFor();
-      const dialogBox = await dialog.boundingBox(); assert.ok(dialogBox.x >= 0 && dialogBox.x + dialogBox.width <= width);
-      assert.ok(await noOverflow(page));
-      if (width === 375) await page.screenshot({ path: shots + 'allocation-dialog-mobile.png' });
-      await page.keyboard.press('Escape');
-      await page.getByRole('button', { name: 'Finalize forecast' }).click();
+      await pickStatus(page, 'Finalized');
       const finalize = page.getByRole('dialog', { name: 'Finalize forecast' }); await finalize.waitFor();
       const finalizeBox = await finalize.boundingBox(); assert.ok(finalizeBox.x >= 0 && finalizeBox.x + finalizeBox.width <= width);
       await page.keyboard.press('Escape');

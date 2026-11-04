@@ -7,7 +7,7 @@ import type {
   ConfirmedOfferingAuditEntry, ConfirmedOfferingSet, OfferingPickCountSummary,
 } from '../../../../../packages/shared/src/forecasting/confirmed-offerings';
 import type {
-  FinalizeRunRequest, ForecastRunDetail, ForecastRunSummary, GenerateRunRequest, RunDecision, RunDecisionBatchRequest, StartRunReviewRequest,
+  FinalizeRunRequest, ForecastRunDetail, ForecastRunSummary, GenerateRunRequest, RunDecision, RunDecisionBatchRequest, RunSubjectStudents, StartRunReviewRequest,
 } from '../../../../../packages/shared/src/forecasting/runs';
 
 /** Every non-2xx answer, timeout or unreadable body. `details` carries safe ids such as `pendingSubjectIds`; `report` the 422 import report. */
@@ -44,6 +44,8 @@ export interface CoordinatorClient {
   listRuns(scope: ForecastScope, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<ForecastRunSummary>>;
   getRun(forecastRunId: number, signal?: AbortSignal): Promise<RunWithRevision>;
   listAudit(forecastRunId: number, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<ForecastAuditEntry>>;
+  /** View only: the students behind one subject's numbers. */
+  getSubjectStudents(forecastRunId: number, subjectId: number, signal?: AbortSignal): Promise<RunSubjectStudents>;
   startReview(forecastRunId: number, revision: string, scope: ForecastScope, reason?: string): Promise<MutationResult>;
   decide(forecastRunId: number, revision: string, scope: ForecastScope, decisions: RunDecision[]): Promise<MutationResult>;
   finalize(forecastRunId: number, revision: string, scope: ForecastScope, input?: { reason?: string; approvalReference?: string }): Promise<MutationResult>;
@@ -82,6 +84,7 @@ function report(value: unknown): ImportValidationReport {
 }
 function receipt(value: unknown) { requireKeys(value, ['resourceId'], ['acceptedAt', 'revision'], []); return value as OperationReceipt; }
 function runDetail(value: unknown) { requireKeys(value, ['forecastRunId', 'versionNumber'], ['status', 'revision'], ['subjects']); object(object(value).summary); return value as ForecastRunDetail; }
+function subjectStudents(value: unknown) { requireKeys(value, ['forecastRunId', 'subjectId'], ['subjectCode'], ['students']); object(object(value).summary); return value as RunSubjectStudents; }
 function runSummary(value: unknown) { requireKeys(value, ['forecastRunId', 'versionNumber'], ['status', 'revision'], []); object(object(value).summary); }
 function confirmationSet(value: unknown) { requireKeys(value, [], [], ['offerings']); object(object(value).scope); return value as ConfirmedOfferingSet; }
 function query(values: object) {
@@ -198,6 +201,7 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
       const run = runDetail(raw.data);
       return { run, revision: raw.etag ?? run.revision };
     },
+    getSubjectStudents: async (id, subjectId, signal) => subjectStudents((await request(prefix + 'forecast-runs/' + id + '/subjects/' + subjectId + '/students', { method: 'GET' }, signal)).data),
     listAudit: async (id, paging, signal) => page<ForecastAuditEntry>((await request(prefix + 'forecast-runs/' + id + '/audit' + query({ limit: paging?.limit, cursor: paging?.cursor }), { method: 'GET' }, signal)).data, item => requireKeys(item, ['decisionAuditId'], ['actionType', 'recordedAt'], [])),
     startReview: (id, revision, scope, reason) => mutate('forecast-runs/' + id + '/reviews', revision, { scope, action: 'START_REVIEW', ...(reason ? { reason } : {}) } satisfies StartRunReviewRequest),
     decide: (id, revision, scope, decisions) => mutate('forecast-runs/' + id + '/decisions', revision, { scope, decisions } satisfies RunDecisionBatchRequest),

@@ -96,7 +96,7 @@ export interface DecisionPlan {
   action: RunDecisionAction;
   reason: string;
   approvalReference: string | null;
-  /** Review status stamped on every current section (REVIEW, APPROVE, DEFER, and REPLACE_ALLOCATION: REVIEWED). */
+  /** Review status stamped on every current section (REVIEW, APPROVE, DEFER, REOPEN: PENDING, and REPLACE_ALLOCATION: REVIEWED). */
   sectionStatus: SectionReviewStatus;
   /** Sections as they were when validated; the transaction guard guarantees nothing changed since. The after-state is read back from the table. */
   before: SectionState[];

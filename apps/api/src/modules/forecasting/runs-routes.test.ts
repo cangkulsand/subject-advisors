@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ScopeProvider } from './scope-provider';
 import { testScopeProvider } from './scope-provider.test-support';
 import type { EngineCapacityRule, EngineCurriculum, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
-import type { ForecastRunDetail, ForecastRunSummary } from '../../../../../packages/shared/src/forecasting/runs';
+import type { ForecastRunDetail, ForecastRunSummary, RunSubjectStudents } from '../../../../../packages/shared/src/forecasting/runs';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow } from './contracts';
 import { ForecastingError, mapForecastingDatabaseError } from './errors';
 import { handleForecastingRequest } from './routes';
@@ -50,7 +50,8 @@ function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINAT
   const batches = [batch(1), batch(2), batch(3, 'VALIDATED'), batch(4, 'ACCEPTED', { learningCentreId: 2 }),
     batch(5, 'ACCEPTED', { summary: { source: 'SYSTEM', internal: { schemaVersion: 1, csvVersion: 1, source: 'PORTAL', dataRows: 0, rejectedRowsByStudent: {} } } as never }),
     batch(6, 'ACCEPTED', { summary: { source: 'COMBINED', internal: { schemaVersion: 1, csvVersion: 1, source: 'COMBINED', dataRows: 3, rejectedRowsByStudent: {}, sourceByReference: {} } } as never })];
-  const fake = fakeRunsRepository({ ...inputs, curricula: [options.shortOnly ? withShortOnly : curriculum] });
+  const liveInputs: EngineInputRows = { ...inputs, curricula: [options.shortOnly ? withShortOnly : curriculum] };
+  const fake = fakeRunsRepository(liveInputs);
   const deps: ForecastingDependencies = {
     auth: {
       verify: vi.fn(async () => ({ clerkUserId: options.actor ?? COORDINATOR, sessionId: 'session_test', primaryEmail: { address: 'coord@utm.my', verified: true } })),
@@ -62,7 +63,7 @@ function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINAT
     scopes: options.scopes ?? testScopeProvider,
     now: () => new Date('2026-11-01T12:00:00.000Z'),
   };
-  return { deps, ...fake };
+  return { deps, liveInputs, ...fake };
 }
 type Deps = ForecastingDependencies;
 
@@ -105,6 +106,59 @@ describe('UC20 forecast run API', () => {
     expect((await detailOf(deps, fromBoth.id)).dataSource).toBe('COMBINED');
     expect((await detailOf(deps, fromCsv.id)).dataSource).toBe('CSV');
     expect((await detailOf(deps, fromSystem.id)).dataSource).toBe('SYSTEM');
+  });
+
+  describe('students behind a subject', () => {
+    const studentsOf = async (deps: Deps, id: number, subjectId: number) => readData<RunSubjectStudents>(await get(deps, `forecast-runs/${id}/subjects/${subjectId}/students`));
+
+    it('lists the students of a subject and its tallies match the stored counts', async () => {
+      const { deps } = fixture();
+      const { id } = await newRun(deps);
+      const detail = await detailOf(deps, id);
+      for (const stored of detail.subjects as unknown as Array<{ subjectId: number; supportedEligibleCount: number; uncertainStudentCount: number; nearGraduationCount: number; breakdown: Record<string, number> }>) {
+        const response = await get(deps, `forecast-runs/${id}/subjects/${stored.subjectId}/students`);
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        const view = await readData<RunSubjectStudents>(response);
+        expect(view).toMatchObject({ forecastRunId: id, subjectId: stored.subjectId, catalogueMatchesRun: true });
+        expect(view.summary).toMatchObject({ counted: stored.supportedEligibleCount, uncertain: stored.uncertainStudentCount, nearGraduation: stored.nearGraduationCount });
+        expect(view.summary.breakdown).toEqual(stored.breakdown);
+        expect(view.students).toHaveLength(stored.breakdown.inCurriculum!);
+        expect(view.students.filter((row) => row.outcome === 'SUPPORTED')).toHaveLength(stored.supportedEligibleCount);
+        expect(view.students.filter((row) => row.nearGraduation)).toHaveLength(stored.nearGraduationCount);
+      }
+      const view = await studentsOf(deps, id, A);
+      expect(view.students[0]).toMatchObject({ externalReference: 'S001', studentName: null, outcome: 'SUPPORTED', nearGraduation: true, remainingCredits: 30 });
+      expect(view.students.map((row) => row.externalReference)).toEqual([...view.students.map((row) => row.externalReference)].sort());
+    });
+
+    it('is hidden outside the assigned scope and answers 404 for unknown runs and subjects', async () => {
+      const open = fixture();
+      const { id } = await newRun(open.deps);
+      const closed = { ...open.deps, scopes: { ...testScopeProvider, isScopeAssigned: async () => false } };
+      expect(await errorOf(await get(closed, `forecast-runs/${id}/subjects/${A}/students`))).toMatchObject({ code: 'RUN_NOT_FOUND' });
+      expect(await errorOf(await get(open.deps, `forecast-runs/999/subjects/${A}/students`))).toMatchObject({ code: 'RUN_NOT_FOUND' });
+      const unknown = await get(open.deps, `forecast-runs/${id}/subjects/9999/students`);
+      expect(unknown.status).toBe(404);
+      expect(await errorOf(unknown)).toMatchObject({ code: 'RUN_SUBJECT_NOT_FOUND' });
+      expect((await get(fixture({ roles: ['STUDENT'] }).deps, `forecast-runs/${id}/subjects/${A}/students`)).status).toBe(403);
+    });
+
+    it('rejects other methods and query parameters', async () => {
+      const { deps } = fixture();
+      const { id } = await newRun(deps);
+      expect((await call(deps, `forecast-runs/${id}/subjects/${A}/students`, { method: 'POST' })).status).toBe(405);
+      expect((await get(deps, `forecast-runs/${id}/subjects/${A}/students?x=1`)).status).toBe(400);
+    });
+
+    it('flags a catalogue that changed after the forecast was generated', async () => {
+      const { deps, liveInputs } = fixture();
+      const { id } = await newRun(deps);
+      liveInputs.curricula = [{ ...curriculum, subjects: curriculum.subjects.map((entry) => entry.subjectId === A ? { ...entry, creditHours: 4 } : entry) }];
+      const view = await studentsOf(deps, id, A);
+      expect(view.catalogueMatchesRun).toBe(false);
+      expect(view.students).toHaveLength(46);
+    });
   });
 
   describe('access', () => {
@@ -285,6 +339,20 @@ describe('UC20 forecast run API', () => {
       expect(approve.after).toMatchObject({ sections: [{ reviewStatus: 'APPROVED' }, { reviewStatus: 'APPROVED' }] });
       const page = await readData<{ items: Array<{ actionType: string }> }>(await get(deps, `forecast-runs/${id}/audit?limit=1`));
       expect(page.items).toHaveLength(1);
+    });
+
+    it('REOPEN puts a removed subject back to PENDING and clears the reviewer', async () => {
+      const { deps } = fixture();
+      const { id, revision } = await reviewing(deps);
+      const deferred = await decide(deps, id, revision, [{ subjectId: B, action: 'DEFER', reason: 'Not this semester.' }]);
+      const { revision: next } = await readData<{ revision: string }>(deferred);
+      const reopened = await post(deps, `forecast-runs/${id}/decisions`, { scope, decisions: [{ subjectId: B, action: 'REOPEN', reason: 'Needed after all.' }] }, { 'If-Match': `"${next}"`, 'Idempotency-Key': 'reopen' });
+      expect(reopened.status).toBe(200);
+      const run = await detailOf(deps, id);
+      const subject = run.subjects.find((s) => s.subjectId === B)!;
+      expect(subject.decisionStatus).toBe('PENDING');
+      expect(subject.sections.every((s) => s.reviewStatus === 'PENDING' && s.reviewedBy === null && s.reviewedAt === null)).toBe(true);
+      expect(run.audit[0]).toMatchObject({ actionType: 'REOPEN', subjectId: B, reason: 'Needed after all.' });
     });
 
     it('refuses a stale revision with 412 and applies nothing', async () => {
