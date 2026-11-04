@@ -3,6 +3,8 @@
 .coordinator-readonly > span { display: grid; gap: 7px; font-size: var(--font-size-label); font-weight: 600; color: var(--color-body); }
 .coordinator-readonly { display: grid; gap: 7px; align-content: start; }
 .coordinator-readonly small { color: var(--color-muted-text); font-size: var(--font-size-small); }
+.admin-shell .coordinator-scope-grid .coordinator-field-label { display: inline-flex; align-items: center; gap: 6px; }
+.coordinator-field-icon { flex: none; color: var(--color-brand); }
 .admin-shell output.coordinator-readonly-value { display: flex; align-items: center; min-height: var(--control-min-height); padding: 9px 11px; border: 1px dashed var(--color-outline); border-radius: 7px; background: var(--color-surface-subtle); color: var(--color-heading); font-size: var(--font-size-control); }
 .admin-shell .coordinator-upload-grid { display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; margin-top: 18px; }
 .coordinator-upload-error, .coordinator-upload-submit { grid-column: 1 / -1; }
@@ -17,7 +19,9 @@
 .admin-shell .coordinator-findings h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 22px 0 10px; font-size: var(--font-size-control); }
 .admin-shell .coordinator-subheading { margin: 26px 0 4px; font-size: var(--font-size-body); }
 .coordinator-table table { min-width: 640px; }
-.coordinator-subjects table { min-width: 1060px; }
+.coordinator-subjects table { min-width: 560px; }
+.coordinator-demand-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.coordinator-subjects .coordinator-row-actions { flex-wrap: nowrap; }
 .coordinator-table th[scope="row"] { text-align: left; background: transparent; font-size: var(--font-size-small); border-bottom: 1px solid var(--color-surface-subtle); }
 .coordinator-subjects th[scope="row"] strong, .coordinator-subjects th[scope="row"] span { display: block; }
 .coordinator-subjects th[scope="row"] span { font-weight: 400; color: var(--color-body); }
@@ -26,13 +30,15 @@
 .admin-shell .coordinator-expander { min-height: var(--control-min-height); padding: 4px 10px; font-size: var(--font-size-small); }
 .coordinator-reasons { margin: 8px 0 0; padding: 0 0 0 16px; font-size: var(--font-size-small); color: var(--color-body); }
 .coordinator-reasons[hidden] { display: none; }
-.coordinator-sections { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.coordinator-sections li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.coordinator-sections .admin-audit-id { flex-basis: 100%; }
 .coordinator-config-issue { display: block; margin-top: 6px; color: #92400e; font-size: var(--font-size-small); overflow-wrap: anywhere; }
 .coordinator-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .coordinator-table .coordinator-row-actions { margin-top: 0; }
 .admin-shell a.coordinator-link-button { display: inline-flex; align-items: center; min-height: var(--control-min-height); padding: 6px 12px; border: 1.5px solid var(--color-brand); border-radius: 8px; font-size: var(--font-size-small); font-weight: 600; white-space: nowrap; }
+.admin-shell .coordinator-icon-button { display: inline-flex; align-items: center; justify-content: center; width: var(--control-min-height); min-height: var(--control-min-height); padding: 0; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: var(--color-body); cursor: pointer; }
+.admin-shell .coordinator-icon-button:hover { background: var(--color-surface-subtle); color: var(--color-brand); text-decoration: none; }
+.admin-shell .coordinator-icon-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-brand) 35%, transparent); outline-offset: 1px; }
+.admin-shell .coordinator-icon-button-primary { border-color: var(--color-brand); background: var(--color-brand); color: #fff; }
+.admin-shell .coordinator-icon-button-primary:hover { background: var(--color-brand); color: #fff; filter: brightness(1.1); }
 .admin-shell a.coordinator-link-button:hover { background: var(--color-surface-subtle); text-decoration: none; }
 .admin-shell a.coordinator-newer { display: inline-block; margin-top: 6px; padding: 3px 9px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: var(--font-size-small); font-weight: 650; }
 .coordinator-newer-wrap { margin: 4px 0 !important; }
@@ -57,15 +63,17 @@
 .coordinator-audit-details pre { max-width: 340px; max-height: 220px; margin: 6px 0 0; padding: 8px; overflow: auto; background: var(--color-surface-subtle); border-radius: 6px; font-size: var(--font-size-small); white-space: pre-wrap; overflow-wrap: anywhere; }
 .coordinator-report-actions { margin-top: 20px; }
 .admin-shell .coordinator-wide-dialog { width: min(680px, calc(100vw - 32px)); }
-.admin-shell .coordinator-allocation { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; min-width: 0; }
-.coordinator-allocation legend { padding: 0; margin-bottom: 8px; font-size: var(--font-size-label); font-weight: 600; color: var(--color-body); }
-.coordinator-allocation-row { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
-.coordinator-allocation-row > button { grid-column: 3; }
-.coordinator-allocation-row > .admin-field:first-child + button { grid-column: 3; }
-.coordinator-allocation-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.coordinator-total-ok { color: #166534; font-weight: 650; font-size: var(--font-size-label); }
-.coordinator-total-bad { color: #92400e; font-weight: 650; font-size: var(--font-size-label); }
-.coordinator-problems { margin: 0; padding-left: 18px; color: #991b1b; font-size: var(--font-size-small); }
+.admin-shell .coordinator-students-dialog { width: min(900px, calc(100vw - 32px)); }
+.coordinator-students-body { display: grid; gap: 16px; min-width: 0; }
+.coordinator-students-body > * { min-width: 0; margin: 0; }
+.coordinator-students-body .coordinator-counts { margin: 0; }
+.coordinator-students-body .admin-dialog-actions { justify-content: flex-end; }
+.coordinator-students-reasons { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: var(--font-size-small); color: var(--color-body); }
+.coordinator-students-reasons li { overflow-wrap: anywhere; }
+.coordinator-students-body .coordinator-student-details { display: block; overflow-wrap: anywhere; }
+.coordinator-students-body .coordinator-student-details + .coordinator-student-details { margin-top: 4px; }
+.admin-shell .coordinator-students-body .coordinator-warning { margin-bottom: 0 !important; }
+.admin-shell .coordinator-students-button { min-height: var(--control-min-height); padding: 4px 10px; font-size: var(--font-size-small); margin-top: 6px; }
 @media (max-width: 1050px) {
   .admin-shell .coordinator-scope-grid { grid-template-columns: 1fr 1fr; }
   .admin-shell .coordinator-upload-grid { grid-template-columns: 1fr 1fr; }
@@ -76,9 +84,6 @@
   .admin-card-title > button, .coordinator-head-actions { width: 100%; }
   .coordinator-head-actions > button { flex: 1 1 140px; }
   .coordinator-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .coordinator-allocation-row { grid-template-columns: 1fr auto; }
-  .coordinator-allocation-row > .admin-field:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
-  .coordinator-allocation-row > button { grid-column: 2; grid-row: 1; }
   .coordinator-upload-submit button { width: 100%; }
 }
 .coordinator-subjects th[scope="row"] { vertical-align: top; }
@@ -121,6 +126,7 @@
 
 /* Setup card (one card per page) and radio-tile groups (S2-P004-009 MT9): native radios drawn as tiles with a large visible circle. */
 .coordinator-setup-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-outline); }
+.coordinator-setup-section ~ .coordinator-setup-section { padding-top: 0; border-top: 0; }
 .admin-shell .coordinator-setup-section > .coordinator-scope-grid { margin-top: 0; }
 .coordinator-setup-section > .admin-card-title + p, .coordinator-setup-section > h3 + p { margin-top: 6px; }
 .admin-shell .coordinator-setup-section > h3, .admin-shell .coordinator-setup-section .admin-card-title h3 { margin: 0; font-size: var(--font-size-body); }
@@ -165,3 +171,36 @@
 .admin-shell .coordinator-subject-filters :is(input, select) { min-height: 46px; font-size: var(--font-size-control); }
 .admin-shell .coordinator-subject-filters button { min-height: 46px; font-size: var(--font-size-control); }
 
+
+/* Forecast header facts: one wrapping row of icon chips (RunMeta). */
+.admin-shell .coordinator-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--color-muted-text); font-size: var(--font-size-label); }
+.admin-shell .coordinator-meta li { display: inline-flex; align-items: center; gap: 6px; }
+.admin-shell .coordinator-meta svg { flex: none; width: 16px; height: 16px; color: var(--color-brand); }
+.admin-shell .coordinator-meta-hint { color: var(--color-muted-text); }
+
+/* Forecast status dropdown (StatusMenu): burgundy button, radio items with a helper line. */
+.coordinator-status-menu { position: relative; }
+.admin-shell button.coordinator-status-button { display: inline-flex; align-items: center; gap: 6px; }
+.admin-shell .coordinator-status-popover { position: absolute; right: 0; z-index: 20; width: 16rem; max-width: calc(100vw - 32px); margin: 6px 0 0; padding: 8px; list-style: none; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 24px -6px rgb(16 24 40 / 0.18); }
+.admin-shell button.coordinator-status-option { display: flex; gap: 10px; width: 100%; min-height: var(--control-min-height); padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--color-heading); text-align: left; font-weight: 400; cursor: pointer; }
+.admin-shell button.coordinator-status-option:hover:not([aria-disabled="true"]), .admin-shell button.coordinator-status-option:focus-visible { background: #f3f4f6; outline: none; }
+.admin-shell button.coordinator-status-option[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
+.coordinator-status-radio { flex: none; width: 16px; height: 16px; margin-top: 2px; border: 1px solid #9ca3af; border-radius: 50%; background: #fff; }
+[aria-checked="true"] > .coordinator-status-radio { border: 5px solid var(--color-brand); }
+.coordinator-status-label { display: block; margin-bottom: 2px; font-size: var(--font-size-control); font-weight: 600; }
+.coordinator-status-help { display: block; color: var(--color-muted-text); font-size: var(--font-size-small); }
+
+/* Subjects table with the Removed subjects table beside it (stacked below 1100px). */
+.coordinator-subjects-layout { display: grid; gap: 20px; align-items: start; }
+.coordinator-subjects-main { min-width: 0; }
+@media (min-width: 1100px) { .coordinator-subjects-layout:has(> .coordinator-removed) { grid-template-columns: minmax(0, 1fr) 22rem; } }
+/* The side table is narrow on purpose: no shared 640px minimum, so it never scrolls sideways. */
+.coordinator-removed table { min-width: 0; width: 100%; }
+.admin-shell .coordinator-removed h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: var(--font-size-body); }
+.admin-shell .coordinator-removed td { width: 1%; text-align: right; }
+.admin-shell .coordinator-icon-button-danger:hover { border-color: #b42318; background: #fef3f2; color: #b42318; }
+
+/* Subject action dropdown (ActionMenu): the decision pill is the button face; the popover has no helper lines. */
+.admin-shell .coordinator-status-popover-compact { width: 12rem; }
+.admin-shell button.coordinator-decision-button { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-min-height); padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: var(--color-heading); cursor: pointer; }
+.admin-shell button.coordinator-decision-button:hover, .admin-shell button.coordinator-decision-button[aria-expanded="true"] { border-color: var(--color-brand); color: var(--color-brand); }

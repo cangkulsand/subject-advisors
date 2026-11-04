@@ -100,7 +100,7 @@ export function fakeRunsRepository(inputs: EngineInputRows) {
             });
           }
         } else {
-          for (const section of sections.filter((entry) => entry.demandId === plan.demandId)) Object.assign(section, { reviewStatus: plan.sectionStatus, reviewedBy: actor, reviewedAt: clock() });
+          for (const section of sections.filter((entry) => entry.demandId === plan.demandId)) Object.assign(section, plan.sectionStatus === 'PENDING' ? { reviewStatus: 'PENDING', reviewedBy: null, reviewedAt: null } : { reviewStatus: plan.sectionStatus, reviewedBy: actor, reviewedAt: clock() });
         }
         const after = stored.detail.sections.filter((section) => section.demandId === plan.demandId).sort((a, b) => a.sectionNumber - b.sectionNumber)
           .map((section) => ({ proposedSectionId: section.proposedSectionId, sectionNumber: section.sectionNumber, expectedStudents: section.expectedStudents, reviewStatus: section.reviewStatus, justification: section.justification }));

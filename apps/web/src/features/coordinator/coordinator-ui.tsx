@@ -60,8 +60,8 @@ export function StatusRegion({ notice }: { notice: Notice }) {
   </div>;
 }
 
-export function PageHeading({ title, text, actions }: { title: string; text: string; actions?: ReactNode }) {
-  return <header className="admin-page-heading"><div><p className="admin-eyebrow">COORDINATOR WORKSPACE</p><h1>{title}</h1><p>{text}</p></div>{actions}</header>;
+export function PageHeading({ title, text, actions }: { title: string; text?: string; actions?: ReactNode }) {
+  return <header className="admin-page-heading"><div><p className="admin-eyebrow">COORDINATOR WORKSPACE</p><h1>{title}</h1>{text && <p>{text}</p>}</div>{actions}</header>;
 }
 
 /** Page-local scope, kept in the URL so links and reloads keep it. */
@@ -107,25 +107,38 @@ export function RadioGroup({ legend, value, options, onChange, help, empty }: { 
   </fieldset>;
 }
 
+/** 18px stroke icon for the square icon buttons in table rows (`coordinator-icon-button`); the button carries the accessible name. */
+export function ActionIcon({ children }: { children: ReactNode }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{children}</svg>;
+}
+
+const fieldIcons: Record<'programme' | 'centre' | 'semester', ReactNode> = {
+  programme: <><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></>,
+  centre: <><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></>,
+  semester: <><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></>,
+};
+function FieldIcon({ name }: { name: keyof typeof fieldIcons }) {
+  return <svg className="coordinator-field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{fieldIcons[name]}</svg>;
+}
+
 /** Card-less scope fields (programme and learning centre selects, read-only target semester) for the single setup card on Data Imports and Class Offering Forecast. */
 export function ScopeFields({ context, path, programmeId, learningCentreId, keep }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null; keep?: Record<string, string> }) {
   const programmeField = useId(), centreField = useId(), semesterField = useId();
   const { centres, target, go } = useScopeChoices({ context, path, programmeId, keep });
   return <>
     <div className="coordinator-scope-grid">
-      <div className="admin-field"><label htmlFor={programmeField}>Programme</label>
+      <div className="admin-field"><label htmlFor={programmeField} className="coordinator-field-label"><FieldIcon name="programme"/>Programme</label>
         <select id={programmeField} value={programmeId ?? ''} onChange={event => go(event.target.value ? Number(event.target.value) : null, null)}>
           <option value="">Select a programme</option>
           {context.programmes.map(item => <option key={item.programmeId} value={item.programmeId}>{item.programmeCode} · {item.programmeName}</option>)}
         </select></div>
-      <div className="admin-field"><label htmlFor={centreField}>Learning centre</label>
+      <div className="admin-field"><label htmlFor={centreField} className="coordinator-field-label"><FieldIcon name="centre"/>Learning centre</label>
         <select id={centreField} value={learningCentreId ?? ''} disabled={programmeId === null} onChange={event => go(programmeId, event.target.value ? Number(event.target.value) : null)}>
           <option value="">{programmeId === null ? 'Choose a programme first' : 'Select a learning centre'}</option>
           {centres.map(item => <option key={item.learningCentreId} value={item.learningCentreId}>{item.centreCode} · {item.centreName}</option>)}
         </select></div>
-      <div className="coordinator-readonly"><span id={semesterField + '-label'}>Target semester</span>
-        <output id={semesterField} aria-labelledby={semesterField + '-label'} className="coordinator-readonly-value">{semesterLabel(target)}</output>
-        <small>Set by the system: the semester after the current one.</small></div>
+      <div className="coordinator-readonly"><span id={semesterField + '-label'} className="coordinator-field-label"><FieldIcon name="semester"/>Target semester</span>
+        <output id={semesterField} aria-labelledby={semesterField + '-label'} className="coordinator-readonly-value">{semesterLabel(target)}</output></div>
     </div>
     {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.</p>}
     {context.currentSemesterId == null
@@ -241,4 +254,29 @@ export function usePagedList<T>(first: (signal: AbortSignal) => Promise<{ items:
   }
   async function refresh() { setExtra({ items: [] }); await read.reload(); }
   return { data: read.data, error: read.error, retry: read.retry, refresh, items, cursor, loadingMore: busy, loadMoreError: failure, more };
+}
+
+/**
+ * Read-only modal: title, content and one Close button. Escape and Close both call `onClose`; focus returns to the opener when it unmounts.
+ * Use it to show information only; use ActionDialog for anything that records a decision.
+ */
+export function ReadOnlyDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null), titleId = useId();
+  useLayoutEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialog.current?.showModal();
+    dialog.current?.querySelector<HTMLElement>('[data-close]')?.focus();
+    return () => {
+      if (dialog.current?.open) dialog.current.close();
+      if (opener?.isConnected) opener.focus(); else document.getElementById(STATUS_REGION_ID)?.focus();
+    };
+  }, []);
+  return <dialog ref={dialog} className="admin-reason-dialog coordinator-wide-dialog coordinator-students-dialog" aria-labelledby={titleId} aria-modal="true"
+    onCancel={event => { event.preventDefault(); onClose(); }}>
+    <div className="coordinator-students-body">
+      <h2 id={titleId}>{title}</h2>
+      {children}
+      <div className="admin-dialog-actions"><button type="button" data-close onClick={onClose}>Close</button></div>
+    </div>
+  </dialog>;
 }

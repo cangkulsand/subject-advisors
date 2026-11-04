@@ -85,6 +85,29 @@ function subject(id, code, name, classType, supported, uncertain, reasons, near,
     qualityStatus: uncertain > 0 ? 'PRELIMINARY' : 'SUPPORTED', configurationStatus: 'CONFIGURED', configurationIssue: null, configurationMessage: null, breakdown: null, decisionStatus: 'PENDING', allocatedStudents: supported, sections, ...extra,
   };
 }
+/** Roster behind a subject, consistent with its counts: supported (first `nearGraduationCount` of them near graduation), uncertain (reasons spread over the reason counts) and a few not counted. */
+function subjectStudents(state, run, subjectRow) {
+  const students = [];
+  const make = (index, patch) => { const n = String(students.length + 1).padStart(3, '0'); students.push({ externalReference: `A22EC${n}`, studentName: `${subjectRow.subjectCode} Student ${n}`, outcome: 'SUPPORTED', uncertaintyReasons: [], nearGraduation: false, remainingCredits: 60, passedByRetake: false, ...patch }); void index; };
+  for (let i = 0; i < subjectRow.supportedEligibleCount; i++) make(i, i < subjectRow.nearGraduationCount ? { nearGraduation: true, remainingCredits: 12 + i } : {});
+  const reasonList = subjectRow.uncertaintyReasonCounts;
+  const reasons = Array.from({ length: subjectRow.uncertainStudentCount }, () => []);
+  let cursor = 0;
+  for (const { reason, count } of reasonList) for (let k = 0; k < count; k++) { reasons[cursor % reasons.length].push(reason); cursor++; }
+  reasons.forEach(list => make(0, { outcome: 'UNCERTAIN', uncertaintyReasons: [...new Set(list)].sort(), remainingCredits: null }));
+  if (subjectRow.sections.length > 0 || subjectRow.supportedEligibleCount > 0) {
+    for (let i = 0; i < 3; i++) make(i, { outcome: 'PASSED', remainingCredits: 40, passedByRetake: i === 0 });
+    make(0, { outcome: 'PREREQUISITE_NOT_MET', remainingCredits: 90 });
+    make(0, { outcome: 'NOT_OFFERED', remainingCredits: 90 });
+  }
+  const count = (kind) => students.filter(student => student.outcome === kind).length;
+  const breakdown = { inCurriculum: students.length, alreadyPassed: count('PASSED'), notOfferedInSemesterType: count('NOT_OFFERED'), prerequisiteNotMet: count('PREREQUISITE_NOT_MET'), supported: count('SUPPORTED'), uncertain: count('UNCERTAIN'), retakeResolvedAsPassed: students.filter(student => student.passedByRetake).length };
+  return ok({
+    forecastRunId: run.forecastRunId, subjectId: subjectRow.subjectId, subjectCode: subjectRow.subjectCode, subjectName: subjectRow.subjectName, catalogueMatchesRun: !state.catalogueChanged,
+    summary: { inCurriculum: students.length, counted: breakdown.supported, uncertain: breakdown.uncertain, nearGraduation: subjectRow.nearGraduationCount, notCounted: breakdown.alreadyPassed + breakdown.prerequisiteNotMet + breakdown.notOfferedInSemesterType, breakdown, uncertaintyReasonCounts: reasonList },
+    students,
+  });
+}
 function addRun(state, importBatchId) {
   const id = state.nextRun++;
   const lab = capacity.LAB, lec = capacity.LECTURE;
@@ -183,11 +206,15 @@ export function handle(state, request) {
   }
   const confirmationResult = handleConfirmation(state, route, method, url, headers, body);
   if (confirmationResult) return confirmationResult;
-  const runMatch = /^forecast-runs(?:\/(\d+)(?:\/(audit|reviews|decisions|finalizations))?)?$/.exec(route);
+  const runMatch = /^forecast-runs(?:\/(\d+)(?:\/(audit|reviews|decisions|finalizations)|\/subjects\/(\d+)\/students)?)?$/.exec(route);
   if (!runMatch) return null;
   if (!runMatch[1]) return method === 'POST' ? generate(state, safeJson(body)) : listRuns(state, url);
   const run = state.runs.get(Number(runMatch[1]));
   if (!run) return failure(404, 'RUN_NOT_FOUND', 'The forecast was not found.');
+  if (runMatch[3]) {
+    const row = run.subjects.find(item => item.subjectId === Number(runMatch[3]));
+    return row ? subjectStudents(state, run, row) : failure(404, 'RUN_SUBJECT_NOT_FOUND', 'The subject is not part of this forecast.');
+  }
   if (!runMatch[2]) return ok(view(state, run), 200, { ETag: `"${revisionOf(run)}"` });
   if (runMatch[2] === 'audit') return ok(paginate(run.audit, url));
   return mutate(state, run, runMatch[2], headers, safeJson(body));
@@ -281,7 +308,7 @@ function mutate(state, run, kind, headers, body) {
         const previous = subjectRow.sections;
         subjectRow.sections = decision.replacementSections.map((entry, index) => ({ ...(previous.find(p => p.proposedSectionId === entry.proposedSectionId) ?? section(run.nextSection++, index + 1, entry.expectedStudents, rule)), sectionNumber: entry.sectionNumber, expectedStudents: entry.expectedStudents, reviewStatus: 'REVIEWED', justification: entry.justification ?? null }));
       } else {
-        const status = { REVIEW: 'REVIEWED', APPROVE: 'APPROVED', DEFER: 'DEFERRED' }[decision.action];
+        const status = { REVIEW: 'REVIEWED', APPROVE: 'APPROVED', DEFER: 'DEFERRED', REOPEN: 'PENDING' }[decision.action];
         subjectRow.sections.forEach(x => { x.reviewStatus = status; });
       }
       run.audit.unshift(auditEntry(state, run, decision.action, decision.subjectId, decision.reason, { sections: 'before' }, { sections: 'after' }));

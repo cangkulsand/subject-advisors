@@ -3,6 +3,7 @@ import type { ClassType, ForecastSubjectOption, HistoryCompleteness } from '../c
 import { allocateSections, evenSplit, resolveCapacityRule } from './capacity';
 import { isNearGraduation } from './policy';
 import { ENGINE_VERSION, runForecastEngine } from './forecast';
+import { subjectStudentOutcomes } from './subject-students';
 import type { EngineCapacityRule, EngineCurriculum, EngineRecord, EngineStudent, ForecastEngineInput } from './types';
 
 const LAB_RULE: EngineCapacityRule = { capacityRuleId: 1, classType: 'LAB', minimumEnrollment: 15, breakEvenTarget: 25, normalMaximum: 35, exceptionMaximum: null, isActive: true };
@@ -340,5 +341,46 @@ describe('result shape and determinism', () => {
     shuffled.snapshot.rejectedRowsByStudent = { s01: 1 };
     shuffled.capacityRules = [LECTURE_RULE, LAB_RULE];
     expect(runForecastEngine(shuffled)).toEqual(first);
+  });
+});
+
+describe('subjectStudentOutcomes', () => {
+  const B = subject(2, 'BBBB1000', 'LECTURE', { prerequisiteLinks: [{ requiredCurriculumSubjectId: 10, requirementType: 'MANDATORY' } as never] });
+  const students = [
+    student('s5', [], { studentName: 'Zed' }),
+    student('s1', [rec(1, 'FAILED'), rec(1, 'COMPLETED')], { studentName: 'Amy' }),
+    student('s2', [rec(1, 'COMPLETED')]),
+    student('s3', [rec(2, 'COMPLETED', 85)], { studentName: 'Near' }),
+    student('s4', [rec(2, 'COMPLETED', 20)], { historyCompleteness: 'PARTIAL' }),
+    student('s6', [rec(1, 'IN_PROGRESS')]),
+    student('s7', [], { curriculumId: 99 }),
+  ];
+  const request = input(students, [A, B, subject(3, 'CCCC1000', 'LAB')]);
+
+  it('tallies equal the engine breakdown, near-graduation count and reason counts for every subject', () => {
+    const result = runForecastEngine(request);
+    for (const demand of result.demands) {
+      const view = subjectStudentOutcomes(request, demand.subjectId);
+      expect(view.breakdown).toEqual(demand.breakdown);
+      expect(view.nearGraduationCount).toBe(demand.nearGraduationCount);
+      expect(view.uncertaintyReasonCounts).toEqual(demand.uncertaintyReasonCounts);
+      expect(view.students).toHaveLength(demand.breakdown.inCurriculum);
+      expect(view.students.filter((row) => row.outcome === 'SUPPORTED')).toHaveLength(demand.breakdown.supported);
+      expect(view.students.filter((row) => row.outcome === 'UNCERTAIN')).toHaveLength(demand.breakdown.uncertain);
+      expect(view.students.filter((row) => row.nearGraduation)).toHaveLength(demand.nearGraduationCount);
+      expect(view.students.filter((row) => row.passedByRetake)).toHaveLength(demand.breakdown.retakeResolvedAsPassed);
+    }
+  });
+  it('lists students sorted by matric with names, reasons and remaining credits', () => {
+    const view = subjectStudentOutcomes(request, 1);
+    expect(view.students.map((row) => row.externalReference)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6']);
+    expect(view.students[0]).toMatchObject({ studentName: 'Amy', outcome: 'PASSED', passedByRetake: true });
+    const near = view.students.find((row) => row.externalReference === 's3')!;
+    expect(near).toMatchObject({ outcome: 'SUPPORTED', nearGraduation: true, remainingCredits: 35, studentName: 'Near' });
+    expect(view.students.find((row) => row.externalReference === 's4')).toMatchObject({ outcome: 'UNCERTAIN', uncertaintyReasons: ['HISTORY_PARTIAL'], nearGraduation: false });
+    expect(view.students.find((row) => row.externalReference === 's6')).toMatchObject({ outcome: 'UNCERTAIN', uncertaintyReasons: ['RETAKE_OUTCOME_UNRESOLVED'] });
+  });
+  it('returns an empty view for a subject that no curriculum contains', () => {
+    expect(subjectStudentOutcomes(request, 404)).toMatchObject({ students: [], nearGraduationCount: 0, breakdown: { inCurriculum: 0 } });
   });
 });

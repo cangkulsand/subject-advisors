@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { AppLink, navigateApp } from '../../app/navigation';
+import { ClearFilters, FilterMenu, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import { CoordinatorApiError, type CoordinatorClient, type UploadOutcome } from './client';
 import {
-  ActionDialog, LoadMore, PageHeading, Panel, RadioGroup, ScopeFields, StatusRegion, chooseScope, errorText, readScope, scopeHref, usePagedList, useRead, when,
+  ActionDialog, ActionIcon, LoadMore, PageHeading, Panel, RadioGroup, ScopeFields, StatusRegion, chooseScope, errorText, readScope, scopeHref, usePagedList, useRead, when,
   type ChosenScope, type Notice,
 } from './coordinator-ui';
 import { IMPORT_LIMITS, type AcceptedImport, type ForecastContext, type CombinedSnapshotCoverage, type ImportSource, type ImportSummary, type ImportValidationReport, type SystemSnapshotCoverage, type ValidationIssue } from '../../../../../packages/shared/src/forecasting/contracts';
@@ -47,7 +48,7 @@ export const readMode = (value: string | null): DataMode => value === 'csv' || v
 
 /** Per-forecast data source choice; kept in the URL next to the scope. A real radio group, so arrow keys and labels work natively. */
 function DataSourceToggle({ mode, scope }: { mode: DataMode; scope: ChosenScope }) {
-  return <RadioGroup legend="Data source for this forecast" value={mode} options={MODES} help="Choose where the students for this forecast come from. You choose per forecast; each option is saved as its own frozen snapshot."
+  return <RadioGroup legend="Data source" value={mode} options={MODES}
     onChange={next => navigateApp(scopeHref('/coordinator/imports', scope, next === 'system' ? {} : { source: next }), { replace: true, skipUnsaved: true })}/>;
 }
 
@@ -93,8 +94,7 @@ function SystemCard({ client, scope, onCreated }: { client: CoordinatorClient; s
   }
   return <section className="coordinator-setup-section" aria-labelledby="coordinator-system-heading">
     <h3 id="coordinator-system-heading" tabIndex={-1}>Students in the system</h3>
-    <p className="admin-muted">Build the forecast from the students currently in the system. Their own academic records count as complete history (student-entered). Students with no records have unknown history and stay uncertain.</p>
-    <p className="admin-muted">Only students with active student access are included. The snapshot is frozen, and student profiles and records are never changed.</p>
+    <p className="admin-muted">Uses the academic records that current students have entered in the system.</p>
     {failure && <p className="admin-form-error" role="alert">{failure}</p>}
     <div className="coordinator-upload-submit"><button type="button" className="admin-primary" disabled={busy} aria-busy={busy} onClick={() => void create()}>{busy ? 'Creating snapshot…' : 'Create snapshot'}</button></div>
   </section>;
@@ -182,9 +182,9 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
     } catch (error) { setFailure(errorText(error, 'The upload failed. Please retry.')); }
     finally { setBusy(false); }
   }
-  async function template(format: 'native' | 'coordinator') {
+  async function template() {
     try {
-      const { filename, text } = await client.template(format);
+      const { filename, text } = await client.template('coordinator');
       const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
       const link = document.createElement('a'); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -194,11 +194,9 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
   return <section className="coordinator-setup-section" aria-labelledby="coordinator-upload-heading">
     <div className="admin-card-title"><div><h3 id="coordinator-upload-heading" tabIndex={-1}>{combined ? 'Students in the system + CSV import' : 'CSV import'}</h3>
       {combined
-        ? <p className="admin-muted">One snapshot made of the students in the system for {scope.programmeLabel} at {scope.centreLabel}, plus the students in your CSV who are not already in the system. The CSV is validated exactly like a normal CSV import.</p>
-        : <p className="admin-muted">Upload one CSV of your students' academic history for {scope.programmeLabel} at {scope.centreLabel}. The optional student_name column lets you recognise students later.</p>}
-      {combined && <p className="admin-muted">If a student is in both, the system record is used and the CSV student is skipped. A CSV external_reference that equals a system student's matric number counts as the same student. Same name with a different reference is kept and flagged as a possible duplicate.</p>}</div>
-      <div className="coordinator-row-actions"><button type="button" onClick={() => void template('coordinator')}>Download coordinator template</button>
-        <button type="button" onClick={() => void template('native')}>Download CSV template</button></div></div>
+        ? <p className="admin-muted">Combines system students with non-duplicate CSV records. Matches on matric number, keeps system data, and flags name conflicts for review.</p>
+        : <p className="admin-muted">Upload one CSV of your students' academic history for {scope.programmeLabel} at {scope.centreLabel}.</p>}</div>
+      <div className="coordinator-row-actions"><button type="button" onClick={() => void template()}>Download template</button></div></div>
     <form className="coordinator-upload-grid" onSubmit={submit} noValidate>
       <div className="admin-field"><label htmlFor={ids.date}>Source date</label>
         <input id={ids.date} ref={element => { first.current.date = element; }} type="date" value={date} max={today()} aria-invalid={!!errors.date || undefined} aria-describedby={errors.date ? ids.date + '-error' : undefined} onChange={event => setDate(event.target.value)}/>{message('date')}</div>
@@ -206,34 +204,60 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
         <input id={ids.label} ref={element => { first.current.label = element; }} type="text" value={label} maxLength={IMPORT_LIMITS.maxSourceLabelLength} placeholder="Example: September cohort export" aria-invalid={!!errors.label || undefined} aria-describedby={errors.label ? ids.label + '-error' : undefined} onChange={event => setLabel(event.target.value)}/>{message('label')}</div>
       <div className="admin-field coordinator-upload-file"><label htmlFor={ids.file}>CSV file</label>
         <input key={fileKey} id={ids.file} ref={element => { first.current.file = element; }} type="file" accept=".csv,text/csv" aria-invalid={!!errors.file || undefined} aria-describedby={ids.help + (errors.file ? ' ' + ids.file + '-error' : '')} onChange={event => pick(event.currentTarget.files?.[0])}/>
-        <small id={ids.help} className="admin-counter">Both formats are accepted: the standard template (at most {IMPORT_LIMITS.maxDataRows.toLocaleString()} data rows) or your own coordinator export with the columns courseCode, subjCode, centerName, stuname, stuMetricNo and grade (at most {IMPORT_LIMITS.maxCoordinatorDataRows.toLocaleString()} rows; other programmes, other learning centres, inactive and in-progress rows are skipped). .csv up to 5 MiB.</small>{message('file')}</div>
+        <small id={ids.help} className="admin-counter">CSV up to 5 MiB (maximum {IMPORT_LIMITS.maxCoordinatorDataRows.toLocaleString()} rows).</small>{message('file')}</div>
       {failure && <p className="admin-form-error coordinator-upload-error" role="alert">{failure}</p>}
       <div className="coordinator-upload-submit"><button type="submit" className="admin-primary" disabled={busy} aria-busy={busy}>{busy ? 'Validating…' : combined ? 'Create combined snapshot' : 'Upload and validate'}</button></div>
     </form>
   </section>;
 }
 
+const rosterIcon = <ActionIcon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></ActionIcon>;
+const forecastIcon = <ActionIcon><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></ActionIcon>;
+
 function importRow(item: ImportSummary, scope: ChosenScope, mode: DataMode, onGenerate: (item: ImportSummary) => void) {
   return <tr key={item.importBatchId}>
     <td><strong>{item.sourceLabel}</strong><span className="admin-audit-id">Import #{item.importBatchId}</span></td><td><SourceBadge source={item.source}/></td>
     <td>{item.sourceDate}</td><td>{when(item.acceptedAt)}</td><td>{item.counts.uniqueStudents}</td><td>{item.counts.rejectedRows}</td>
     <td><div className="coordinator-row-actions">
-      <AppLink className="coordinator-link-button" href={scopeHref('/coordinator/imports', scope, { ...modeExtra(mode), import: item.importBatchId })} aria-label={`View roster for ${item.sourceLabel}`}>View roster</AppLink>
-      <button type="button" className="admin-row-action" onClick={() => onGenerate(item)} aria-label={`Generate forecast from ${item.sourceLabel}`}>Generate forecast</button></div></td>
+      <AppLink className="coordinator-icon-button" href={scopeHref('/coordinator/imports', scope, { ...modeExtra(mode), import: item.importBatchId })} aria-label={`View roster for ${item.sourceLabel}`} title="View roster">{rosterIcon}</AppLink>
+      <button type="button" className="coordinator-icon-button coordinator-icon-button-primary" onClick={() => onGenerate(item)} aria-label={`Generate forecast from ${item.sourceLabel}`} title="Generate forecast">{forecastIcon}</button></div></td>
   </tr>;
 }
 
+const SOURCE_FILTERS = [{ value: '', label: 'All' }, { value: 'SYSTEM', label: 'System' }, { value: 'CSV', label: 'CSV' }, { value: 'COMBINED', label: 'Combined' }];
+type SnapshotSort = 'newest' | 'oldest' | 'name' | 'students';
+const SNAPSHOT_SORTS: Array<{ value: SnapshotSort; label: string }> = [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'name', label: 'Name A–Z' }, { value: 'students', label: 'Most students' }];
+const snapshotOrder: Record<SnapshotSort, (a: ImportSummary, b: ImportSummary) => number> = {
+  newest: (a, b) => b.acceptedAt.localeCompare(a.acceptedAt) || b.importBatchId - a.importBatchId,
+  oldest: (a, b) => a.acceptedAt.localeCompare(b.acceptedAt) || a.importBatchId - b.importBatchId,
+  name: (a, b) => a.sourceLabel.localeCompare(b.sourceLabel) || b.importBatchId - a.importBatchId,
+  students: (a, b) => b.counts.uniqueStudents - a.counts.uniqueStudents || b.importBatchId - a.importBatchId,
+};
+
 function ImportList({ client, scope, mode, version, onGenerate }: { client: CoordinatorClient; scope: ChosenScope; mode: DataMode; version: number; onGenerate: (item: ImportSummary) => void }) {
-  const list = usePagedList(signal => client.listImports(scope, { limit: 20 }, signal), cursor => client.listImports(scope, { limit: 20, cursor }), [scope.programmeId, scope.learningCentreId, version].join('|'));
+  // Snapshots per scope are few, so a page of 100 normally holds the whole list and the filters apply to all of it.
+  const list = usePagedList(signal => client.listImports(scope, { limit: 100 }, signal), cursor => client.listImports(scope, { limit: 100, cursor }), [scope.programmeId, scope.learningCentreId, version].join('|'));
+  const [source, setSource] = useState(''), [query, setQuery] = useState(''), [sort, setSort] = useState<SnapshotSort>('newest');
+  const needle = query.trim().toLowerCase(), filtering = source !== '' || needle !== '';
+  const rows = list.items.filter(item => (!source || item.source === source) && (!needle || item.sourceLabel.toLowerCase().includes(needle) || String(item.importBatchId).includes(needle.replace(/^#/, '')))).sort(snapshotOrder[sort]);
   return <section className="admin-card" aria-labelledby="coordinator-imports-heading">
-    <div className="admin-card-title"><div><h2 id="coordinator-imports-heading">Accepted imports</h2><p className="admin-muted">Each accepted import is a frozen snapshot, either of the students in the system or from a CSV. Generate a forecast from one of them.</p></div></div>
-    <Panel error={list.error} retry={list.retry} label="imports">{list.data && (list.items.length === 0
-      ? <div className="admin-empty"><h3>No accepted imports yet</h3><p>Create a snapshot of the students in the system above, or upload a CSV. Valid data is accepted straight away.</p></div>
-      : <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Accepted imports table" tabIndex={0}>
-        <table><thead><tr><th scope="col">Import</th><th scope="col">Source</th><th scope="col">Source date</th><th scope="col">Accepted</th><th scope="col">Students</th><th scope="col">Rejected rows</th><th scope="col">Actions</th></tr></thead>
-          <tbody>{list.items.map(item => importRow(item, scope, mode, onGenerate))}</tbody></table></div>
+    <div className="admin-card-title"><div><h2 id="coordinator-imports-heading">Student data snapshots</h2><p className="admin-muted">Each snapshot is frozen, taken from the students in the system, a CSV, or both. Generate a forecast from one of them.</p></div></div>
+    <Panel error={list.error} retry={list.retry} label="snapshots">{list.data && (list.items.length === 0
+      ? <div className="admin-empty"><h3>No snapshots yet</h3><p>Create a snapshot of the students in the system above, or upload a CSV. Valid data is accepted straight away.</p></div>
+      : <><TableToolbar label="Filter and sort snapshots">
+          <SegmentedFilter label="Source" options={SOURCE_FILTERS} value={source} onChange={setSource}/>
+          <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', value: sort, noAll: true, options: SNAPSHOT_SORTS, onChange: value => setSort(value as SnapshotSort) }]}/>
+          <SearchField label="Search snapshots" value={query} placeholder="Search name or import #" maxLength={120} onChange={setQuery}/>
+          {filtering && <ClearFilters onClear={() => { setSource(''); setQuery(''); }}/>}
+        </TableToolbar>
+        {rows.length === 0
+          ? <div className="admin-empty"><h3>No snapshots match</h3><p>Change the source or the search to see more snapshots.</p></div>
+          : <div className="admin-table-scroll coordinator-table" role="region" aria-label="Student data snapshots table" tabIndex={0}>
+            <table><thead><tr><th scope="col">Snapshot</th><th scope="col">Source</th><th scope="col">Source date</th><th scope="col">Accepted</th><th scope="col">Students</th><th scope="col">Rejected rows</th><th scope="col">Actions</th></tr></thead>
+              <tbody>{rows.map(item => importRow(item, scope, mode, onGenerate))}</tbody></table></div>}
+        {filtering && list.cursor && <p className="admin-muted">Filters apply to the snapshots loaded so far. Load more to include older ones.</p>}
         {list.loadMoreError && <p className="admin-form-error" role="alert">{list.loadMoreError}</p>}
-        <LoadMore cursor={list.cursor} busy={list.loadingMore} onMore={() => void list.more()} label="Load more imports"/></>)}
+        <LoadMore cursor={list.cursor} busy={list.loadingMore} onMore={() => void list.more()} label="Load more snapshots"/></>)}
     </Panel>
   </section>;
 }
@@ -245,7 +269,7 @@ function ImportDetail({ client, scope, mode, importId, onGenerate }: { client: C
   useEffect(() => { if (detail.data) heading.current?.focus(); }, [detail.data?.importBatchId]);
   const item: AcceptedImport | undefined = detail.data;
   return <section className="admin-card" aria-labelledby="coordinator-import-heading">
-    <AppLink className="admin-back" href={scopeHref('/coordinator/imports', scope, modeExtra(mode))}>← Back to imports</AppLink>
+    <AppLink className="admin-back" href={scopeHref('/coordinator/imports', scope, modeExtra(mode))}>← Back to snapshots</AppLink>
     <Panel error={detail.error} retry={detail.retry} label="import">{item && <>
       <div className="admin-card-title"><div><h2 id="coordinator-import-heading" tabIndex={-1} ref={heading}>{item.sourceLabel}</h2>
         <p className="admin-muted">Import #{item.importBatchId} · source date {item.sourceDate} · accepted {when(item.acceptedAt)} · frozen snapshot</p>
@@ -298,7 +322,7 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
   return <>
     <StatusRegion notice={notice}/>
     <section className="admin-card coordinator-setup" aria-labelledby="coordinator-setup-heading">
-      <div className="admin-card-title"><div><h2 id="coordinator-setup-heading">Forecast data setup</h2><p className="admin-muted">Choose a programme and a learning centre, then where the students for the next semester come from. Imports and forecasts are kept separately for each scope.</p></div></div>
+      <div className="admin-card-title"><div><h2 id="coordinator-setup-heading">Forecast data setup</h2><p className="admin-muted">Imports and forecasts are kept separately for each scope.</p></div></div>
       <div className="coordinator-setup-section"><ScopeFields context={context} path="/coordinator/imports" programmeId={programmeId} learningCentreId={learningCentreId} keep={mode === 'system' ? undefined : { source: mode }}/></div>
       {scope && importId === null && <>
         <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>
@@ -336,7 +360,7 @@ export function ImportsPage({ client, search }: { client: CoordinatorClient; sea
   const mode = readMode(extra.get('source')), importParam = extra.get('import'), importId = importParam && /^[1-9]\d*$/.test(importParam) ? Number(importParam) : null;
   const scope = context.data ? chooseScope(context.data, programmeId, learningCentreId) : null;
   return <>
-    <PageHeading title="Data Imports" text="Choose where the forecast data for the next semester comes from: the students in the system, a CSV import, or both. Accepted snapshots are kept for forecasting."/>
+    <PageHeading title="Data Imports" />
     <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && <>
       <ImportWorkspace client={client} context={context.data} scope={scope} programmeId={programmeId} learningCentreId={learningCentreId} importId={importId} mode={mode}/>
     </>}</Panel>

@@ -8,12 +8,16 @@ import type {
   ImportSource, Paginated, UncertaintyReason,
 } from './contracts';
 import type { ConfigurationIssueCode, DemandBreakdown, EngineOriginalRecommendation, EngineRuleSnapshot, UncertaintyReasonCount } from './engine/types';
+import type { SubjectStudentOutcome } from './engine/subject-students';
+
+export type { SubjectStudentOutcome, SubjectStudentOutcomeKind } from './engine/subject-students';
 
 export const FORECAST_RUN_STATUSES = ['DRAFT', 'UNDER_REVIEW', 'FINALIZED'] as const;
 export type ForecastRunStatus = (typeof FORECAST_RUN_STATUSES)[number];
 export const SECTION_REVIEW_STATUSES = ['PENDING', 'REVIEWED', 'APPROVED', 'DEFERRED'] as const;
 export type SectionReviewStatus = (typeof SECTION_REVIEW_STATUSES)[number];
-export const RUN_DECISION_ACTIONS = ['REVIEW', 'APPROVE', 'DEFER', 'REPLACE_ALLOCATION'] as const;
+/** REOPEN puts a decided subject back to PENDING (for example, adding back a removed subject). */
+export const RUN_DECISION_ACTIONS = ['REVIEW', 'APPROVE', 'DEFER', 'REOPEN', 'REPLACE_ALLOCATION'] as const;
 export type RunDecisionAction = (typeof RUN_DECISION_ACTIONS)[number];
 /** BELOW_MINIMUM / BELOW_OPTIMAL as the engine; ABOVE_NORMAL_MAXIMUM marks an approved exception (needs justification). */
 export type RunSectionFlag = 'BELOW_MINIMUM' | 'BELOW_OPTIMAL' | 'ABOVE_NORMAL_MAXIMUM';
@@ -140,10 +144,37 @@ export interface GenerateRunRequest extends ForecastScope { importBatchId: Int32
 export interface StartRunReviewRequest { scope: ForecastScope; action: 'START_REVIEW'; reason?: string }
 export interface ReplacementSection { proposedSectionId?: Int32Id; sectionNumber: number; expectedStudents: number; justification?: string }
 export type RunDecision =
-  | { subjectId: Int32Id; action: 'REVIEW' | 'APPROVE' | 'DEFER'; reason: string; approvalReference?: string }
+  | { subjectId: Int32Id; action: 'REVIEW' | 'APPROVE' | 'DEFER' | 'REOPEN'; reason: string; approvalReference?: string }
   | { subjectId: Int32Id; action: 'REPLACE_ALLOCATION'; reason: string; approvalReference?: string; replacementSections: ReplacementSection[] };
 export interface RunDecisionBatchRequest { scope: ForecastScope; decisions: RunDecision[] }
 export interface FinalizeRunRequest { scope: ForecastScope; reason?: string; approvalReference?: string }
+
+/** Read-only roster behind one subject's numbers (GET forecast-runs/{id}/subjects/{subjectId}/students). Never changes demand. */
+export interface RunSubjectStudents {
+  forecastRunId: Int32Id;
+  subjectId: Int32Id;
+  subjectCode: string;
+  subjectName: string;
+  /**
+   * False when the live curriculum catalogue no longer matches the run's stored rule snapshot: the list was recomputed with the current
+   * curriculum and may differ from the stored counts.
+   */
+  catalogueMatchesRun: boolean;
+  summary: {
+    inCurriculum: number;
+    /** Supported students: the potential demand counted for the subject. */
+    counted: number;
+    uncertain: number;
+    nearGraduation: number;
+    /** Already passed + prerequisite not met + not offered this semester. */
+    notCounted: number;
+    breakdown: DemandBreakdown;
+    uncertaintyReasonCounts: UncertaintyReasonCount[];
+  };
+  /** Sorted by matric (external reference). */
+  students: SubjectStudentOutcome[];
+}
+export type RunSubjectStudentsEnvelope = Envelope<RunSubjectStudents>;
 
 export type ForecastRunDetailEnvelope = Envelope<ForecastRunDetail>;
 export type ForecastRunSummaryList = Paginated<ForecastRunSummary>;

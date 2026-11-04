@@ -507,6 +507,41 @@
         "description": "Subjects with demand, uncertain counts and reasons, nearGraduationCount, configuration status, sections and recomputed flags, the run revision (body and ETag), the newerForecastAvailable indicator and the newest audit entries. Unassigned scopes are indistinguishable from absent runs (404)."
       }
     },
+    "/api/coordinator/forecast-runs/{forecastRunId}/subjects/{subjectId}/students": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "operationId": "listForecastSubjectStudents",
+        "summary": "Read the students behind one subject of a run (view only)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ForecastRunId"
+          },
+          {
+            "$ref": "#/components/parameters/ForecastSubjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RunSubjectStudentsResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Read-only roster for judging a subject. The forecast stores only per-subject counts, so the list is recomputed by the same engine functions from the run's frozen import snapshot and stored target semester; its tallies equal the stored breakdown and nearGraduationCount unless catalogueMatchesRun is false. Never changes demand and has no per-student overrides. Same authorization and scope handling as the run detail: unassigned scopes and absent runs are 404 RUN_NOT_FOUND; a subject that is not part of the run is 404 RUN_SUBJECT_NOT_FOUND. No query parameters."
+      }
+    },
     "/api/coordinator/forecast-runs/{forecastRunId}/decisions": {
       "post": {
         "tags": [
@@ -1316,6 +1351,14 @@
         "schema": {
           "type": "string",
           "maxLength": 512
+        }
+      },
+      "ForecastSubjectId": {
+        "name": "subjectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
         }
       }
     },
@@ -2525,7 +2568,8 @@
                 "enum": [
                   "REVIEW",
                   "APPROVE",
-                  "DEFER"
+                  "DEFER",
+                  "REOPEN"
                 ]
               },
               "reason": {
@@ -2536,7 +2580,7 @@
                 "type": "string"
               }
             },
-            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. REVIEW, APPROVE and DEFER set every current section of the subject to REVIEWED, APPROVED or DEFERRED; a subject without sections cannot be decided. A reason of 1-500 characters is required for every decision."
+            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. REVIEW, APPROVE and DEFER set every current section of the subject to REVIEWED, APPROVED or DEFERRED; REOPEN sets them back to PENDING (clearing the reviewer), for example to add back a removed subject; a subject without sections cannot be decided. A reason of 1-500 characters is required for every decision."
           },
           {
             "type": "object",
@@ -4999,6 +5043,175 @@
             }
           }
         }
+      },
+      "SubjectStudentOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "externalReference",
+          "studentName",
+          "outcome",
+          "uncertaintyReasons",
+          "nearGraduation",
+          "remainingCredits",
+          "passedByRetake"
+        ],
+        "properties": {
+          "externalReference": {
+            "type": "string",
+            "description": "Matric number as imported."
+          },
+          "studentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PASSED",
+              "NOT_OFFERED",
+              "PREREQUISITE_NOT_MET",
+              "SUPPORTED",
+              "UNCERTAIN"
+            ],
+            "description": "SUPPORTED students are the counted potential demand."
+          },
+          "uncertaintyReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UncertaintyReason"
+            },
+            "description": "Sorted; empty unless outcome is UNCERTAIN."
+          },
+          "nearGraduation": {
+            "type": "boolean",
+            "description": "True only for SUPPORTED students counted in nearGraduationCount."
+          },
+          "remainingCredits": {
+            "type": "number",
+            "nullable": true,
+            "description": "Curriculum credits still to earn; null when the curriculum total or a passed credit value is unknown."
+          },
+          "passedByRetake": {
+            "type": "boolean",
+            "description": "PASSED only: a pass plus another attempt, resolved as passed."
+          }
+        }
+      },
+      "RunSubjectStudents": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "forecastRunId",
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "catalogueMatchesRun",
+          "summary",
+          "students"
+        ],
+        "properties": {
+          "forecastRunId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "catalogueMatchesRun": {
+            "type": "boolean",
+            "description": "False when the live curriculum catalogue no longer matches the run's stored rule snapshot; the list was then recomputed with the current curriculum and may differ from the stored counts."
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "inCurriculum",
+              "counted",
+              "uncertain",
+              "nearGraduation",
+              "notCounted",
+              "breakdown",
+              "uncertaintyReasonCounts"
+            ],
+            "properties": {
+              "inCurriculum": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "counted": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Supported students (potential demand)."
+              },
+              "uncertain": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "nearGraduation": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "notCounted": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Already passed + prerequisite not met + not offered this semester."
+              },
+              "breakdown": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "description": "inCurriculum, alreadyPassed, notOfferedInSemesterType, prerequisiteNotMet, supported, uncertain, retakeResolvedAsPassed."
+              },
+              "uncertaintyReasonCounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "reason",
+                    "count"
+                  ],
+                  "properties": {
+                    "reason": {
+                      "$ref": "#/components/schemas/UncertaintyReason"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubjectStudentOutcome"
+            },
+            "description": "Sorted by matric."
+          }
+        }
+      },
+      "RunSubjectStudentsEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RunSubjectStudents"
+          }
+        }
       }
     },
     "responses": {
@@ -5352,6 +5565,21 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/ImportStudentListEnvelope"
+            }
+          }
+        }
+      },
+      "RunSubjectStudentsResponse": {
+        "description": "Students behind one subject of a run; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunSubjectStudentsEnvelope"
             }
           }
         }

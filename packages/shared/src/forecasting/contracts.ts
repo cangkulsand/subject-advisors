@@ -356,7 +356,7 @@ export interface GenerateForecastRequest extends ForecastScope {
 }
 export interface StartForecastReviewRequest { scope: ForecastScope; action: 'START_REVIEW'; reason?: string }
 export type SubjectAllocationDecision =
-  | { subjectId: Int32Id; action: 'REVIEW' | 'APPROVE' | 'DEFER'; reason: string; approvalReference?: string }
+  | { subjectId: Int32Id; action: 'REVIEW' | 'APPROVE' | 'DEFER' | 'REOPEN'; reason: string; approvalReference?: string }
   | { subjectId: Int32Id; action: 'REPLACE_ALLOCATION'; reason: string; approvalReference?: string; replacementSections: SubjectAllocation[] };
 export interface DecisionBatchRequest { scope: ForecastScope; decisions: SubjectAllocationDecision[] }
 export interface FinalizeForecastRequest { scope: ForecastScope; reason?: string; approvalReference?: string }

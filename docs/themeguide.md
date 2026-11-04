@@ -315,7 +315,7 @@ Every data table that is filtered, searched or sorted uses the shared toolbar in
 
 **Guard.** `assertReadable` in `tools/ui/readability.mjs` also fails when a `.tt-search` or `.tt-menu-button` is under 44px or a `.tt-segment` is under 40px.
 
-**Tables that currently use it:** admin Users & Access (tabs by access, role and invitation-status menu, search) and Audit Log (event-type tabs plus date fields), coordinator forecast Subjects (decision tabs, Filter and Sort menus, search) and the student offerings subject search. Tables with no filters today (semesters, faculties, learning centres, coordinator assignments, forecast list, accepted imports, offering decisions, records) adopt the component the moment they gain filtering.
+**Tables that currently use it:** admin Users & Access (tabs by access, role and invitation-status menu, search) and Audit Log (event-type tabs plus date fields), coordinator forecast Subjects (decision tabs, Filter and Sort menus, search), coordinator Student data snapshots and Forecasts list (source or status tabs, Sort menu, search; icon row actions) and the student offerings subject search. Tables with no filters today (semesters, faculties, learning centres, coordinator assignments, offering decisions, records) adopt the component the moment they gain filtering.
 
 ---
 

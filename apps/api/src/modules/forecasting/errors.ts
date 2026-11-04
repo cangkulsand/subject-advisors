@@ -4,7 +4,7 @@ export type ForecastingErrorCode =
   | 'TARGET_SEMESTER_NOT_ALLOWED' | 'TARGET_SEMESTER_UNAVAILABLE'
   | 'IMPORT_STATE_CONFLICT' | 'IMPORT_NOT_SUBSET_ACCEPTABLE' | 'IMPORT_REVISION_MISMATCH' | 'IMPORT_CURRICULUM_MISMATCH' | 'IMPORT_CONFLICT'
   | 'SYSTEM_SNAPSHOT_EMPTY' | 'IMPORT_FAILED' | 'FORECASTING_UNAVAILABLE'
-  | 'RUN_NOT_FOUND' | 'RUN_ALREADY_EXISTS' | 'RUN_REVISION_MISMATCH' | 'RUN_FINALIZED' | 'RUN_STATE_CONFLICT' | 'RUN_CONFLICT' | 'RUN_FAILED'
+  | 'RUN_NOT_FOUND' | 'RUN_SUBJECT_NOT_FOUND' | 'RUN_ALREADY_EXISTS' | 'RUN_REVISION_MISMATCH' | 'RUN_FINALIZED' | 'RUN_STATE_CONFLICT' | 'RUN_CONFLICT' | 'RUN_FAILED'
   | 'CATALOGUE_INVALID' | 'DECISION_INVALID' | 'DECISION_REASON_REQUIRED' | 'DECISION_DUPLICATE_SUBJECT' | 'DECISION_SUBJECT_NOT_FOUND' | 'DECISION_NO_SECTIONS'
   | 'SUBJECT_NOT_CONFIGURED' | 'ALLOCATION_INVALID' | 'ALLOCATION_TOTAL_MISMATCH' | 'ALLOCATION_EXCEEDS_CAPACITY' | 'ALLOCATION_JUSTIFICATION_REQUIRED' | 'REVIEWS_INCOMPLETE'
   | 'CONFIRMATION_NOT_FOUND' | 'CONFIRMATION_REVISION_MISMATCH' | 'CONFIRMATION_REASON_REQUIRED' | 'CONFIRMATION_RUN_MISMATCH' | 'CONFIRMATION_UNCHANGED'
@@ -31,6 +31,7 @@ const catalogue: Record<ForecastingErrorCode, { status: number; message: string 
   IMPORT_FAILED: { status: 500, message: 'The import could not be stored. Please retry.' },
   FORECASTING_UNAVAILABLE: { status: 503, message: 'Forecasting data is unavailable. Please retry.' },
   RUN_NOT_FOUND: { status: 404, message: 'The forecast was not found.' },
+  RUN_SUBJECT_NOT_FOUND: { status: 404, message: 'The subject is not part of this forecast.' },
   RUN_ALREADY_EXISTS: { status: 409, message: 'A forecast already exists for this import snapshot. Reload to open it.' },
   RUN_REVISION_MISMATCH: { status: 412, message: 'The forecast changed since you loaded it. Reload and review the current state.' },
   RUN_FINALIZED: { status: 409, message: 'This forecast is finalized and read-only.' },

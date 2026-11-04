@@ -337,7 +337,10 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
           }
         } else {
           statements.push({
-            text: 'UPDATE public.proposed_class_section SET review_status = $2::text, reviewed_by = $3::text, reviewed_at = now() WHERE demand_id = $1::integer',
+            // A reopened (PENDING) section is no longer reviewed, so it carries no reviewer; the audit row keeps who reopened it.
+            text: `UPDATE public.proposed_class_section SET review_status = $2::text,
+                reviewed_by = CASE WHEN $2::text = 'PENDING' THEN NULL ELSE $3::text END, reviewed_at = CASE WHEN $2::text = 'PENDING' THEN NULL ELSE now() END
+              WHERE demand_id = $1::integer`,
             values: [plan.demandId, plan.sectionStatus, actor],
           });
         }
