@@ -68,6 +68,7 @@ export function fakeRunsRepository(inputs: EngineInputRows) {
           subjects: entry.detail.subjects.length, excludedSubjects: 0, notOfferedInSemesterTypeSubjects: 0, configurationRequiredSubjects: 0, totalSupportedDemand: 0, totalUncertain: 0,
           totalSections: entry.detail.sections.length, pendingSections: entry.detail.sections.filter((section) => section.reviewStatus === 'PENDING').length,
           sectionsBelowMinimum: 0, sectionsBelowOptimal: 0,
+          pendingSubjects: new Set(entry.detail.sections.filter((section) => section.reviewStatus === 'PENDING').map((section) => section.demandId)).size, subjectsBelowMinimum: 0,
         },
       })),
     listAudit: async (id, _scope, limit, before) => [...(find(id)?.audit ?? [])].sort((a, b) => b.decisionAuditId - a.decisionAuditId)

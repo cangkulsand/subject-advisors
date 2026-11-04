@@ -76,6 +76,8 @@ export function summaryOf(subjects: RunSubject[]): RunSummary {
     totalSections: sections.length, pendingSections: sections.filter((section) => section.reviewStatus === 'PENDING').length,
     sectionsBelowMinimum: sections.filter((section) => section.flags.includes('BELOW_MINIMUM')).length,
     sectionsBelowOptimal: sections.filter((section) => section.flags.includes('BELOW_OPTIMAL')).length,
+    pendingSubjects: subjects.filter((subject) => subject.sections.some((section) => section.reviewStatus === 'PENDING')).length,
+    subjectsBelowMinimum: subjects.filter((subject) => subject.sections.some((section) => section.flags.includes('BELOW_MINIMUM'))).length,
   };
 }
 

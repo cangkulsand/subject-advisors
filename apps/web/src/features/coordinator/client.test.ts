@@ -10,7 +10,7 @@ const scope = { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 };
 const counts = { studentRows: 3, uniqueStudents: 2, validAttempts: 3, rejectedRows: 1, partialStudents: 0, unknownHistoryStudents: 0 };
 const report = { validationId: '6f1c9d2e-0000-4000-8000-000000000001', validationRevision: 'sha256:abc', status: 'CORRECTION_REQUIRED', counts, issues: [], completenessChanges: [], subsetAcknowledgementRequired: true, acceptedSnapshot: null };
 const accepted = { importBatchId: 9, ...scope, sourceDate: '2026-10-30', sourceLabel: 'Cohort', acceptedAt: '2026-11-01T00:00:00Z', sourceFingerprint: 'f', counts, snapshotStatus: 'ACCEPTED_IMMUTABLE', validationReport: { ...report, status: 'VALID' } };
-const summary = { subjects: 1, excludedSubjects: 0, notOfferedInSemesterTypeSubjects: 0, configurationRequiredSubjects: 0, totalSupportedDemand: 1, totalUncertain: 0, totalSections: 1, pendingSections: 1, sectionsBelowMinimum: 0, sectionsBelowOptimal: 1 };
+const summary = { subjects: 1, excludedSubjects: 0, notOfferedInSemesterTypeSubjects: 0, configurationRequiredSubjects: 0, totalSupportedDemand: 1, totalUncertain: 0, totalSections: 1, pendingSections: 1, sectionsBelowMinimum: 0, sectionsBelowOptimal: 1, pendingSubjects: 1, subjectsBelowMinimum: 0 };
 const detail = { forecastRunId: 3, importBatchId: 9, versionNumber: 1, status: 'DRAFT', revision: 'fr3.DRAFT.0', subjects: [], summary, ...scope };
 const receipt = { resourceId: 3, ...scope, acceptedAt: '2026-11-01T00:00:00Z', revision: 'fr3.UNDER_REVIEW.1' };
 const reply = (data: unknown, init: ResponseInit = {}) => new Response(JSON.stringify({ data }), { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } });

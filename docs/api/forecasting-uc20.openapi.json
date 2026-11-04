@@ -4172,7 +4172,9 @@
           "totalSections",
           "pendingSections",
           "sectionsBelowMinimum",
-          "sectionsBelowOptimal"
+          "sectionsBelowOptimal",
+          "pendingSubjects",
+          "subjectsBelowMinimum"
         ],
         "properties": {
           "subjects": {
@@ -4216,6 +4218,16 @@
           "sectionsBelowOptimal": {
             "type": "integer",
             "minimum": 0
+          },
+          "pendingSubjects": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Subjects with at least one PENDING section; finalization needs this to be 0."
+          },
+          "subjectsBelowMinimum": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Subjects whose potential demand is under the minimum enrolment."
           }
         }
       },

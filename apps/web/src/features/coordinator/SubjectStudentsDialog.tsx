@@ -4,6 +4,7 @@ import type { UncertaintyReason } from '../../../../../packages/shared/src/forec
 import type { RunSubjectStudents, SubjectStudentOutcome, SubjectStudentOutcomeKind } from '../../../../../packages/shared/src/forecasting/runs';
 import type { CoordinatorClient } from './client';
 import { Panel, ReadOnlyDialog, useRead } from './coordinator-ui';
+import { HELP, Help } from './coordinator-help';
 
 export const reasonLabels: Record<UncertaintyReason, string> = {
   COHORT_STATUS_UNMAPPED: 'Cohort status is not active', HISTORY_UNKNOWN: 'Academic history unknown', HISTORY_PARTIAL: 'Academic history incomplete', SOURCE_STATUS_UNMAPPED: 'Unmapped subject status',
@@ -45,9 +46,9 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE)), page = Math.min(requested, pages);
   const clear = () => { setFilter(''); setSearch(''); setPage(1); };
   const s = data.summary;
-  const facts: Array<[string, number]> = [['Potential demand (counted)', s.counted], ['Uncertain', s.uncertain], ['Near graduation', s.nearGraduation], ['Not counted', s.notCounted]];
+  const facts: Array<[string, number, string]> = [['Potential demand (counted)', s.counted, HELP.counted], ['Uncertain', s.uncertain, HELP.uncertain], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted, HELP.notCounted]];
   return <>
-    <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
     {s.uncertaintyReasonCounts.length > 0 && <ul className="coordinator-students-reasons" aria-label="Why students are uncertain">
       {s.uncertaintyReasonCounts.map(item => <li key={item.reason}>{reasonLabels[item.reason] ?? item.reason}: {item.count}</li>)}</ul>}
     {!data.catalogueMatchesRun && <p className="coordinator-warning" role="status">This list was recomputed with the current curriculum, so it may differ from the counts saved with this forecast.</p>}
@@ -59,7 +60,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
     {matching.length === 0
       ? <div className="admin-empty" role="status"><p>{data.students.length === 0 ? 'No students follow a curriculum that includes this subject.' : 'No students match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div>
       : <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Students table" tabIndex={0}>
-        <table><thead><tr><th scope="col">Student</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+        <table><thead><tr><th scope="col"><Help label="Student" text={HELP.student}/></th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
           <tbody>{matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(student => <tr key={student.externalReference} data-student={student.externalReference}>
             <th scope="row"><strong>{student.studentName ?? 'Name not provided'}</strong><span className="coordinator-subject-code">{student.externalReference}</span></th>
             <td><span className={'admin-pill ' + statusClass[student.outcome]}>{statusLabels[student.outcome]}</span></td>
@@ -70,10 +71,26 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   </>;
 }
 
-/** Read-only list of the students behind one subject's numbers. Never changes demand. */
-export function SubjectStudentsDialog({ client, forecastRunId, subjectId, subjectCode, onClose }: { client: CoordinatorClient; forecastRunId: number; subjectId: number; subjectCode: string; onClose: () => void }) {
-  const read = useRead(signal => client.getSubjectStudents(forecastRunId, subjectId, signal), `students|${forecastRunId}|${subjectId}`);
+/**
+ * Student lists already loaded on the open forecast page, keyed `forecastRunId|subjectId`. Memory only: the lists hold
+ * personal data, so they are never written to browser storage (docs/cachingguide.md). A run's frozen snapshot does not
+ * change, so a list stays valid until the page is left or refreshed, which clears it.
+ */
+export type StudentListCache = Map<string, RunSubjectStudents>;
+
+function LoadRoster({ client, forecastRunId, subjectId, cache, cacheKey }: { client: CoordinatorClient; forecastRunId: number; subjectId: number; cache: StudentListCache; cacheKey: string }) {
+  const read = useRead(async signal => {
+    const data = await client.getSubjectStudents(forecastRunId, subjectId, signal);
+    cache.set(cacheKey, data);
+    return data;
+  }, 'students|' + cacheKey);
+  return <Panel error={read.error} retry={read.retry} label="students">{read.data && <Roster data={read.data}/>}</Panel>;
+}
+
+/** Read-only list of the students behind one subject's numbers. Never changes demand. Reopening a subject uses the page's cache. */
+export function SubjectStudentsDialog({ client, forecastRunId, subjectId, subjectCode, cache, onClose }: { client: CoordinatorClient; forecastRunId: number; subjectId: number; subjectCode: string; cache: StudentListCache; onClose: () => void }) {
+  const cacheKey = `${forecastRunId}|${subjectId}`, cached = cache.get(cacheKey);
   return <ReadOnlyDialog title={`Students · ${subjectCode}`} onClose={onClose}>
-    <Panel error={read.error} retry={read.retry} label="students">{read.data && <Roster data={read.data}/>}</Panel>
+    {cached ? <Roster data={cached}/> : <LoadRoster client={client} forecastRunId={forecastRunId} subjectId={subjectId} cache={cache} cacheKey={cacheKey}/>}
   </ReadOnlyDialog>;
 }

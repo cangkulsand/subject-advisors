@@ -121,15 +121,7 @@ export function runForecastEngine(input: ForecastEngineInput): ForecastEngineRes
     });
   }
 
-  const curriculumFingerprints = curricula.map((curriculum) => ({
-    curriculumId: curriculum.curriculumId, curriculumVersion: curriculum.curriculumVersion, totalCreditsRequired: curriculum.totalCreditsRequired,
-    fingerprint: fingerprint({
-      id: curriculum.curriculumId, total: curriculum.totalCreditsRequired,
-      requirements: [...curriculum.requirements].sort((a, b) => a.requirementId - b.requirementId),
-      rules: [...curriculum.subjectSemesterRules].sort((a, b) => a.ruleId - b.ruleId),
-      subjects: [...curriculum.subjects].sort((a, b) => a.curriculumSubjectId - b.curriculumSubjectId),
-    }),
-  }));
+  const curriculumFingerprints = curriculumFingerprintsOf(curricula);
   const ruleSnapshot: EngineRuleSnapshot = {
     ...scope,
     engineVersion: ENGINE_VERSION,
@@ -142,7 +134,7 @@ export function runForecastEngine(input: ForecastEngineInput): ForecastEngineRes
     exclusions,
     semesterTypeExclusions,
     curricula: curriculumFingerprints,
-    catalogueFingerprint: fingerprint(curriculumFingerprints.map((entry) => [entry.curriculumId, entry.fingerprint])),
+    catalogueFingerprint: catalogueFingerprintOf(curriculumFingerprints),
     snapshotStudentCount: students.length,
   };
 
@@ -170,3 +162,19 @@ export function runForecastEngine(input: ForecastEngineInput): ForecastEngineRes
   };
   return { engineVersion: ENGINE_VERSION, ruleSnapshot, demands, originalRecommendations, summary };
 }
+
+function curriculumFingerprintsOf(curricula: ForecastEngineInput['curricula']) {
+  return [...curricula].sort((a, b) => a.curriculumId - b.curriculumId).map((curriculum) => ({
+    curriculumId: curriculum.curriculumId, curriculumVersion: curriculum.curriculumVersion, totalCreditsRequired: curriculum.totalCreditsRequired,
+    fingerprint: fingerprint({
+      id: curriculum.curriculumId, total: curriculum.totalCreditsRequired,
+      requirements: [...curriculum.requirements].sort((a, b) => a.requirementId - b.requirementId),
+      rules: [...curriculum.subjectSemesterRules].sort((a, b) => a.ruleId - b.ruleId),
+      subjects: [...curriculum.subjects].sort((a, b) => a.curriculumSubjectId - b.curriculumSubjectId),
+    }),
+  }));
+}
+const catalogueFingerprintOf = (entries: Array<{ curriculumId: number; fingerprint: string }>) => fingerprint(entries.map((entry) => [entry.curriculumId, entry.fingerprint]));
+
+/** The run's `ruleSnapshot.catalogueFingerprint` for these curricula, without running the forecast. */
+export const catalogueFingerprint = (curricula: ForecastEngineInput['curricula']): string => catalogueFingerprintOf(curriculumFingerprintsOf(curricula));

@@ -53,6 +53,12 @@ explicit change to the agreed project requirements.
    snapshot. A successful offering PUT clears academic snapshots before response
    decoding because the server may have committed even if the response is invalid.
 
+9. UC20 subject student list (`GET /api/forecast-runs/{id}/subjects/{subjectId}/students`, S2-P004-014) is
+   personal data: the server keeps `Cache-Control: no-store`, and the web keeps loaded lists only in memory on
+   the open forecast page (`StudentListCache` in `SubjectStudentsDialog.tsx`, keyed `forecastRunId|subjectId`).
+   A run's snapshot is frozen, so reopening a subject reuses the list. The cache is cleared when the page is left,
+   another forecast is opened, or Refresh is pressed. Never put it in `sessionStorage` or `localStorage`.
+
 ## Scope and limits
 
 This policy covers academic profile, records and curriculum options. Choose and
