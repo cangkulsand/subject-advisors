@@ -1,0 +1,211 @@
+{
+  "formatVersion": 1,
+  "owner": "P001",
+  "sprint": 1,
+  "useCases": [
+    "UC03",
+    "UC04"
+  ],
+  "sourceRevision": "0ccac62c14e563fd5ba461a5002f48e71d99069c",
+  "requiredSharedChange": "S1-INT-001-copy-paste-routing",
+  "createdAt": "2026-10-26T04:38:41.438Z",
+  "existingFilesReplaced": 0,
+  "baselineFiles": [
+    {
+      "path": "package.json",
+      "sha256": "a5d7a3382725d0eae7b6cbd349fcfbf1a7b46f02fbfdecffb449a24790524f2b"
+    },
+    {
+      "path": "tsconfig.auth.json",
+      "sha256": "fd2130d33205c5204949345034b9aeed6d54068185358b08028fda40df6970b7"
+    },
+    {
+      "path": "vitest.auth.config.ts",
+      "sha256": "c2633288590f35565f629e1ba0c1b24cec5af89d3af72c765f0d3403f5cf092c"
+    },
+    {
+      "path": "apps/api/src/modules/auth/index.ts",
+      "sha256": "314f3293cde6ebd9d510319e63dd54e4d09a77fc9d6e2111cfa1db0cd851c37b"
+    },
+    {
+      "path": "apps/api/src/middleware/auth.ts",
+      "sha256": "709241ddf011a11443e5b74414f31d90c8d6c18861d1a1381ac91b7698ae2860"
+    },
+    {
+      "path": "apps/web/src/features/auth/index.ts",
+      "sha256": "9680604bfa5ae168e9b4117595b7222fa7c359e15e4c86dfba0212ff0fe56a32"
+    }
+  ],
+  "files": [
+    {
+      "path": "P001-HANDOFF.txt",
+      "sha256": "6115c9bc3bc1f167d9cc333f849630fcf73d96fefc8c6ce5d29cb29c0df1d2d7",
+      "bytes": 1798
+    },
+    {
+      "path": "apps/api/src/modules/profile/contracts.ts",
+      "sha256": "cfc4ee95123900d7540b0f896fc78719f1e98226ac8bac4e37f7610775570ad5",
+      "bytes": 1341
+    },
+    {
+      "path": "apps/api/src/modules/profile/index.ts",
+      "sha256": "8b579b8d1d31742f8ae05fee79c343a6db764977318e1133c834ad518db40f81",
+      "bytes": 886
+    },
+    {
+      "path": "apps/api/src/modules/profile/profile.test.ts",
+      "sha256": "494cc98592d37da1416a72ff292d592c60830b19060efa6e4656bf27373a1a89",
+      "bytes": 9720
+    },
+    {
+      "path": "apps/api/src/modules/profile/repository.ts",
+      "sha256": "9fb05d9a5ee408b6e885dc3e8ee4cf61b79eec8b62b4979ad4bd987a82038411",
+      "bytes": 4808
+    },
+    {
+      "path": "apps/api/src/modules/profile/routes.ts",
+      "sha256": "5563706894a7217db4d7a9eb7acc42e18bd26f5ad2013f5c1514e0166ca4f241",
+      "bytes": 2342
+    },
+    {
+      "path": "apps/api/src/modules/profile/validation.ts",
+      "sha256": "a057b53383742a8e607a62028e60f5055c6106909b1d08e172182989d205f380",
+      "bytes": 3888
+    },
+    {
+      "path": "apps/api/src/modules/records/contracts.ts",
+      "sha256": "3e94da4613e7a197a5861397475077bb2fcb5adf8a4525576da737717edb77d3",
+      "bytes": 770
+    },
+    {
+      "path": "apps/api/src/modules/records/repository.ts",
+      "sha256": "bd5dd0751562e1039e4a6b990c1f761ce4e4b982ace0522e0de5032812a707c2",
+      "bytes": 3348
+    },
+    {
+      "path": "apps/api/src/modules/records/validation.ts",
+      "sha256": "36b68e9e415a8067c60e22de5eb56cf525a2d7114e53fe78accf3764879d5e5f",
+      "bytes": 1174
+    },
+    {
+      "path": "apps/web/src/features/profile/ProfilePage.tsx",
+      "sha256": "acc30c77d164874e05abc8d46651dcb4d946590ba63b8a03609f6a3e28a7e0f4",
+      "bytes": 7572
+    },
+    {
+      "path": "apps/web/src/features/profile/client.test.ts",
+      "sha256": "b449cedf0c4259817099ea54129e5c0e96afe0ef80033a3232bd4e7f8846d5c2",
+      "bytes": 1345
+    },
+    {
+      "path": "apps/web/src/features/profile/client.ts",
+      "sha256": "7bd2f559f5ca450480b8fb224531ae2a0a11065678545474b06e440a03abc7dd",
+      "bytes": 1855
+    },
+    {
+      "path": "apps/web/src/features/profile/profile.css",
+      "sha256": "23a1995c377f90c7e6c243871e803c91c48ec67c2f5ff39c8ab8fa757a1544db",
+      "bytes": 3196
+    },
+    {
+      "path": "apps/web/src/features/records/RecordsPage.tsx",
+      "sha256": "d1768ac797715b30058d20c0d1e34919d04120f12114c87ec6577f1c8de46cac",
+      "bytes": 8974
+    },
+    {
+      "path": "docs/changes/S1-P001-001-profile-and-records.md",
+      "sha256": "5a8729ff66845d4b768095d9f1f07f0920291790005bc6e3f49078b7fece76db",
+      "bytes": 7026
+    },
+    {
+      "path": "docs/p001-review/profile-desktop.png",
+      "sha256": "a1e3cd0c4f8a2496f3f3e747a4f1210b43dc55979101ccea2a53dc826b5b57aa",
+      "bytes": 58612
+    },
+    {
+      "path": "docs/p001-review/profile-mobile.png",
+      "sha256": "bc1684505704f8a24cb3a9a59d5103625fbd725ceadb1129a091cbf371cadad7",
+      "bytes": 56656
+    },
+    {
+      "path": "docs/p001-review/records-desktop.png",
+      "sha256": "d0095fc378244f618c42300f1cc0952893509cc141b27a3927d06f80f2f895e5",
+      "bytes": 66307
+    },
+    {
+      "path": "docs/p001-review/records-mobile.png",
+      "sha256": "dde2fda69123e61eb742212cc29a1e3a9e3080cd4e9517c48255bb3e8775136a",
+      "bytes": 62306
+    },
+    {
+      "path": "docs/p001-sprint1-handoff.md",
+      "sha256": "2d9b12558a1ba173d4d6e565d434a4439f51aa1fe1611eaafa5143d62e50f721",
+      "bytes": 9327
+    },
+    {
+      "path": "tools/p001/check.mjs",
+      "sha256": "4e8d3706154bec12e83ae13a3a6bb0125c5e9df221a95e8763b086edf4612ddf",
+      "bytes": 1056
+    },
+    {
+      "path": "tools/p001/dev.mjs",
+      "sha256": "7b41f656ff3659b34bb7cd69f800ea92b4c6096e100fdce906a1c7829581524a",
+      "bytes": 99
+    },
+    {
+      "path": "tools/p001/local/api.ts",
+      "sha256": "097b24958ebd5b3d9bb7804059acfc9c57ffbf523e79c40d9c162fd68fa7e073",
+      "bytes": 122
+    },
+    {
+      "path": "tools/p001/local/index.html",
+      "sha256": "0763758c8ba01a26d3232e4c60893034d67283893426de48d23fd59862fbd697",
+      "bytes": 265
+    },
+    {
+      "path": "tools/p001/local/main.tsx",
+      "sha256": "d27da1af8ee7b7434ed2e3889813334f255da4e411116fc1588497ac2b0e2c9d",
+      "bytes": 115
+    },
+    {
+      "path": "tools/p001/local/preview.css",
+      "sha256": "721aa8e6fe5417fb60968144a60b61de0d088e2c812da504281f7f0a07b09637",
+      "bytes": 492
+    },
+    {
+      "path": "tools/p001/test-db.mjs",
+      "sha256": "0bbc0d4e003b24c99a5176e45c22bd2e4479ad695d2aeb3ce030d3dfcc57186b",
+      "bytes": 8241
+    },
+    {
+      "path": "tools/p001/test-ui.mjs",
+      "sha256": "ebf12877a7e79dfda91b503d056105c805ff6c863885d30898347eae1e9a2a6d",
+      "bytes": 12587
+    },
+    {
+      "path": "tools/p001/testing/ui-harness.tsx",
+      "sha256": "279e5c675f71f44fce7afe681ce4b389a2aef716818a3a8a588ac3579248a045",
+      "bytes": 1108
+    },
+    {
+      "path": "tools/p001/verify-handoff.mjs",
+      "sha256": "36bf23e71f6d50b3d7dfa9549780da20af662c3a67de6674f8989d547a4be866",
+      "bytes": 2109
+    },
+    {
+      "path": "tsconfig.p001.json",
+      "sha256": "dc15d652706f77d1e462fdef3c7524f10f6e63698979d264d6a524e3c3e31baa",
+      "bytes": 156
+    },
+    {
+      "path": "vite.p001.config.ts",
+      "sha256": "07c8303ebd29df5bfad157b6c99c07868944fcd1e091e585c1289eb707940a27",
+      "bytes": 620
+    },
+    {
+      "path": "wrangler.p001.jsonc",
+      "sha256": "98a3fa75189cca474d4aeb87ad54786501eded296581ff7d7af151ffb6dd7ee3",
+      "bytes": 381
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+.p002-demand { min-width: 0; }
+.p002-demand-metrics { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+.p002-demand-metrics p { background: var(--color-surface-subtle, #f0e9da); border-radius: 10px; padding: 16px; flex: 1; min-width: 140px; }
+.p002-demand-metrics strong { display: block; font-size: var(--font-size-metric); color: var(--color-heading, #1a1a1a); font-variant-numeric: tabular-nums; }
+.p002-demand-table { max-width: 100%; }
+.p002-demand-table table { min-width: 920px; }
+.p002-demand-table td { padding: 14px; font-size: var(--font-size-table); line-height: var(--line-height-table); }
+.p002-demand-table th { font-size: var(--font-size-table-head); }
+.p002-demand-table th:not(:first-child), .p002-demand-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.p002-demand-table td:first-child { min-width: 240px; }
+.p002-demand-table td strong { display: block; font-size: var(--font-size-subject-name); }
+.p002-demand-code { display: block; font-size: var(--font-size-subject-code); color: var(--color-muted-text); }
+.p002-demand-table details { text-align: left; white-space: normal; min-width: 130px; }
+.p002-demand-table summary, .p002-demand-provenance summary { cursor: pointer; padding: 12px 0; min-height: var(--control-min-height); }
+.p002-demand-table ul { padding-left: 18px; }
+.p002-demand-provenance { margin-top: 20px; overflow-wrap: anywhere; }
+.p002-demand-provenance dt { font-size: var(--font-size-label); font-weight: 600; margin-top: 12px; }
+.p002-demand-provenance dd { margin-left: 0; font-size: var(--font-size-control); }
+
+@media (max-width: 480px) {
+  .p002-demand .tt-segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex-basis: 100%; }
+}

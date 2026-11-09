@@ -1,0 +1,33 @@
+P001 SPRINT 1 — UC03 ACADEMIC PROFILE / UC04 SUBJECT RECORDS
+
+Integration-ready package: first update main to include S1-INT-001 shared routing.
+Then merge these new files/directories into the existing project root.
+Do not replace the project's entire apps, docs or tools folder.
+No existing shared files or package manifests are included for replacement.
+
+Before copying (optional read-only collision check):
+  node <extracted-folder>/tools/p001/verify-handoff.mjs --project <project-folder> --preflight
+
+After copying, from the project root:
+  npm.cmd ci
+  node tools/p001/verify-handoff.mjs
+  node tools/p001/check.mjs
+  node tools/p001/dev.mjs
+
+Open http://127.0.0.1:5173. Reuse the team's private Clerk/Neon development settings.
+The shared Neon branch is development (same branch ID as former p004-local).
+No migrations or demo seeds are included. An empty approved catalogue needs to be
+configured by its owner before real academic setup can be completed.
+
+Read docs/p001-sprint1-handoff.md for detailed setup, API contracts and evidence.
+Checks: 49 P001 unit/route/client tests passed (plus shared auth/integration checks), 19 mocked
+browser checks passed, 15 actual Neon repository checks passed with fixture rollback.
+Five optional historical auth DB tests skipped. Real-account browser acceptance and
+independent peer review remain pending; no production deployment was performed.
+
+The developer can review the resulting diff, then commit/push through the normal
+team process. This package's author has not committed or pushed anything.
+
+P001 preview now delegates to the shared launcher. It includes /student/offerings
+and the P002 API automatically when the P002 canonical overlay is pasted.
+Preserve shared root package/config/router files; do not replace them with older overlays.

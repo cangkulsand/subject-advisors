@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "subject-advisors-p001-local",
+  "main": "tools/p001/local/api.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "ip": "127.0.0.1", "port": 8787, "local_protocol": "http" },
+  "vars": { "CLERK_AUTHORIZED_PARTIES": "http://127.0.0.1:5173,http://localhost:5173" }
+}

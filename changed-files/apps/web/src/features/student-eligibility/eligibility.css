@@ -1,0 +1,83 @@
+.student-eligibility { min-width: 0; max-width: 1280px; color: var(--color-body); }
+.student-eligibility-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.student-eligibility-header h1 { margin: 0 0 6px; color: var(--color-heading); font-size: 28px; font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; }
+.student-eligibility-header p { margin: 0; color: var(--color-muted-text); font-size: var(--font-size-body); line-height: var(--line-height-body); }
+.student-eligibility-header > button, .student-eligibility-panel > button { min-height: var(--control-min-height); padding: 8px 14px; border: 1.5px solid var(--color-brand); border-radius: 8px; background: var(--color-brand); color: #fff; font: inherit; font-size: var(--font-size-control); font-weight: 600; cursor: pointer; }
+.student-eligibility-header > button:hover, .student-eligibility-panel > button:hover { background: var(--color-brand-hover); }
+.student-eligibility-header > button:focus-visible, .student-eligibility-panel > button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.student-eligibility-header > button:disabled, .student-eligibility-panel > button:disabled { cursor: wait; }
+.student-eligibility-panel, .student-eligibility-provenance, .student-eligibility-results { min-width: 0; padding: 20px; border: 1px solid var(--color-outline); border-radius: 12px; background: var(--color-surface); }
+.student-eligibility-panel { font-size: var(--font-size-body); line-height: var(--line-height-body); }
+.student-eligibility-panel h2, .student-eligibility-provenance h2 { margin: 0 0 8px; color: var(--color-heading); font-size: 20px; font-weight: 650; }
+.student-eligibility-panel p { margin: 8px 0 0; }
+.student-eligibility-panel a, .student-eligibility a { color: var(--color-accent); font-weight: 600; text-underline-offset: 3px; }
+.student-eligibility-panel a:hover, .student-eligibility a:hover { color: var(--color-accent-hover); }
+.student-eligibility-error { border-color: #fecaca; background: var(--color-danger-bg); color: #7f1d1d; }
+.student-eligibility-error h2 { color: var(--color-danger-text); }
+.student-eligibility-error button { margin-top: 14px; }
+.student-eligibility-provenance { margin-bottom: 18px; }
+.student-eligibility-provenance dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px 20px; margin: 14px 0 0; }
+.student-eligibility-provenance dl > div { min-width: 0; }
+.student-eligibility-provenance dt { color: var(--color-muted-text); font-size: var(--font-size-label); font-weight: 650; }
+.student-eligibility-provenance dd { margin: 3px 0 0; color: var(--color-heading); font-size: var(--font-size-control); line-height: var(--line-height-body); overflow-wrap: anywhere; }
+.student-eligibility-basis, .student-eligibility-note { margin: 12px 0 0; color: var(--color-muted-text); font-size: var(--font-size-label); line-height: var(--line-height-body); overflow-wrap: anywhere; }
+.student-eligibility-count { margin: -8px 0 10px; color: var(--color-muted-text); font-size: var(--font-size-label); }
+.student-eligibility-table-hint { margin: 0 0 8px; color: var(--color-muted-text); font-size: var(--font-size-label); }
+.student-eligibility-table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-outline); border-radius: 8px; }
+.student-eligibility-table-scroll:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.student-eligibility-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: var(--font-size-table); line-height: var(--line-height-table); }
+.student-eligibility-table th { padding: 14px 16px; border-bottom: 1px solid var(--color-outline); background: var(--color-app-bg); color: var(--color-heading); font-size: var(--font-size-table-head); font-weight: 650; text-align: left; vertical-align: top; }
+.student-eligibility-table td { padding: 16px; border-bottom: 1px solid var(--color-surface-subtle); vertical-align: top; }
+.student-eligibility-table tbody tr:last-child td, .student-eligibility-table tbody tr:last-child th { border-bottom: 0; }
+.student-eligibility-table tbody th[scope="row"] { min-width: 170px; background: var(--color-surface); font-size: var(--font-size-table); }
+.student-eligibility-table tbody th strong, .student-eligibility-code { display: block; overflow-wrap: anywhere; }
+.student-eligibility-table tbody th strong { color: var(--color-heading); font-size: var(--font-size-subject-name); font-weight: 650; }
+.student-eligibility-code { margin-top: 2px; color: var(--color-muted-text); font-size: var(--font-size-subject-code); }
+.student-eligibility-status { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 999px; font-size: var(--font-size-table); font-weight: 700; white-space: nowrap; }
+.student-eligibility-status.is-eligible { color: #166534; background: #f0fdf4; }
+.student-eligibility-status.is-ineligible { color: #991b1b; background: #fef2f2; }
+.student-eligibility-status.is-uncertain { color: #92400e; background: #fffbeb; }
+.student-eligibility-status.is-conditional { color: #92400e; background: #fffbeb; }
+.student-eligibility-credits { min-width: 72px; text-align: right; font-variant-numeric: tabular-nums; }
+.student-eligibility-review-links { display: block; margin-top: 6px; }
+.student-eligibility-note { margin-top: 14px; }
+@media (max-width: 640px) {
+  .student-eligibility-header { align-items: stretch; }
+  .student-eligibility-header > button { width: 100%; }
+  .student-eligibility-header h1 { font-size: 24px; }
+  .student-eligibility-panel, .student-eligibility-provenance, .student-eligibility-results { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+  .student-eligibility .tt-segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex-basis: 100%; }
+}
+.semester-selection { margin-top: 20px; font-size: var(--font-size-body); line-height: var(--line-height-body); }
+.semester-selection-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.semester-selection-heading h2 { margin: 0; color: var(--color-heading); font-size: 20px; font-weight: 650; }
+.semester-selection-heading p { margin: 5px 0 0; }
+.semester-selection-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 4px 20px; margin: 16px 0; padding: 12px; border-radius: 8px; background: var(--color-app-bg); }
+.semester-selection-facts p { margin: 0; font-size: var(--font-size-control); overflow-wrap: anywhere; }
+.semester-selection-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.semester-selection-list > li { min-width: 0; border: 1px solid var(--color-outline); border-radius: 8px; background: var(--color-surface); }
+.semester-selection-list > li.is-selected { border-color: var(--color-brand); background: #faf6ee; }
+.semester-selection-list label, .semester-selection-readonly { display: flex; align-items: flex-start; gap: 12px; min-height: 56px; padding: 12px; }
+.semester-selection-list label { cursor: pointer; }
+.semester-selection-list input { width: 20px; height: 20px; min-width: 20px; margin: 2px 0 0; accent-color: var(--color-brand); }
+.semester-selection-list input:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.semester-selection-list label > span, .semester-selection-readonly > span:first-child { min-width: 0; display: grid; gap: 2px; }
+.semester-selection-list strong { color: var(--color-heading); font-size: var(--font-size-subject-name); }
+.semester-selection-list small { color: var(--color-muted-text); font-size: var(--font-size-control); overflow-wrap: anywhere; }
+.semester-selection-warning { color: #92400e; }
+.semester-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.semester-selection-actions button, .semester-selection-error button, .student-eligibility-secondary { min-height: var(--control-min-height); padding: 8px 14px; border: 1.5px solid var(--color-brand); border-radius: 8px; background: var(--color-brand); color: #fff; font: inherit; font-size: var(--font-size-control); font-weight: 600; cursor: pointer; }
+.semester-selection-actions button:hover, .semester-selection-error button:hover { background: var(--color-brand-hover); }
+.semester-selection-actions .student-eligibility-secondary, .semester-selection-error .student-eligibility-secondary { background: var(--color-surface); color: var(--color-brand); }
+.semester-selection-actions button:focus-visible, .semester-selection-error button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.semester-selection-actions button:disabled { cursor: not-allowed; opacity: .65; }
+.semester-selection-issues, .semester-selection-error { margin-top: 12px; padding: 12px; border: 1px solid #fecaca; border-radius: 8px; background: var(--color-danger-bg); color: #7f1d1d; }
+.semester-selection-issues h3 { margin: 0; color: var(--color-danger-text); font-size: var(--font-size-control); }
+.semester-selection-issues ul { margin: 6px 0 0; padding-left: 22px; }
+.semester-selection-error p, .semester-selection-draft { margin: 0 0 8px; }
+.semester-selection-draft { margin-top: 12px; color: var(--color-warning-text); }
+.semester-selection-saved { margin: 12px 0 0; color: #166534; }
+@media (max-width: 640px) { .semester-selection-actions { display: grid; grid-template-columns: 1fr; } }

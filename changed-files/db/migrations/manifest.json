@@ -1,0 +1,63 @@
+{
+  "formatVersion": 1,
+  "owner": "DATABASE_FOUNDATION",
+  "metadataSchema": "migration_meta",
+  "migrations": [
+    {
+      "version": "0000",
+      "file": "0000_preserve_legacy_p004.sql",
+      "description": "Preserve a recognized, explicitly approved P004-only UUID table; no-op on an empty DB"
+    },
+    {
+      "version": "0001",
+      "file": "0001_initial_schema.sql",
+      "description": "SRS v2.0 canonical 26-entity integer baseline"
+    },
+    {
+      "version": "0002",
+      "file": "0002_copy_legacy_access.sql",
+      "description": "Preserve roles/status/timestamps and UUID-to-integer history"
+    },
+    {
+      "version": "0003",
+      "file": "0003_profile_current_semester.sql",
+      "description": "Add an optional configured current semester to student profiles"
+    },
+    {
+      "version": "0004",
+      "file": "0004_multi_role_access.sql",
+      "description": "Add explicit role memberships and immutable role audit while preserving account IDs and global suspension"
+    },
+    {
+      "version": "0005",
+      "file": "0005_network_security_reference_support.sql",
+      "description": "Add nullable curriculum-specific display/prerequisite metadata and private reference-import receipts"
+    },
+    {
+      "version": "0006",
+      "file": "0006_admin_user_management.sql",
+      "description": "Audit access-status changes and add the pending admin user invitation table"
+    },
+    {
+      "version": "0007",
+      "file": "0007_uc20_forecast_and_confirmation.sql",
+      "description": "UC20 programme-scoped imports and forecast runs, acceptance/finalization freeze, rule snapshots, adjustment audit and coordinator offering confirmation"
+    },
+    {
+      "version": "0008",
+      "file": "0008_admin_academic_setup.sql",
+      "description": "Add audited academic reference setup, coordinator scopes and explicit current-semester selection"
+    },
+    {
+      "version": "0010",
+      "file": "0010_p002_semester_selection.sql",
+      "description": "Add P002 student and semester selection metadata over canonical academic plans"
+    }
+  ],
+  "historicalExcluded": [
+    {
+      "file": "20261024_p004_user_access_assignment.sql",
+      "reason": "Historical applied UUID feature schema, preserved byte-for-byte; not in canonical execution order"
+    }
+  ]
+}

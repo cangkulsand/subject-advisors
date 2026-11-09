@@ -1,0 +1,497 @@
+{
+  "owner": "P002 / Muhammad Nor Idham",
+  "date": "2026-11-09",
+  "status": "READY_FOR_REVIEW",
+  "source_archive": {
+    "filename": "subject-advisors-main (1).zip",
+    "sha256": "74b6365a5c4e0fcfdfa2287ee0f3e0362a5f17ef3a31d094ea02c42f9a9e7d24"
+  },
+  "discussion_source": {
+    "filename": "Sprint_1_and_2_Discussion(1).docx",
+    "sha256": "221f3c8601992224410a5c00eca4ef2b38d2a4efbe321d501b6845e489c00a3d"
+  },
+  "specification_source": {
+    "filename": "UTMSPACE_SRS_SDD_v2.1_Formatted_Technical_Diagram_Titles.docx",
+    "sha256": "33832e86917c6eff248dcc71007550dea3f713e55f0693fca525edf30c7403f4"
+  },
+  "project_source_file_count": 600,
+  "baseline_source_file_count": 559,
+  "changed_file_count": 60,
+  "added_file_count": 41,
+  "modified_file_count": 19,
+  "deleted_files": [],
+  "dependencies_unchanged": true,
+  "verification_log_count": 12,
+  "verification_logs": {
+    "test.log": {
+      "sha256": "72c3d7545e639b508f1f9d161999f2d4d4e7f9c04e47b9a3881b2522f2527fe5",
+      "size_bytes": 680
+    },
+    "typecheck.log": {
+      "sha256": "82f06bbd99d854e099c0800f16b7dd5d68245bcb4f5880e7f330e0c12529ad2b",
+      "size_bytes": 408
+    },
+    "lint.log": {
+      "sha256": "4fa4233efd1cb8339a1a3964f3a402f3650b3c3ada2a7e281e626e1c2c079756",
+      "size_bytes": 308
+    },
+    "build.log": {
+      "sha256": "b4211bb9dbbd700a3075af028f6dc43e907c14c0c88d18bce4765df076d556eb",
+      "size_bytes": 333
+    },
+    "build-local.log": {
+      "sha256": "6620e44bfb11db857e1cfe01917377b7e064d6887d893e63a7693050b0925713",
+      "size_bytes": 895
+    },
+    "test-integration.log": {
+      "sha256": "a9c9f4044e9e04a5c639da99094ea154057f160dd08cf5ac5dadd2909fa9c0e6",
+      "size_bytes": 1364
+    },
+    "db-review.log": {
+      "sha256": "5542b90ab305cba8ebd226b114f713f389f9d048e5feefa3b87c49b65b38d99d",
+      "size_bytes": 2502
+    },
+    "db-tooling.log": {
+      "sha256": "aeb030899e0ce45bf6e689b4de26a55cb2c437ed831e6391604646b0b6ccc44e",
+      "size_bytes": 2261
+    },
+    "eslint-p002.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ui.log": {
+      "sha256": "026d827dbe08faedc6a239d80151e92d73ed919c21461e04ca1b3719573f5071",
+      "size_bytes": 1429
+    },
+    "selection-db.log": {
+      "sha256": "b490087e0ec09ff7e8183b686347a87c0fd1dc497179f6464e6fceb94edd367a",
+      "size_bytes": 801
+    },
+    "build-cloudflare-fixture.log": {
+      "sha256": "7be013367026ef101c4623c3f560dd673a43ca58cc56342671de1308382797af",
+      "size_bytes": 1200
+    }
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "action": "modified",
+      "baseline_sha256": "10a95e04c73dbaa708c8923ec0993b65764f42e5bcd07db54ed41fe3b024251d",
+      "result_sha256": "52bc56d27ff84d8522213df2ef575faa7892e8ea197cf0aefcb92472b6f48d2d",
+      "size_bytes": 5904
+    },
+    {
+      "path": "apps/api/src/integration/router.test.ts",
+      "action": "modified",
+      "baseline_sha256": "105274e922fe7f8acb88f620ce6d9809d2a7edf4b3778993e8bf7f6ad65a27e2",
+      "result_sha256": "b0cd288ab8d8a87cdd5d9a51965b6fe5de64f15007fa709d9b658aaba3e7e41d",
+      "size_bytes": 6462
+    },
+    {
+      "path": "apps/api/src/integration/router.ts",
+      "action": "modified",
+      "baseline_sha256": "e91aebc5820dfab76e14f0a91058784998d86860ecf6472b0fb14d9063f8b6e2",
+      "result_sha256": "5d0c4e900d872d4c1a5e38d4349797db8289f7e8289c9e379f1de6dcd560b976",
+      "size_bytes": 2897
+    },
+    {
+      "path": "apps/api/src/modules/forecasting/routes.test.ts",
+      "action": "modified",
+      "baseline_sha256": "6faea8d35dbb96cf98c00e3f85c8051718210b8c1af30b0263997d38ec8c9407",
+      "result_sha256": "c020b6c421d662d663aa31a6e0d52b8b3ac74dae9d7fb03540c04ac3ce93706a",
+      "size_bytes": 38575
+    },
+    {
+      "path": "apps/api/src/modules/forecasting/routes.ts",
+      "action": "modified",
+      "baseline_sha256": "b15fc56b7002823724d2c16ab7e698db44e46a22bbfa75f00c5eb84f7e068731",
+      "result_sha256": "3009254623124a611351b564eabe2d05682ddb145b83813ef6cf09609d1a0825",
+      "size_bytes": 27485
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/index.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "f036d9ce886d4ab44c441efa972e55c03d8489ed91b372fe5aaf9d8d75e028ea",
+      "size_bytes": 1505
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/index.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "adc090aec283b31166881c944b0db8b9823bd5008e4cae1a817b3db1c9411eaf",
+      "size_bytes": 1569
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/repository.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "d5c77ba019e0f0e37bb09b77906b8f4c3a3bc945303dfc68c6234ee1f7aeab62",
+      "size_bytes": 13265
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/repository.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "a46d15a288083d4b125c13acd18e49ee495e654141a1db1bc3278339bf8afd71",
+      "size_bytes": 11886
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/routes.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "857f74b00bde30ecc8892b387e33804d1cd43b9d949d227a04690855cff97041",
+      "size_bytes": 4802
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/routes.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "aa9f0623af1143f1090411974325f7404490ef1e5669aa69e7cd26eb5658fa36",
+      "size_bytes": 2496
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/selection-repository.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "2afc5d65c3583fd94cbb35bd3b0e1dd11fc2986310e440c49b02ff045dcb2dac",
+      "size_bytes": 7401
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/selection-routes.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "f4f837ddb385c7d86e8c9fe61863fb82a5d3eced20fbfaea946bbbea2600ccea",
+      "size_bytes": 8919
+    },
+    {
+      "path": "apps/api/src/modules/student-eligibility/selection.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "0d6670c08ee7f635785f76dc0073043600f3587248e6c87a9f231b40959964dc",
+      "size_bytes": 11261
+    },
+    {
+      "path": "apps/web/src/app/AppRoutes.tsx",
+      "action": "modified",
+      "baseline_sha256": "ac5e5bcb76e481fcc8658b52aabb65d8729689ba57dad0f74f7529f4c8b26f5a",
+      "result_sha256": "fd497f51a8e1f489ac918d9f7d23634f699bd5871115273ef77d6db72de5ad9a",
+      "size_bytes": 1585
+    },
+    {
+      "path": "apps/web/src/app/StudentRoutes.tsx",
+      "action": "modified",
+      "baseline_sha256": "95ebd00343e41de33e7e0168bdc8429f14dd1251ae9b884065a2aeb5be3cf966",
+      "result_sha256": "71732bcf0a7fcb97c7368705f0c449707d1561ad64c58c43b4f1c729de47a2c4",
+      "size_bytes": 1776
+    },
+    {
+      "path": "apps/web/src/app/StudentShell.tsx",
+      "action": "modified",
+      "baseline_sha256": "e5baaaf7fcc51fda3b40bd5738a9e52e95707df1a47c42eeb510df2407830cb3",
+      "result_sha256": "87d179722676dc76fc6946d4a4d30a89c66e581a13cdb1713e11de40ae86290a",
+      "size_bytes": 10002
+    },
+    {
+      "path": "apps/web/src/app/feature-contracts.ts",
+      "action": "modified",
+      "baseline_sha256": "ad5c59e6fe3a4df469fda8befdadb14b7e04f4f2ebb38488624ce9ce4cce2357",
+      "result_sha256": "78519b5f3b748f6bdf72e68d131f8ff2f5a1f522232d20b8ea73ef7a231d2c78",
+      "size_bytes": 367
+    },
+    {
+      "path": "apps/web/src/features/coordinator/CoordinatorRoutes.tsx",
+      "action": "modified",
+      "baseline_sha256": "865eddc23f14d8501e9464214c85cc0eef9426dadb7ee378bba055a48055f8ae",
+      "result_sha256": "633007483414fb371d67e41717c69fc6cb3fd63b9885c312fbed02c8d971deb0",
+      "size_bytes": 5130
+    },
+    {
+      "path": "apps/web/src/features/coordinator/ImportsPage.tsx",
+      "action": "modified",
+      "baseline_sha256": "8e5a2824d457c2b135d765e60f260806155b654d742cde74aff808a2c92a81d2",
+      "result_sha256": "e494bb18c1d8f5055c7424a48d45dc042ec58c2dbcbb8bc2f9e49bc9218dd0de",
+      "size_bytes": 36759
+    },
+    {
+      "path": "apps/web/src/features/coordinator/InitialDemandPage.tsx",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "e21223f6f7d05ef0ff090f9ae8c2c3ae8691008bc081e1ae5efe04634a782594",
+      "size_bytes": 9717
+    },
+    {
+      "path": "apps/web/src/features/coordinator/client.test.ts",
+      "action": "modified",
+      "baseline_sha256": "04c05b758e57a7072e8cafbd965e110f7f6c829d5bbdd16be52fba15551c33dd",
+      "result_sha256": "be223e8bcacea1c96f4d9ff0f00aab46b9ee40f6e28e56fd95a694fcd5e63dc4",
+      "size_bytes": 22486
+    },
+    {
+      "path": "apps/web/src/features/coordinator/client.ts",
+      "action": "modified",
+      "baseline_sha256": "51268bedc006ce7aaac824d4895b867c8df9a16b7678149d7a1278a84870599e",
+      "result_sha256": "43cceb07170bddfb49594532fb45c359247a8915eef869e7b21611c1f3c6ac90",
+      "size_bytes": 21042
+    },
+    {
+      "path": "apps/web/src/features/coordinator/initial-demand.css",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "7b372493e414c7d4c757d9b7abf9f22582a52fa8d1b5c5e430fa4e6ca4a3f4f3",
+      "size_bytes": 1755
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/EligibilityPage.tsx",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "008ff6c66c32fbd902a38075af66afaca45ad9334a2eb1b228949dce47df180d",
+      "size_bytes": 8850
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/SemesterSelectionPanel.tsx",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "a8a3d5372bb519d3afa79971151f397e82a59f384a4a43b1c9b49c3b43f0e282",
+      "size_bytes": 13096
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/client.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "2b00825388d8555cae8395ae114824fbbb5724634c3051706e0eeca9923c78f4",
+      "size_bytes": 9621
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/client.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "c7358ae66a59a9d53f3547e7106b95d0c0c431cfbf179d88e82ef6a83c423d83",
+      "size_bytes": 16847
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/eligibility.css",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "1d42e64e77bc0fdacb7d8cb2c4709ca975b2aa123985e56dae1e7abe7ae6f7e8",
+      "size_bytes": 9562
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/index.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "3f10be3ec4b20072f11d1ba988582d98db7b7811d9bade6ecaffe55d92160ef4",
+      "size_bytes": 357
+    },
+    {
+      "path": "apps/web/src/features/student-eligibility/selection-client.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "c887cd7f57355aa8933e10eed81360e66cceca15fb64df8a0f2d304706db1e6c",
+      "size_bytes": 390
+    },
+    {
+      "path": "db/engineering-extensions.json",
+      "action": "modified",
+      "baseline_sha256": "35d242492fa36034f598ff051493022d32192c0ec7ac5d472ede8fddc06c33e5",
+      "result_sha256": "acd6e0fea20c05486e52b33ffee4b1c0daff04bd3082badcf712125ba79d6870",
+      "size_bytes": 6520
+    },
+    {
+      "path": "db/migrations/0010_p002_semester_selection.sql",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "c9a1e3abc2fdac380b8c87c67cf36c966387da6ac1fe006ce04108fd06cedc95",
+      "size_bytes": 686
+    },
+    {
+      "path": "db/migrations/manifest.json",
+      "action": "modified",
+      "baseline_sha256": "305eb6944135478785c7cfd3ea1725312f3d99216366e2c7aea7d3cfe0ac1c7d",
+      "result_sha256": "1703fa4f88077eeaafb6fb5c1c3780e3b6f966de70bac83b0d72905c65e86a3b",
+      "size_bytes": 2305
+    },
+    {
+      "path": "docs/changes/S1-P002-012-initial-demand-filter.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "8a3c1e1a5f13a13fabcf9fa111e75844a606768773e34edf152a8331deac6a20",
+      "size_bytes": 6810
+    },
+    {
+      "path": "docs/changes/S2-P002-001-finalised-student-eligibility.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "71a814bcaa65249f0b78307610a5fdd53c2286cc05adea4ebf5f07cfa15ab389",
+      "size_bytes": 7007
+    },
+    {
+      "path": "docs/changes/S2-P002-002-v21-semester-selection.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "51d7dde6924f83cb2d9d547530619574480f4ee978fcb2631f4d6ba12f793fed",
+      "size_bytes": 6923
+    },
+    {
+      "path": "docs/p002-lecturer-summary.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "7be7e6a5016855e8af963e73d275a0bf90f66bc8c6aa167d6387836a5fa35b94",
+      "size_bytes": 6554
+    },
+    {
+      "path": "docs/p002-revised-sprints.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "7d9827e3f044bfc93d035045b8dd0d575b5eaac56b63d9b915a3f833e7c6b7dd",
+      "size_bytes": 7449
+    },
+    {
+      "path": "docs/p002-v21-github.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "1b80a3e3a32641ab5c8ef334dec5a5859f0a7f31e463f2c3d00fc77d75860a44",
+      "size_bytes": 5158
+    },
+    {
+      "path": "docs/p002-v21-requirement-map.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "053836d13abf78ce47f00535a2cef821c32a1f912d0bfd2fb788dac3f3ee8f62",
+      "size_bytes": 12440
+    },
+    {
+      "path": "docs/p002-v21-setup.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "e4fd7ccbda9162587af0a4cb866017a351a754d3057bc3afb24a3da34816ee24",
+      "size_bytes": 8801
+    },
+    {
+      "path": "docs/p002-v21-verification.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "fb8ca98d82e35f79e9ef0445d50d805785bb4819263e15f1e9c48f57203c35b9",
+      "size_bytes": 4373
+    },
+    {
+      "path": "docs/p002-verification.md",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "b7183a16e2ee7c0166c81c62fea50dd807a583735ee48f813f721d318f184459",
+      "size_bytes": 4882
+    },
+    {
+      "path": "packages/shared/src/forecasting/index.ts",
+      "action": "modified",
+      "baseline_sha256": "e0ec6071ed0741ec6fbde71df75337005847680f454f727c62741adeed9b5e00",
+      "result_sha256": "420a08de298592e3b106d261856f62a27bbf9841694da0341b35811f8242daa3",
+      "size_bytes": 277
+    },
+    {
+      "path": "packages/shared/src/forecasting/initial-demand.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "75ee294802e7b5120e7f39ea0b33910a7a7a1af87e733a2744978c8471075113",
+      "size_bytes": 6460
+    },
+    {
+      "path": "packages/shared/src/forecasting/p002-demo-fixture.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "d8841de062c757df319ad1211aa83556e7271bd697100cf189d383027516e4db",
+      "size_bytes": 836
+    },
+    {
+      "path": "packages/shared/src/forecasting/p002-eligibility-policy.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "d7aca9ddec8beee6c81eb2f41a164959e3bcb3987f30af2b100d59a372021c1c",
+      "size_bytes": 5469
+    },
+    {
+      "path": "packages/shared/src/forecasting/p002-projections.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "87a858680a349ee115ddb5166de62cd9c82d7604970fc127c2b3b00e64b10a29",
+      "size_bytes": 14290
+    },
+    {
+      "path": "packages/shared/src/forecasting/semester-selection-contracts.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "07d0481d556237899f4bfc6959a5a7bd117b3020c0199c2dac46be09578d0af5",
+      "size_bytes": 969
+    },
+    {
+      "path": "packages/shared/src/forecasting/semester-selection.test.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "e1d58aeba7a341156375cd9a29aaae4d3ba80b1d6416fdde1562c43d4a15b9c7",
+      "size_bytes": 6909
+    },
+    {
+      "path": "packages/shared/src/forecasting/semester-selection.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "5a600a024943eb38a91e8c2411ff2b9c8470699885cd258e6f88b2e6647f4995",
+      "size_bytes": 3964
+    },
+    {
+      "path": "packages/shared/src/forecasting/student-eligibility.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "0c12433218bd22e318fe65298a1858531aad776531782b2600038848421a15da",
+      "size_bytes": 5271
+    },
+    {
+      "path": "tools/db/migrations.test.mjs",
+      "action": "modified",
+      "baseline_sha256": "f8b12289e1bf00682a9bdc2c6e31a5c7c9ee76438c23d80eb296018b8f11e79c",
+      "result_sha256": "0f70c40f215221d0fb05ad53c77ae13f55a2f7eb4a4a713196d630f55ae8a7c8",
+      "size_bytes": 15812
+    },
+    {
+      "path": "tools/integration/prepare.mjs",
+      "action": "modified",
+      "baseline_sha256": "2a226768edf20a84ec6a8c3b79cc7a8af8327378ef268930cc4c47fbce20ab1b",
+      "result_sha256": "e549dea0feb2ae63777bdacd86df1a973f049de022b55463e8ea35bb3db1d3ea",
+      "size_bytes": 6494
+    },
+    {
+      "path": "tools/integration/prepare.test.mjs",
+      "action": "modified",
+      "baseline_sha256": "a4953a86f5e1ea4b74bcdb6366e4dcca29f978494b9dab19222a09cd37027086",
+      "result_sha256": "2e24e1bda46af2fd666303d57fa720aa87bda0c0fcdb8059746066041a6a9ca3",
+      "size_bytes": 4626
+    },
+    {
+      "path": "tools/p002/demo-data.ts",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "74e2f1460715d6abf4c5b9d9f71db096c610f98e4d089f3cffa4e76db4b31f76",
+      "size_bytes": 6673
+    },
+    {
+      "path": "tools/p002/export-demo.mjs",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "a335917f484402c5814f1eb24bb2016cda44876a81eff9cf7fd54bba20631064",
+      "size_bytes": 1186
+    },
+    {
+      "path": "tools/p002/test-selection-db.mjs",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "c6870ebbe34ad0bd009046e124cd6127a58be06db3dc763a9643d50ba0649fc0",
+      "size_bytes": 18955
+    },
+    {
+      "path": "tools/p002/test-ui.mjs",
+      "action": "added",
+      "baseline_sha256": null,
+      "result_sha256": "65f1eebf05081804bbc250e33692ca3fa0127b23c3c5c72501461b0202ebc352",
+      "size_bytes": 27752
+    }
+  ]
+}
