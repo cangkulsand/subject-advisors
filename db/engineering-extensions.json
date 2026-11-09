@@ -165,6 +165,11 @@
         { "table": "academic_semester", "name": "is_current", "sqlType": "boolean", "nullable": false, "default": false, "purpose": "Explicit system current-semester marker" }
       ],
       "purpose": "P004 academic reference administration, coordinator scope and immutable audit; excluded from the frozen SRS baseline"
+    },
+    {
+      "migration": "0010",
+      "tables": ["p002_semester_selection"],
+      "purpose": "P002 UC10 student and semester selection metadata; academic_plan and plan_subject remain the canonical plan records, and the table is excluded from the frozen SRS baseline"
     }
   ]
 }

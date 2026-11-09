@@ -47,6 +47,11 @@
       "version": "0008",
       "file": "0008_admin_academic_setup.sql",
       "description": "Add audited academic reference setup, coordinator scopes and explicit current-semester selection"
+    },
+    {
+      "version": "0010",
+      "file": "0010_p002_semester_selection.sql",
+      "description": "Add P002 student and semester selection metadata over canonical academic plans"
     }
   ],
   "historicalExcluded": [
