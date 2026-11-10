@@ -151,6 +151,25 @@ describe('UC20 forecast run API', () => {
       expect((await get(deps, `forecast-runs/${id}/subjects/${A}/students?x=1`)).status).toBe(400);
     });
 
+    it('adds the matric number and sign-in email of portal students and keeps the list when the lookup fails', async () => {
+      const { deps, liveInputs } = fixture();
+      const { id } = await newRun(deps);
+      liveInputs.snapshot = { ...liveInputs.snapshot, students: liveInputs.snapshot.students.map((student, index) => index < 2 ? { ...student, externalReference: 'PORTAL-' + (index + 1) } : student) };
+      const lookup = vi.fn(async (ids: number[]) => ({ emailsAvailable: true, contacts: new Map(ids.filter((id) => id === 1).map((id) => [id, { matricNo: 'A22EC0013', email: 'harraz@graduate.utm.my' }])) }));
+      const view = await studentsOf({ ...deps, portalContacts: lookup }, id, A);
+      expect(lookup).toHaveBeenCalledWith([1, 2]);
+      expect(view.emailsAvailable).toBe(true);
+      const byRef = new Map(view.students.map((row) => [row.externalReference, [row.matricNo, row.email]]));
+      expect([byRef.get('PORTAL-1'), byRef.get('PORTAL-2'), byRef.get('S003')]).toEqual([['A22EC0013', 'harraz@graduate.utm.my'], [null, null], [null, null]]);
+      const noEmails = await studentsOf({ ...deps, portalContacts: async () => ({ emailsAvailable: false, contacts: new Map([[1, { matricNo: 'A22EC0013', email: null }]]) }) }, id, A);
+      expect(noEmails.emailsAvailable).toBe(false);
+      expect(noEmails.students.find((row) => row.externalReference === 'PORTAL-1')).toMatchObject({ matricNo: 'A22EC0013', email: null });
+      const failed = await studentsOf({ ...deps, portalContacts: async () => { throw new Error('Database unavailable'); } }, id, A);
+      expect(failed.emailsAvailable).toBe(false);
+      expect(failed.students.every((row) => row.email === null && row.matricNo === null)).toBe(true);
+      expect(failed.students).toHaveLength(view.students.length);
+    });
+
     it('flags a catalogue that changed after the forecast was generated', async () => {
       const { deps, liveInputs } = fixture();
       const { id } = await newRun(deps);

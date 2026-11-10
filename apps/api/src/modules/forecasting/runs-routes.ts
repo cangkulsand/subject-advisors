@@ -3,9 +3,9 @@ import type { ForecastScope, UncertaintyReason } from '../../../../../packages/s
 import { catalogueFingerprint, runForecastEngine, subjectStudentOutcomes } from '../../../../../packages/shared/src/forecasting/engine';
 import type { EngineSubjectDemand } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { OperationReceipt } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { RunSubjectStudents } from '../../../../../packages/shared/src/forecasting/runs';
+import type { RunSubjectStudents, SubjectStudentOutcome } from '../../../../../packages/shared/src/forecasting/runs';
 import { RUN_LIMITS } from '../../../../../packages/shared/src/forecasting/runs';
-import type { ForecastingDependencies } from './contracts';
+import type { ForecastingDependencies, PortalContact } from './contracts';
 import { ForecastingError } from './errors';
 import { sourceOf } from './import-source';
 import { bad, decodeCursor, encodeCursor, methodNotAllowed, onlyParameters, positive, readJson } from './http';
@@ -157,6 +157,20 @@ async function auditPage(forecastRunId: number, url: URL, deps: ForecastingDepen
  * Read-only roster behind one subject's numbers. Rebuilds the engine input from the run's frozen import batch and the run's stored target semester,
  * so the only live input is the curriculum catalogue; `catalogueMatchesRun` says whether that still equals the run's stored fingerprint.
  */
+/** Adds the live matric number and sign-in email of portal (`PORTAL-<student_id>`) students. A lookup failure keeps the list usable without them. */
+async function withContacts(students: SubjectStudentOutcome[], deps: ForecastingDependencies): Promise<Pick<RunSubjectStudents, 'emailsAvailable' | 'students'>> {
+  const idOf = (reference: string) => { const match = /^PORTAL-(\d+)$/.exec(reference); return match ? Number(match[1]) : null; };
+  const ids = [...new Set(students.map((student) => idOf(student.externalReference)).filter((id): id is number => id !== null))];
+  let contacts = new Map<number, PortalContact>(), emailsAvailable = true;
+  if (ids.length && deps.portalContacts) {
+    try { ({ contacts, emailsAvailable } = await deps.portalContacts(ids)); } catch { emailsAvailable = false; }
+  }
+  return { emailsAvailable, students: students.map((student) => {
+    const id = idOf(student.externalReference), contact = id === null ? undefined : contacts.get(id);
+    return { ...student, matricNo: contact?.matricNo ?? null, email: contact?.email ?? null };
+  }) };
+}
+
 async function subjectStudents(forecastRunId: number, subjectId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
   const run = await loadRun(deps, actor, forecastRunId);
   const rows = await deps.runs.getDetail(forecastRunId);
@@ -179,7 +193,7 @@ async function subjectStudents(forecastRunId: number, subjectId: number, deps: F
       inCurriculum: b.inCurriculum, counted: b.supported, uncertain: b.uncertain, nearGraduation: view.nearGraduationCount,
       notCounted: b.alreadyPassed + b.prerequisiteNotMet + b.notOfferedInSemesterType, breakdown: b, uncertaintyReasonCounts: view.uncertaintyReasonCounts,
     },
-    students: view.students,
+    ...await withContacts(view.students, deps),
   };
   return authJson({ data });
 }

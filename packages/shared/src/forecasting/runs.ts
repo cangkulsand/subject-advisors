@@ -176,8 +176,15 @@ export interface RunSubjectStudents {
     uncertaintyReasonCounts: UncertaintyReasonCount[];
   };
   /** Sorted by matric (external reference). */
-  students: SubjectStudentOutcome[];
+  /** False when sign-in emails could not be read from the identity provider; students then show their reference. */
+  emailsAvailable: boolean;
+  students: RunSubjectStudent[];
 }
+/**
+ * A student row. For portal students (`PORTAL-<id>`), `matricNo` (from the profile) and `email` (sign-in email) are read live for display only;
+ * both are null for CSV students, whose `externalReference` is already the matric number.
+ */
+export type RunSubjectStudent = SubjectStudentOutcome & { matricNo: string | null; email: string | null };
 export type RunSubjectStudentsEnvelope = Envelope<RunSubjectStudents>;
 
 export type ForecastRunDetailEnvelope = Envelope<ForecastRunDetail>;

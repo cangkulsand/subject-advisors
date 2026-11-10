@@ -177,7 +177,8 @@ export function createProfileReader(repository: ProfileRepository): ProfileReade
   return { async stateFor(userId) {
     try {
       const p = await repository.find(userId);
-      return p && p.studentName.trim() && p.curriculumId > 0 &&
+      // A matric number is required (S2-P004-016): coordinators identify portal students by it in the forecast student list.
+      return p && p.studentName.trim() && p.matricNo?.trim() && p.curriculumId > 0 &&
         Number.isInteger(p.currentSemesterId) && p.currentSemesterId! > 0 &&
         Number.isInteger(p.weeklyWorkingHours) && p.weeklyWorkingHours! >= 0 &&
         Number.isInteger(p.availableStudyHours) && p.availableStudyHours! >= 0 ? 'COMPLETE' : 'SETUP_REQUIRED';

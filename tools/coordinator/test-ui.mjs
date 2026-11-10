@@ -483,6 +483,13 @@ else {
       const first = dialog.locator('tr[data-student="A22EC001"]');
       assert.deepEqual(await first.locator('th').evaluate(cell => [...cell.children].map(child => child.textContent.trim())), ['SECJ1013 Student 001', 'A22EC001']);
       assert.equal((await first.locator('.admin-pill').innerText()).trim(), 'Counted');
+      await dialog.getByLabel('Search students').fill('a22ec9051');
+      assert.deepEqual(await rows.locator('th').evaluateAll(cells => cells.map(cell => [...cell.children].map(child => child.textContent.trim()))), [['SECJ1013 Student 051', 'A22EC9051']], 'portal students show their profile matric number, searchable');
+      await dialog.getByLabel('Search students').fill('student052@');
+      assert.deepEqual(await rows.locator('th').evaluateAll(cells => cells.map(cell => [...cell.children].map(child => child.textContent.trim()))), [['SECJ1013 Student 052', 'student052@graduate.utm.my']], 'no matric number yet: the sign-in email, searchable');
+      await dialog.getByLabel('Search students').fill('Student 054');
+      assert.equal((await rows.first().locator('.coordinator-subject-code').innerText()).trim(), 'PORTAL-54', 'no known email: the portal reference stays');
+      await dialog.getByLabel('Search students').fill('');
       assert.ok((await first.innerText()).includes('Near graduation · 12 credits left'));
       await dialog.getByRole('button', { name: 'Next' }).click(); await dialog.getByText(/Page 2 of 3/).waitFor();
       await dialog.getByRole('button', { name: 'Previous' }).click();
@@ -520,6 +527,7 @@ else {
       await dialog.getByRole('alert').getByText('Forecasting data is unavailable. Please retry.').waitFor();
       await dialog.getByRole('button', { name: 'Retry' }).click();
       await dialog.getByText(/recomputed with the current curriculum/).waitFor();
+      assert.equal(await dialog.getByText(/Sign-in emails could not be loaded/).count(), 0);
       await dialog.getByRole('button', { name: 'Close' }).click();
       await page.getByRole('button', { name: 'View students for SECJ1023' }).click();
       const second = page.getByRole('dialog', { name: 'Students · SECJ1023' }); await second.waitFor();
@@ -536,6 +544,18 @@ else {
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByLabel('Student counts').waitFor();
       assert.equal(listCalls(), before + 1, 'Refresh clears the cache');
+    });
+
+    await check('forecast: students show their portal reference when sign-in emails cannot be loaded', async page => {
+      const state = await mock(page, { seed: 'review' }); state.emailsUnavailable = true;
+      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.getByLabel('Student counts').waitFor();
+      await dialog.getByText('Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.').waitFor();
+      await dialog.getByLabel('Search students').fill('Student 052');
+      assert.equal((await dialog.locator('tbody tr').first().locator('.coordinator-subject-code').innerText()).trim(), 'PORTAL-52');
+      await dialog.getByLabel('Search students').fill('Student 051');
+      assert.equal((await dialog.locator('tbody tr').first().locator('.coordinator-subject-code').innerText()).trim(), 'A22EC9051', 'matric numbers come from the database, not the identity provider');
     });
 
     for (const width of [320, 375]) await check('mobile: the students dialog fits without page overflow at ' + width, async page => {

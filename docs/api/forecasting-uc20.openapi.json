@@ -5066,7 +5066,9 @@
           "uncertaintyReasons",
           "nearGraduation",
           "remainingCredits",
-          "passedByRetake"
+          "passedByRetake",
+          "matricNo",
+          "email"
         ],
         "properties": {
           "externalReference": {
@@ -5107,6 +5109,16 @@
           "passedByRetake": {
             "type": "boolean",
             "description": "PASSED only: a pass plus another attempt, resolved as passed."
+          },
+          "matricNo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Matric number of a portal student (reference PORTAL-<student_id>), read live from the student profile for display only and never stored. Null for CSV students (their externalReference is the matric number) and for portal students who have not added one."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sign-in (primary) email of a portal student (reference PORTAL-<student_id>), read live from the identity provider for display only and never stored. Null for CSV students, unknown accounts, or when emails could not be loaded."
           }
         }
       },
@@ -5120,6 +5132,7 @@
           "subjectName",
           "catalogueMatchesRun",
           "summary",
+          "emailsAvailable",
           "students"
         ],
         "properties": {
@@ -5210,6 +5223,10 @@
               "$ref": "#/components/schemas/SubjectStudentOutcome"
             },
             "description": "Sorted by matric."
+          },
+          "emailsAvailable": {
+            "type": "boolean",
+            "description": "False when sign-in emails could not be read from the identity provider; matric numbers are still shown, and portal students without one show their reference."
           }
         }
       },

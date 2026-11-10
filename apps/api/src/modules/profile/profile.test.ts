@@ -8,8 +8,8 @@ import { AuthError } from '../auth/errors';
 import type { Profile, ProfileRepository } from './contracts';
 import type { AccessAssignment } from '../auth/contracts';
 
-const input = { studentName: 'Demo student', curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
-const profile: Profile = { ...input, studentId: 1, matricNo: null, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
+const input = { studentName: 'Demo student', matricNo: 'A22EC0001', curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
+const profile: Profile = { ...input, studentId: 1, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
 const record = { subjectId: 1, semesterId: null, status: 'EXEMPTED', recognizedCredits: 0, remarks: 'DEMO credit-free exemption' };
 const cacheBindings: CacheBindings = {
   REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
@@ -40,7 +40,11 @@ function request(path: string, method = 'GET', body?: unknown) {
   return new Request('https://example.test' + path, { method, headers: { Authorization: 'Bearer test', 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 describe('P001 strict input validation', () => {
-  it('normalizes a valid profile and permits zero working hours', () => expect(profileInput({ ...input, studentName: ' Demo ' })).toMatchObject({ studentName: 'Demo', matricNo: null }));
+  it('normalizes a valid profile and permits zero working hours', () => expect(profileInput({ ...input, studentName: ' Demo ', matricNo: ' a22ec 0001 ' })).toMatchObject({ studentName: 'Demo', matricNo: 'A22EC0001' }));
+  it('requires a matric number of 4 to 30 letters or digits', () => {
+    for (const matricNo of [undefined, null, '', '   ', 'A2', 'A22-EC-0001', 'X'.repeat(31), 12345]) expect(() => profileInput({ ...input, matricNo })).toThrow(/Matric number/);
+    expect(profileInput({ ...input, matricNo: 'SX230001ECJHF04' }).matricNo).toBe('SX230001ECJHF04');
+  });
   it.each([-1, 1.5, NaN, Infinity, '0', null, undefined, 2147483648])('rejects invalid hour value %s', value => expect(() => profileInput({ ...input, weeklyWorkingHours: value })).toThrow(P001Error));
   it.each(['uuid-value', 0, -2, 1.5, 2147483648])('rejects invalid curriculum ID %s', value => expect(() => profileInput({ ...input, curriculumId: value })).toThrow());
   it.each(['uuid-value', 0, -2, 1.5, 2147483648, undefined, null])('rejects invalid current semester ID %s', value => expect(() => profileInput({ ...input, currentSemesterId: value })).toThrow());
@@ -85,6 +89,8 @@ describe('P001 ProfileReader seam', () => {
     expect(await createProfileReader(repository(async () => ({ ...profile, currentSemesterId: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
     expect(await createProfileReader(repository(async () => ({ ...profile, currentSemesterId: undefined as unknown as number }))).stateFor('a')).toBe('SETUP_REQUIRED');
     expect(await createProfileReader(repository(async () => ({ ...profile, availableStudyHours: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
+    expect(await createProfileReader(repository(async () => ({ ...profile, matricNo: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
+    expect(await createProfileReader(repository(async () => ({ ...profile, matricNo: '  ' }))).stateFor('a')).toBe('SETUP_REQUIRED');
   });
   it('reports unavailable on a persistence failure', async () => expect(await createProfileReader(repository(async () => { throw new Error('private details'); })).stateFor('a')).toBe('UNAVAILABLE'));
 });
@@ -177,7 +183,7 @@ describe('P001 authenticated route boundary', () => {
 
   it('allows setup/profile writes before completion using verified identity only', async () => {
     const deps = dependencies('SETUP_REQUIRED'); const response = await handleP001Request(request('/api/profile','PUT',input),deps);
-    expect(response?.status).toBe(200); expect(deps.profiles.save).toHaveBeenCalledWith('verified_student_a', { ...input, matricNo: null });
+    expect(response?.status).toBe(200); expect(deps.profiles.save).toHaveBeenCalledWith('verified_student_a', input);
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
   });
   it('returns absent profile as a valid setup state', async () => {

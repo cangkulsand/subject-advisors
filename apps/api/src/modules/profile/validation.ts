@@ -17,6 +17,13 @@ export function text(value: unknown, label: string, max: number, required = fals
   if (result.length > max || (required && !result)) invalid(label + ' must contain ' + (required ? '1 to ' : 'at most ') + max + ' characters.');
   return result || null;
 }
+/** Matric number: required; spaces removed and upper-cased; 4-30 letters or digits (for example A22EC0001 or SX230001ECJHF04). */
+export function matricNumber(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) invalid('Matric number is required.');
+  const result = value.replace(/\s+/g, '').toUpperCase();
+  if (!/^[A-Z0-9]{4,30}$/.test(result)) invalid('Matric number must be 4 to 30 letters or digits, for example A22EC0001.');
+  return result;
+}
 export function fields(value: unknown, allowed: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('Provide a JSON object.');
   const result = value as Record<string, unknown>;
@@ -44,7 +51,7 @@ export function profileInput(value: unknown) {
   const body = fields(value, ['studentName', 'matricNo', 'curriculumId', 'currentSemesterId', 'weeklyWorkingHours', 'availableStudyHours']);
   return {
     studentName: text(body.studentName, 'Student name', 255, true)!,
-    matricNo: text(body.matricNo, 'Matric number', 30),
+    matricNo: matricNumber(body.matricNo),
     curriculumId: positiveId(body.curriculumId, 'Curriculum'),
     currentSemesterId: positiveId(body.currentSemesterId, 'Current semester'),
     weeklyWorkingHours: nonnegative(body.weeklyWorkingHours, 'Weekly working hours'),

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ClearFilters, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import type { UncertaintyReason } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { RunSubjectStudents, SubjectStudentOutcome, SubjectStudentOutcomeKind } from '../../../../../packages/shared/src/forecasting/runs';
+import type { RunSubjectStudent, RunSubjectStudents, SubjectStudentOutcomeKind } from '../../../../../packages/shared/src/forecasting/runs';
 import type { CoordinatorClient } from './client';
 import { Panel, ReadOnlyDialog, useRead } from './coordinator-ui';
 import { HELP, Help } from './coordinator-help';
@@ -22,14 +22,14 @@ const FILTERS = [
 ];
 const PAGE_SIZE = 20;
 
-function matchesFilter(student: SubjectStudentOutcome, filter: string) {
+function matchesFilter(student: RunSubjectStudent, filter: string) {
   if (filter === 'COUNTED') return student.outcome === 'SUPPORTED';
   if (filter === 'UNCERTAIN') return student.outcome === 'UNCERTAIN';
   if (filter === 'NEAR') return student.nearGraduation;
   if (filter === 'NOT_COUNTED') return student.outcome !== 'SUPPORTED' && student.outcome !== 'UNCERTAIN';
   return true;
 }
-function Details({ student }: { student: SubjectStudentOutcome }) {
+function Details({ student }: { student: RunSubjectStudent }) {
   const lines: string[] = [];
   if (student.uncertaintyReasons.length > 0) lines.push(student.uncertaintyReasons.map(reason => reasonLabels[reason] ?? reason).join('; '));
   if (student.nearGraduation) lines.push(`Near graduation · ${Math.max(0, student.remainingCredits ?? 0)} credits left`);
@@ -42,7 +42,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   const [filter, setFilter] = useState(''), [search, setSearch] = useState(''), [requested, setPage] = useState(1);
   const term = search.trim().toLowerCase(), filtering = filter !== '' || term !== '';
   const matching = data.students.filter(student => matchesFilter(student, filter)
-    && (!term || student.externalReference.toLowerCase().includes(term) || (student.studentName ?? '').toLowerCase().includes(term)));
+    && (!term || [student.externalReference, student.studentName ?? '', student.matricNo ?? '', student.email ?? ''].some(value => value.toLowerCase().includes(term))));
   const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE)), page = Math.min(requested, pages);
   const clear = () => { setFilter(''); setSearch(''); setPage(1); };
   const s = data.summary;
@@ -51,10 +51,11 @@ function Roster({ data }: { data: RunSubjectStudents }) {
     <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
     {s.uncertaintyReasonCounts.length > 0 && <ul className="coordinator-students-reasons" aria-label="Why students are uncertain">
       {s.uncertaintyReasonCounts.map(item => <li key={item.reason}>{reasonLabels[item.reason] ?? item.reason}: {item.count}</li>)}</ul>}
+    {!data.emailsAvailable && <p className="coordinator-warning" role="status">Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.</p>}
     {!data.catalogueMatchesRun && <p className="coordinator-warning" role="status">This list was recomputed with the current curriculum, so it may differ from the counts saved with this forecast.</p>}
     <TableToolbar label="Filter students">
       <SegmentedFilter label="Show" value={filter} onChange={value => { setFilter(value); setPage(1); }} options={FILTERS}/>
-      <SearchField label="Search students" value={search} placeholder="Search matric or name" onChange={value => { setSearch(value); setPage(1); }}/>
+      <SearchField label="Search students" value={search} placeholder="Search name, matric or email" onChange={value => { setSearch(value); setPage(1); }}/>
       {filtering && <ClearFilters onClear={clear}/>}
     </TableToolbar>
     {matching.length === 0
@@ -62,7 +63,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
       : <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Students table" tabIndex={0}>
         <table><thead><tr><th scope="col"><Help label="Student" text={HELP.student}/></th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
           <tbody>{matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(student => <tr key={student.externalReference} data-student={student.externalReference}>
-            <th scope="row"><strong>{student.studentName ?? 'Name not provided'}</strong><span className="coordinator-subject-code">{student.externalReference}</span></th>
+            <th scope="row"><strong>{student.studentName ?? 'Name not provided'}</strong><span className="coordinator-subject-code">{student.matricNo ?? student.email ?? student.externalReference}</span></th>
             <td><span className={'admin-pill ' + statusClass[student.outcome]}>{statusLabels[student.outcome]}</span></td>
             <td><Details student={student}/></td>
           </tr>)}</tbody></table></div>
