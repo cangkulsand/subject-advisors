@@ -1,6 +1,6 @@
 # S2-P004-018 — Offering decisions API
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -53,5 +53,5 @@ Not verified: the SQL repository and the new PostgreSQL test block were not run 
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Added. Coordinator offering decisions API (`offering-decisions` read, decide and audit) with stale-change protection and next-semester and selection-window gating; `forecast-context` lists every semester with its selection window. Compatibility: additive; old confirmation and run routes unchanged; `ForecastingDependencies` gains `decisions`. Outstanding: apply migration 0009 and run the database test; pick counts and withdrawal arrive in Task 3. Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Added. Coordinator offering decisions API (`offering-decisions` read, decide and audit) with stale-change protection and next-semester and selection-window gating; `forecast-context` lists every semester with its selection window. Compatibility: additive; old confirmation and run routes unchanged; `ForecastingDependencies` gains `decisions`. Outstanding: apply migration 0009 and run the database test; pick counts and withdrawal arrive in Task 3. Status: MERGED.
 - 2026-11-10 - Type: Fixed. Every decision failed with `DECISION_STALE` against the real database. The stale guard cast the sentinel string alone (`'GUARD_DECISION_STALE'::integer`); PostgreSQL folds such a constant at plan time, so the cast failed before the `CASE` compared statuses. The cast input now includes the current status (`'GUARD_DECISION_STALE:' || status`), as the run guard does. Found in manual testing on the dev database; mock-based tests could not catch it.

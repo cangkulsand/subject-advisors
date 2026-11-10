@@ -1,6 +1,6 @@
 # S2-P004-021 — Coordinator screen: selection open and closed, Picked column and pickers dialog
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -41,4 +41,4 @@ Not verified: the screen against the real API and database (mocked fixtures that
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Added. While student selection is open the coordinator can still change subjects live; withdrawing an approved subject says how many students who picked it will see a note. After selection closes the decisions are locked and a Picked column shows how many students picked each approved subject, with a read-only list of those students (name, matric number or sign-in email). Compatibility: no API change. Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Added. While student selection is open the coordinator can still change subjects live; withdrawing an approved subject says how many students who picked it will see a note. After selection closes the decisions are locked and a Picked column shows how many students picked each approved subject, with a read-only list of those students (name, matric number or sign-in email). Compatibility: no API change. Status: MERGED.

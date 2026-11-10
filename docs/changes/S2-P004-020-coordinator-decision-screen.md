@@ -1,6 +1,6 @@
 # S2-P004-020 — Coordinator screen: snapshot picker, decisions table, audit
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -46,4 +46,4 @@ Not verified: the screen against the real API and database (the browser checks u
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Changed. Class Offering Forecast is now one decisions screen: pick a student data snapshot, see "Not taken yet" and "Eligible to take" per subject, and set each subject to Pending, Approved or Removed with one click (toast, audit history, no dialog, no reason); removed subjects can be added back; decisions carry across snapshots. The review, finalize and "Potential demand" wording is gone from this screen. Compatibility: the `run` URL parameter of `/coordinator/forecasts` is no longer read; the old Offering Decisions page and its API are unchanged until Task 8. Outstanding: Task 5 (open/closed behaviour, Picked column, pickers dialog). Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Changed. Class Offering Forecast is now one decisions screen: pick a student data snapshot, see "Not taken yet" and "Eligible to take" per subject, and set each subject to Pending, Approved or Removed with one click (toast, audit history, no dialog, no reason); removed subjects can be added back; decisions carry across snapshots. The review, finalize and "Potential demand" wording is gone from this screen. Compatibility: the `run` URL parameter of `/coordinator/forecasts` is no longer read; the old Offering Decisions page and its API are unchanged until Task 8. Outstanding: Task 5 (open/closed behaviour, Picked column, pickers dialog). Status: MERGED.

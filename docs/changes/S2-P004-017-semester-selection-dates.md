@@ -1,6 +1,6 @@
 # S2-P004-017 — Migration 0009, shared selection phase and admin semester selection dates
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4 (admin Academic Semesters is an admin-module change)
@@ -56,4 +56,4 @@ Not verified: migration 0009, `db/checks/014`, the edited 001/004 checks and the
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Added. Migration 0009 (selection window on semesters, student learning centre backfilled to KL, offering decisions with immutable audit, pick withdrawals), shared `selectionPhase`, and admin Academic Semesters "Selection opens" / "Selection closes". Compatibility: additive; existing development confirmation data is not migrated; 0007 tables stay unused. Outstanding: apply 0009 with `npm run db:migrate` and run `npm run db:verify`; Tasks 2-8 consume these objects. Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Added. Migration 0009 (selection window on semesters, student learning centre backfilled to KL, offering decisions with immutable audit, pick withdrawals), shared `selectionPhase`, and admin Academic Semesters "Selection opens" / "Selection closes". Compatibility: additive; existing development confirmation data is not migrated; 0007 tables stay unused. Outstanding: apply 0009 with `npm run db:migrate` and run `npm run db:verify`; Tasks 2-8 consume these objects. Status: MERGED.

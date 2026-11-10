@@ -1,6 +1,6 @@
 # S2-P004-024 — Remove the review, finalize and confirm flow; refresh documentation
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4 (touches P002 shared helper comments and docs, and one help text on the P001 profile page)
@@ -69,4 +69,4 @@ Not verified: the SQL against a real PostgreSQL (the database test file was edit
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Removed / Docs. The old coordinator flow is gone: the Offering Decisions page, the forecast versions and comparison navigation entries, review, decide and finalize on a forecast, offering confirmation with a pick deadline, and the pick-count endpoint. The coordinator now works only on the Class Offering Forecast screen (approve or remove subjects; see S2-P004-020 and S2-P004-021). Compatibility: the API routes `GET forecast-runs`, `forecast-runs/{id}/reviews|decisions|finalizations|audit`, `confirmed-offerings*` and `offering-pick-counts` no longer exist; `POST forecast-runs`, `GET forecast-runs/{id}` and the students-behind-a-subject read are unchanged (the run detail now always has `newerForecastAvailable: null` and an empty `audit`). Database: nothing changed; the 0007 tables (`offering_confirmation`, `confirmed_offering` and their audit tables) are retained and unused, and no past-semester data was deleted or overwritten. Documents refreshed: OpenAPI, caching guide, data contracts, offerings integration, README, implementation guide. Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Removed / Docs. The old coordinator flow is gone: the Offering Decisions page, the forecast versions and comparison navigation entries, review, decide and finalize on a forecast, offering confirmation with a pick deadline, and the pick-count endpoint. The coordinator now works only on the Class Offering Forecast screen (approve or remove subjects; see S2-P004-020 and S2-P004-021). Compatibility: the API routes `GET forecast-runs`, `forecast-runs/{id}/reviews|decisions|finalizations|audit`, `confirmed-offerings*` and `offering-pick-counts` no longer exist; `POST forecast-runs`, `GET forecast-runs/{id}` and the students-behind-a-subject read are unchanged (the run detail now always has `newerForecastAvailable: null` and an empty `audit`). Database: nothing changed; the 0007 tables (`offering_confirmation`, `confirmed_offering` and their audit tables) are retained and unused, and no past-semester data was deleted or overwritten. Documents refreshed: OpenAPI, caching guide, data contracts, offerings integration, README, implementation guide. Status: MERGED.

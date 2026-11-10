@@ -1,6 +1,6 @@
 # S2-P004-019 — Picks API: pick counts, pickers and pick withdrawal on removal
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -46,4 +46,4 @@ Not verified: the SQL (`pickCounts`, `pickers`, withdrawal statement) and the ne
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Added. Coordinator pickers endpoint (`offering-decisions/{subjectId}/pickers`), per-subject `pickCounts` in the decision set, and withdrawal of student picks (with immutable withdrawal records and the count in the audit) when an approved subject is removed or set back to pending. Compatibility: additive; `affectedPicks` and `pickCounts` were previously always 0 / empty. Outstanding: apply migration 0009 and run the database test. Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Added. Coordinator pickers endpoint (`offering-decisions/{subjectId}/pickers`), per-subject `pickCounts` in the decision set, and withdrawal of student picks (with immutable withdrawal records and the count in the audit) when an approved subject is removed or set back to pending. Compatibility: additive; `affectedPicks` and `pickCounts` were previously always 0 / empty. Outstanding: apply migration 0009 and run the database test. Status: MERGED.

@@ -1,6 +1,6 @@
 # S2-P004-022 — Student offerings: approved subjects for the next semester, selection window, withdrawal note
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4 (cross-module change to the P002 offerings module; the P002 owner should review)
@@ -46,4 +46,4 @@ Not verified: the SQL against a real PostgreSQL (the offerings database suite ne
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Changed. The student offerings page now always works on the next semester, lists only the subjects the coordinator approved for the student's programme and learning centre, opens and closes picking with the admin selection dates, keeps the maximum subjects and credits, and shows a note when a coordinator withdrew a subject the student had picked. A student without a learning centre is asked to choose one in the profile. Compatibility: additive response fields (`window`, `limits`, `prerequisiteCatalogue`, `withdrawnSubjects`); `currentSemesterId` now means the target semester; new PUT errors `PICKS_NOT_OPEN`, `OFFERING_NOT_APPROVED`, `SEMESTER_NOT_TARGET`, `PROFILE_CHANGED`; cache marker bumped. Cross-module (P002). Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Changed. The student offerings page now always works on the next semester, lists only the subjects the coordinator approved for the student's programme and learning centre, opens and closes picking with the admin selection dates, keeps the maximum subjects and credits, and shows a note when a coordinator withdrew a subject the student had picked. A student without a learning centre is asked to choose one in the profile. Compatibility: additive response fields (`window`, `limits`, `prerequisiteCatalogue`, `withdrawnSubjects`); `currentSemesterId` now means the target semester; new PUT errors `PICKS_NOT_OPEN`, `OFFERING_NOT_APPROVED`, `SEMESTER_NOT_TARGET`, `PROFILE_CHANGED`; cache marker bumped. Cross-module (P002). Status: MERGED.

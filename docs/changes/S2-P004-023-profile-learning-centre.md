@@ -1,6 +1,6 @@
 # S2-P004-023 — Profile learning centre, lock during selection, live centre in forecasting
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-11); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4, on P001's profile module (cross-module change; the P001 owner should review)
@@ -55,4 +55,4 @@ Not verified: the SQL against a real PostgreSQL (the lock and window queries, th
 
 ## 4. Changelog
 
-- 2026-11-10 - Type: Changed. Students now choose their learning centre in their profile (required, from the active centres). Students without one are asked to add it; the forecast counts "students in the system" under the centre saved in the profile instead of assuming Kuala Lumpur, and leaves out students without a centre. From the moment selection opens for the next semester until the admin moves the current semester forward, a student's centre cannot be changed (the page explains why). Compatibility: `PUT /api/profile` now requires `learningCentreId`; `GET /api/profile` adds `learningCentreId` and `learningCentreLocked`; `GET /api/profile/options` adds `learningCentres`; new errors `PROFILE_CENTRE_LOCKED` (409) and `INVALID_LEARNING_CENTRE` (400); existing students without a centre become `SETUP_REQUIRED`. Cross-module (P001 profile). Status: READY_FOR_REVIEW.
+- 2026-11-10 - Type: Changed. Students now choose their learning centre in their profile (required, from the active centres). Students without one are asked to add it; the forecast counts "students in the system" under the centre saved in the profile instead of assuming Kuala Lumpur, and leaves out students without a centre. From the moment selection opens for the next semester until the admin moves the current semester forward, a student's centre cannot be changed (the page explains why). Compatibility: `PUT /api/profile` now requires `learningCentreId`; `GET /api/profile` adds `learningCentreId` and `learningCentreLocked`; `GET /api/profile/options` adds `learningCentres`; new errors `PROFILE_CENTRE_LOCKED` (409) and `INVALID_LEARNING_CENTRE` (400); existing students without a centre become `SETUP_REQUIRED`. Cross-module (P001 profile). Status: MERGED.
