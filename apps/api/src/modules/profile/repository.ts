@@ -2,6 +2,7 @@ import type { Profile, ProfileInput, ProfileRepository, Query } from './contract
 import type { ProfileReader } from '../auth/contracts';
 import type { ReferenceCache } from '../../cache/redis';
 import { P001Error, persistenceError } from './validation';
+import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 
 const curriculumOptionKeys = ['curriculumId', 'curriculumVersion', 'programmeId', 'programmeCode', 'programmeName'];
 const semesterOptionKeys = ['semesterId', 'academicYear', 'semesterNo', 'semesterType'];
@@ -47,9 +48,11 @@ function isCurriculumOptionsBundle(value: unknown): value is {
 export interface ProfileRepositoryOptions {
   /** Selects the optional curriculum-scoped path after full flag/config validation by composition. */
   curriculumCacheEnabled?: boolean;
+  /** Server clock for the learning centre lock; tests inject a fixed time. */
+  now?: () => Date;
 }
 
-const select = `SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",
+const select = `SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",p.learning_centre_id AS "learningCentreId",
  p.curriculum_id AS "curriculumId",p.current_semester_id AS "currentSemesterId",p.weekly_working_hours AS "weeklyWorkingHours",p.available_study_hours AS "availableStudyHours",
  p.created_at AS "createdAt",p.updated_at AS "updatedAt",c.curriculum_version AS "curriculumVersion",
  g.programme_code AS "programmeCode",g.programme_name AS "programmeName",c.total_credit_required AS "totalCreditRequired"
@@ -59,38 +62,67 @@ function mapped(row: Record<string, unknown>): Profile {
   if (!Number.isInteger(value.studentId) || typeof value.studentName !== 'string' || !Number.isInteger(value.curriculumId)) throw new Error('Invalid profile result');
   if (value.totalCreditRequired !== undefined && value.totalCreditRequired !== null &&
       (!Number.isInteger(value.totalCreditRequired) || value.totalCreditRequired < 0 || value.totalCreditRequired > 2147483647)) throw new Error('Invalid profile curriculum total');
-  return { ...value, createdAt: new Date(value.createdAt).toISOString(), updatedAt: new Date(value.updatedAt).toISOString() };
+  return { ...value, learningCentreId: value.learningCentreId ?? null, learningCentreLocked: false,
+    createdAt: new Date(value.createdAt).toISOString(), updatedAt: new Date(value.updatedAt).toISOString() };
 }
+const ISO = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
+const CENTRE_LOCKED_MESSAGE = 'Your learning centre is locked while subject selection for the next semester is open. It unlocks when the next semester starts.';
 export function createProfileRepository(query: Query, referenceCache?: ReferenceCache, options: ProfileRepositoryOptions = {}): ProfileRepository {
+  const now = options.now ?? (() => new Date());
+  /** True once the next semester's selection has opened (OPEN or CLOSED) and the admin has not yet moved the current semester forward. */
+  const selectionStarted = async () => {
+    const rows = await query(`SELECT to_char(s.selection_opens_at AT TIME ZONE 'UTC', ${ISO}) AS "selectionOpensAt",
+        to_char(s.selection_closes_at AT TIME ZONE 'UTC', ${ISO}) AS "selectionClosesAt"
+      FROM public.academic_semester s, public.academic_semester c
+      WHERE c.is_current AND (s.academic_year, s.semester_no) > (c.academic_year, c.semester_no)
+      ORDER BY s.academic_year, s.semester_no LIMIT 1`, []);
+    const row = rows[0];
+    if (!row) return false;
+    const selectionOpensAt = typeof row.selectionOpensAt === 'string' ? row.selectionOpensAt : null;
+    const selectionClosesAt = typeof row.selectionClosesAt === 'string' ? row.selectionClosesAt : null;
+    return selectionPhase({ selectionOpensAt, selectionClosesAt }, now()) !== 'PLANNING';
+  };
   const find = async (userId: string) => {
     const rows = await query(select + ' WHERE p.clerk_user_id=$1', [userId]);
-    return rows[0] ? mapped(rows[0]) : null;
+    if (!rows[0]) return null;
+    const profile = mapped(rows[0]);
+    // A student without a centre can always set one, so only a saved centre can be locked.
+    return profile.learningCentreId === null ? profile : { ...profile, learningCentreLocked: await selectionStarted() };
   };
   return {
     find,
     async save(userId: string, input: ProfileInput) {
       try {
+        const existing = (await query('SELECT learning_centre_id AS "learningCentreId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0]?.learningCentreId;
+        const savedCentre = typeof existing === 'number' ? existing : null;
+        // Changing a saved centre is blocked while selection is open; a student without one may set it at any time.
+        const locked = savedCentre !== null && await selectionStarted();
+        if (locked && savedCentre !== input.learningCentreId)
+          throw new P001Error(409, 'PROFILE_CENTRE_LOCKED', CENTRE_LOCKED_MESSAGE);
         const rows = await query(`WITH saved AS (
-          INSERT INTO public.student_profile(clerk_user_id,student_name,matric_no,curriculum_id,current_semester_id,weekly_working_hours,available_study_hours)
-          SELECT $1,$2,$3,c.curriculum_id,s.semester_id,$6,$7 FROM public.curriculum c JOIN public.programme g USING(programme_id)
+          INSERT INTO public.student_profile(clerk_user_id,student_name,matric_no,learning_centre_id,curriculum_id,current_semester_id,weekly_working_hours,available_study_hours)
+          SELECT $1,$2,$3,lc.learning_centre_id,c.curriculum_id,s.semester_id,$6,$7 FROM public.curriculum c JOIN public.programme g USING(programme_id)
           JOIN public.academic_semester s ON s.semester_id=$5
+          JOIN public.learning_centre lc ON lc.learning_centre_id=$8 AND (lc.is_active OR lc.learning_centre_id=$9)
           WHERE c.curriculum_id=$4 AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE'
           ON CONFLICT(clerk_user_id) DO UPDATE SET student_name=EXCLUDED.student_name,matric_no=EXCLUDED.matric_no,
-            curriculum_id=EXCLUDED.curriculum_id,current_semester_id=EXCLUDED.current_semester_id,
+            learning_centre_id=EXCLUDED.learning_centre_id,curriculum_id=EXCLUDED.curriculum_id,current_semester_id=EXCLUDED.current_semester_id,
             weekly_working_hours=EXCLUDED.weekly_working_hours,available_study_hours=EXCLUDED.available_study_hours
           RETURNING *
-        ) SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",
+        ) SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",p.learning_centre_id AS "learningCentreId",
           p.curriculum_id AS "curriculumId",p.current_semester_id AS "currentSemesterId",p.weekly_working_hours AS "weeklyWorkingHours",p.available_study_hours AS "availableStudyHours",
           p.created_at AS "createdAt",p.updated_at AS "updatedAt",c.curriculum_version AS "curriculumVersion",
           g.programme_code AS "programmeCode",g.programme_name AS "programmeName",c.total_credit_required AS "totalCreditRequired"
           FROM saved p JOIN public.curriculum c USING(curriculum_id) JOIN public.programme g USING(programme_id)`,
-        [userId,input.studentName,input.matricNo,input.curriculumId,input.currentSemesterId,input.weeklyWorkingHours,input.availableStudyHours]);
+        [userId,input.studentName,input.matricNo,input.curriculumId,input.currentSemesterId,input.weeklyWorkingHours,input.availableStudyHours,input.learningCentreId,savedCentre]);
         if (!rows[0]) {
+          const centres = await query('SELECT learning_centre_id FROM public.learning_centre WHERE learning_centre_id=$1 AND (is_active OR learning_centre_id=$2)', [input.learningCentreId, savedCentre]);
+          if (!centres[0]) throw new P001Error(400, 'INVALID_LEARNING_CENTRE', 'Select an available learning centre.');
           const semesters = await query('SELECT semester_id FROM public.academic_semester WHERE semester_id=$1', [input.currentSemesterId]);
           if (!semesters[0]) throw new P001Error(400, 'INVALID_SEMESTER', 'Select a configured academic year and semester.');
           throw new P001Error(400, 'INVALID_CURRICULUM', 'Select an available configured curriculum.');
         }
-        return mapped(rows[0]);
+        return { ...mapped(rows[0]), learningCentreLocked: locked };
       } catch (error) { return persistenceError(error); }
     },
     async options(userId: string) {
@@ -99,15 +131,20 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code,c.curriculum_version`, []);
       const loadSemesters = () => query(`SELECT semester_id AS "semesterId",academic_year AS "academicYear",semester_no AS "semesterNo",semester_type AS "semesterType"
           FROM public.academic_semester ORDER BY academic_year DESC,semester_no DESC`, []);
+      // Active centres, plus the student's saved centre even if it was deactivated so the select can still show it. Not cached: it is tiny and follows admin edits at once.
+      const loadCentres = () => query(`SELECT learning_centre_id AS "learningCentreId",centre_code AS "centreCode",centre_name AS "centreName"
+          FROM public.learning_centre WHERE is_active OR learning_centre_id=(SELECT learning_centre_id FROM public.student_profile WHERE clerk_user_id=$1)
+          ORDER BY centre_code`, [userId]);
       if (options.curriculumCacheEnabled && referenceCache) {
         const association = await query('SELECT curriculum_id AS "curriculumId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]);
         const curriculumId = association[0]?.curriculumId;
         if (curriculumId === undefined || curriculumId === null) {
-          const [curricula, semesters] = await Promise.all([
+          const [curricula, semesters, learningCentres] = await Promise.all([
             referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows }),
             referenceCache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isSemesterOptionRows }),
+            loadCentres(),
           ]);
-          return { curricula, subjects: [], semesters, subjectGroups: [] } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+          return { curricula, subjects: [], semesters, subjectGroups: [], learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
         }
         if (!isDatabaseId(curriculumId)) throw new Error('Invalid curriculum association result');
         const loadSubjects = () => query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS "subjectName",s.credit_hours AS "creditHours",
@@ -133,14 +170,15 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           const [subjects, subjectGroups] = await Promise.all([loadSubjects(), loadSubjectGroups()]);
           return { curriculumId, subjects, subjectGroups };
         };
-        const [curricula, semesters, bundle] = await Promise.all([
+        const [curricula, semesters, bundle, learningCentres] = await Promise.all([
           referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows }),
           referenceCache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isSemesterOptionRows }),
           referenceCache.getOrLoad({ kind: 'curriculum-options', curriculumId, ttlSeconds: 300, load: loadBundle, validate: isCurriculumOptionsBundle }),
+          loadCentres(),
         ]);
-        return { curricula, subjects: bundle.subjects, semesters, subjectGroups: bundle.subjectGroups } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+        return { curricula, subjects: bundle.subjects, semesters, subjectGroups: bundle.subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
       }
-      const [curricula, subjects, semesters, subjectGroups] = await Promise.all([
+      const [curricula, subjects, semesters, subjectGroups, learningCentres] = await Promise.all([
         referenceCache
           ? referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows })
           : loadCurricula(),
@@ -168,8 +206,9 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           FROM category_counts cc LEFT JOIN requirement_counts rc ON rc.curriculum_id=cc.curriculum_id
             AND rc.requirement_type=btrim(regexp_replace(upper(cc.category),'[^A-Z0-9]+','_','g'),'_')
           ORDER BY cc.category`, [userId]),
+        loadCentres(),
       ]);
-      return { curricula, subjects, semesters, subjectGroups } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+      return { curricula, subjects, semesters, subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
     },
   };
 }
@@ -178,7 +217,8 @@ export function createProfileReader(repository: ProfileRepository): ProfileReade
     try {
       const p = await repository.find(userId);
       // A matric number is required (S2-P004-016): coordinators identify portal students by it in the forecast student list.
-      return p && p.studentName.trim() && p.matricNo?.trim() && p.curriculumId > 0 &&
+      // A learning centre is required too (S2-P004-023): it decides which approved offerings the student sees.
+      return p && p.studentName.trim() && p.matricNo?.trim() && Number.isInteger(p.learningCentreId) && p.learningCentreId! > 0 && p.curriculumId > 0 &&
         Number.isInteger(p.currentSemesterId) && p.currentSemesterId! > 0 &&
         Number.isInteger(p.weeklyWorkingHours) && p.weeklyWorkingHours! >= 0 &&
         Number.isInteger(p.availableStudyHours) && p.availableStudyHours! >= 0 ? 'COMPLETE' : 'SETUP_REQUIRED';

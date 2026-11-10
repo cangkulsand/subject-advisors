@@ -4,7 +4,7 @@ import type { ScopeProvider } from './scope-provider';
 import { csvLine } from './csv';
 import type { ForecastingDependencies } from './contracts';
 import { createForecastingRepository, type ForecastingStatement } from './repository';
-import { createOfferingsRepository } from './offerings-repository';
+import { createOfferingDecisionsRepository } from './decisions-repository';
 import { createForecastRunsRepository } from './runs-repository';
 import { handleForecastingRequest } from './routes';
 
@@ -90,7 +90,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       scopes,
       repository: createForecastingRepository(query, transaction),
       runs: createForecastRunsRepository(query, transaction),
-      offerings: createOfferingsRepository(query, transaction),
+      decisions: createOfferingDecisionsRepository(query, transaction),
       now: () => new Date('2026-11-01T12:00:00.000Z'),
     };
   });
@@ -216,7 +216,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
     expect(await scalar('SELECT (SELECT count(*) FROM public.student_profile) AS profiles, (SELECT count(*) FROM public.academic_record) AS records')).toEqual(before);
   });
 
-  describe('forecast runs (generate, review, decide, finalize, frozen)', () => {
+  describe('forecast runs (generate, replay, snapshots)', () => {
     const base = 'https://test.invalid/api/coordinator/';
     const call = async (path: string, init?: RequestInit) => await handleForecastingRequest(new Request(base + path, init), deps) as Response;
     const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -225,9 +225,6 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
     const cohortCsv = (count: number) => [header, ...Array.from({ length: count }, (_, i) => row('Q' + String(i + 1).padStart(3, '0'), '', 'ACTIVE', 'COMPLETE'))].join('\n');
     const importCohort = async (count: number) => (await (await upload(cohortCsv(count))).json()).data.importBatchId as number;
     const generate = async (importBatchId: number) => await post('forecast-runs', { ...runScope(), importBatchId, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
-    const revisionOf = async (response: Response) => (await response.json()).data.revision as string;
-    const mutate = (id: number, leaf: string, revision: string, body: Record<string, unknown>) =>
-      post('forecast-runs/' + id + '/' + leaf, { scope: runScope(), ...body }, { 'If-Match': '"' + revision + '"' });
     const rejects = async (sql: string, values: unknown[], pattern: RegExp) => {
       await client.query('SAVEPOINT probe');
       await expect(client.query(sql, values)).rejects.toThrow(pattern);
@@ -277,12 +274,12 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect(v2.status).toBe(201);
       const v2Id = (await v2.json()).data.resourceId;
       expect(await scalar('SELECT version_number, parent_forecast_run_id FROM public.forecast_run WHERE forecast_run_id=$1', [v2Id])).toEqual({ version_number: 2, parent_forecast_run_id: receipt.resourceId });
-      expect((await (await call('forecast-runs/' + receipt.resourceId)).json()).data.newerForecastAvailable).toEqual({ forecastRunId: v2Id, versionNumber: 2, status: 'DRAFT' });
-      const list = (await (await call(`forecast-runs?programmeId=${ids.programme}&learningCentreId=${ids.centre}&targetSemesterId=${ids.target}`)).json()).data;
-      expect(list.items.map((i: { versionNumber: number; summary: { totalSections: number; pendingSections: number } }) => [i.versionNumber, i.summary.totalSections, i.summary.pendingSections])).toEqual([[2, 2, 2], [1, 2, 2]]);
+      expect((await (await call('forecast-runs/' + receipt.resourceId)).json()).data.newerForecastAvailable).toBeNull();
+      const other = await handleForecastingRequest(new Request(base + 'forecast-runs/' + receipt.resourceId), { ...deps, scopes: { ...deps.scopes, isScopeAssigned: async () => false } }) as Response;
+      expect(other.status).toBe(404);
     });
 
-    it('builds the forecast from the students in the system (portal snapshot): selection, mapping, replay, unchanged student tables, then review, finalize and confirm', async () => {
+    it('builds the forecast from the students in the system (portal snapshot): selection, mapping, replay, unchanged student tables', async () => {
       await client.query("SELECT set_config('app.access_actor','db-seed',true), set_config('app.access_reason','seed',true)");
       const person = async (name: string, access: 'ACTIVE' | 'SUSPENDED', role: 'STUDENT' | 'COORDINATOR', curriculum = ids.curriculum) => {
         const clerk = 'user_sys_' + Math.random().toString(36).slice(2, 10);
@@ -356,7 +353,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect(secondId).not.toBe(accepted.importBatchId);
       await client.query('DELETE FROM public.academic_record WHERE student_id=$1', [bob]); // restore for the unchanged-tables check below
 
-      // Generate, review, finalize and confirm work unchanged on the snapshot.
+      // Generating the forecast works unchanged on the snapshot.
       const run = await generate(accepted.importBatchId);
       expect(run.status).toBe(201);
       const receipt = (await run.json()).data;
@@ -368,14 +365,6 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect([lecture.supportedEligibleCount, lecture.uncertainStudentCount]).toEqual([0, 1]);
       expect(lecture.uncertaintyReasons).toContain('HISTORY_UNKNOWN');
       expect([lab.supportedEligibleCount, lab.uncertainStudentCount]).toEqual([1, 1]);
-      let revision = receipt.revision as string;
-      revision = await revisionOf(await mutate(receipt.resourceId, 'reviews', revision, { action: 'START_REVIEW' }));
-      const withSections = detail.subjects.filter((s: { sections: unknown[] }) => s.sections.length).map((s: { subjectId: number }) => ({ subjectId: s.subjectId, action: 'APPROVE', reason: 'ok' }));
-      revision = await revisionOf(await mutate(receipt.resourceId, 'decisions', revision, { decisions: withSections }));
-      const done = await mutate(receipt.resourceId, 'finalizations', revision, {});
-      expect(done.status).toBe(200);
-      const confirm = await post('confirmed-offerings', { scope: runScope(), forecastRunId: receipt.resourceId, subjectIds: [ids.s102], reason: 'Offered.', baseRevision: null, pickDeadline: '2026-12-01T04:00:00.000Z' });
-      expect(confirm.status).toBe(201);
 
       // The student tables were never written.
       expect(await studentTables()).toEqual(before);
@@ -443,7 +432,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       const subset = await post('forecast-imports/' + report.validationId + '/subset-acceptances', { ...runScope(), validationRevision: report.validationRevision, acknowledgeRejectedRows: true }, { 'If-Match': etag });
       expect(subset.status).toBe(201);
       expect((await subset.json()).data).toMatchObject({ source: 'COMBINED', counts: { uniqueStudents: 5 } });
-      // Generate, review, finalize and confirm work unchanged on the combined snapshot.
+      // Generating the forecast works unchanged on the combined snapshot.
       const run = await generate(accepted.importBatchId);
       expect(run.status).toBe(201);
       const receipt = (await run.json()).data;
@@ -453,259 +442,70 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect(await studentTables()).toEqual(before);
     });
 
-    it('reviews, decides with before/after audit, finalizes, and the frozen forecast rejects every change', async () => {
-      const batchId = await importCohort(30);
-      const created = await generate(batchId);
-      const id = (await created.json()).data.resourceId as number;
-      let revision = 'fr' + id + '.DRAFT.0';
-      expect((await mutate(id, 'reviews', 'fr' + id + '.DRAFT.5', { action: 'START_REVIEW' })).status).toBe(412);
-      expect(Number((await scalar('SELECT count(*) AS n FROM public.forecast_adjustment_audit WHERE forecast_run_id=$1', [id])).n)).toBe(0);
-      const started = await mutate(id, 'reviews', revision, { action: 'START_REVIEW' });
-      expect(started.status).toBe(200);
-      revision = await revisionOf(started);
-      expect(revision).toBe('fr' + id + '.UNDER_REVIEW.1');
-      expect(await scalar("SELECT demand_id, recorded_by, reason, before_state, after_state FROM public.forecast_adjustment_audit WHERE forecast_run_id=$1 AND action='START_REVIEW'", [id]))
-        .toEqual({ demand_id: null, recorded_by: actor, reason: 'Review started.', before_state: { status: 'DRAFT' }, after_state: { status: 'UNDER_REVIEW' } });
-      expect((await scalar('SELECT status FROM public.forecast_run WHERE forecast_run_id=$1', [id])).status).toBe('UNDER_REVIEW');
-
-      const detailBefore = (await (await call('forecast-runs/' + id)).json()).data;
-      const lectureBefore = detailBefore.subjects.find((s: { subjectId: number }) => s.subjectId === ids.s101);
-      const first = lectureBefore.sections[0].proposedSectionId as number;
-      const decided = await mutate(id, 'decisions', revision, { decisions: [
-        { subjectId: ids.s102, action: 'APPROVE', reason: 'Lab is booked.', approvalReference: 'LAB/1' },
-        { subjectId: ids.s101, action: 'REPLACE_ALLOCATION', reason: 'Split for the timetable.', replacementSections: [
-          { proposedSectionId: first, sectionNumber: 1, expectedStudents: 15 }, { sectionNumber: 2, expectedStudents: 15 }] },
-      ] });
-      expect(decided.status).toBe(200);
-      revision = await revisionOf(decided);
-      expect(revision).toBe('fr' + id + '.UNDER_REVIEW.3');
-      const lecture = (await (await call('forecast-runs/' + id)).json()).data.subjects.find((s: { subjectId: number }) => s.subjectId === ids.s101);
-      expect(lecture.sections.map((s: { sectionNumber: number; expectedStudents: number; reviewStatus: string }) => [s.sectionNumber, s.expectedStudents, s.reviewStatus])).toEqual([[1, 15, 'REVIEWED'], [2, 15, 'REVIEWED']]);
-      expect(lecture.sections[0].proposedSectionId).toBe(first);
-      expect(lecture.allocatedStudents).toBe(lecture.forecastCount);
-
-      const audit = (await client.query('SELECT a.action, a.reason, a.recorded_by, a.before_state, a.after_state, d.subject_id FROM public.forecast_adjustment_audit a JOIN public.forecast_subject_demand d USING (demand_id) WHERE a.forecast_run_id=$1 ORDER BY a.adjustment_audit_id', [id])).rows;
-      expect(audit.map((entry) => [entry.action, entry.subject_id, entry.recorded_by])).toEqual([['APPROVE', ids.s102, actor], ['REPLACE_ALLOCATION', ids.s101, actor]]);
-      expect(audit[1]!.before_state).toMatchObject({ sections: [{ proposedSectionId: first, expectedStudents: 30, reviewStatus: 'PENDING' }] });
-      expect((audit[1]!.after_state as { sections: unknown[] }).sections).toHaveLength(2);
-      expect(audit[0]!.after_state).toMatchObject({ approvalReference: 'LAB/1', sections: [{ reviewStatus: 'APPROVED' }] });
-
-      // concurrency: a stale expectation is refused atomically by the database guard, and nothing is written
-      await expect(deps.runs.applyDecisions(id, { status: 'UNDER_REVIEW', auditCount: 2 }, actor, [])).rejects.toMatchObject({ code: 'RUN_REVISION_MISMATCH' });
-      // the total is preserved, then retiring a section (the replacement keeps one section: the other is retired)
-      const tooMany = await mutate(id, 'decisions', revision, { decisions: [{ subjectId: ids.s101, action: 'REPLACE_ALLOCATION', reason: 'Bad total.', replacementSections: [{ sectionNumber: 1, expectedStudents: 31 }] }] });
-      expect((await tooMany.json()).error.code).toBe('ALLOCATION_TOTAL_MISMATCH');
-      const merged = await mutate(id, 'decisions', revision, { decisions: [{ subjectId: ids.s101, action: 'REPLACE_ALLOCATION', reason: 'Merge back.', replacementSections: [{ proposedSectionId: first, sectionNumber: 1, expectedStudents: 30 }] }] });
-      expect(merged.status).toBe(200);
-      revision = await revisionOf(merged);
-      expect(Number((await scalar('SELECT count(*) AS n FROM public.proposed_class_section s JOIN public.forecast_subject_demand d USING (demand_id) WHERE d.forecast_run_id=$1 AND d.subject_id=$2', [id, ids.s101])).n)).toBe(1);
-
-      const done = await mutate(id, 'finalizations', revision, { reason: 'Board approved.', approvalReference: 'BOARD/1' });
-      expect(done.status).toBe(200);
-      const finalRevision = await revisionOf(done);
-      expect(finalRevision).toBe('fr' + id + '.FINALIZED.5');
-      expect(await scalar('SELECT status, finalized_by, finalized_at IS NOT NULL AS stamped FROM public.forecast_run WHERE forecast_run_id=$1', [id])).toEqual({ status: 'FINALIZED', finalized_by: actor, stamped: true });
-      const finalAudit = await scalar("SELECT reason, recorded_by, demand_id, after_state FROM public.forecast_adjustment_audit WHERE forecast_run_id=$1 AND action='FINALIZE'", [id]);
-      expect(finalAudit).toMatchObject({ reason: 'Board approved.', recorded_by: actor, demand_id: null, after_state: { status: 'FINALIZED', approvalReference: 'BOARD/1' } });
-
-      // API path
-      const late = await mutate(id, 'decisions', finalRevision, { decisions: [{ subjectId: ids.s101, action: 'REVIEW', reason: 'late' }] });
-      expect(late.status).toBe(409);
-      expect((await late.json()).error.code).toBe('RUN_FINALIZED');
-      // repository path with a matching expectation reaches the database, which refuses it
-      const demandId = Number((await scalar('SELECT demand_id FROM public.forecast_subject_demand WHERE forecast_run_id=$1 AND subject_id=$2', [id, ids.s101])).demand_id);
-      const plan = { demandId, subjectId: ids.s101, action: 'REVIEW' as const, reason: 'bypass', approvalReference: null, sectionStatus: 'REVIEWED' as const, before: [], replace: null };
-      await expect(deps.runs.applyDecisions(id, { status: 'FINALIZED', auditCount: 5 }, actor, [plan])).rejects.toMatchObject({ code: 'RUN_FINALIZED' });
-      // raw SQL paths
-      await rejects('UPDATE public.proposed_class_section SET expected_students=expected_students', [], /read-only/i);
-      await rejects('DELETE FROM public.forecast_subject_demand WHERE forecast_run_id=$1', [id], /read-only/i);
-      await rejects('DELETE FROM public.forecast_run WHERE forecast_run_id=$1', [id], /cannot be deleted|read-only/i);
-      await rejects("UPDATE public.forecast_run SET scenario_assumptions='{}'::jsonb WHERE forecast_run_id=$1", [id], /read-only/i);
-      await rejects("INSERT INTO public.forecast_adjustment_audit(forecast_run_id, demand_id, action, before_state, after_state, reason, recorded_by) SELECT forecast_run_id, demand_id, 'REVIEW', '{}', '{}', 'x', 'y' FROM public.forecast_subject_demand WHERE forecast_run_id=$1 LIMIT 1", [id], /read-only/i);
-      const frozenGet = (await (await call('forecast-runs/' + id)).json()).data;
-      expect(frozenGet).toMatchObject({ status: 'FINALIZED', revision: finalRevision, finalizedBy: actor });
-      expect(frozenGet.audit[0].actionType).toBe('FINALIZE');
-    });
-
-    it('refuses to finalize while sections are pending, reports the pending subjects and hides runs from unassigned coordinators', async () => {
-      const batchId = await importCohort(30);
-      const id = (await (await generate(batchId)).json()).data.resourceId as number;
-      const started = await revisionOf(await mutate(id, 'reviews', 'fr' + id + '.DRAFT.0', { action: 'START_REVIEW' }));
-      const blocked = await mutate(id, 'finalizations', started, {});
-      expect(blocked.status).toBe(422);
-      expect((await blocked.json()).error).toMatchObject({ code: 'REVIEWS_INCOMPLETE', details: { pendingSubjectIds: [ids.s101, ids.s102].sort((x, y) => x - y) } });
-      const other = await handleForecastingRequest(new Request(base + 'forecast-runs/' + id), { ...deps, scopes: { ...deps.scopes, isScopeAssigned: async () => false } }) as Response;
-      expect(other.status).toBe(404);
-    });
   });
-  describe('offering confirmation (finalized run, audit, append-only)', () => {
+  describe('offering decisions on PostgreSQL', () => {
     const base = 'https://test.invalid/api/coordinator/';
-    const deadline = '2026-12-01T04:00:00.000Z';
-    const later = '2026-12-08T04:00:00.000Z';
-    const call = async (path: string, init?: RequestInit) => await handleForecastingRequest(new Request(base + path, init), deps) as Response;
-    const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
-      call(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    const post = async (body: unknown) => await handleForecastingRequest(new Request(base + 'offering-decisions', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    }), deps) as Response;
     const scope = () => ({ programmeId: ids.programme, learningCentreId: ids.centre, targetSemesterId: ids.target });
-    const query = () => `programmeId=${ids.programme}&learningCentreId=${ids.centre}&targetSemesterId=${ids.target}`;
-    const rejects = async (sql: string, values: unknown[], pattern: RegExp) => {
-      await client.query('SAVEPOINT probe');
-      await expect(client.query(sql, values)).rejects.toThrow(pattern);
-      await client.query('ROLLBACK TO SAVEPOINT probe');
-    };
-    let excludedId: number; let strayId: number;
-    beforeEach(async () => {
-      await client.query("INSERT INTO public.class_capacity_rule(class_type, minimum_enrollment, break_even_target, normal_maximum, exception_maximum, is_active) VALUES ('LECTURE',15,25,45,50,true)");
-      await client.query("INSERT INTO public.class_capacity_rule(class_type, minimum_enrollment, break_even_target, normal_maximum, exception_maximum, is_active) VALUES ('LAB',15,25,35,NULL,true)");
-      await client.query("UPDATE public.subject SET class_type='LECTURE' WHERE subject_id=$1", [ids.s101]);
-      await client.query("UPDATE public.subject SET class_type='LAB' WHERE subject_id=$1", [ids.s102]);
-      excludedId = Number((await scalar("INSERT INTO public.subject(subject_code, subject_name, credit_hours, include_in_offering_forecast) VALUES ('EX' || substr(md5(random()::text),1,6), 'Excluded subject', 6, false) RETURNING subject_id")).subject_id);
-      await client.query("INSERT INTO public.curriculum_subject(is_compulsory, subject_category, curriculum_id, subject_id) VALUES (1,'CORE',$1,$2)", [ids.curriculum, excludedId]);
-      strayId = Number((await scalar("INSERT INTO public.subject(subject_code, subject_name, credit_hours) VALUES ('ST' || substr(md5(random()::text),1,6), 'Not in curriculum', 3) RETURNING subject_id")).subject_id);
+
+    it('approves a subject with an audit row, rejects a stale change and keeps the audit immutable', async () => {
+      const approved = await post({ scope: scope(), subjectId: ids.s101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: null });
+      expect(approved.status).toBe(200);
+      expect((await approved.json()).data).toMatchObject({ beforeStatus: 'PENDING', afterStatus: 'APPROVED', affectedPicks: 0, phase: 'PLANNING' });
+      expect(await scalar('SELECT status, decided_by FROM public.offering_decision WHERE subject_id=$1 AND semester_id=$2', [ids.s101, ids.target])).toMatchObject({ status: 'APPROVED', decided_by: actor });
+      expect(await scalar('SELECT before_status, after_status, recorded_by FROM public.offering_decision_audit WHERE subject_id=$1', [ids.s101])).toMatchObject({ before_status: 'PENDING', after_status: 'APPROVED', recorded_by: actor });
+
+      const stale = await post({ scope: scope(), subjectId: ids.s101, status: 'REMOVED', expectedStatus: 'PENDING', importBatchId: null });
+      expect(stale.status).toBe(409);
+      expect((await stale.json()).error.code).toBe('DECISION_STALE');
+      expect(Number((await scalar('SELECT count(*) AS n FROM public.offering_decision_audit WHERE subject_id=$1', [ids.s101])).n)).toBe(1);
+
+      const added = await post({ scope: scope(), subjectId: ids.s101, status: 'PENDING', expectedStatus: 'APPROVED', importBatchId: null });
+      expect(added.status).toBe(200);
+      expect(Number((await scalar('SELECT count(*) AS n FROM public.offering_decision WHERE subject_id=$1', [ids.s101])).n)).toBe(0);
+
+      await client.query('SAVEPOINT immutable_audit');
+      await expect(client.query("UPDATE public.offering_decision_audit SET recorded_by='x'")).rejects.toThrow(/immutable/i);
+      await client.query('ROLLBACK TO SAVEPOINT immutable_audit');
     });
 
-    const newRun = async (students: number) => {
-      const csv = [header, ...Array.from({ length: students }, (_, i) => row('Q' + String(i + 1).padStart(3, '0'), '', 'ACTIVE', 'COMPLETE'))].join('\n');
-      const data = new FormData();
-      for (const [key, value] of Object.entries(fields())) data.append(key, value);
-      data.append('file', new File([csv], 'import.csv', { type: 'text/csv' }));
-      const imported = await handleForecastingRequest(new Request(base + 'forecast-imports', { method: 'POST', body: data }), deps) as Response;
-      const importBatchId = (await imported.json()).data.importBatchId as number;
-      const created = await post('forecast-runs', { ...scope(), importBatchId, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
-      return (await created.json()).data as { resourceId: number; revision: string };
-    };
-    const finalized = async (students: number) => {
-      const run = await newRun(students);
-      const step = async (leaf: string, revision: string, body: Record<string, unknown>) => (await (await post(`forecast-runs/${run.resourceId}/${leaf}`, { scope: scope(), ...body }, { 'If-Match': '"' + revision + '"' })).json()).data.revision as string;
-      let revision = await step('reviews', run.revision, { action: 'START_REVIEW' });
-      revision = await step('decisions', revision, { decisions: [{ subjectId: ids.s101, action: 'APPROVE', reason: 'ok' }, { subjectId: ids.s102, action: 'APPROVE', reason: 'ok' }] });
-      await step('finalizations', revision, {});
-      return run.resourceId;
-    };
-    const confirmBody = (forecastRunId: number, subjectIds: number[], extra: Record<string, unknown> = {}) =>
-      ({ scope: scope(), forecastRunId, subjectIds, reason: 'Offered next semester.', baseRevision: null, pickDeadline: deadline, ...extra });
-    const send = (path: string, body: unknown, revision: string | null) => post(path, body, revision ? { 'If-Match': '"' + revision + '"' } : {});
-    const readSet = async () => (await (await call('confirmed-offerings?' + query())).json()).data;
-    const errorCode = async (response: Response) => (await response.json()).error.code as string;
+    it('withdraws scoped picks when an approved subject is removed and keeps the withdrawal record', async () => {
+      const otherCentre = Number((await scalar("INSERT INTO public.learning_centre(centre_code, centre_name) VALUES (substr(md5(random()::text),1,8), 'DB other centre') RETURNING learning_centre_id")).learning_centre_id);
+      const student = async (name: string, centreId: number) => Number((await scalar(
+        "INSERT INTO public.student_profile(clerk_user_id, matric_no, student_name, curriculum_id, learning_centre_id) VALUES ('db-' || substr(md5(random()::text),1,12), 'A' || substr(md5(random()::text),1,8), $1, $2, $3) RETURNING student_id",
+        [name, ids.curriculum, centreId])).student_id);
+      const pick = async (studentId: number, subjectId: number, semesterId = ids.target) => await client.query(
+        'INSERT INTO public.semester_offering(student_id, semester_id, curriculum_subject_id) SELECT $1, $2, curriculum_subject_id FROM public.curriculum_subject WHERE curriculum_id=$3 AND subject_id=$4',
+        [studentId, semesterId, ids.curriculum, subjectId]);
+      const here = await student('Picker Here', ids.centre); const elsewhere = await student('Picker Elsewhere', otherCentre);
+      await pick(here, ids.s101); await pick(here, ids.s102); await pick(elsewhere, ids.s101); await pick(here, ids.s101, ids.later);
+      expect((await post({ scope: scope(), subjectId: ids.s101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: null })).status).toBe(200);
 
-    it('confirms from a FINALIZED run, writes the header, offerings and audit rows through the triggers', async () => {
-      const run = await finalized(30);
-      const created = await send('confirmed-offerings', confirmBody(run, [ids.s101, ids.s102]), null);
-      expect(created.status).toBe(201);
-      const receipt = (await created.json()).data;
-      expect(await scalar('SELECT forecast_run_id, revision, created_by, updated_by FROM public.offering_confirmation WHERE confirmation_id=$1', [receipt.resourceId]))
-        .toMatchObject({ forecast_run_id: run, revision: 3, created_by: actor, updated_by: actor });
-      expect(receipt.revision).toBe('oc' + receipt.resourceId + '.3');
-      const audit = (await client.query('SELECT action, subject_id, before_state, after_state, reason, recorded_by FROM public.confirmed_offering_audit WHERE confirmation_id=$1 ORDER BY audit_id', [receipt.resourceId])).rows;
-      expect(audit.map((entry) => [entry.action, entry.subject_id, entry.recorded_by, entry.reason])).toEqual([
-        ['SET_DEADLINE', null, actor, 'Offered next semester.'], ['CONFIRM', ids.s101, actor, 'Offered next semester.'], ['CONFIRM', ids.s102, actor, 'Offered next semester.'],
-      ]);
-      expect(audit[0]!.after_state).toMatchObject({ forecastRunId: run });
-      const set = await readSet();
-      expect(set).toMatchObject({ revision: receipt.revision, forecastRunId: run, pickWindow: 'OPEN', newerForecastAvailable: null });
-      expect(set.pickDeadline).toBe(deadline);
-      expect(set.offerings.map((o: { subjectId: number; status: string; classType: string; forecastRunId: number }) => [o.subjectId, o.status, o.classType, o.forecastRunId]).sort())
-        .toEqual([[ids.s101, 'CONFIRMED', 'LECTURE', run], [ids.s102, 'CONFIRMED', 'LAB', run]].sort());
+      const pickers = await handleForecastingRequest(new Request(base + `offering-decisions/${ids.s101}/pickers?programmeId=${ids.programme}&learningCentreId=${ids.centre}&targetSemesterId=${ids.target}`), deps) as Response;
+      expect(pickers.headers.get('cache-control')).toBe('no-store');
+      expect((await pickers.json()).data).toMatchObject({ pickCount: 1, pickers: [{ studentId: here, studentName: 'Picker Here' }] });
+      const set = await handleForecastingRequest(new Request(base + `offering-decisions?programmeId=${ids.programme}&learningCentreId=${ids.centre}&targetSemesterId=${ids.target}`), deps) as Response;
+      expect((await set.json()).data.pickCounts).toEqual([{ subjectId: ids.s101, pickCount: 1 }, { subjectId: ids.s102, pickCount: 1 }]);
+
+      const removed = await post({ scope: scope(), subjectId: ids.s101, status: 'REMOVED', expectedStatus: 'APPROVED', importBatchId: null });
+      expect(removed.status).toBe(200);
+      expect((await removed.json()).data).toMatchObject({ beforeStatus: 'APPROVED', afterStatus: 'REMOVED', affectedPicks: 1 });
+      const remaining = (await client.query('SELECT o.student_id, o.semester_id, cs.subject_id FROM public.semester_offering o JOIN public.curriculum_subject cs USING (curriculum_subject_id) WHERE o.student_id = ANY($1) ORDER BY o.student_id, cs.subject_id', [[here, elsewhere]])).rows;
+      // The scoped pick is gone; the other subject, the other centre and the later semester keep theirs.
+      const key = (row: unknown[]) => row.join(':');
+      expect(remaining.map((row) => key([row.student_id, row.semester_id, row.subject_id])).sort()).toEqual([key([here, ids.target, ids.s102]), key([here, ids.later, ids.s101]), key([elsewhere, ids.target, ids.s101])].sort());
+      const audit = await scalar('SELECT audit_id, affected_picks FROM public.offering_decision_audit WHERE subject_id=$1 AND after_status=$2', [ids.s101, 'REMOVED']);
+      expect(Number(audit.affected_picks)).toBe(1);
+      const withdrawals = (await client.query('SELECT audit_id, student_id, semester_id, subject_id FROM public.offering_pick_withdrawal')).rows;
+      expect(withdrawals).toEqual([{ audit_id: audit.audit_id, student_id: here, semester_id: ids.target, subject_id: ids.s101 }]);
     });
 
-    it('rejects a DRAFT run, an excluded subject and a subject outside the run, and writes nothing', async () => {
-      const draft = await newRun(30);
-      expect(await errorCode(await send('confirmed-offerings', confirmBody(draft.resourceId, [ids.s101]), null))).toBe('RUN_NOT_FINALIZED');
-      const run = await finalized(31);
-      const excluded = await send('confirmed-offerings', confirmBody(run, [ids.s101, excludedId]), null);
-      expect(excluded.status).toBe(422);
-      expect(await errorCode(excluded)).toBe('SUBJECT_EXCLUDED');
-      expect(await errorCode(await send('confirmed-offerings', confirmBody(run, [strayId]), null))).toBe('SUBJECT_NOT_IN_RUN');
-      expect(Number((await scalar('SELECT count(*) AS n FROM public.offering_confirmation WHERE programme_id=$1', [ids.programme])).n)).toBe(0);
-      // the database enforces the same rules when the API is bypassed
-      await client.query("SELECT set_config('app.offering_actor','sql',true), set_config('app.offering_reason','sql test',true)");
-      await rejects("INSERT INTO public.offering_confirmation(programme_id, learning_centre_id, semester_id, forecast_run_id, pick_deadline, created_by, updated_by) VALUES ($1,$2,$3,$4,now(),'x','x')",
-        [ids.programme, ids.centre, ids.target, draft.resourceId], /FINALIZED forecast run/i);
-      await rejects("INSERT INTO public.offering_confirmation(programme_id, learning_centre_id, semester_id, forecast_run_id, pick_deadline, created_by, updated_by) VALUES ($1,$2,$3,$4,now(),'x','x')",
-        [ids.programme, ids.centre, ids.later, run], /FINALIZED forecast run/i);
-    });
-
-    it('stores a Short-only subject as EXCLUDED for a Normal target and refuses to confirm it with a stable code', async () => {
-      const shortId = Number((await scalar("INSERT INTO public.subject(subject_code, subject_name, credit_hours, class_type) VALUES ('SH' || substr(md5(random()::text),1,6), 'Short-only subject', 2, 'LECTURE') RETURNING subject_id")).subject_id);
-      const curriculumSubjectId = Number((await scalar("INSERT INTO public.curriculum_subject(is_compulsory, subject_category, curriculum_id, subject_id) VALUES (1,'CORE',$1,$2) RETURNING curriculum_subject_id", [ids.curriculum, shortId])).curriculum_subject_id);
-      await client.query("INSERT INTO public.subject_semester_rule(semester_type, curriculum_subject_id) VALUES ('SHORT',$1)", [curriculumSubjectId]);
-      const run = await finalized(30);
-      expect(await scalar('SELECT configuration_status, forecast_count, eligible_count FROM public.forecast_subject_demand WHERE forecast_run_id=$1 AND subject_id=$2', [run, shortId]))
-        .toEqual({ configuration_status: 'EXCLUDED', forecast_count: null, eligible_count: 0 });
-      const detail = (await (await call('forecast-runs/' + run)).json()).data;
-      expect(detail.subjects.find((x: { subjectId: number }) => x.subjectId === shortId)).toMatchObject({ excluded: false, semesterTypeExcluded: true, semesterTypeExclusionReason: 'Runs only in Short semesters', sections: [] });
-      expect(detail.summary).toMatchObject({ excludedSubjects: 1, notOfferedInSemesterTypeSubjects: 1 });
-      const rejected = await send('confirmed-offerings', confirmBody(run, [ids.s101, shortId]), null);
-      expect(rejected.status).toBe(422);
-      expect(await errorCode(rejected)).toBe('SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE');
-      expect(Number((await scalar('SELECT count(*) AS n FROM public.offering_confirmation WHERE programme_id=$1', [ids.programme])).n)).toBe(0);
-    });
-
-    it('withdraws, re-confirms and adds subjects with revisions, 412 on stale ones, and audits every transition', async () => {
-      const run = await finalized(30);
-      const created = (await (await send('confirmed-offerings', confirmBody(run, [ids.s101]), null)).json()).data;
-      const withdrawn = await send('confirmed-offerings/withdrawals', { scope: scope(), subjectIds: [ids.s101], reason: 'Not enough demand.', baseRevision: created.revision }, created.revision);
-      expect(withdrawn.status).toBe(200);
-      const afterWithdraw = (await withdrawn.json()).data.revision as string;
-      expect(await scalar('SELECT status, withdrawn_by, withdrawn_at IS NOT NULL AS stamped FROM public.confirmed_offering WHERE subject_id=$1', [ids.s101])).toEqual({ status: 'WITHDRAWN', withdrawn_by: actor, stamped: true });
-      const stale = await send('confirmed-offerings', confirmBody(run, [ids.s101], { baseRevision: created.revision }), created.revision);
-      expect(stale.status).toBe(412);
-      expect(await errorCode(stale)).toBe('CONFIRMATION_REVISION_MISMATCH');
-      const again = await send('confirmed-offerings', confirmBody(run, [ids.s101, ids.s102], { baseRevision: afterWithdraw, reason: 'Demand recovered.' }), afterWithdraw);
-      expect(again.status).toBe(200);
-      expect(await scalar('SELECT status, withdrawn_by FROM public.confirmed_offering WHERE subject_id=$1', [ids.s101])).toEqual({ status: 'CONFIRMED', withdrawn_by: null });
-      const set = await readSet();
-      expect(set.offerings.map((o: { subjectId: number; status: string; reason: string }) => [o.subjectId, o.status, o.reason]).sort())
-        .toEqual([[ids.s101, 'CONFIRMED', 'Demand recovered.'], [ids.s102, 'CONFIRMED', 'Demand recovered.']].sort());
-      const audit = (await client.query("SELECT action, before_state->>'status' AS b, after_state->>'status' AS a, reason FROM public.confirmed_offering_audit WHERE subject_id=$1 ORDER BY audit_id", [ids.s101])).rows;
-      expect(audit).toEqual([
-        { action: 'CONFIRM', b: null, a: 'CONFIRMED', reason: 'Offered next semester.' }, { action: 'WITHDRAW', b: 'CONFIRMED', a: 'WITHDRAWN', reason: 'Not enough demand.' },
-        { action: 'CONFIRM', b: 'WITHDRAWN', a: 'CONFIRMED', reason: 'Demand recovered.' },
-      ]);
-      // atomic stale-expectation guard at the repository level: nothing is written
-      const header = (await deps.offerings.get(scope()))!.header;
-      const before = Number((await scalar('SELECT count(*) AS n FROM public.confirmed_offering_audit')).n);
-      await expect(deps.offerings.withdraw({ confirmationId: header.confirmationId, expectedRevision: header.revision - 1, subjectIds: [ids.s101], reason: 'racing', actor })).rejects.toMatchObject({ code: 'CONFIRMATION_REVISION_MISMATCH' });
-      expect(Number((await scalar('SELECT count(*) AS n FROM public.confirmed_offering_audit')).n)).toBe(before);
-    });
-
-    it('audits a deadline change and a source-run switch as SET_DEADLINE with before and after, and shows a newer forecast without changing anything', async () => {
-      const run = await finalized(30);
-      const created = (await (await send('confirmed-offerings', confirmBody(run, [ids.s101]), null)).json()).data;
-      const newer = await finalized(31);
-      const draft = await newRun(32);
-      expect((await readSet()).newerForecastAvailable).toEqual({ forecastRunId: draft.resourceId, versionNumber: 3, status: 'DRAFT' });
-      expect((await readSet()).revision).toBe(created.revision);
-      const changed = await send('confirmed-offerings/pick-deadline', { scope: scope(), pickDeadline: later, reason: 'Registry asked for more time.', baseRevision: created.revision, forecastRunId: newer }, created.revision);
-      expect(changed.status).toBe(200);
-      expect(await scalar('SELECT forecast_run_id FROM public.offering_confirmation WHERE confirmation_id=$1', [created.resourceId])).toMatchObject({ forecast_run_id: newer });
-      const entry = await scalar("SELECT before_state, after_state, reason, recorded_by, subject_id FROM public.confirmed_offering_audit WHERE confirmation_id=$1 AND action='SET_DEADLINE' ORDER BY audit_id DESC LIMIT 1", [created.resourceId]);
-      expect(entry).toMatchObject({ reason: 'Registry asked for more time.', recorded_by: actor, subject_id: null, before_state: { forecastRunId: run }, after_state: { forecastRunId: newer } });
-      const page = (await (await call('confirmed-offerings/audit?' + query() + '&limit=2')).json()).data;
-      expect(page.items[0]).toMatchObject({ action: 'SET_DEADLINE', beforeDeadline: deadline, afterDeadline: later, forecastRunId: newer, reason: 'Registry asked for more time.' });
-      expect(page.items[1]).toMatchObject({ action: 'CONFIRM', subjectId: ids.s101, forecastRunId: run });
-      expect(page.nextCursor).toBeTruthy();
-      expect(await errorCode(await send('confirmed-offerings/pick-deadline', { scope: scope(), pickDeadline: deadline, reason: 'again', baseRevision: created.revision }, created.revision))).toBe('CONFIRMATION_REVISION_MISMATCH');
-    });
-
-    it('keeps the audit append-only and refuses mutations without trusted actor and reason', async () => {
-      const run = await finalized(30);
-      const created = (await (await send('confirmed-offerings', confirmBody(run, [ids.s101]), null)).json()).data;
-      await rejects('UPDATE public.confirmed_offering_audit SET reason=reason', [], /immutable/i);
-      await rejects('DELETE FROM public.confirmed_offering_audit', [], /immutable/i);
-      await rejects('TRUNCATE public.confirmed_offering_audit', [], /immutable/i);
-      await rejects('DELETE FROM public.confirmed_offering', [], /immutable/i);
-      await rejects('DELETE FROM public.offering_confirmation', [], /immutable/i);
-      await client.query("SELECT set_config('app.offering_actor','',true), set_config('app.offering_reason','',true)");
-      await rejects("UPDATE public.confirmed_offering SET status='WITHDRAWN' WHERE subject_id=$1", [ids.s101], /trusted actor and reason/i);
-      await rejects('UPDATE public.offering_confirmation SET pick_deadline = now() WHERE confirmation_id=$1', [created.resourceId], /trusted actor and reason/i);
-      await rejects("INSERT INTO public.confirmed_offering_audit(confirmation_id, subject_id, action, before_state, after_state, reason, recorded_by) VALUES ($1,NULL,'SET_DEADLINE',NULL,'{}','x','y')", [created.resourceId], /trusted actor and reason/i);
-    });
-
-    it('hides the confirmation from unassigned coordinators', async () => {
-      const closed = { ...deps, scopes: { ...deps.scopes, isScopeAssigned: async () => false } };
-      const response = await handleForecastingRequest(new Request(base + 'confirmed-offerings?' + query()), closed) as Response;
-      expect(response.status).toBe(403);
-      expect((await response.json()).error.code).toBe('SCOPE_NOT_ASSIGNED');
+    it('refuses decisions for a semester that is not the next one', async () => {
+      const response = await post({ scope: { ...scope(), targetSemesterId: ids.current }, subjectId: ids.s101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: null });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error.code).toBe('SEMESTER_READ_ONLY');
     });
   });
 });

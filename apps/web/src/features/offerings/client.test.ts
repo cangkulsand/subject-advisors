@@ -76,6 +76,22 @@ describe('offerings browser API transport', () => {
       { requiredCurriculumSubjectId: demoContext.subjects[1]!.curriculumSubjectId, requirementType: 'MANDATORY' },
     ] });
   });
+  it('bypasses v5 snapshots so the approved-offerings response shape is fetched', async () => {
+    const base = 'https://api.invalid';
+    const path = '/api/semester-offerings';
+    const v5Key = JSON.stringify([accountSessionStamp(), base, 'p002-context-v5-curriculum-prerequisite-details', path]);
+    await cachedAcademicRead(v5Key, async () => ({ ...demoContext, subjects: [], selection: null }), undefined, ACADEMIC_CACHE_TTL);
+    const window = { status: 'NOT_OPEN', targetSemesterId: '201', selectionOpensAt: '2099-01-01T00:00:00.000Z', selectionClosesAt: null, learningCentreName: 'Kuala Lumpur' };
+    const fetcher = vi.fn(async (url: string) => url.endsWith('/api/academic-records')
+      ? Response.json({ data: [] })
+      : Response.json({ data: { ...demoContext, window, selection: null } }));
+    vi.stubGlobal('fetch', fetcher);
+    const page = await createOfferingClient(async () => 'fixture-token', base).load();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(page.window?.status).toBe('NOT_OPEN');
+    const v6Key = JSON.stringify([accountSessionStamp(), base, 'p002-context-v6-approved-offerings', path]);
+    expect(await cachedAcademicRead(v6Key, async () => { throw new Error('should be cached'); }, undefined, ACADEMIC_CACHE_TTL)).toMatchObject({ window: { status: 'NOT_OPEN' } });
+  });
   it('retains offering and records snapshots after failed save, invalidates before decoding successful save', async () => {
     const fetcher = vi.fn(async (path: string, init: RequestInit) => successfulResponse(path, init)); vi.stubGlobal('fetch', fetcher);
     const client = createOfferingClient(async () => 'fixture-token');

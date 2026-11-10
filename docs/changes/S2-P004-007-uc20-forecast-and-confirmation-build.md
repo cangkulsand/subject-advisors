@@ -7,6 +7,7 @@
 - **Related UC / FR:** UC20 (Packages 2-6), coordinator offering confirmation and pick deadline (S2-P004-006: OP1, OP8, OP10, OP13, OP14)
 - **Branch / PR:** `feature/p004-s2-uc20-forecast-build`; no PR
 - **Reviewer:** Coordinator review per mini-task; human review not required by user
+- **Superseded by S2-P004-017 to S2-P004-024 (2026-11-10):** the review, finalize and offering confirmation screens and API built here were removed; only the forecast engine, generation and the students-behind-a-subject read remain. See [S2-P004-024](S2-P004-024-remove-review-confirm-flow.md). History below is kept as written.
 
 ## 1. Plan
 

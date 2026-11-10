@@ -1,13 +1,13 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import type {
   AcceptedImport, ForecastContext, ForecastScope, ImportListData, ImportStudentListData, ImportValidationReport, OperationReceipt, Paginated,
-  ForecastAuditEntry, SystemSnapshotRequest,
+  SystemSnapshotRequest,
 } from '../../../../../packages/shared/src/forecasting/contracts';
 import type {
-  ConfirmedOfferingAuditEntry, ConfirmedOfferingSet, OfferingPickCountSummary,
-} from '../../../../../packages/shared/src/forecasting/confirmed-offerings';
+  DecideOfferingRequest, DecideOfferingResult, DecisionPickers, OfferingDecisionAuditEntry, OfferingDecisionSet,
+} from '../../../../../packages/shared/src/forecasting/offering-decisions';
 import type {
-  FinalizeRunRequest, ForecastRunDetail, ForecastRunSummary, GenerateRunRequest, RunDecision, RunDecisionBatchRequest, RunSubjectStudents, StartRunReviewRequest,
+  ForecastRunDetail, GenerateRunRequest, RunSubjectStudents,
 } from '../../../../../packages/shared/src/forecasting/runs';
 
 /** Every non-2xx answer, timeout or unreadable body. `details` carries safe ids such as `pendingSubjectIds`; `report` the 422 import report. */
@@ -24,9 +24,6 @@ export interface SystemSnapshotOutcome { replay: boolean; data: AcceptedImport }
 export interface RunWithRevision { run: ForecastRunDetail; revision: string }
 export interface MutationResult { receipt: OperationReceipt; revision: string; created: boolean }
 export interface PageQuery { limit?: number; cursor?: string }
-/** `revision` is null until the first confirmation of the scope exists. */
-export interface ConfirmationWithRevision { set: ConfirmedOfferingSet; revision: string | null }
-export interface ConfirmOfferingsInput { scope: ForecastScope; forecastRunId: number; subjectIds: number[]; reason: string; pickDeadline: string; revision: string | null }
 
 export interface CoordinatorClient {
   context(programmeId?: number, signal?: AbortSignal): Promise<ForecastContext>;
@@ -41,20 +38,16 @@ export interface CoordinatorClient {
   getImport(importBatchId: number, signal?: AbortSignal): Promise<AcceptedImport>;
   listStudents(importBatchId: number, page?: PageQuery, signal?: AbortSignal): Promise<ImportStudentListData>;
   generateRun(request: GenerateRunRequest): Promise<MutationResult>;
-  listRuns(scope: ForecastScope, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<ForecastRunSummary>>;
   getRun(forecastRunId: number, signal?: AbortSignal): Promise<RunWithRevision>;
-  listAudit(forecastRunId: number, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<ForecastAuditEntry>>;
   /** View only: the students behind one subject's numbers. */
   getSubjectStudents(forecastRunId: number, subjectId: number, signal?: AbortSignal): Promise<RunSubjectStudents>;
-  startReview(forecastRunId: number, revision: string, scope: ForecastScope, reason?: string): Promise<MutationResult>;
-  decide(forecastRunId: number, revision: string, scope: ForecastScope, decisions: RunDecision[]): Promise<MutationResult>;
-  finalize(forecastRunId: number, revision: string, scope: ForecastScope, input?: { reason?: string; approvalReference?: string }): Promise<MutationResult>;
-  getConfirmation(scope: ForecastScope, signal?: AbortSignal): Promise<ConfirmationWithRevision>;
-  listConfirmationAudit(scope: ForecastScope, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<ConfirmedOfferingAuditEntry>>;
-  pickCounts(scope: ForecastScope, signal?: AbortSignal): Promise<OfferingPickCountSummary>;
-  confirmOfferings(input: ConfirmOfferingsInput): Promise<MutationResult>;
-  withdrawOfferings(scope: ForecastScope, revision: string, subjectIds: number[], reason: string): Promise<MutationResult>;
-  setPickDeadline(scope: ForecastScope, revision: string, input: { pickDeadline: string; reason: string; forecastRunId?: number }): Promise<MutationResult>;
+  /** Decisions (Approved / Removed; no row is Pending) of one scope, with the selection phase of its semester. */
+  getDecisions(scope: ForecastScope, signal?: AbortSignal): Promise<OfferingDecisionSet>;
+  /** One click, no reason: sets a subject to Pending, Approved or Removed. 409 DECISION_STALE when the stored status differs from `expectedStatus`. */
+  decide(input: DecideOfferingRequest): Promise<DecideOfferingResult>;
+  listDecisionAudit(scope: ForecastScope, page?: PageQuery, signal?: AbortSignal): Promise<Paginated<OfferingDecisionAuditEntry>>;
+  /** Students who picked one decided subject (personal data, served no-store); 404 OFFERING_DECISION_NOT_FOUND when the subject has no decision. */
+  getPickers(scope: ForecastScope, subjectId: number, signal?: AbortSignal): Promise<DecisionPickers>;
 }
 
 const BAD = 'Forecasting data could not be read. Please retry.';
@@ -85,8 +78,23 @@ function report(value: unknown): ImportValidationReport {
 function receipt(value: unknown) { requireKeys(value, ['resourceId'], ['acceptedAt', 'revision'], []); return value as OperationReceipt; }
 function runDetail(value: unknown) { requireKeys(value, ['forecastRunId', 'versionNumber'], ['status', 'revision'], ['subjects']); object(object(value).summary); return value as ForecastRunDetail; }
 function subjectStudents(value: unknown) { requireKeys(value, ['forecastRunId', 'subjectId'], ['subjectCode'], ['students']); object(object(value).summary); return value as RunSubjectStudents; }
-function runSummary(value: unknown) { requireKeys(value, ['forecastRunId', 'versionNumber'], ['status', 'revision'], []); object(object(value).summary); }
-function confirmationSet(value: unknown) { requireKeys(value, [], [], ['offerings']); object(object(value).scope); return value as ConfirmedOfferingSet; }
+function decisionSet(value: unknown) {
+  const item = requireKeys(value, [], ['phase', 'asOf'], ['decisions', 'pickCounts']);
+  object(item.scope); object(item.semester);
+  if (typeof item.editable !== 'boolean') invalid();
+  return item as unknown as OfferingDecisionSet;
+}
+function decideResult(value: unknown) {
+  const item = requireKeys(value, ['subjectId', 'affectedPicks'], ['beforeStatus', 'afterStatus', 'phase'], []);
+  return item as unknown as DecideOfferingResult;
+}
+function decisionPickers(value: unknown) {
+  const item = requireKeys(value, ['subjectId', 'pickCount'], ['subjectCode', 'subjectName'], ['pickers']);
+  object(item.scope);
+  if (typeof item.emailsAvailable !== 'boolean') invalid();
+  for (const picker of item.pickers as unknown[]) requireKeys(picker, ['studentId'], ['studentName'], []);
+  return item as unknown as DecisionPickers;
+}
 function query(values: object) {
   const parameters = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) if (value !== undefined && value !== '') parameters.set(key, String(value));
@@ -195,33 +203,18 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
     getImport: async (id, signal) => acceptedImport((await request(prefix + 'forecast-imports/' + id, { method: 'GET' }, signal)).data),
     listStudents: async (id, paging, signal) => page((await request(prefix + 'forecast-imports/' + id + '/students' + query({ limit: paging?.limit, cursor: paging?.cursor }), { method: 'GET' }, signal)).data, item => requireKeys(item, ['importedStudentId'], ['externalReference'], [])) as ImportStudentListData,
     generateRun: request0 => mutate('forecast-runs', undefined, request0),
-    listRuns: async (scope, paging, signal) => page<ForecastRunSummary>((await request(prefix + 'forecast-runs' + scopeQuery(scope, paging), { method: 'GET' }, signal)).data, runSummary),
     getRun: async (id, signal) => {
       const raw = await request(prefix + 'forecast-runs/' + id, { method: 'GET' }, signal);
       const run = runDetail(raw.data);
       return { run, revision: raw.etag ?? run.revision };
     },
     getSubjectStudents: async (id, subjectId, signal) => subjectStudents((await request(prefix + 'forecast-runs/' + id + '/subjects/' + subjectId + '/students', { method: 'GET' }, signal)).data),
-    listAudit: async (id, paging, signal) => page<ForecastAuditEntry>((await request(prefix + 'forecast-runs/' + id + '/audit' + query({ limit: paging?.limit, cursor: paging?.cursor }), { method: 'GET' }, signal)).data, item => requireKeys(item, ['decisionAuditId'], ['actionType', 'recordedAt'], [])),
-    startReview: (id, revision, scope, reason) => mutate('forecast-runs/' + id + '/reviews', revision, { scope, action: 'START_REVIEW', ...(reason ? { reason } : {}) } satisfies StartRunReviewRequest),
-    decide: (id, revision, scope, decisions) => mutate('forecast-runs/' + id + '/decisions', revision, { scope, decisions } satisfies RunDecisionBatchRequest),
-    getConfirmation: async (scope, signal) => {
-      const raw = await request(prefix + 'confirmed-offerings' + scopeQuery(scope), { method: 'GET' }, signal);
-      const set = confirmationSet(raw.data);
-      return { set, revision: set.revision === null ? null : raw.etag ?? set.revision };
+    getDecisions: async (scope, signal) => decisionSet((await request(prefix + 'offering-decisions' + scopeQuery(scope), { method: 'GET' }, signal)).data),
+    decide: async input => {
+      const body: DecideOfferingRequest = { scope: plainScope(input.scope), subjectId: input.subjectId, status: input.status, expectedStatus: input.expectedStatus, importBatchId: input.importBatchId };
+      return decideResult((await request(prefix + 'offering-decisions', { method: 'POST', headers: jsonHeaders(), body: json(body) })).data);
     },
-    listConfirmationAudit: async (scope, paging, signal) => page<ConfirmedOfferingAuditEntry>((await request(prefix + 'confirmed-offerings/audit' + scopeQuery(scope, paging), { method: 'GET' }, signal)).data, item => requireKeys(item, ['auditId'], ['action', 'recordedAt'], [])),
-    pickCounts: async (scope, signal) => {
-      const data = requireKeys((await request(prefix + 'offering-pick-counts' + scopeQuery(scope), { method: 'GET' }, signal)).data, [], [], ['counts']);
-      return data as unknown as OfferingPickCountSummary;
-    },
-    confirmOfferings: input => mutate('confirmed-offerings', input.revision ?? undefined, {
-      scope: plainScope(input.scope), forecastRunId: input.forecastRunId, subjectIds: input.subjectIds, reason: input.reason, baseRevision: input.revision, pickDeadline: input.pickDeadline,
-    }),
-    withdrawOfferings: (scope, revision, subjectIds, reason) => mutate('confirmed-offerings/withdrawals', revision, { scope: plainScope(scope), subjectIds, reason, baseRevision: revision }),
-    setPickDeadline: (scope, revision, input) => mutate('confirmed-offerings/pick-deadline', revision, {
-      scope: plainScope(scope), pickDeadline: input.pickDeadline, reason: input.reason, baseRevision: revision, ...(input.forecastRunId ? { forecastRunId: input.forecastRunId } : {}),
-    }),
-    finalize: (id, revision, scope, input) => mutate('forecast-runs/' + id + '/finalizations', revision, { scope, ...(input?.reason ? { reason: input.reason } : {}), ...(input?.approvalReference ? { approvalReference: input.approvalReference } : {}) } satisfies FinalizeRunRequest),
+    listDecisionAudit: async (scope, paging, signal) => page<OfferingDecisionAuditEntry>((await request(prefix + 'offering-decisions/audit' + scopeQuery(scope, paging), { method: 'GET' }, signal)).data, item => requireKeys(item, ['auditId'], ['beforeStatus', 'afterStatus', 'recordedAt'], [])),
+    getPickers: async (scope, subjectId, signal) => decisionPickers((await request(prefix + 'offering-decisions/' + subjectId + '/pickers' + scopeQuery(scope), { method: 'GET' }, signal)).data),
   };
 }

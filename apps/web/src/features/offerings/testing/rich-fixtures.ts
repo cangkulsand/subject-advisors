@@ -3,6 +3,8 @@ import type { OfferingPageData } from '../../../../../../packages/shared/src/off
 /** Test-only data: curriculum IDs deliberately differ from P001 subject IDs. */
 export const richOfferingFixture: OfferingPageData = {
   curriculum: { curriculumId: '401', name: 'Fictional computing curriculum', programmeName: 'Browser acceptance fixture', totalCreditRequired: 131 },
+  // An open window with no dates: the page applies no deadline hint and no limits.
+  window: { status: 'OPEN', targetSemesterId: '201', selectionOpensAt: null, selectionClosesAt: null, learningCentreName: 'Kuala Lumpur' },
   semesters: [
     { semesterId: '201', academicYear: '2026/2027', semesterNo: 1 },
     { semesterId: '202', academicYear: '2026/2027', semesterNo: 2 },

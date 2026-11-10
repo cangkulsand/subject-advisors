@@ -46,7 +46,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE)), page = Math.min(requested, pages);
   const clear = () => { setFilter(''); setSearch(''); setPage(1); };
   const s = data.summary;
-  const facts: Array<[string, number, string]> = [['Potential demand (counted)', s.counted, HELP.counted], ['Uncertain', s.uncertain, HELP.uncertain], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted, HELP.notCounted]];
+  const facts: Array<[string, number, string]> = [['Eligible to take (counted)', s.counted, HELP.counted], ['Uncertain', s.uncertain, HELP.uncertain], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted, HELP.notCounted]];
   return <>
     <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
     {s.uncertaintyReasonCounts.length > 0 && <ul className="coordinator-students-reasons" aria-label="Why students are uncertain">

@@ -89,4 +89,33 @@ describe('UC08 offering response compatibility', () => {
       { ...demoContext.subjects[1], subjectId: '501' },
     ], selection: null })).toThrow('Invalid offerings response');
   });
+  it('decodes the selection window, pick limits and withdrawal notes', () => {
+    const page = readPageData({ ...demoContext, selection: null,
+      window: { status: 'NOT_OPEN', targetSemesterId: '201', selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: null, learningCentreName: 'Kuala Lumpur' },
+      limits: { maxSubjects: 6, maxCredits: 18 },
+      withdrawnSubjects: [{ subjectId: '9', code: 'DEMO204', name: 'Human-computer interaction', withdrawnAt: '2026-11-09T10:00:00.000Z' }] });
+    expect(page.window).toEqual({ status: 'NOT_OPEN', targetSemesterId: '201', selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: null, learningCentreName: 'Kuala Lumpur' });
+    expect(page.limits).toEqual({ maxSubjects: 6, maxCredits: 18 });
+    expect(page.withdrawnSubjects?.[0]?.code).toBe('DEMO204');
+  });
+  it.each([
+    { window: { status: 'MAYBE', targetSemesterId: null, selectionOpensAt: null, selectionClosesAt: null, learningCentreName: null } },
+    { window: { status: 'OPEN', targetSemesterId: null, selectionOpensAt: 'tomorrow', selectionClosesAt: null, learningCentreName: null } },
+    { limits: { maxSubjects: -1, maxCredits: 18 } },
+    { withdrawnSubjects: [{ subjectId: '9', code: 'A', name: 'A', withdrawnAt: 'x' }] },
+    { withdrawnSubjects: 'none' },
+  ])('rejects malformed window data %j', extra => {
+    expect(() => readPageData({ ...demoContext, selection: null, ...extra })).toThrow('Invalid offerings response');
+  });
+  it('resolves prerequisites of offered subjects against the whole-curriculum catalogue', () => {
+    const [first, second] = demoContext.subjects;
+    const offered = { ...first!, curriculumSubjectId: '501', subjectId: '701', code: 'FIX101', prerequisites: { status: 'available', items: [{ requiredCurriculumSubjectId: '502', requirementType: 'MANDATORY' }] } };
+    const hidden = { ...second!, curriculumSubjectId: '502', subjectId: '702', code: 'FIX102' };
+    const page = readPageData({ ...demoContext, subjects: [offered], prerequisiteCatalogue: [{ ...offered, prerequisites: undefined }, hidden], selection: null });
+    expect(page.subjects[0]?.prerequisites).toEqual({ status: 'available', items: [{ requiredCurriculumSubjectId: '502', requirementType: 'MANDATORY' }] });
+    expect(page.prerequisiteCatalogue?.map(subject => subject.code)).toEqual(['FIX101', 'FIX102']);
+    // Without the catalogue the same edge points outside the list and degrades to unavailable.
+    expect(readPageData({ ...demoContext, subjects: [offered], selection: null }).subjects[0]?.prerequisites).toEqual({ status: 'unavailable' });
+    expect(() => readPageData({ ...demoContext, subjects: [offered], prerequisiteCatalogue: [hidden], selection: null })).toThrow('Invalid offerings response');
+  });
 });

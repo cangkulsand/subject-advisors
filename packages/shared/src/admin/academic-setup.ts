@@ -25,6 +25,8 @@ export interface AcademicSemester {
   semesterId: number; academicYear: string; semesterNo: 1 | 2 | 3;
   semesterType: SemesterType; maxSubjects: number; maxCredits: number;
   startDate: string | null; endDate: string | null; isCurrent: boolean;
+  /** Admin-set picking window (ISO date-time, UTC). Both null means selection is not scheduled. */
+  selectionOpensAt: string | null; selectionClosesAt: string | null;
 }
 export interface AdminCoordinatorAssignment extends CoordinatorAssignment {
   assignmentId: number; accountId: number; startedAt: string; endedAt: string | null;
@@ -34,7 +36,7 @@ export interface UpdateLearningCentreRequest { centreCode?: string; centreName?:
 export interface CreateFacultyRequest { facultyCode: string; facultyName: string; reason: string }
 export interface UpdateFacultyRequest { facultyCode?: string; facultyName?: string; isActive?: boolean; reason: string }
 export interface SetProgrammeFacultyRequest { facultyId: number | null; reason: string }
-export type SemesterFields = Pick<AcademicSemester, 'academicYear' | 'semesterNo' | 'semesterType' | 'maxSubjects' | 'maxCredits' | 'startDate' | 'endDate'>;
+export type SemesterFields = Pick<AcademicSemester, 'academicYear' | 'semesterNo' | 'semesterType' | 'maxSubjects' | 'maxCredits' | 'startDate' | 'endDate' | 'selectionOpensAt' | 'selectionClosesAt'>;
 export interface CreateSemesterRequest extends SemesterFields { reason: string }
 export type UpdateSemesterRequest = Partial<SemesterFields> & { reason: string };
 export interface SetCurrentSemesterRequest { semesterId: number; reason: string }
@@ -65,6 +67,9 @@ function date(v: unknown): v is string | null {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || v.startsWith('0000-')) return false;
   const d = new Date(`${v}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+function dateTime(v: unknown): v is string | null {
+  return v === null || (typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v)));
 }
 function year(v: unknown): v is string {
   return typeof v === 'string' && /^[0-9]{4}\/[0-9]{4}$/.test(v);
@@ -105,8 +110,13 @@ export function validateSetProgrammeFacultyRequest(body: unknown): AdminValidati
   const why = reason(parsed.value);
   return why.ok ? { ok: true, value: { facultyId: parsed.value.facultyId as number | null, reason: why.value } } : why;
 }
+function selectionWindowError(opens: string | null, closes: string | null): string | null {
+  if (closes === null) return null;
+  if (opens === null) return 'selectionClosesAt requires selectionOpensAt.';
+  return Date.parse(closes) > Date.parse(opens) ? null : 'selectionClosesAt must be after selectionOpensAt.';
+}
 function semester(body: unknown, update: boolean): AdminValidation<CreateSemesterRequest | UpdateSemesterRequest> {
-  const fields = ['academicYear', 'semesterNo', 'semesterType', 'maxSubjects', 'maxCredits', 'startDate', 'endDate'];
+  const fields = ['academicYear', 'semesterNo', 'semesterType', 'maxSubjects', 'maxCredits', 'startDate', 'endDate', 'selectionOpensAt', 'selectionClosesAt'];
   const parsed = record(body, [...fields, 'reason']);
   if (!parsed.ok) return parsed;
   const r = parsed.value;
@@ -117,6 +127,8 @@ function semester(body: unknown, update: boolean): AdminValidation<CreateSemeste
   if ((!update || own(r, 'maxSubjects')) && !smallint(r.maxSubjects)) return fail('Invalid maxSubjects.');
   if ((!update || own(r, 'maxCredits')) && !smallint(r.maxCredits)) return fail('Invalid maxCredits.');
   for (const field of ['startDate', 'endDate']) if ((!update || own(r, field)) && !date(r[field])) return fail(`Invalid ${field}.`);
+  for (const field of ['selectionOpensAt', 'selectionClosesAt']) if (own(r, field) && !dateTime(r[field])) return fail(`Invalid ${field}.`);
+  if (own(r, 'selectionOpensAt') && own(r, 'selectionClosesAt')) { const bad = selectionWindowError(r.selectionOpensAt as string | null, r.selectionClosesAt as string | null); if (bad) return fail(bad); }
   if (own(r, 'semesterNo') && own(r, 'semesterType') &&
       (r.semesterNo === 3 ? r.semesterType !== 'SHORT' : r.semesterType !== 'NORMAL')) return fail('semesterNo and semesterType do not match.');
   if (own(r, 'startDate') && own(r, 'endDate') && r.startDate !== null && r.endDate !== null && (r.startDate as string) > (r.endDate as string)) return fail('endDate must not precede startDate.');
@@ -134,9 +146,12 @@ export function validateMergedSemester(existing: AcademicSemester, patch: Update
   const merged = { ...existing, ...patch };
   if (merged.semesterNo === 3 ? merged.semesterType !== 'SHORT' : merged.semesterType !== 'NORMAL') return fail('semesterNo and semesterType do not match.');
   if (merged.startDate !== null && merged.endDate !== null && merged.startDate > merged.endDate) return fail('endDate must not precede startDate.');
+  const window = selectionWindowError(merged.selectionOpensAt, merged.selectionClosesAt);
+  if (window) return fail(window);
   return { ok: true, value: {
     academicYear: merged.academicYear, semesterNo: merged.semesterNo, semesterType: merged.semesterType,
     maxSubjects: merged.maxSubjects, maxCredits: merged.maxCredits, startDate: merged.startDate, endDate: merged.endDate,
+    selectionOpensAt: merged.selectionOpensAt, selectionClosesAt: merged.selectionClosesAt,
   } };
 }
 export function validateSetCurrentSemesterRequest(body: unknown): AdminValidation<SetCurrentSemesterRequest> {

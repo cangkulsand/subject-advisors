@@ -315,9 +315,9 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
   }
   async function generateRun(importBatchId: number) {
     if (!scope) return;
-    const result = await client.generateRun({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId, targetSemesterId: scope.targetSemesterId, importBatchId, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
+    await client.generateRun({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId, targetSemesterId: scope.targetSemesterId, importBatchId, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
     setGenerate(null);
-    navigateApp(scopeHref('/coordinator/forecasts', scope, { run: result.receipt.resourceId }));
+    navigateApp(scopeHref('/coordinator/forecasts', scope, { snapshot: importBatchId }));
   }
   return <>
     <StatusRegion notice={notice}/>
@@ -349,7 +349,7 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
         catch (error) { if (error instanceof CoordinatorApiError && error.code === 'IMPORT_REVISION_MISMATCH') { setSubset(false); setOutcome(null); setNotice({ kind: 'warning', text: error.message }); return; } throw error; }
       }}/>}
     {scope && generate && <ActionDialog title="Generate forecast" confirmLabel="Generate forecast" reasonLabel={null}
-      description={<>Create a draft forecast from "{generate.label}" for {scope.programmeLabel} at {scope.centreLabel}. The result is potential demand for planning, not student registration. You can review and change it before finalizing.</>}
+      description={<>Create the forecast from "{generate.label}" for {scope.programmeLabel} at {scope.centreLabel} and open it in the Class Offering Forecast, where you approve or remove subjects. The result is potential demand for planning, not student registration.</>}
       onCancel={() => setGenerate(null)} onSubmit={() => generateRun(generate.importBatchId)}/>}
   </>;
 }

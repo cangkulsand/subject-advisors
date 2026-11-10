@@ -1,93 +1,30 @@
 import { ClearFilters, FilterMenu, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { AppLink } from '../../app/navigation';
-import { CoordinatorApiError, type CoordinatorClient, type MutationResult } from './client';
+import { AppLink, navigateApp } from '../../app/navigation';
+import { ToastStack } from '../../components/feedback/ToastStack';
+import { useToastNotifications } from '../../components/feedback/useToastNotifications';
+import { InfoTip } from '../../components/info-tip/InfoTip';
+import { CoordinatorApiError, type CoordinatorClient } from './client';
 import {
-  ActionDialog, ActionIcon, LoadMore, PageHeading, Panel, ScopeFields, StatusRegion, chooseScope, readScope, scopeHref, usePagedList, useRead, when,
-  type ChosenScope, type Notice,
+  ActionIcon, LoadMore, PageHeading, Panel, ScopeFields, chooseScope, errorText, readScope, scopeHref, usePagedList, useRead, when,
+  type ChosenScope,
 } from './coordinator-ui';
+import { SubjectPickersDialog, type PickerListCache } from './SubjectPickersDialog';
 import { SubjectStudentsDialog, type StudentListCache } from './SubjectStudentsDialog';
 import { HELP, Help } from './coordinator-help';
-import type { ForecastAuditEntry, ForecastScope } from '../../../../../packages/shared/src/forecasting/contracts';
-import {
-  type ForecastRunDetail, type ForecastRunStatus, type ForecastRunSummary, type NewerForecastAvailable, type RunDecisionAction,
-  type RunSectionFlag, type RunSubject, type SubjectDecisionStatus,
-} from '../../../../../packages/shared/src/forecasting/runs';
+import type { ClassType, ForecastContext, ForecastScope, ImportSource, ImportSummary } from '../../../../../packages/shared/src/forecasting/contracts';
+import type { ForecastRunDetail, RunSubject } from '../../../../../packages/shared/src/forecasting/runs';
+import type { OfferingDecision, OfferingDecisionAuditEntry, OfferingDecisionSet, OfferingDecisionStatus } from '../../../../../packages/shared/src/forecasting/offering-decisions';
 
-const statusLabels: Record<ForecastRunStatus, string> = { DRAFT: 'Draft', UNDER_REVIEW: 'Under review', FINALIZED: 'Finalized' };
-const statusClass: Record<ForecastRunStatus, string> = { DRAFT: 'coordinator-pill-info', UNDER_REVIEW: 'coordinator-pill-warning', FINALIZED: 'coordinator-pill-success' };
-const decisionLabels: Record<SubjectDecisionStatus, string> = { NONE: 'No sections', PENDING: 'Pending', REVIEWED: 'Reviewed', APPROVED: 'Approved', DEFERRED: 'Removed', MIXED: 'Mixed' };
-const decisionClass: Record<SubjectDecisionStatus, string> = { NONE: '', PENDING: 'coordinator-pill-warning', REVIEWED: 'coordinator-pill-info', APPROVED: 'coordinator-pill-success', DEFERRED: 'coordinator-pill-muted', MIXED: 'coordinator-pill-info' };
-const flagLabels: Record<RunSectionFlag, string> = { BELOW_MINIMUM: 'Below minimum', BELOW_OPTIMAL: 'Below optimal', ABOVE_NORMAL_MAXIMUM: 'Above normal maximum' };
-const qualityLabels = { SUPPORTED: 'Supported', PRELIMINARY: 'Preliminary', INSUFFICIENT_DATA: 'Insufficient data' } as const;
-const actionLabels: Record<string, string> = { START_REVIEW: 'Review started', REVIEW: 'Marked reviewed', APPROVE: 'Approved', DEFER: 'Removed', REPLACE_ALLOCATION: 'Classes changed', REOPEN: 'Added back', FINALIZE: 'Finalized' };
-/** Decisions offered as row buttons; REOPEN is only used by Add back. REPLACE_ALLOCATION is not offered: class splitting happens outside this system. */
-type SubjectAction = Exclude<RunDecisionAction, 'REPLACE_ALLOCATION' | 'REOPEN'>;
-const actionVerb: Record<SubjectAction, { title: string; confirm: string; text: string }> = {
-  APPROVE: { title: 'Approve', confirm: 'Approve subject', text: 'Approve this subject for the offering plan.' },
-  REVIEW: { title: 'Mark reviewed', confirm: 'Mark reviewed', text: 'Mark this subject as reviewed, without approving it yet.' },
-  DEFER: { title: 'Remove', confirm: 'Remove subject', text: 'Remove this subject from the offering plan. You can add it back from Removed subjects.' },
-};
+const statusLabels: Record<OfferingDecisionStatus, string> = { PENDING: 'Pending', APPROVED: 'Approved', REMOVED: 'Removed' };
+const statusClass: Record<OfferingDecisionStatus, string> = { PENDING: 'coordinator-pill-warning', APPROVED: 'coordinator-pill-success', REMOVED: 'coordinator-pill-muted' };
+const SOURCE_LABELS: Record<ImportSource, string> = { SYSTEM: 'System students', CSV: 'CSV upload', COMBINED: 'Combined' };
 const plural = (count: number, one: string, many = one + 's') => `${count} ${count === 1 ? one : many}`;
 
-function FlagBadges({ flags }: { flags: RunSectionFlag[] }) {
-  return <>{flags.map(flag => <span key={flag} data-flag={flag} className={'admin-pill ' + (flag === 'ABOVE_NORMAL_MAXIMUM' ? 'coordinator-pill-danger' : 'coordinator-pill-warning')}>{flagLabels[flag]}</span>)}</>;
-}
-/** Subjects listed in the table: excluded and not-offered subjects are hidden, so they are not counted. */
-const shownSubjects = (summary: ForecastRunSummary['summary']) => summary.subjects - summary.excludedSubjects - summary.notOfferedInSemesterTypeSubjects;
-function SummaryFacts({ run }: { run: Pick<ForecastRunDetail, 'summary'> }) {
-  const s = run.summary;
-  const facts: Array<[string, number, string]> = [['Subjects', shownSubjects(s), HELP.subjects], ['Potential demand', s.totalSupportedDemand, HELP.demand], ['Below minimum', s.subjectsBelowMinimum, HELP.belowMinimum]];
-  return <dl className="coordinator-counts" aria-label="Forecast summary">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>;
-}
-function NewerBadge({ newer, scope }: { newer: NewerForecastAvailable; scope: ForecastScope }) {
-  return <AppLink className="coordinator-newer" href={scopeHref('/coordinator/forecasts', scope, { run: newer.forecastRunId })}>Newer forecast available: version {newer.versionNumber} ({statusLabels[newer.status].toLowerCase()})</AppLink>;
-}
-
-const RUN_STATUS_FILTERS = [{ value: '', label: 'All' }, ...(['DRAFT', 'UNDER_REVIEW', 'FINALIZED'] as const).map(value => ({ value, label: statusLabels[value] }))];
-type RunSort = 'newest' | 'oldest' | 'demand' | 'pending';
-const RUN_SORTS: Array<{ value: RunSort; label: string }> = [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'demand', label: 'Most demand' }, { value: 'pending', label: 'Most awaiting decision' }];
-const runOrder: Record<RunSort, (a: ForecastRunSummary, b: ForecastRunSummary) => number> = {
-  newest: (a, b) => b.versionNumber - a.versionNumber || b.forecastRunId - a.forecastRunId,
-  oldest: (a, b) => a.versionNumber - b.versionNumber || a.forecastRunId - b.forecastRunId,
-  demand: (a, b) => b.summary.totalSupportedDemand - a.summary.totalSupportedDemand || b.versionNumber - a.versionNumber,
-  pending: (a, b) => b.summary.pendingSubjects - a.summary.pendingSubjects || b.versionNumber - a.versionNumber,
-};
-const openIcon = <ActionIcon><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></ActionIcon>;
-
-const SOURCE_META: Record<ForecastRunDetail['dataSource'], { label: string; hint: string }> = {
-  SYSTEM: { label: 'System students', hint: 'Student-entered records' },
-  CSV: { label: 'CSV upload', hint: 'Coordinator CSV' },
-  COMBINED: { label: 'Combined', hint: 'Student-entered records + CSV' },
-};
-const metaIcons = {
-  generated: <ActionIcon><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></ActionIcon>,
-  finalized: <ActionIcon><path d="M20 6 9 17l-5-5"/></ActionIcon>,
-  snapshot: <ActionIcon><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></ActionIcon>,
-  id: <ActionIcon><path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3 8 21"/><path d="M16 3l-2 18"/></ActionIcon>,
-};
-/** Forecast header facts as one row of icon chips. Account IDs are not shown: they mean nothing to a coordinator (names come with the audit history). */
-function RunMeta({ run }: { run: ForecastRunDetail }) {
-  const source = SOURCE_META[run.dataSource];
-  return <ul className="coordinator-meta" aria-label="Forecast details">
-    <li><span className={'admin-pill ' + (run.dataSource === 'CSV' ? 'coordinator-pill-neutral' : 'admin-status-active')}>{source.label}</span><span className="coordinator-meta-hint">{source.hint}</span></li>
-    <li>{metaIcons.generated}Generated {when(run.generatedAt)}</li>
-    {run.finalizedAt && <li>{metaIcons.finalized}Finalized {when(run.finalizedAt)}</li>}
-    <li>{metaIcons.snapshot}<AppLink href={scopeHref('/coordinator/imports', run, { import: run.importBatchId })}>Snapshot #{run.importBatchId}</AppLink></li>
-    <li>{metaIcons.id}Forecast #{run.forecastRunId}</li>
-  </ul>;
-}
-
-const STATUS_STEPS: Array<{ value: ForecastRunStatus; help: string }> = [
-  { value: 'DRAFT', help: 'Generated, not reviewed yet.' },
-  { value: 'UNDER_REVIEW', help: 'Record a decision on each subject.' },
-  { value: 'FINALIZED', help: 'Read-only. Next: confirm offerings.' },
-];
-/** Forecast status dropdown: radio items with a helper line. Status only moves forward one step (Draft -> Under review -> Finalized); picking it opens the existing confirmation dialog. */
 interface MenuOption<T extends string> { value: T; label: string; help?: string; checked: boolean; disabled: boolean }
 const chevron = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="m19 9-7 7-7-7"/></svg>;
 /**
- * Dropdown of radio items (Flowbite "dropdown with radio" pattern), used for the forecast status and each subject's action.
+ * Dropdown of radio items (Flowbite "dropdown with radio" pattern), used for each subject's action (Pending, Approved, Removed).
  * The popover is fixed to the viewport, so a scrolling table cannot clip it; it follows its button on scroll or resize and opens upwards near the bottom.
  */
 function RadioMenu<T extends string>({ label, menuLabel, buttonClass, children, options, onPick }: { label: string; menuLabel: string; buttonClass: string; children: ReactNode; options: Array<MenuOption<T>>; onPick: (value: T) => void }) {
@@ -135,250 +72,228 @@ function RadioMenu<T extends string>({ label, menuLabel, buttonClass, children, 
   </div>;
 }
 
-/** Forecast status: only the next status can be picked (Draft -> Under review -> Finalized); picking it opens the existing confirmation dialog. */
-function StatusMenu({ status, onChange }: { status: ForecastRunStatus; onChange: (next: 'UNDER_REVIEW' | 'FINALIZED') => void }) {
-  const current = STATUS_STEPS.findIndex(step => step.value === status), next = STATUS_STEPS[current + 1]?.value;
-  return <RadioMenu label={`Forecast status: ${statusLabels[status]}`} menuLabel="Forecast status" buttonClass="admin-primary coordinator-status-button"
-    options={STATUS_STEPS.map(step => ({ value: step.value, label: statusLabels[step.value], help: step.help, checked: step.value === status, disabled: step.value !== status && step.value !== next }))}
-    onPick={value => onChange(value as 'UNDER_REVIEW' | 'FINALIZED')}>Status: {statusLabels[status]}</RadioMenu>;
+/** One row of the decisions table: a forecast subject merged with its stored decision (no decision = Pending). Subjects decided earlier but absent from the chosen snapshot have no counts. */
+interface SubjectRow {
+  subjectId: number; subjectCode: string; subjectName: string; creditHours: number; classType: ClassType;
+  status: OfferingDecisionStatus; inSnapshot: boolean; run: RunSubject | null;
+  /** Students whose curriculum has the subject and who have not passed it; null without a breakdown or snapshot. */
+  notTaken: number | null;
+  /** Supported eligible students; null when the subject is not in the snapshot. */
+  eligible: number | null;
+}
+function buildRows(run: ForecastRunDetail, decisions: OfferingDecision[]): SubjectRow[] {
+  const decided = new Map(decisions.map(decision => [decision.subjectId, decision]));
+  const rows: SubjectRow[] = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded).map(subject => ({
+    subjectId: subject.subjectId, subjectCode: subject.subjectCode, subjectName: subject.subjectName, creditHours: subject.creditHours, classType: subject.classType,
+    status: decided.get(subject.subjectId)?.status ?? 'PENDING', inSnapshot: true, run: subject,
+    notTaken: subject.breakdown ? subject.breakdown.inCurriculum - subject.breakdown.alreadyPassed : null, eligible: subject.supportedEligibleCount,
+  }));
+  const listed = new Set(rows.map(row => row.subjectId));
+  for (const decision of decisions) if (!listed.has(decision.subjectId)) rows.push({
+    subjectId: decision.subjectId, subjectCode: decision.subjectCode, subjectName: decision.subjectName, creditHours: decision.creditHours, classType: decision.classType,
+    status: decision.status, inSnapshot: false, run: null, notTaken: null, eligible: null,
+  });
+  return rows;
 }
 
-const ACTION_CHOICES: Array<{ action: SubjectAction; status: SubjectDecisionStatus }> = [{ action: 'APPROVE', status: 'APPROVED' }, { action: 'REVIEW', status: 'REVIEWED' }, { action: 'DEFER', status: 'DEFERRED' }];
-/** A subject's action: the current decision as a pill; the menu offers Approved, Reviewed or Removed, each confirmed in a dialog with a reason. */
-function ActionMenu({ subject, onDecide }: { subject: RunSubject; onDecide: (action: SubjectAction, subject: RunSubject) => void }) {
-  return <RadioMenu label={`Action for ${subject.subjectCode}: ${decisionLabels[subject.decisionStatus]}`} menuLabel={`Action for ${subject.subjectCode}`} buttonClass="coordinator-decision-button"
-    options={ACTION_CHOICES.map(choice => ({ value: choice.action, label: decisionLabels[choice.status], checked: subject.decisionStatus === choice.status, disabled: false }))}
-    onPick={action => onDecide(action, subject)}><span className={'admin-pill ' + decisionClass[subject.decisionStatus]}>{decisionLabels[subject.decisionStatus]}</span></RadioMenu>;
-}
-
-function RunList({ client, scope }: { client: CoordinatorClient; scope: ChosenScope }) {
-  // Forecast versions per scope are few, so a page of 100 normally holds the whole list and the filters apply to all of it.
-  const list = usePagedList<ForecastRunSummary>(signal => client.listRuns(scope, { limit: 100 }, signal), cursor => client.listRuns(scope, { limit: 100, cursor }), [scope.programmeId, scope.learningCentreId].join('|'));
-  const [status, setStatus] = useState(''), [query, setQuery] = useState(''), [sort, setSort] = useState<RunSort>('newest');
-  const needle = query.trim().toLowerCase().replace(/^(version|v|#)\s*/, ''), filtering = status !== '' || needle !== '';
-  const rows = list.items.filter(run => (!status || run.status === status) && (!needle || [run.versionNumber, run.forecastRunId, run.importBatchId].some(id => String(id) === needle))).sort(runOrder[sort]);
-  return <section className="coordinator-setup-section" aria-labelledby="coordinator-runs-heading">
-    <div className="admin-card-title"><div><h3 id="coordinator-runs-heading">Forecasts</h3><p className="admin-muted">Each forecast comes from one student data snapshot. Figures are potential demand, not registration.</p></div></div>
-    <Panel error={list.error} retry={list.retry} label="forecasts">{list.data && (list.items.length === 0
-      ? <div className="admin-empty"><h3>No forecasts yet</h3><p>Generate one from a student data snapshot.</p><AppLink className="coordinator-link-button" href={scopeHref('/coordinator/imports', scope)}>Go to Data Imports</AppLink></div>
-      : <><TableToolbar label="Filter and sort forecasts">
-          <SegmentedFilter label="Status" options={RUN_STATUS_FILTERS} value={status} onChange={setStatus}/>
-          <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', value: sort, noAll: true, options: RUN_SORTS, onChange: value => setSort(value as RunSort) }]}/>
-          <SearchField label="Search forecasts" value={query} placeholder="Search version, forecast or import #" maxLength={20} onChange={setQuery}/>
-          {filtering && <ClearFilters onClear={() => { setStatus(''); setQuery(''); }}/>}
-        </TableToolbar>
-        {rows.length === 0
-          ? <div className="admin-empty"><h3>No forecasts match</h3><p>Change the status or the search to see more forecasts.</p></div>
-          : <div className="admin-table-scroll coordinator-table" role="region" aria-label="Forecasts table" tabIndex={0}>
-          <table><thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Generated</th><th scope="col"><Help label="Subjects" text={HELP.subjects}/></th><th scope="col"><Help label="Potential demand" text={HELP.demand}/></th><th scope="col"><Help label="Awaiting decision" text={HELP.awaiting}/></th><th scope="col">Actions</th></tr></thead>
-            <tbody>{rows.map(run => <tr key={run.forecastRunId}>
-              <td><strong>Version {run.versionNumber}</strong><span className="admin-audit-id">Forecast #{run.forecastRunId} · import #{run.importBatchId}</span>
-                {run.newerForecastAvailable && <NewerBadge newer={run.newerForecastAvailable} scope={run}/>}</td>
-              <td><span className={'admin-pill ' + statusClass[run.status]}>{statusLabels[run.status]}</span></td><td>{when(run.generatedAt)}</td>
-              <td>{shownSubjects(run.summary)}</td><td>{run.summary.totalSupportedDemand}<span className="admin-audit-id">{run.summary.totalUncertain} uncertain</span></td>
-              <td>{run.summary.pendingSubjects}</td>
-              <td><div className="coordinator-row-actions"><AppLink className="coordinator-icon-button" href={scopeHref('/coordinator/forecasts', run, { run: run.forecastRunId })} aria-label={`Open forecast version ${run.versionNumber}`} title="Open forecast">{openIcon}</AppLink></div></td></tr>)}</tbody></table></div>}
-        {filtering && list.cursor && <p className="admin-muted">Filters apply to the forecasts loaded so far. Load more to include older ones.</p>}
-        {list.loadMoreError && <p className="admin-form-error" role="alert">{list.loadMoreError}</p>}
-        <LoadMore cursor={list.cursor} busy={list.loadingMore} onMore={() => void list.more()} label="Load more forecasts"/></>)}
-    </Panel>
-  </section>;
-}
-
-/** Capacity flags of any proposed section, shown once per subject under its demand. Below optimal is not shown: it depends on a class split, which is not done in this system. */
-const subjectFlags = (subject: RunSubject) => [...new Set(subject.sections.flatMap(section => section.flags))].filter(flag => flag !== 'BELOW_OPTIMAL');
-
-type Dialog = null | { kind: 'start' } | { kind: 'finalize' } | { kind: 'decide'; action: SubjectAction; subject: RunSubject } | { kind: 'restore'; subject: RunSubject };
-
-const SORT_LABELS = { name: 'Subject name (A–Z)', code: 'Subject code (A–Z)', demand: 'Potential demand (high to low)' } as const;
+const SORT_LABELS = { eligible: 'Eligible to take', name: 'Subject name', code: 'Subject code' } as const;
 type SubjectSort = keyof typeof SORT_LABELS;
-interface SubjectFilters { q: string; type: string; decision: string; flag: string; sort: SubjectSort }
-const NO_FILTERS: SubjectFilters = { q: '', type: '', decision: '', flag: '', sort: 'name' };
-function matchesFilters(subject: RunSubject, { q, type, decision, flag }: SubjectFilters) {
+interface SubjectFilters { q: string; type: string; status: string; flag: string; sort: SubjectSort }
+const NO_FILTERS: SubjectFilters = { q: '', type: '', status: '', flag: '', sort: 'eligible' };
+function matchesFilters(row: SubjectRow, { q, type, status, flag }: SubjectFilters) {
   const term = q.trim().toLowerCase();
-  if (term && !subject.subjectCode.toLowerCase().includes(term) && !subject.subjectName.toLowerCase().includes(term)) return false;
-  if (type && (subject.classType ?? 'NONE') !== type) return false;
-  if (decision && subject.decisionStatus !== decision) return false;
-  if (flag === 'BELOW_MINIMUM') return subject.sections.some(section => section.flags.includes(flag));
-  if (flag === 'CONFIG') return subject.configurationStatus === 'CONFIGURATION_REQUIRED';
-  if (flag === 'UNCERTAIN') return subject.uncertainStudentCount > 0;
+  if (term && !row.subjectCode.toLowerCase().includes(term) && !row.subjectName.toLowerCase().includes(term)) return false;
+  if (type && (row.classType ?? 'NONE') !== type) return false;
+  if (status && row.status !== status) return false;
+  if (flag === 'UNCERTAIN') return (row.run?.uncertainStudentCount ?? 0) > 0;
   return true;
 }
-function sortSubjects(list: RunSubject[], sort: SubjectSort) {
-  const value = (subject: RunSubject) => subject.supportedEligibleCount;
-  const alpha = sort === 'name' || sort === 'code';
-  return [...list].sort((left, right) => (alpha ? 0 : value(right) - value(left)) || (sort === 'code' ? 0 : left.subjectName.localeCompare(right.subjectName, undefined, { sensitivity: 'base' })) || left.subjectCode.localeCompare(right.subjectCode));
+const byName = (left: SubjectRow, right: SubjectRow) => left.subjectName.localeCompare(right.subjectName, undefined, { sensitivity: 'base' }) || left.subjectCode.localeCompare(right.subjectCode);
+/** Default order: most eligible students first (subjects outside the snapshot last), then by name. */
+function sortRows(list: SubjectRow[], sort: SubjectSort) {
+  return [...list].sort((left, right) => sort === 'code' ? left.subjectCode.localeCompare(right.subjectCode)
+    : sort === 'name' ? byName(left, right) : ((right.eligible ?? -1) - (left.eligible ?? -1)) || byName(left, right));
 }
 const SUBJECT_PAGE_SIZE = 20;
-const classTypeLabel = (subject: RunSubject) => subject.classType === 'LAB' ? 'Lab' : subject.classType === 'LECTURE' ? 'Lecture' : 'Class type not set';
-const decisionIcons: Record<'RESTORE', ReactNode> = {
-  RESTORE: <ActionIcon><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></ActionIcon>,
-};
-/** Removed (deferred) subjects, beside the Subjects table: name and code only, with an add-back action while the review is open. */
-function RemovedSubjects({ subjects, editable, onRestore }: { subjects: RunSubject[]; editable: boolean; onRestore: (subject: RunSubject) => void }) {
+const classTypeLabel = (classType: ClassType) => classType === 'LAB' ? 'Lab' : classType === 'LECTURE' ? 'Lecture' : 'Class type not set';
+const restoreIcon = <ActionIcon><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></ActionIcon>;
+
+/** A subject's action: the current status as a pill; the menu offers Pending, Approved or Removed and a click applies it at once (no dialog, no reason). */
+function ActionMenu({ row, onDecide }: { row: SubjectRow; onDecide: (row: SubjectRow, status: OfferingDecisionStatus) => void }) {
+  return <RadioMenu label={`Action for ${row.subjectCode}: ${statusLabels[row.status]}`} menuLabel={`Action for ${row.subjectCode}`} buttonClass="coordinator-decision-button"
+    options={(['PENDING', 'APPROVED', 'REMOVED'] as const).map(status => ({ value: status, label: statusLabels[status], checked: row.status === status, disabled: false }))}
+    onPick={status => onDecide(row, status)}><span className={'admin-pill ' + statusClass[row.status]}>{statusLabels[row.status]}</span></RadioMenu>;
+}
+
+/** Removed subjects, beside the Subjects table: name and code only, with an add-back action (back to Pending) while decisions are editable. */
+function RemovedSubjects({ rows, editable, onRestore }: { rows: SubjectRow[]; editable: boolean; onRestore: (row: SubjectRow) => void }) {
   return <aside className="coordinator-removed" aria-labelledby="coordinator-removed-heading">
-    <h3 id="coordinator-removed-heading">Removed subjects <span className="admin-pill coordinator-pill-muted">{subjects.length}</span></h3>
+    <h3 id="coordinator-removed-heading">Removed subjects <span className="admin-pill coordinator-pill-muted">{rows.length}</span></h3>
     <div className="admin-table-scroll coordinator-table" role="region" aria-label="Removed subjects table" tabIndex={0}>
       <table><thead><tr><th scope="col">Subject</th>{editable && <th scope="col"><span className="admin-sr-only">Action</span></th>}</tr></thead>
-        <tbody>{subjects.map(subject => <tr key={subject.subjectId} data-subject={subject.subjectCode}>
-          <th scope="row"><strong>{subject.subjectName}</strong><span className="coordinator-subject-code">{subject.subjectCode}</span></th>
-          {editable && <td><button type="button" className="coordinator-icon-button" aria-label={`Add back ${subject.subjectCode}`} title="Add back" onClick={() => onRestore(subject)}>{decisionIcons.RESTORE}</button></td>}
+        <tbody>{rows.map(row => <tr key={row.subjectId} data-subject={row.subjectCode}>
+          <th scope="row"><strong>{row.subjectName}</strong><span className="coordinator-subject-code">{row.subjectCode}</span>{!row.inSnapshot && <span className="admin-pill coordinator-pill-muted">not in this snapshot</span>}</th>
+          {editable && <td><button type="button" className="coordinator-icon-button" aria-label={`Add back ${row.subjectCode}`} title="Add back" onClick={() => onRestore(row)}>{restoreIcon}</button></td>}
         </tr>)}</tbody></table></div>
   </aside>;
 }
-function SubjectTable({ client, run, studentCache, editable, pendingIds, onDecide, onRestore }: { client: CoordinatorClient; run: ForecastRunDetail; studentCache: StudentListCache; editable: boolean; pendingIds: number[]; onDecide: (action: SubjectAction, subject: RunSubject) => void; onRestore: (subject: RunSubject) => void }) {
-  const [studentsFor, setStudentsFor] = useState<RunSubject | null>(null);
-  const listed = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded);
-  // Removed (deferred) subjects leave the main table and are listed beside it, where they can be added back.
-  const subjects = listed.filter(subject => subject.decisionStatus !== 'DEFERRED'), removed = listed.filter(subject => subject.decisionStatus === 'DEFERRED');
-  const [filters, setFilters] = useState(NO_FILTERS), [requested, setPage] = useState(1), filtering = filters.q !== '' || filters.type !== '' || filters.decision !== '' || filters.flag !== '';
-  const matching = sortSubjects(subjects.filter(subject => matchesFilters(subject, filters)), filters.sort);
+
+function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, editable, closed, pickCounts, onDecide }: { client: CoordinatorClient; scope: ForecastScope; runId: number; rows: SubjectRow[]; studentCache: StudentListCache; pickerCache: PickerListCache; editable: boolean; closed: boolean; pickCounts: Map<number, number>; onDecide: (row: SubjectRow, status: OfferingDecisionStatus) => void }) {
+  const [studentsFor, setStudentsFor] = useState<SubjectRow | null>(null), [pickersFor, setPickersFor] = useState<SubjectRow | null>(null);
+  // Removed subjects leave the main table and are listed beside it, where they can be added back.
+  const subjects = rows.filter(row => row.status !== 'REMOVED'), removed = sortRows(rows.filter(row => row.status === 'REMOVED'), 'name');
+  const [filters, setFilters] = useState(NO_FILTERS), [requested, setPage] = useState(1), filtering = filters.q !== '' || filters.type !== '' || filters.status !== '' || filters.flag !== '';
+  const matching = sortRows(subjects.filter(row => matchesFilters(row, filters)), filters.sort);
   const pages = Math.max(1, Math.ceil(matching.length / SUBJECT_PAGE_SIZE)), page = Math.min(requested, pages);
   const change = (patch: Partial<SubjectFilters>) => { setFilters(current => ({ ...current, ...patch })); setPage(1); };
   const clear = () => { setFilters(current => ({ ...NO_FILTERS, sort: current.sort })); setPage(1); };
-  // After a finalize attempt with unreviewed subjects: clear filters and sorting (a filter could hide them), then show the page of the first one that still needs a decision.
-  useEffect(() => {
-    const first = sortSubjects(subjects, NO_FILTERS.sort).findIndex(subject => pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING');
-    if (first >= 0) { setFilters(NO_FILTERS); setPage(Math.floor(first / SUBJECT_PAGE_SIZE) + 1); }
-  }, [pendingIds]);
-  const decisionTabs = ['PENDING', 'APPROVED', 'REVIEWED'] as const, otherDecisions = ['MIXED', 'NONE'] as const;
   const toolbar = <TableToolbar label="Filter and sort subjects">
-    <SegmentedFilter label="Decision" value={filters.decision} onChange={decision => change({ decision })} options={[{ value: '', label: 'All' }, ...decisionTabs.map(status => ({ value: status, label: decisionLabels[status] }))]}/>
+    <SegmentedFilter label="Status" value={filters.status} onChange={status => change({ status })} options={[{ value: '', label: 'All' }, { value: 'PENDING', label: 'Pending' }, { value: 'APPROVED', label: 'Approved' }]}/>
     <FilterMenu groups={[
       { id: 'type', heading: 'Class type', value: filters.type, onChange: type => change({ type }), options: [{ value: 'LECTURE', label: 'Lecture' }, { value: 'LAB', label: 'Lab' }, { value: 'NONE', label: 'Not set' }] },
-      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'BELOW_MINIMUM', label: 'Below minimum' }, { value: 'CONFIG', label: 'Configuration required' }, { value: 'UNCERTAIN', label: 'Has uncertain students' }] },
-      { id: 'decision', heading: 'Other decisions', allLabel: 'Any', value: (otherDecisions as readonly string[]).includes(filters.decision) ? filters.decision : '', onChange: decision => change({ decision }), options: otherDecisions.map(status => ({ value: status, label: decisionLabels[status] })) },
+      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'UNCERTAIN', label: 'Has uncertain students' }] },
     ]}/>
     <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', noAll: true, value: filters.sort, onChange: sort => change({ sort: sort as SubjectSort }), options: Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label })) }]}/>
     <SearchField label="Search subjects" value={filters.q} placeholder="Search subject code or name" onChange={q => change({ q })}/>
     {filtering && <ClearFilters onClear={clear}/>}
   </TableToolbar>;
-  const side = removed.length > 0 && <RemovedSubjects subjects={removed} editable={editable} onRestore={onRestore}/>;
-  const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={run.forecastRunId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} cache={studentCache} onClose={() => setStudentsFor(null)}/>;
-  if (matching.length === 0) return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-empty" role="status"><p>{subjects.length === 0 ? 'Every subject has been removed.' : 'No subjects match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div></div>{side}{studentsDialog}</div>;
-  return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects" role="region" aria-label="Subjects table" tabIndex={0}>
-    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Potential demand" text={HELP.demand}/></th><th scope="col"><Help label="Quality" text={HELP.quality}/></th><th scope="col">Action</th></tr></thead>
-      <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(subject => {
-        const highlight = pendingIds.includes(subject.subjectId) && subject.decisionStatus === 'PENDING';
-        const decidable = editable && subject.configurationStatus === 'CONFIGURED' && subject.sections.length > 0;
-        return <tr key={subject.subjectId} className={highlight ? 'coordinator-row-pending' : undefined} data-subject={subject.subjectCode}>
-          <th scope="row"><strong>{subject.subjectName}</strong><span className="coordinator-subject-code">{subject.subjectCode}</span><span className="admin-audit-id">{classTypeLabel(subject)} · {subject.creditHours} credit hours</span></th>
-          <td><strong className="coordinator-number">{subject.supportedEligibleCount}</strong>{subjectFlags(subject).length > 0 && <div className="coordinator-demand-flags"><FlagBadges flags={subjectFlags(subject)}/></div>}</td>
-          <td><span className={'admin-pill ' + (subject.qualityStatus === 'SUPPORTED' ? 'coordinator-pill-success' : subject.qualityStatus === 'PRELIMINARY' ? 'coordinator-pill-warning' : 'coordinator-pill-muted')}>{qualityLabels[subject.qualityStatus]}</span>
-            <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View students for ${subject.subjectCode}`} onClick={() => setStudentsFor(subject)}>{subject.uncertainStudentCount > 0 ? `${subject.uncertainStudentCount} uncertain · View students` : 'View students'}</button>
-            {subject.configurationStatus === 'CONFIGURATION_REQUIRED' && <span className="coordinator-config-issue">Configuration required{subject.configurationMessage ? `: ${subject.configurationMessage}` : ''}</span>}</td>
-          <td>{decidable ? <ActionMenu subject={subject} onDecide={onDecide}/> : <span className={'admin-pill ' + decisionClass[subject.decisionStatus]}>{decisionLabels[subject.decisionStatus]}</span>}
-            {highlight && <span className="coordinator-needed">Decision needed</span>}</td>
-        </tr>;
-      })}</tbody></table>
+  const side = removed.length > 0 && <RemovedSubjects rows={removed} editable={editable} onRestore={row => onDecide(row, 'PENDING')}/>;
+  const pickersDialog = pickersFor && <SubjectPickersDialog client={client} scope={scope} subjectId={pickersFor.subjectId} subjectCode={pickersFor.subjectCode} cache={pickerCache} onClose={() => setPickersFor(null)}/>;
+  const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={runId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} cache={studentCache} onClose={() => setStudentsFor(null)}/>;
+  if (matching.length === 0) return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-empty" role="status"><p>{subjects.length === 0 ? 'Every subject has been removed.' : 'No subjects match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div></div>{side}{studentsDialog}{pickersDialog}</div>;
+  return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects coordinator-decisions" role="region" aria-label="Subjects table" tabIndex={0}>
+    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Not taken yet" text={HELP.notTakenYet}/></th><th scope="col"><Help label="Eligible to take" text={HELP.eligible}/></th><th scope="col"><Help label="Action" text={HELP.action}/></th>{closed && <th scope="col"><Help label="Picked" text={HELP.picked}/></th>}</tr></thead>
+      <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(row => <tr key={row.subjectId} data-subject={row.subjectCode}>
+        <th scope="row"><strong>{row.subjectName}</strong><span className="coordinator-subject-code">{row.subjectCode}</span><span className="admin-audit-id">{classTypeLabel(row.classType)} · {row.creditHours} credit hours</span>
+          {!row.inSnapshot && <span className="admin-pill coordinator-pill-muted">not in this snapshot</span>}</th>
+        <td><strong className="coordinator-number">{row.notTaken ?? '—'}</strong></td>
+        <td><strong className="coordinator-number">{row.eligible ?? '—'}</strong>
+          {row.run && <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View students for ${row.subjectCode}`} onClick={() => setStudentsFor(row)}>{row.run.uncertainStudentCount > 0 ? `${row.run.uncertainStudentCount} uncertain · View students` : 'View students'}</button>}</td>
+        <td>{editable ? <ActionMenu row={row} onDecide={onDecide}/> : <span className={'admin-pill ' + statusClass[row.status]}>{statusLabels[row.status]}</span>}</td>
+        {closed && <td>{row.status === 'APPROVED'
+          ? <><strong className="coordinator-number">{pickCounts.get(row.subjectId) ?? 0}</strong>
+            <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View pickers for ${row.subjectCode}`} onClick={() => setPickersFor(row)}>View pickers</button></>
+          : <strong className="coordinator-number">—</strong>}</td>}
+      </tr>)}</tbody></table>
   </div>
-  {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${subjects.length}` : matching.length} subjects · Page {page} of {pages}</span><div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</div>{side}{studentsDialog}</div>;
+  {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${subjects.length}` : matching.length} subjects · Page {page} of {pages}</span><div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</div>{side}{studentsDialog}{pickersDialog}</div>;
 }
 
-function AuditTable({ client, run }: { client: CoordinatorClient; run: ForecastRunDetail }) {
-  const audit = usePagedList<ForecastAuditEntry>(signal => client.listAudit(run.forecastRunId, { limit: 20 }, signal), cursor => client.listAudit(run.forecastRunId, { limit: 20, cursor }), 'audit|' + run.forecastRunId);
-  const first = useRef(true);
-  useEffect(() => { if (first.current) { first.current = false; return; } void audit.refresh(); }, [run.revision]);
-  const codes = new Map(run.subjects.map(subject => [subject.subjectId, subject.subjectCode]));
+function AuditTable({ audit }: { audit: ReturnType<typeof usePagedList<OfferingDecisionAuditEntry>> }) {
   return <section className="admin-card" aria-labelledby="coordinator-audit-heading">
-    <div className="admin-card-title"><div><h2 id="coordinator-audit-heading">Audit history</h2><p className="admin-muted">Every review step and decision, newest first.</p></div></div>
+    <div className="admin-card-title"><div><h2 id="coordinator-audit-heading">Audit history</h2><p className="admin-muted">Every change of a subject's status, newest first.</p></div></div>
     <Panel error={audit.error} retry={audit.retry} label="audit history">{audit.data && (audit.items.length === 0 ? <p className="admin-empty">No decisions recorded yet.</p> :
       <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Audit history table" tabIndex={0}>
-        <table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Subject</th><th scope="col">By</th><th scope="col">Reason</th></tr></thead>
-          <tbody>{audit.items.map(entry => <tr key={entry.decisionAuditId}><td>{when(entry.recordedAt)}</td><td>{actionLabels[entry.actionType] ?? entry.actionType}</td>
-            <td>{entry.subjectId ? codes.get(entry.subjectId) ?? `#${entry.subjectId}` : 'Whole forecast'}</td><td className="admin-actor">{entry.recordedBy}</td>
-            <td className="admin-reason">{entry.reason ?? '—'}
-              <details className="coordinator-audit-details"><summary>Before and after</summary><pre>{JSON.stringify({ before: entry.before, after: entry.after }, null, 2)}</pre></details></td></tr>)}</tbody></table></div>
+        <table><thead><tr><th scope="col">When</th><th scope="col">Change</th><th scope="col">Subject</th><th scope="col">By</th><th scope="col">Snapshot</th></tr></thead>
+          <tbody>{audit.items.map(entry => <tr key={entry.auditId}><td>{when(entry.recordedAt)}</td><td>{statusLabels[entry.beforeStatus]} → {statusLabels[entry.afterStatus]}</td>
+            <th scope="row"><strong>{entry.subjectName}</strong><span className="coordinator-subject-code">{entry.subjectCode}</span></th><td className="admin-actor">{entry.recordedBy}</td>
+            <td>{entry.importBatchId ? `Snapshot #${entry.importBatchId}` : '—'}</td></tr>)}</tbody></table></div>
         {audit.loadMoreError && <p className="admin-form-error" role="alert">{audit.loadMoreError}</p>}
         <LoadMore cursor={audit.cursor} busy={audit.loadingMore} onMore={() => void audit.more()} label="Load older entries"/></>)}
     </Panel>
   </section>;
 }
 
-function RunDetail({ client, runId }: { client: CoordinatorClient; runId: number }) {
-  const read = useRead(signal => client.getRun(runId, signal), 'run|' + runId);
-  const [notice, setNotice] = useState<Notice>(null), [dialog, setDialog] = useState<Dialog>(null), [pendingIds, setPendingIds] = useState<number[]>([]);
-  const heading = useRef<HTMLHeadingElement>(null), studentCache = useRef<StudentListCache>(new Map());
-  useEffect(() => { if (read.data) heading.current?.focus(); }, [read.data?.run.forecastRunId]);
-  useEffect(() => { const cache = studentCache.current; cache.clear(); return () => cache.clear(); }, [runId]);
-  const loaded = read.data;
-  const run = loaded?.run, revision = loaded?.revision ?? '';
-  const announce = (next: Notice) => { setNotice(next); requestAnimationFrame(() => document.getElementById('coordinator-action-status')?.focus()); };
-  async function mutate(op: (revision: string) => Promise<MutationResult>, success: string) {
-    try { await op(revision); }
-    catch (error) {
-      if (error instanceof CoordinatorApiError && error.code === 'RUN_REVISION_MISMATCH') { setDialog(null); setPendingIds([]); announce({ kind: 'warning', text: 'This forecast changed; reloaded.' }); await read.reload(); return; }
-      if (error instanceof CoordinatorApiError && ['RUN_FINALIZED', 'RUN_STATE_CONFLICT'].includes(error.code)) void read.reload();
-      throw error;
+/** "Selection not scheduled" / "Selection opens …" / "Selection open until …" / "Selection closed …". */
+function phaseText(set: OfferingDecisionSet) {
+  const { selectionOpensAt, selectionClosesAt } = set.semester;
+  if (set.phase === 'PLANNING') return selectionOpensAt ? `Selection opens ${when(selectionOpensAt)}` : 'Selection not scheduled';
+  if (set.phase === 'OPEN') return selectionClosesAt ? `Selection open until ${when(selectionClosesAt)}` : 'Selection open';
+  return `Selection closed ${when(selectionClosesAt)}`;
+}
+const snapshotText = (item: ImportSummary) => `${item.sourceLabel} · ${SOURCE_LABELS[item.source] ?? item.source} · ${item.sourceDate}`;
+const newestFirst = (left: ImportSummary, right: ImportSummary) => Date.parse(right.acceptedAt) - Date.parse(left.acceptedAt) || right.importBatchId - left.importBatchId;
+
+/** The forecast of one scope for a chosen snapshot, with the decision of every subject. The semester is always the next one (`targetSemesterId`); there is no semester choice. */
+function Forecast({ client, scope, search, scopeFields }: { client: CoordinatorClient; scope: ChosenScope; search: string; scopeFields: ReactNode }) {
+  const snapshotField = useId(), scopeKey = [scope.programmeId, scope.learningCentreId, scope.targetSemesterId].join('|');
+  const { toasts, notify, dismissToast, onToastAnimationEnd } = useToastNotifications();
+  const imports = useRead(signal => client.listImports(scope, { limit: 100 }, signal), 'imports|' + scopeKey);
+  const snapshots = [...(imports.data?.items ?? [])].sort(newestFirst);
+  const param = readScope(search).extra.get('snapshot'), asked = param && /^[1-9]\d*$/.test(param) ? Number(param) : null;
+  const chosen = snapshots.find(item => item.importBatchId === asked) ?? snapshots[0] ?? null;
+  // Keep the snapshot in the URL so a reload or a shared link shows the same forecast.
+  useEffect(() => { if (chosen && asked !== chosen.importBatchId) navigateApp(scopeHref('/coordinator/forecasts', scope, { snapshot: chosen.importBatchId }), { replace: true, skipUnsaved: true }); }, [chosen?.importBatchId, asked]);
+  // The forecast of a snapshot is created on first use (the request is idempotent), so there is no separate generate step.
+  const forecast = useRead(async signal => {
+    if (!chosen) return null;
+    const created = await client.generateRun({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId, targetSemesterId: scope.targetSemesterId, importBatchId: chosen.importBatchId, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
+    return client.getRun(created.receipt.resourceId, signal);
+  }, `run|${scopeKey}|${chosen?.importBatchId ?? 'none'}`);
+  const decisions = useRead(signal => client.getDecisions(scope, signal), 'decisions|' + scopeKey);
+  const audit = usePagedList<OfferingDecisionAuditEntry>(signal => client.listDecisionAudit(scope, { limit: 20 }, signal), cursor => client.listDecisionAudit(scope, { limit: 20, cursor }), 'decision-audit|' + scopeKey);
+  const studentCache = useRef<StudentListCache>(new Map()), pickerCache = useRef<PickerListCache>(new Map()), busy = useRef(false);
+  const run = forecast.data?.run, set = decisions.data;
+  useEffect(() => { const cache = studentCache.current; cache.clear(); return () => cache.clear(); }, [run?.forecastRunId]);
+  // Picker lists hold personal data: memory only, dropped when the scope changes or the page is left (Refresh clears them too).
+  useEffect(() => { const cache = pickerCache.current; cache.clear(); return () => cache.clear(); }, [scopeKey]);
+
+  /** One click applies the change: no dialog, no reason. A toast confirms it; a stale or locked answer reloads the decisions. */
+  async function decide(row: SubjectRow, status: OfferingDecisionStatus) {
+    if (busy.current || !chosen) return;
+    busy.current = true;
+    try {
+      const result = await client.decide({ scope, subjectId: row.subjectId, status, expectedStatus: row.status, importBatchId: chosen.importBatchId });
+      // While selection is open, taking an approved subject away withdraws it from the students who picked it.
+      if (result.phase === 'OPEN' && result.beforeStatus === 'APPROVED' && result.afterStatus !== 'APPROVED') notify(result.affectedPicks > 0 ? `${row.subjectCode} withdrawn. ${plural(result.affectedPicks, 'student')} who picked it will see a note.` : `${row.subjectCode} withdrawn.`);
+      else if (result.beforeStatus !== result.afterStatus) notify(result.afterStatus === 'APPROVED' ? `${row.subjectCode} approved.` : result.afterStatus === 'REMOVED' ? `${row.subjectCode} removed.`
+        : result.beforeStatus === 'REMOVED' ? `${row.subjectCode} added back.` : `${row.subjectCode} set back to pending.`);
+    } catch (error) {
+      if (error instanceof CoordinatorApiError && error.code === 'DECISION_STALE') notify('This subject was changed by someone else; reloaded.', 'warning');
+      else if (error instanceof CoordinatorApiError && ['SEMESTER_READ_ONLY', 'SELECTION_CLOSED'].includes(error.code)) notify(error.message, 'warning');
+      else { notify(errorText(error), 'danger'); busy.current = false; return; }
     }
-    setDialog(null); announce({ kind: 'success', text: success }); await read.reload();
+    try { await Promise.all([decisions.reload(), audit.refresh()]); } finally { busy.current = false; }
   }
-  return <Panel error={read.error} retry={read.retry} label="forecast">{run && (() => {
-    const scope: ForecastScope = { programmeId: run.programmeId, learningCentreId: run.learningCentreId, targetSemesterId: run.targetSemesterId };
-    const editable = run.status === 'UNDER_REVIEW', shown = run.subjects.filter(subject => !subject.excluded && !subject.semesterTypeExcluded).length;
-    const decide = (action: SubjectAction, subject: RunSubject) => async (reason: string) => mutate(rev => client.decide(run.forecastRunId, rev, scope, [{ subjectId: subject.subjectId, action, reason }]), `${actionVerb[action].title}: ${subject.subjectCode} recorded.`);
-    return <>
-      <StatusRegion notice={notice}/>
-      <section className="admin-card" aria-labelledby="coordinator-run-heading">
-        <AppLink className="admin-back" href={scopeHref('/coordinator/forecasts', run)}>← Back to forecasts</AppLink>
-        <div className="admin-card-title"><div><h2 id="coordinator-run-heading" tabIndex={-1} ref={heading}>Forecast version {run.versionNumber}</h2>
-          <RunMeta run={run}/></div>
-          <div className="coordinator-head-actions">
-            <button type="button" onClick={() => { studentCache.current.clear(); void read.reload(); }}>Refresh</button>
-            <StatusMenu status={run.status} onChange={next => setDialog({ kind: next === 'UNDER_REVIEW' ? 'start' : 'finalize' })}/>
-          </div></div>
-        {run.newerForecastAvailable && <p className="coordinator-newer-wrap"><NewerBadge newer={run.newerForecastAvailable} scope={run}/></p>}
-        <SummaryFacts run={run}/>
-        {run.status === 'DRAFT' && <p className="admin-muted">Start the review to record decisions on each subject.</p>}
-        {run.status === 'FINALIZED' && <p className="coordinator-readonly-note" role="note">This forecast is finalized and read-only. Next step: <AppLink href="/coordinator/decisions">Confirm offerings</AppLink>.</p>}
-      </section>
-      <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
-        <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Potential demand is the supported eligible pool. Uncertain students are not counted in it.</p></div></div>
-        {shown === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p> : <SubjectTable client={client} run={run} studentCache={studentCache.current} editable={editable} pendingIds={pendingIds} onDecide={(action, subject) => setDialog({ kind: 'decide', action, subject })} onRestore={subject => setDialog({ kind: 'restore', subject })}/>}
-      </section>
-      <AuditTable client={client} run={run}/>
-      {dialog?.kind === 'start' && <ActionDialog title="Start review" confirmLabel="Start review" reasonLabel={null} onCancel={() => setDialog(null)}
-        description="Move this draft forecast into review. You can then approve, review or remove each subject."
-        onSubmit={() => mutate(rev => client.startReview(run.forecastRunId, rev, scope), 'Review started.')}/>}
-      {dialog?.kind === 'decide' && <ActionDialog title={`${actionVerb[dialog.action].title} ${dialog.subject.subjectCode}`} confirmLabel={actionVerb[dialog.action].confirm} onCancel={() => setDialog(null)}
-        description={<>{dialog.subject.subjectName}. {actionVerb[dialog.action].text}</>} onSubmit={decide(dialog.action, dialog.subject)}/>}
-      {dialog?.kind === 'restore' && <ActionDialog title={`Add back ${dialog.subject.subjectCode}`} confirmLabel="Add back subject" onCancel={() => setDialog(null)}
-        description={<>{dialog.subject.subjectName}. Put this subject back in the offering plan. It returns to the Subjects table as pending and needs a new decision.</>}
-        onSubmit={async reason => mutate(rev => client.decide(run.forecastRunId, rev, scope, [{ subjectId: dialog.subject.subjectId, action: 'REOPEN', reason }]), `Added back: ${dialog.subject.subjectCode}.`)}/>}
-      {dialog?.kind === 'finalize' && <ActionDialog title="Finalize forecast" confirmLabel="Finalize forecast" danger onCancel={() => setDialog(null)}
-        description={<>Finalizing freezes this forecast: no decision can change afterwards. Every subject must already be approved, reviewed or removed ({plural(run.summary.pendingSubjects, 'subject')} still pending).</>}
-        onSubmit={async reason => {
-          try { await mutate(rev => client.finalize(run.forecastRunId, rev, scope, { reason }), 'Forecast finalized. It is now read-only.'); }
-          catch (error) {
-            if (error instanceof CoordinatorApiError && error.code === 'REVIEWS_INCOMPLETE') {
-              const ids = Array.isArray(error.details?.pendingSubjectIds) ? (error.details!.pendingSubjectIds as unknown[]).filter((id): id is number => typeof id === 'number') : [];
-              const codes = run.subjects.filter(subject => ids.includes(subject.subjectId)).map(subject => subject.subjectCode);
-              setDialog(null); setPendingIds(ids);
-              announce({ kind: 'warning', text: `${plural(ids.length, 'subject')} still ${ids.length === 1 ? 'needs' : 'need'} a decision before this forecast can be finalized${codes.length ? ': ' + codes.join(', ') : ''}. They are highlighted below.` });
-              return;
-            }
-            throw error;
-          }
-        }}/>}
-    </>;
-  })()}</Panel>;
+  const refresh = () => { studentCache.current.clear(); pickerCache.current.clear(); void forecast.reload(); void decisions.reload(); void audit.refresh(); };
+
+  const rows = run && set ? buildRows(run, set.decisions) : null;
+  const pending = rows ? rows.filter(row => row.status === 'PENDING').length : 0;
+  return <>
+    <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
+      <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme and a learning centre. Decisions are for the next semester.</p></div></div>
+      <div className="coordinator-setup-section">{scopeFields}</div>
+      <div className="coordinator-setup-section">
+        <Panel error={imports.error} retry={imports.retry} label="student data snapshots">{imports.data && (snapshots.length === 0
+          ? <div className="admin-empty"><h3>No student data snapshots yet</h3><p>Create a snapshot of the student data first. The forecast is calculated from it.</p><AppLink className="coordinator-link-button" href={scopeHref('/coordinator/imports', scope)}>Go to Data Imports</AppLink></div>
+          : <div className="admin-field coordinator-snapshot-field"><span className="coordinator-field-label"><label htmlFor={snapshotField}>Student data snapshot</label><InfoTip title="Student data snapshot">{HELP.snapshot}</InfoTip></span>
+            <select id={snapshotField} value={chosen?.importBatchId ?? ''} onChange={event => navigateApp(scopeHref('/coordinator/forecasts', scope, { snapshot: event.target.value }), { replace: true, skipUnsaved: true })}>
+              {snapshots.map(item => <option key={item.importBatchId} value={item.importBatchId}>{snapshotText(item)}</option>)}
+            </select></div>)}
+        </Panel>
+        {chosen && set && rows && <>
+          <p className="coordinator-phase" role="status">{phaseText(set)} · {plural(pending, 'subject')} still pending</p>
+          {set.phase === 'PLANNING' && pending > 0 && <p className="coordinator-warning" role="status">{pending === 1 ? "1 subject still pending; it won't be shown to students unless approved." : `${pending} subjects still pending; they won't be shown to students unless approved.`}</p>}
+        </>}
+      </div>
+    </section>
+    {chosen && <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
+      <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Eligible students are a forecast, not registration.{set?.editable === false ? " Decisions are locked." : " Choose an action for each subject; it applies at once."}</p></div>
+        <button type="button" onClick={refresh}>Refresh</button></div>
+      <Panel error={forecast.error ?? decisions.error} retry={() => { forecast.retry(); decisions.retry(); }} label="forecast">{rows && run && set && (rows.length === 0
+        ? <p className="admin-empty">No subjects are forecast for this scope.</p>
+        : <SubjectTable client={client} scope={scope} runId={run.forecastRunId} rows={rows} studentCache={studentCache.current} pickerCache={pickerCache.current} editable={set.editable} closed={set.phase === 'CLOSED'} pickCounts={new Map(set.pickCounts.map(item => [item.subjectId, item.pickCount]))} onDecide={(row, status) => void decide(row, status)}/>)}
+      </Panel>
+    </section>}
+    {chosen && <AuditTable audit={audit}/>}
+    <ToastStack toasts={toasts} onDismiss={dismissToast} onExitAnimationEnd={onToastAnimationEnd}/>
+  </>;
 }
 
 export function ForecastsPage({ client, search }: { client: CoordinatorClient; search: string }) {
   const context = useRead(signal => client.context(undefined, signal), 'context');
-  const { programmeId, learningCentreId, extra } = readScope(search);
-  const runParam = extra.get('run'), runId = runParam && /^[1-9]\d*$/.test(runParam) ? Number(runParam) : null;
+  const { programmeId, learningCentreId } = readScope(search);
   const scope = context.data ? chooseScope(context.data, programmeId, learningCentreId) : null;
+  const fields = (data: ForecastContext) => <ScopeFields context={data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/>;
   return <>
     <PageHeading title="Class Offering Forecast"/>
-    {runId !== null ? <RunDetail key={runId} client={client} runId={runId}/> :
-      <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && <>
-        <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
-          <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
-          <div className="coordinator-setup-section"><ScopeFields context={context.data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/></div>
-          {scope ? <RunList key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope}/>
-            : context.data.programmes.length > 0 && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecasts.</p></div>}
-        </section>
-      </>}</Panel>}
+    <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && (scope
+      ? <Forecast key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope} search={search} scopeFields={fields(context.data)}/>
+      : <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
+        <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme and a learning centre. Decisions are for the next semester.</p></div></div>
+        <div className="coordinator-setup-section">{fields(context.data)}</div>
+        {context.data.programmes.length > 0 && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecast.</p></div>}
+      </section>)}
+    </Panel>
   </>;
 }

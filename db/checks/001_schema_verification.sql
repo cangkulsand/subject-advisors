@@ -17,7 +17,8 @@ FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
  -- The frozen 171 source attributes remain intact. Registered additive columns are
  -- one student_profile field (0003), exactly two curriculum_subject fields (0005) and the 16 nullable UC20 columns of 0007.
  IF actual_count<>(jsonb_array_length(t->'columns')
-   + CASE WHEN t->>'table'='student_profile' THEN 1 ELSE 0 END
+   + CASE WHEN t->>'table'='student_profile' THEN 2 ELSE 0 END -- current_semester_id (0003), learning_centre_id (0009)
+   + CASE WHEN t->>'table'='academic_semester' THEN 2 ELSE 0 END -- selection_opens_at, selection_closes_at (0009)
    + CASE WHEN t->>'table'='curriculum_subject' THEN 2 ELSE 0 END
    + CASE t->>'table' WHEN 'academic_import_batch' THEN 6 WHEN 'imported_student' THEN 2 WHEN 'imported_subject_record' THEN 1
      WHEN 'forecast_run' THEN 4 WHEN 'forecast_subject_demand' THEN 3 ELSE 0 END
@@ -42,8 +43,8 @@ END LOOP;
 SELECT count(*) INTO actual_count FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace
 WHERE n.nspname='public' AND c.contype='f'
   AND c.conrelid IN (SELECT to_regclass('public.'||(value->>'table')) FROM jsonb_array_elements(expected));
--- The one additional 0003 FK is checked by the explicit extension check. 0005 adds no FK on a source-contract table. 0007 adds three (batch programme, batch target semester, run programme); 0008 adds programme.faculty_id.
-IF actual_count<>44 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK, three 0007 FKs and the 0008 faculty FK'; END IF;
+-- The one additional 0003 FK is checked by the explicit extension check. 0005 adds no FK on a source-contract table. 0007 adds three (batch programme, batch target semester, run programme); 0008 adds programme.faculty_id; 0009 adds student_profile.learning_centre_id.
+IF actual_count<>45 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK, three 0007 FKs, the 0008 faculty FK and the 0009 profile learning centre FK'; END IF;
 END $verify$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.student_profile'::regclass AND tgname='touch_student_profile' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_student_profile'; END IF; END $v$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.academic_plan'::regclass AND tgname='touch_academic_plan' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_academic_plan'; END IF; END $v$;

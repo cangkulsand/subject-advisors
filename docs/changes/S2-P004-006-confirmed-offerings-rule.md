@@ -8,6 +8,7 @@
 - **Branch / PR:** `docs/s2-confirmed-offerings-rule`; no PR
 - **Reviewer:** Pending (human review of the product-owner rule transcription requested)
 - **Supersedes in part:** S1-P002-* (student-reported offerings), S2-P004-001, S2-P004-002, S2-P004-003 where they say "does not publish official semester offerings", "independent of student portal participation" or "student-reported offerings". Those records are historical and are not rewritten.
+- **Superseded by S2-P004-017 to S2-P004-024 (2026-11-10):** the coordinator confirmation, pick deadline and `confirmed_offering` design here was replaced by one-click Approve/Remove decisions per programme, learning centre and semester plus an admin-set selection window; the 0007 tables stay in the database, unused. See [S2-P004-024](S2-P004-024-remove-review-confirm-flow.md). History below is kept as written.
 
 ## 1. Plan
 

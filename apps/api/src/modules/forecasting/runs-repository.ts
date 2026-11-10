@@ -1,14 +1,14 @@
 import type {
-  ClassType, ForecastAuditEntry, ForecastConfigurationStatus, ForecastQualityStatus, JsonObject, UncertaintyReason,
+  ClassType, ForecastConfigurationStatus, ForecastQualityStatus, UncertaintyReason,
 } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ForecastSubjectOption } from '../../../../../packages/shared/src/forecasting/contracts';
 import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 import { fingerprint } from '../../../../../packages/shared/src/forecasting/engine/hash';
 import type { EngineCapacityRule, EngineCurriculum, EngineRecord, EngineRuleSnapshot, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { ForecastRunStatus, SectionReviewStatus } from '../../../../../packages/shared/src/forecasting/runs';
-import { ForecastingError, mapForecastingDatabaseError, RUN_GUARD_EXISTS, RUN_GUARD_REVISION } from './errors';
+import { ForecastingError, mapForecastingDatabaseError, RUN_GUARD_EXISTS } from './errors';
 import type {
-  EngineInputRows, ForecastRunsRepository, NewRunInput, RunDetailRows, RunExpectation, RunListRow, RunRecord, RunSectionRow, RunSubjectRow,
+  EngineInputRows, ForecastRunsRepository, NewRunInput, RunDetailRows, RunRecord, RunSectionRow, RunSubjectRow,
 } from './runs-contracts';
 import type { ForecastingQuery, ForecastingStatement, ForecastingTransaction } from './repository';
 
@@ -38,29 +38,6 @@ function runFrom(row: Record<string, unknown>): RunRecord {
     auditCount: integer(row.audit_count),
   };
 }
-
-/**
- * Two statements that serialise concurrent mutations of a run and then abort the whole transaction when the run no
- * longer matches the state the request was validated against. The check is its own statement so it runs on a fresh
- * snapshot after the row lock was granted (READ COMMITTED). The failing cast is non-constant so it is only evaluated on mismatch.
- */
-function guardRun(forecastRunId: number, expected: RunExpectation): ForecastingStatement[] {
-  return [
-    { text: 'SELECT 1 AS locked FROM public.forecast_run r WHERE r.forecast_run_id = $1::integer FOR UPDATE OF r', values: [forecastRunId] },
-    {
-      text: `SELECT CASE WHEN r.status = $2::text AND (SELECT count(*) FROM public.forecast_adjustment_audit a WHERE a.forecast_run_id = r.forecast_run_id) = $3::bigint
-          THEN 0 ELSE ('${RUN_GUARD_REVISION}' || r.status)::integer END AS ok
-        FROM public.forecast_run r WHERE r.forecast_run_id = $1::integer`,
-      values: [forecastRunId, expected.status, expected.auditCount],
-    },
-  ];
-}
-const selectRun = (forecastRunId: number): ForecastingStatement => ({ text: `SELECT ${RUN_COLUMNS} FROM public.forecast_run r WHERE r.forecast_run_id = $1::integer`, values: [forecastRunId] });
-
-/** Exact state of a subject's sections, read back inside the transaction for the audit after-state. */
-const SECTIONS_AFTER = `(SELECT COALESCE(jsonb_agg(jsonb_build_object('proposedSectionId', s.proposed_section_id, 'sectionNumber', s.section_number,
-    'expectedStudents', s.expected_students, 'reviewStatus', s.review_status, 'justification', s.justification) ORDER BY s.section_number), '[]'::jsonb)
-  FROM public.proposed_class_section s WHERE s.demand_id = $1::integer)`;
 
 export function createForecastRunsRepository(query: ForecastingQuery, transaction: ForecastingTransaction): ForecastRunsRepository {
   const read = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -166,13 +143,6 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
       return rows[0] ? runFrom(rows[0]) : null;
     }),
 
-    latestVersion: (scope) => read(async () => {
-      const rows = await query(`SELECT forecast_run_id, version_number, status FROM public.forecast_run
-        WHERE programme_id = $1 AND learning_centre_id = $2 AND target_semester_id = $3 ORDER BY version_number DESC LIMIT 1`,
-      [scope.programmeId, scope.learningCentreId, scope.targetSemesterId]);
-      return rows[0] ? { forecastRunId: integer(rows[0].forecast_run_id), versionNumber: integer(rows[0].version_number), status: text(rows[0].status) as ForecastRunStatus } : null;
-    }),
-
     createRun: (input: NewRunInput) => run([
       { text: 'SELECT 1 AS locked FROM public.academic_import_batch b WHERE b.import_batch_id = $1::integer FOR UPDATE OF b', values: [input.importBatchId] },
       {
@@ -252,122 +222,6 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
         })),
       };
     }),
-
-    listRuns: (scope, limit, beforeRunId) => read(async () => (await query(`SELECT ${RUN_COLUMNS},
-        dm.subjects, dm.excluded, dm.not_offered, dm.config_required, dm.total_supported, dm.total_uncertain,
-        sc.total_sections, sc.pending_sections, sc.below_minimum, sc.below_optimal, sc.pending_subjects, sc.subjects_below_minimum
-      FROM public.forecast_run r
-      CROSS JOIN LATERAL (SELECT count(*) AS subjects,
-          count(*) FILTER (WHERE d.configuration_status = 'EXCLUDED' AND COALESCE(r.scenario_assumptions->'subjects'->(d.subject_id::text)->>'semesterTypeExcluded', 'false') <> 'true') AS excluded,
-          count(*) FILTER (WHERE d.configuration_status = 'EXCLUDED' AND r.scenario_assumptions->'subjects'->(d.subject_id::text)->>'semesterTypeExcluded' = 'true') AS not_offered,
-          count(*) FILTER (WHERE d.configuration_status = 'CONFIGURATION_REQUIRED') AS config_required,
-          COALESCE(sum(d.eligible_count) FILTER (WHERE d.configuration_status IS DISTINCT FROM 'EXCLUDED'), 0) AS total_supported,
-          COALESCE(sum(d.uncertain_count) FILTER (WHERE d.configuration_status IS DISTINCT FROM 'EXCLUDED'), 0) AS total_uncertain
-        FROM public.forecast_subject_demand d WHERE d.forecast_run_id = r.forecast_run_id) dm
-      CROSS JOIN LATERAL (SELECT count(*) AS total_sections,
-          count(*) FILTER (WHERE ps.review_status = 'PENDING') AS pending_sections,
-          count(*) FILTER (WHERE ps.expected_students < cr.minimum_enrollment) AS below_minimum,
-          count(*) FILTER (WHERE ps.expected_students < cr.break_even_target) AS below_optimal,
-          count(DISTINCT d.demand_id) FILTER (WHERE ps.review_status = 'PENDING') AS pending_subjects,
-          count(DISTINCT d.demand_id) FILTER (WHERE ps.expected_students < cr.minimum_enrollment) AS subjects_below_minimum
-        FROM public.proposed_class_section ps JOIN public.forecast_subject_demand d ON d.demand_id = ps.demand_id
-        JOIN public.class_capacity_rule cr ON cr.capacity_rule_id = ps.capacity_rule_id WHERE d.forecast_run_id = r.forecast_run_id) sc
-      WHERE r.programme_id = $1 AND r.learning_centre_id = $2 AND r.target_semester_id = $3 AND ($5::integer IS NULL OR r.forecast_run_id < $5::integer)
-      ORDER BY r.forecast_run_id DESC LIMIT $4`, [scope.programmeId, scope.learningCentreId, scope.targetSemesterId, limit, beforeRunId]))
-      .map((row): RunListRow => ({
-        ...runFrom(row),
-        summary: {
-          subjects: integer(row.subjects), excludedSubjects: integer(row.excluded), notOfferedInSemesterTypeSubjects: integer(row.not_offered), configurationRequiredSubjects: integer(row.config_required),
-          totalSupportedDemand: integer(row.total_supported), totalUncertain: integer(row.total_uncertain), totalSections: integer(row.total_sections),
-          pendingSections: integer(row.pending_sections), sectionsBelowMinimum: integer(row.below_minimum), sectionsBelowOptimal: integer(row.below_optimal),
-          pendingSubjects: integer(row.pending_subjects), subjectsBelowMinimum: integer(row.subjects_below_minimum),
-        },
-      }))),
-
-    listAudit: (forecastRunId, scope, limit, beforeAuditId) => read(async () => (await query(`SELECT a.adjustment_audit_id, a.forecast_run_id, d.subject_id, a.action,
-        a.before_state, a.after_state, a.reason, a.recorded_by, ${isoSql('a.recorded_at')} AS recorded_at
-      FROM public.forecast_adjustment_audit a LEFT JOIN public.forecast_subject_demand d ON d.demand_id = a.demand_id
-      WHERE a.forecast_run_id = $1 AND ($3::bigint IS NULL OR a.adjustment_audit_id < $3::bigint) ORDER BY a.adjustment_audit_id DESC LIMIT $2`,
-    [forecastRunId, limit, beforeAuditId])).map((row): ForecastAuditEntry => {
-      const after = json<JsonObject>(row.after_state);
-      const approvalReference = typeof after.approvalReference === 'string' ? after.approvalReference : undefined;
-      return {
-        decisionAuditId: integer(row.adjustment_audit_id), forecastRunId: integer(row.forecast_run_id), scope, subjectId: nullableInteger(row.subject_id),
-        proposedSectionId: null, actionType: text(row.action), recordedBy: text(row.recorded_by), recordedAt: text(row.recorded_at), reason: text(row.reason),
-        ...(approvalReference ? { approvalReference } : {}), before: json<JsonObject>(row.before_state), after,
-      };
-    })),
-
-    startReview: (forecastRunId, expected, actor, reason) => run([
-      ...guardRun(forecastRunId, expected),
-      {
-        text: `INSERT INTO public.forecast_adjustment_audit(forecast_run_id, demand_id, action, before_state, after_state, reason, recorded_by)
-          VALUES ($1::integer, NULL, 'START_REVIEW', jsonb_build_object('status', $2::text), jsonb_build_object('status', 'UNDER_REVIEW'), $3::text, $4::text)`,
-        values: [forecastRunId, expected.status, reason, actor],
-      },
-      { text: "UPDATE public.forecast_run SET status = 'UNDER_REVIEW' WHERE forecast_run_id = $1::integer AND status = 'DRAFT'", values: [forecastRunId] },
-      selectRun(forecastRunId),
-    ]),
-
-    applyDecisions: (forecastRunId, expected, actor, plans) => {
-      const statements: ForecastingStatement[] = [...guardRun(forecastRunId, expected)];
-      for (const plan of plans) {
-        if (plan.replace) {
-          const { deleteSectionIds, keep, insert } = plan.replace;
-          if (deleteSectionIds.length) {
-            statements.push({ text: 'DELETE FROM public.proposed_class_section WHERE demand_id = $1::integer AND proposed_section_id = ANY($2::integer[])', values: [plan.demandId, deleteSectionIds] });
-          }
-          if (keep.length) {
-            // Park kept sections on temporary numbers so renumbering can never collide with the (demand, section) unique key.
-            statements.push({
-              text: 'UPDATE public.proposed_class_section SET section_number = section_number + 1000 WHERE demand_id = $1::integer AND proposed_section_id = ANY($2::integer[])',
-              values: [plan.demandId, keep.map((k) => k.proposedSectionId)],
-            });
-            statements.push({
-              text: `UPDATE public.proposed_class_section ps SET section_number = k.n, expected_students = k.e, justification = k.j, review_status = $3::text,
-                  reviewed_by = $4::text, reviewed_at = now()
-                FROM jsonb_to_recordset($2::jsonb) AS k(id integer, n integer, e integer, j text) WHERE ps.proposed_section_id = k.id AND ps.demand_id = $1::integer`,
-              values: [plan.demandId, JSON.stringify(keep.map((k) => ({ id: k.proposedSectionId, n: k.sectionNumber, e: k.expectedStudents, j: k.justification }))), plan.sectionStatus, actor],
-            });
-          }
-          if (insert.length) {
-            statements.push({
-              text: `INSERT INTO public.proposed_class_section(demand_id, capacity_rule_id, section_number, expected_students, review_status, justification, reviewed_by, reviewed_at)
-                SELECT $1::integer, i.capacity_rule_id, i.n, i.e, $3::text, i.j, $4::text, now()
-                FROM jsonb_to_recordset($2::jsonb) AS i(capacity_rule_id integer, n integer, e integer, j text)`,
-              values: [plan.demandId, JSON.stringify(insert.map((i) => ({ capacity_rule_id: i.capacityRuleId, n: i.sectionNumber, e: i.expectedStudents, j: i.justification }))), plan.sectionStatus, actor],
-            });
-          }
-        } else {
-          statements.push({
-            // A reopened (PENDING) section is no longer reviewed, so it carries no reviewer; the audit row keeps who reopened it.
-            text: `UPDATE public.proposed_class_section SET review_status = $2::text,
-                reviewed_by = CASE WHEN $2::text = 'PENDING' THEN NULL ELSE $3::text END, reviewed_at = CASE WHEN $2::text = 'PENDING' THEN NULL ELSE now() END
-              WHERE demand_id = $1::integer`,
-            values: [plan.demandId, plan.sectionStatus, actor],
-          });
-        }
-        statements.push({
-          text: `INSERT INTO public.forecast_adjustment_audit(forecast_run_id, demand_id, action, before_state, after_state, reason, recorded_by)
-            VALUES ($2::integer, $1::integer, $3::text, jsonb_build_object('sections', $4::jsonb),
-              jsonb_build_object('sections', ${SECTIONS_AFTER}, 'approvalReference', $5::text), $6::text, $7::text)`,
-          values: [plan.demandId, forecastRunId, plan.action, JSON.stringify(plan.before), plan.approvalReference, plan.reason, actor],
-        });
-      }
-      statements.push(selectRun(forecastRunId));
-      return run(statements);
-    },
-
-    finalize: (forecastRunId, expected, actor, audit) => run([
-      ...guardRun(forecastRunId, expected),
-      {
-        text: `INSERT INTO public.forecast_adjustment_audit(forecast_run_id, demand_id, action, before_state, after_state, reason, recorded_by)
-          VALUES ($1::integer, NULL, 'FINALIZE', jsonb_build_object('status', $2::text), jsonb_build_object('status', 'FINALIZED', 'approvalReference', $3::text), $4::text, $5::text)`,
-        values: [forecastRunId, expected.status, audit.approvalReference, audit.reason, actor],
-      },
-      { text: "UPDATE public.forecast_run SET status = 'FINALIZED', finalized_by = $2::text, finalized_at = now() WHERE forecast_run_id = $1::integer AND status = 'UNDER_REVIEW'", values: [forecastRunId, actor] },
-      selectRun(forecastRunId),
-    ]),
   };
 }
 

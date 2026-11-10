@@ -7,7 +7,7 @@ import { nextSemesterAfter } from '../../../../../packages/shared/src/offerings/
 import type { ForecastingDependencies, ImportBatchRow, StoredValidationSummary } from './contracts';
 import { ForecastingError } from './errors';
 import { bad, decodeCursor, encodeCursor, errorResponse, methodNotAllowed, noStore, onlyParameters, positive, readBounded, readJson, sha256Hex } from './http';
-import { handleOfferingRoute, OFFERING_ROUTE } from './offerings-routes';
+import { DECISION_ROUTE, handleDecisionRoute } from './decisions-routes';
 import { handleRunRoute, RUN_ROUTE } from './runs-routes';
 import { combinedFingerprint, combinedSummary, mergeCombined } from './combined-snapshot';
 import { sourceOf, studentSourceOf } from './import-source';
@@ -126,11 +126,12 @@ async function requireScope(deps: ForecastingDependencies, actor: string, scope:
 
 async function forecastContext(deps: ForecastingDependencies, actor: string, programmeId: number | null): Promise<ForecastContext> {
   const scopes = await deps.scopes.listScopes(actor);
+  const allSemesters = await deps.repository.semesters();
   const programmes = [...new Map(scopes.map((s) => [s.programme.programmeId, s.programme])).values()];
   const learningCentres = [...new Map(scopes.map((s) => [s.centre.learningCentreId, s.centre])).values()];
   const { currentSemesterId, target } = await resolveTarget(deps);
   const context: ForecastContext = {
-    programmes, learningCentres, targetSemesters: target ? [target] : [],
+    programmes, learningCentres, targetSemesters: target ? [target] : [], semesters: allSemesters,
     assignedScopes: scopes.map((s) => ({ programmeId: s.programme.programmeId, learningCentreId: s.centre.learningCentreId })),
     currentSemesterId, targetSemesterId: target?.semesterId ?? null, curricula: [], subjects: [],
   };
@@ -281,14 +282,14 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
   const importId = /^forecast-imports\/([1-9]\d*)$/.exec(route);
   const students = /^forecast-imports\/([1-9]\d*)\/students$/.exec(route);
   const subset = /^forecast-imports\/([^/]+)\/subset-acceptances$/.exec(route);
-  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots', 'forecast-imports/combined-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || OFFERING_ROUTE.test(route);
+  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots', 'forecast-imports/combined-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || DECISION_ROUTE.test(route);
   if (!known) return null;
   try {
     // Coordinator only. The actor is always the verified Clerk user of the session, never a request value.
     const actor = (await authorize(request, deps.auth, { roles: ['COORDINATOR'] })).clerkUserId;
     const method = request.method;
     if (RUN_ROUTE.test(route)) return await handleRunRoute(route, request, url, deps, actor);
-    if (OFFERING_ROUTE.test(route)) return await handleOfferingRoute(route, request, url, deps, actor);
+    if (DECISION_ROUTE.test(route)) return await handleDecisionRoute(route, request, url, deps, actor);
     if (route === 'forecast-context') {
       if (method !== 'GET') return methodNotAllowed(['GET']);
       onlyParameters(url, ['programmeId']);

@@ -2,6 +2,8 @@ import { authorize } from '../../middleware/auth';
 import { AuthError, authErrorResponse, authJson } from '../auth/errors';
 import type { OfferingDependencies, OfferingScope } from './contracts';
 import { readSave, requireId } from './validation';
+import { pickLimitMessage } from '../../../../../packages/shared/src/offerings/offerings';
+import { OFFERING_NOT_APPROVED_MESSAGE, PICKS_CLOSED_MESSAGE, PICKS_NOT_OPEN_MESSAGE, SEMESTER_NOT_TARGET_MESSAGE } from './messages';
 
 /** FOUNDATION registers this handler; unmatched routes return null. */
 export async function handleOfferingRequest(request: Request, deps: OfferingDependencies): Promise<Response | null> {
@@ -16,27 +18,48 @@ export async function handleOfferingRequest(request: Request, deps: OfferingDepe
     const account = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
     const context = await deps.contextFor(account.clerkUserId, { includePrerequisites: request.method === 'GET' });
     if (!context) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile before entering offerings.');
-    if (!context.currentSemesterId) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Choose a current academic year and semester in your academic profile before entering offerings.');
-    const publicContext = { curriculum: context.curriculum, currentSemesterId: context.currentSemesterId, subjects: context.subjects, semesters: context.semesters };
-    const scope: OfferingScope = { clerkUserId: account.clerkUserId, studentId: context.studentId, curriculumId: context.curriculum.curriculumId };
+    const { window } = context;
+    const target = window.targetSemesterId;
+    const publicContext = {
+      curriculum: context.curriculum, ...(context.currentSemesterId ? { currentSemesterId: context.currentSemesterId } : {}),
+      subjects: context.subjects, semesters: context.semesters, window,
+      ...(context.limits ? { limits: context.limits } : {}),
+      ...(context.prerequisiteCatalogue ? { prerequisiteCatalogue: context.prerequisiteCatalogue } : {}),
+      withdrawnSubjects: context.withdrawnSubjects,
+    };
+    const scope: OfferingScope | null = context.learningCentreId === null ? null : {
+      clerkUserId: account.clerkUserId, studentId: context.studentId, curriculumId: context.curriculum.curriculumId,
+      programmeId: context.programmeId, learningCentreId: context.learningCentreId,
+    };
     if ([...url.searchParams.keys()].some(key => key !== 'semesterId') || url.searchParams.getAll('semesterId').length > 1 ||
         (request.method === 'PUT' && url.search)) {
       throw new AuthError(400, 'INVALID_QUERY', 'Use only one semesterId query parameter for GET; PUT uses a JSON body.');
     }
     const input = request.method === 'PUT' ? await readSave(request) : null;
-    const semesterId = input?.semesterId ?? (url.searchParams.has('semesterId') ? requireId(url.searchParams.get('semesterId')) : context.currentSemesterId);
-    if (!context.semesters.some(semester => semester.semesterId === semesterId)) {
+    const requested = input?.semesterId ?? (url.searchParams.has('semesterId') ? requireId(url.searchParams.get('semesterId')) : target);
+    if (requested !== null && !context.semesters.some(semester => semester.semesterId === requested)) {
       throw new AuthError(404, 'SEMESTER_NOT_FOUND', 'This semester is not configured. Choose another semester.');
     }
-    if (semesterId !== context.currentSemesterId) throw new AuthError(409, 'PROFILE_SEMESTER_MISMATCH', 'Offerings are available for the semester selected in your academic profile.');
+    if (requested !== null && requested !== target) throw new AuthError(409, 'SEMESTER_NOT_TARGET', SEMESTER_NOT_TARGET_MESSAGE);
     if (input) {
-      const allowed = new Set(context.subjects.map(subject => subject.curriculumSubjectId));
-      if (input.curriculumSubjectIds.some(id => !allowed.has(id))) {
-        throw new AuthError(400, 'SUBJECT_OUTSIDE_CURRICULUM', 'Select subjects from your saved curriculum only.');
+      // The repository repeats the window, approved-set and limit checks inside its transaction.
+      if (window.status === 'CLOSED') throw new AuthError(409, 'PICKS_CLOSED', PICKS_CLOSED_MESSAGE);
+      if (window.status !== 'OPEN' || !scope) throw new AuthError(409, 'PICKS_NOT_OPEN', PICKS_NOT_OPEN_MESSAGE);
+      const offered = new Map(context.subjects.map(subject => [subject.curriculumSubjectId, subject]));
+      if (input.curriculumSubjectIds.some(id => !offered.has(id))) throw new AuthError(409, 'OFFERING_NOT_APPROVED', OFFERING_NOT_APPROVED_MESSAGE);
+      const credits = input.curriculumSubjectIds.reduce((total, id) => total + (offered.get(id)?.creditHours ?? 0), 0);
+      if (context.limits && (input.curriculumSubjectIds.length > context.limits.maxSubjects || credits > context.limits.maxCredits)) {
+        throw new AuthError(409, 'PICK_LIMIT_EXCEEDED', pickLimitMessage(context.limits));
       }
       return authJson({ data: await deps.repository.replace(scope, input) });
     }
-    return authJson({ data: { ...publicContext, selection: await deps.repository.read(scope, semesterId) } });
+    let selection = null;
+    if (scope && target) {
+      const read = await deps.repository.read(scope, target);
+      // Picks that are no longer offered are not listed; the page only decodes picks it can show.
+      selection = { ...read, curriculumSubjectIds: read.curriculumSubjectIds.filter(id => context.subjects.some(subject => subject.curriculumSubjectId === id)) };
+    }
+    return authJson({ data: { ...publicContext, selection } });
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);
     // Do not serialize database, provider or context-reader errors.

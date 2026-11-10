@@ -101,19 +101,18 @@ else {
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
     });
-    await check('coordinator quick links: five planned routes use only account access', async page => {
+    await check('coordinator quick links: the planned routes (Data Quality, Decision Audit) use only account access', async page => {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const destinations = [
-        ['Data Imports', 'Data Imports'], ['Data Quality', 'Data Quality'], ['Class Offering Forecast', 'Class Offering Forecast'],
-        ['Forecast Versions', 'Forecast Versions'], ['Compare Versions', 'Compare Versions'], ['Offering Decisions', 'Offering Decisions'], ['Decision Audit', 'Decision Audit'],
+        ['Data Imports', 'Data Imports'], ['Data Quality', 'Data Quality'], ['Class Offering Forecast', 'Class Offering Forecast'], ['Decision Audit', 'Decision Audit'],
       ];
       const quicklinks = page.locator('.coordinator-quicklinks');
       assert.equal(await quicklinks.getByRole('link').count(), destinations.length);
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Coordinator navigation' });
-      for (const [label, title] of destinations.filter((_, index) => ![0, 2, 5].includes(index))) {
+      for (const [label, title] of destinations.filter((_, index) => ![0, 2].includes(index))) {
         await navigation.getByRole('link', { name: label, exact: true }).click();
         await page.getByRole('heading', { name: title, exact: true }).waitFor();
         await page.getByText('This workspace is planned.', { exact: false }).waitFor();
@@ -130,7 +129,7 @@ else {
       assert.equal(await navigation.getByRole('link', { name: 'Overview', exact: true }).getAttribute('aria-current'), null);
       const workspace = page.getByRole('combobox', { name: 'Workspace view' });
       assert.equal(await workspace.inputValue(), 'SYSTEM_ADMIN');
-      await page.goto(base + '/coordinator/decisions'); await page.getByRole('heading', { name: 'Offering Decisions', exact: true }).waitFor();
+      await page.goto(base + '/coordinator/audit'); await page.getByRole('heading', { name: 'Decision Audit', exact: true }).waitFor();
       assert.equal(await page.getByRole('combobox', { name: 'Workspace view' }).inputValue(), 'COORDINATOR');
       assert.equal(await page.getByRole('heading', { name: 'Academic profile setup' }).count(), 0);
     });
@@ -176,7 +175,7 @@ else {
       assert.equal(duplicates, 0);
     });
     for (const width of [320, 375, 768, 1280]) await check('staff shells have no horizontal overflow at ' + width, async page => {
-      await mock(page, { roles: ['COORDINATOR'] }); await page.setViewportSize({ width, height: 600 }); await page.goto(base + '/coordinator');
+      await mock(page, { roles: ['COORDINATOR'] }); await page.setViewportSize({ width, height: [320, 1280].includes(width) ? 300 : 600 }); await page.goto(base + '/coordinator'); // short viewport: the shorter coordinator menu must still scroll inside itself
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       if (width === 375) await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-mobile.png', fullPage: true });
@@ -193,6 +192,20 @@ else {
         await nav.evaluate(element => { element.scrollTop = element.scrollHeight; });
         assert.ok(await nav.evaluate(element => element.scrollTop > 0));
       }
+    });
+    await check('semesters: selection opens/closes are editable, shown in the table and sent as ISO', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/semesters');
+      await page.getByRole('button', { name: 'Edit 2026/2027 · Semester 2' }).click();
+      await page.getByLabel('Selection opens').fill('2026-11-20T09:00');
+      await page.getByLabel('Selection closes').fill('2026-12-01T17:00');
+      await page.getByLabel('Reason (recorded in the audit log)').fill('Open picking for semester 2');
+      await page.getByRole('button', { name: 'Save' }).click();
+      await page.getByText('Semester configuration saved.').waitFor();
+      const patch = state.bodies.find(item => item.method === 'PATCH' && item.path.endsWith('/semesters/2'));
+      assert.equal(patch.body.selectionOpensAt, new Date('2026-11-20T09:00').toISOString());
+      assert.equal(patch.body.selectionClosesAt, new Date('2026-12-01T17:00').toISOString());
+      assert.match(await page.getByRole('region', { name: 'Academic semesters' }).innerText(), /Selection/);
+      assert.match(await page.getByRole('region', { name: 'Academic semesters' }).innerText(), /Not scheduled/);
     });
     await check('admin mobile shell screenshot at 375px', async page => {
       await mock(page, { roles: ['SYSTEM_ADMIN'] }); await page.setViewportSize({ width: 375, height: 844 }); await page.goto(base + '/admin');

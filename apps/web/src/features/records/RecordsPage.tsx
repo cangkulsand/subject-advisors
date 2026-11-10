@@ -32,7 +32,7 @@ function selectionMap(subjects: ProfileOptions['subjects'], records: AcademicRec
 export function RecordsPage({ api }: { api: AcademicClient }) {
   const [records, setRecords] = useState<AcademicRecord[]>([]);
   const [undoRecords, setUndoRecords] = useState<AcademicRecord[]>([]);
-  const [options, setOptions] = useState<ProfileOptions>({ curricula: [], subjects: [], semesters: [] });
+  const [options, setOptions] = useState<ProfileOptions>({ curricula: [], subjects: [], semesters: [], learningCentres: [] });
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selections, setSelections] = useState<Record<string, SubjectRecordSelection>>({});
   const [initialSelections, setInitialSelections] = useState<Record<string, SubjectRecordSelection>>({});

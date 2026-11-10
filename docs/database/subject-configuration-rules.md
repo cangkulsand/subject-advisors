@@ -21,7 +21,7 @@ needs redeploying. The create/edit subject form is where these values are set.
 | Subject name | `subject_name` varchar(255) | Required. |
 | Credit hours | `credit_hours` integer ≥ 0 | Required. Drives credit totals, near-graduation and the default semester type (section 3). |
 | Class type | `class_type` `LECTURE` or `LAB` | **Required for anything that is offered.** Decides the class size (section 2). A subject with no class type shows "Configuration required" in the forecast and gets no proposed classes. |
-| Offered through the forecast | `include_in_offering_forecast` boolean, default true | Turn **off** for subjects that are never offered as classes (section 4). Off means: no demand, no classes, cannot be confirmed. |
+| Offered through the forecast | `include_in_offering_forecast` boolean, default true | Turn **off** for subjects that are never offered as classes (section 4). Off means: no demand, no classes, cannot be approved. |
 | Status | `status` | Existing field; keep current usage. |
 
 ### Subject inside a curriculum (table `curriculum_subject`, per curriculum)
@@ -94,7 +94,7 @@ Set `include_in_offering_forecast = false` for:
 Effect:
 
 - **Coordinator forecast:** listed under "Excluded subjects" with the reason; no demand and no classes.
-- **Confirm offerings:** cannot be confirmed, so students never pick them on the offerings page.
+- **Approve offerings:** cannot be approved, so students never pick them on the offerings page.
 - **Student records and degree progress: no effect.** Students still record these subjects (completed,
   failed, exempted) and their credits still count. The flag is read only by the coordinator forecasting
   module.
@@ -108,8 +108,8 @@ reason, e.g. "Final year project", "Industrial training" or "Co-curricular exper
 | --- | --- | --- | --- | --- |
 | Credit hours | Credits, near graduation | Shown | Pick limits | Credits |
 | Class type | Class size and number of classes | Shown | — | — |
-| Offered as a class | Excluded list | Cannot confirm | Never listed | No effect |
-| Semester type | Off-semester subjects listed separately | Cannot confirm for the other type | Should read the same table (follow-up) | No effect |
+| Offered as a class | Excluded list | Cannot approve | Never listed | No effect |
+| Semester type | Off-semester subjects listed separately | Cannot approve for the other type | Should read the same table (follow-up) | No effect |
 | MANDATORY prerequisite | Eligibility | — | Display aid | — |
 
 Follow-up for P002: the student offerings page still uses a hardcoded Normal/Short predicate

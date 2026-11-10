@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type {
-  AcceptedImport, AcceptSubsetRequest, CapacityRule, DecisionBatchRequest, FinalizeForecastRequest, ForecastAuditEntry,
+  AcceptedImport, AcceptSubsetRequest, CapacityRule, ForecastAuditEntry,
   ForecastConfiguration, ForecastConfigurationRequest, ForecastContext, ForecastRun, ForecastScope,
-  GenerateForecastRequest, ImportUploadRequest, StartForecastReviewRequest, SubjectExclusion,
+  GenerateForecastRequest, ImportUploadRequest, SubjectExclusion,
 } from './contracts';
 import { HISTORY_COMPLETENESS, IMPORT_CSV_HEADER, IMPORTED_SUBJECT_STATUSES } from './contracts';
 
@@ -130,16 +130,10 @@ const uploadRequestExample = {
   ...scope, sourceDate: '2099-01-15', sourceLabel: 'Fictional demo upload',
   file: new File([`${IMPORT_CSV_HEADER.join(',')}\nDEMO-VALID-001,2024-DEMO,ACTIVE,COMPLETE,DEMO101,COMPLETED,1001,3,true`], 'uc20-demo.csv', { type: 'text/csv' }),
 } satisfies ImportUploadRequest;
-const decisionsExample = {
-  scope, decisions: [{ subjectId: 502, action: 'REPLACE_ALLOCATION', reason: 'Fictional section adjustment',
-    replacementSections: [{ sectionNumber: 1, expectedStudents: 12 }] }],
-} satisfies DecisionBatchRequest;
 const subsetAcceptanceExample = {
   ...scope, validationRevision: 'sha256:fictional-validation', acknowledgeRejectedRows: true,
 } satisfies AcceptSubsetRequest;
 const generationExample = { ...scope, importBatchId: 911, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' } satisfies GenerateForecastRequest;
-const reviewExample = { scope, action: 'START_REVIEW', reason: 'Fictional coordinator review' } satisfies StartForecastReviewRequest;
-const finalizationExample = { scope, reason: 'Fictional review complete' } satisfies FinalizeForecastRequest;
 const configurationRequestExample = {
   capacityRules: [capacityRule], subjectExclusions: [exclusion], staleSourceMaxAgeDays: null,
   baseRevision: 'cfg-rev-fictional-2',
@@ -199,25 +193,20 @@ describe('UC20 transport contracts and example alignment', () => {
 
   it('aligns upload and decision requests and protects their mutation preconditions', () => {
     expectDeclaredShape('ImportUploadRequest', { ...uploadRequestExample, file: 'fake-binary' });
-    expectDeclaredShape('DecisionBatchRequest', decisionsExample);
     expectDeclaredShape('AcceptSubsetRequest', subsetAcceptanceExample);
     expectDeclaredShape('GenerateForecastRequest', generationExample);
-    expectDeclaredShape('StartReviewRequest', reviewExample);
-    expectDeclaredShape('FinalizeForecastRequest', finalizationExample);
     expectDeclaredShape('ForecastConfigurationRequest', configurationRequestExample);
-    expectDeclaredShape('ForecastDecision', at(decisionsExample.decisions, 0));
-    expect(schema('DecisionBatchRequest').properties?.scope).toBeDefined();
-    expect(schema('ForecastDecision').oneOf).toHaveLength(2);
     const operations = [
-      operation('/api/coordinator/forecast-runs/{forecastRunId}/reviews', 'post'),
-      operation('/api/coordinator/forecast-runs/{forecastRunId}/decisions', 'post'),
-      operation('/api/coordinator/forecast-runs/{forecastRunId}/finalizations', 'post'),
+      operation('/api/coordinator/forecast-imports/{validationId}/subset-acceptances', 'post'),
       operation('/api/admin/forecasting/configuration', 'put'),
     ];
     for (const operation of operations) {
       expect(operation.parameters?.some(parameter => parameter.$ref === '#/components/parameters/IfMatch')).toBe(true);
       expect(operation.parameters?.some(parameter => parameter.$ref === '#/components/parameters/IdempotencyKey')).toBe(true);
     }
+    expect(operation('/api/coordinator/forecast-runs', 'post').parameters?.some(parameter => parameter.$ref === '#/components/parameters/IdempotencyKey')).toBe(true);
+    for (const removed of ['/reviews', '/decisions', '/finalizations', '/audit']) expect(spec.paths).not.toHaveProperty('/api/coordinator/forecast-runs/{forecastRunId}' + removed);
+    expect(spec.paths).not.toHaveProperty('/api/coordinator/confirmed-offerings');
     expect(operation('/api/coordinator/forecast-imports', 'post').responses?.['422']?.$ref).toBe('#/components/responses/ImportValidationResponse');
     expect(operation('/api/coordinator/forecast-imports/{importBatchId}', 'get').responses?.['200']?.$ref).toBe('#/components/responses/ImportAcceptedResponse');
     expect(schema('AcceptedImport').required).toContain('validationReport');

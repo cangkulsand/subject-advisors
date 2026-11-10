@@ -4,28 +4,19 @@ import { catalogueFingerprint, runForecastEngine, subjectStudentOutcomes } from 
 import type { EngineSubjectDemand } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { OperationReceipt } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { RunSubjectStudents, SubjectStudentOutcome } from '../../../../../packages/shared/src/forecasting/runs';
-import { RUN_LIMITS } from '../../../../../packages/shared/src/forecasting/runs';
 import type { ForecastingDependencies, PortalContact } from './contracts';
 import { ForecastingError } from './errors';
 import { sourceOf } from './import-source';
-import { bad, decodeCursor, encodeCursor, methodNotAllowed, onlyParameters, positive, readJson } from './http';
+import { bad, methodNotAllowed, onlyParameters, positive, readJson } from './http';
 import type { NewRunInput, RunRecord } from './runs-contracts';
-import { parseDecisions, parseScope, planDecisions, sameScope } from './runs-decisions';
-import { detailOf, newerOf, revisionOf, summaryOfList } from './runs-view';
+import { detailOf, revisionOf } from './runs-view';
 import type { StoredSubjectAssumptions } from './runs-view';
 
-export const RUN_ROUTE = /^forecast-runs(?:\/([1-9]\d*)(?:\/(audit|reviews|decisions|finalizations)|\/subjects\/([1-9]\d*)\/students)?)?$/;
+export const RUN_ROUTE = /^forecast-runs(?:\/([1-9]\d*)(?:\/subjects\/([1-9]\d*)\/students)?)?$/;
 
 function checkIdempotencyKey(request: Request) {
   const key = request.headers.get('idempotency-key');
   if (key !== null && (key.length < 1 || key.length > 128)) bad('Idempotency-Key must be 1-128 characters.');
-}
-function ifMatchRevision(request: Request): string {
-  const header = request.headers.get('if-match');
-  if (!header) throw new ForecastingError('IF_MATCH_REQUIRED');
-  const match = /^"([^"]{1,200})"$/.exec(header.trim().replace(/^W\//, ''));
-  if (!match) bad('If-Match must be the quoted revision of the forecast.');
-  return match![1]!;
 }
 const scopeOf = (run: RunRecord): ForecastScope => ({ programmeId: run.programmeId, learningCentreId: run.learningCentreId, targetSemesterId: run.targetSemesterId });
 
@@ -46,22 +37,6 @@ async function loadRun(deps: ForecastingDependencies, actor: string, forecastRun
   if (!run || !(await deps.scopes.isScopeAssigned(actor, run.programmeId, run.learningCentreId))) throw new ForecastingError('RUN_NOT_FOUND');
   return run;
 }
-
-/** Common mutation prelude: header, body, run, scope match, frozen check, revision check. */
-async function mutationContext(request: Request, deps: ForecastingDependencies, actor: string, forecastRunId: number) {
-  checkIdempotencyKey(request);
-  const supplied = ifMatchRevision(request);
-  const body = await readJson(request);
-  const run = await loadRun(deps, actor, forecastRunId);
-  return { body, run, supplied };
-}
-function requireEditableAtRevision(run: RunRecord, supplied: string, bodyScope: ForecastScope) {
-  if (!sameScope(bodyScope, scopeOf(run))) throw new ForecastingError('RUN_NOT_FOUND');
-  if (run.status === 'FINALIZED') throw new ForecastingError('RUN_FINALIZED');
-  if (supplied !== revisionOf(run)) throw new ForecastingError('RUN_REVISION_MISMATCH');
-}
-const expectationOf = (run: RunRecord) => ({ status: run.status, auditCount: run.auditCount });
-const now = (deps: ForecastingDependencies) => (deps.now ?? (() => new Date()))().toISOString();
 
 function assumptionsOf(demand: EngineSubjectDemand): StoredSubjectAssumptions {
   return {
@@ -113,44 +88,13 @@ async function generate(request: Request, deps: ForecastingDependencies, actor: 
   return receiptResponse(run, 201, run.generatedAt);
 }
 
-async function list(url: URL, deps: ForecastingDependencies, actor: string): Promise<Response> {
-  onlyParameters(url, ['programmeId', 'learningCentreId', 'targetSemesterId', 'limit', 'cursor']);
-  const scope: ForecastScope = { programmeId: positive(url.searchParams.get('programmeId'), 'programmeId'), learningCentreId: positive(url.searchParams.get('learningCentreId'), 'learningCentreId'), targetSemesterId: positive(url.searchParams.get('targetSemesterId'), 'targetSemesterId') };
-  const limit = url.searchParams.has('limit') ? positive(url.searchParams.get('limit'), 'limit') : RUN_LIMITS.defaultPageSize;
-  if (limit > RUN_LIMITS.maxPageSize) bad('limit must be between 1 and ' + RUN_LIMITS.maxPageSize + '.');
-  const cursor = url.searchParams.has('cursor') ? decodeCursor(url.searchParams.get('cursor')!) : null;
-  await requireScope(deps, actor, scope);
-  const rows = await deps.runs.listRuns(scope, limit + 1, cursor);
-  const page = rows.slice(0, limit);
-  const latest = await deps.runs.latestVersion(scope);
-  const last = page[page.length - 1];
-  return authJson({ data: { items: page.map((row) => summaryOfList(row, newerOf(latest, row))), ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.forecastRunId) } : {}) } });
-}
-
 async function detail(forecastRunId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
   await loadRun(deps, actor, forecastRunId);
   const rows = await deps.runs.getDetail(forecastRunId);
   if (!rows) throw new ForecastingError('RUN_NOT_FOUND');
-  const [latest, audit] = await Promise.all([
-    deps.runs.latestVersion(scopeOf(rows.run)),
-    deps.runs.listAudit(forecastRunId, scopeOf(rows.run), RUN_LIMITS.embeddedAuditEntries + 1, null),
-  ]);
-  const truncated = audit.length > RUN_LIMITS.embeddedAuditEntries;
-  const response = authJson({ data: detailOf(rows, newerOf(latest, rows.run), audit.slice(0, RUN_LIMITS.embeddedAuditEntries), truncated) });
+  const response = authJson({ data: detailOf(rows) });
   response.headers.set('ETag', '"' + revisionOf(rows.run) + '"');
   return response;
-}
-
-async function auditPage(forecastRunId: number, url: URL, deps: ForecastingDependencies, actor: string): Promise<Response> {
-  onlyParameters(url, ['limit', 'cursor']);
-  const limit = url.searchParams.has('limit') ? positive(url.searchParams.get('limit'), 'limit') : RUN_LIMITS.defaultPageSize;
-  if (limit > RUN_LIMITS.maxPageSize) bad('limit must be between 1 and ' + RUN_LIMITS.maxPageSize + '.');
-  const cursor = url.searchParams.has('cursor') ? decodeCursor(url.searchParams.get('cursor')!) : null;
-  const run = await loadRun(deps, actor, forecastRunId);
-  const rows = await deps.runs.listAudit(forecastRunId, scopeOf(run), limit + 1, cursor);
-  const page = rows.slice(0, limit);
-  const last = page[page.length - 1];
-  return authJson({ data: { items: page, ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.decisionAuditId) } : {}) } });
 }
 
 /**
@@ -198,83 +142,20 @@ async function subjectStudents(forecastRunId: number, subjectId: number, deps: F
   return authJson({ data });
 }
 
-const CONTROL_CHARACTERS = new RegExp('[\u0000-\u001f\u007f]');
-function optional(value: unknown, label: string, max: number): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') bad(label + ' must be text.');
-  const trimmed = (value as string).trim();
-  if (trimmed.length > max || CONTROL_CHARACTERS.test(trimmed)) bad(label + ' must be at most ' + max + ' printable characters.');
-  return trimmed || null;
-}
-
-async function startReview(request: Request, forecastRunId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
-  const { body, run, supplied } = await mutationContext(request, deps, actor, forecastRunId);
-  if (Object.keys(body).some((key) => !['scope', 'action', 'reason'].includes(key))) bad('The request must contain exactly the documented fields.');
-  if (body.action !== 'START_REVIEW') bad('action must be START_REVIEW.');
-  const reason = optional(body.reason, 'reason', RUN_LIMITS.maxReasonLength);
-  requireEditableAtRevision(run, supplied, parseScope(body.scope));
-  if (run.status !== 'DRAFT') throw new ForecastingError('RUN_STATE_CONFLICT');
-  const updated = await deps.runs.startReview(forecastRunId, expectationOf(run), actor, reason ?? 'Review started.');
-  return receiptResponse(updated, 200, now(deps));
-}
-
-async function decide(request: Request, forecastRunId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
-  const { body, run, supplied } = await mutationContext(request, deps, actor, forecastRunId);
-  const parsed = parseDecisions(body);
-  requireEditableAtRevision(run, supplied, parsed.scope);
-  const rows = await deps.runs.getDetail(forecastRunId);
-  if (!rows || revisionOf(rows.run) !== supplied) throw new ForecastingError('RUN_REVISION_MISMATCH');
-  const plans = planDecisions(parsed.decisions, rows);
-  const updated = await deps.runs.applyDecisions(forecastRunId, expectationOf(rows.run), actor, plans);
-  return receiptResponse(updated, 200, now(deps));
-}
-
-async function finalize(request: Request, forecastRunId: number, deps: ForecastingDependencies, actor: string): Promise<Response> {
-  const { body, run, supplied } = await mutationContext(request, deps, actor, forecastRunId);
-  if (Object.keys(body).some((key) => !['scope', 'reason', 'approvalReference'].includes(key))) bad('The request must contain exactly the documented fields.');
-  const reason = optional(body.reason, 'reason', RUN_LIMITS.maxReasonLength);
-  const approvalReference = optional(body.approvalReference, 'approvalReference', RUN_LIMITS.maxApprovalReferenceLength);
-  requireEditableAtRevision(run, supplied, parseScope(body.scope));
-  if (run.status !== 'UNDER_REVIEW') throw new ForecastingError('RUN_STATE_CONFLICT');
-  const rows = await deps.runs.getDetail(forecastRunId);
-  if (!rows || revisionOf(rows.run) !== supplied) throw new ForecastingError('RUN_REVISION_MISMATCH');
-  const pending = rows.subjects.filter((subject) => rows.sections.some((section) => section.demandId === subject.demandId && section.reviewStatus === 'PENDING'));
-  if (pending.length) throw new ForecastingError('REVIEWS_INCOMPLETE', { pendingSubjectIds: pending.map((subject) => subject.subjectId).sort((a, b) => a - b) });
-  const updated = await deps.runs.finalize(forecastRunId, expectationOf(rows.run), actor, { reason: reason ?? 'Forecast finalized.', approvalReference });
-  return receiptResponse(updated, 200, updated.finalizedAt ?? now(deps));
-}
-
 /** Handles `forecast-runs...` routes. The caller already authenticated a COORDINATOR and passes the verified actor. */
 export async function handleRunRoute(route: string, request: Request, url: URL, deps: ForecastingDependencies, actor: string): Promise<Response | null> {
   const match = RUN_ROUTE.exec(route);
   if (!match) return null;
   const method = request.method;
   const id = match[1] ? Number(match[1]) : null;
-  const leaf = match[2] ?? null;
-  const subjectId = match[3] ? Number(match[3]) : null;
+  const subjectId = match[2] ? Number(match[2]) : null;
   if (id === null) {
-    if (method === 'POST') { onlyParameters(url, []); return await generate(request, deps, actor); }
-    if (method !== 'GET') return methodNotAllowed(['GET', 'POST']);
-    return await list(url, deps, actor);
-  }
-  if (subjectId !== null) {
-    if (method !== 'GET') return methodNotAllowed(['GET']);
+    if (method !== 'POST') return methodNotAllowed(['POST']);
     onlyParameters(url, []);
-    return await subjectStudents(id, subjectId, deps, actor);
+    return await generate(request, deps, actor);
   }
-  if (leaf === null) {
-    if (method !== 'GET') return methodNotAllowed(['GET']);
-    onlyParameters(url, []);
-    return await detail(id, deps, actor);
-  }
-  if (leaf === 'audit') {
-    if (method !== 'GET') return methodNotAllowed(['GET']);
-    return await auditPage(id, url, deps, actor);
-  }
-  if (method !== 'POST') return methodNotAllowed(['POST']);
+  if (method !== 'GET') return methodNotAllowed(['GET']);
   onlyParameters(url, []);
-  if (leaf === 'reviews') return await startReview(request, id, deps, actor);
-  if (leaf === 'decisions') return await decide(request, id, deps, actor);
-  return await finalize(request, id, deps, actor);
+  if (subjectId !== null) return await subjectStudents(id, subjectId, deps, actor);
+  return await detail(id, deps, actor);
 }
-
