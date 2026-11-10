@@ -1,6 +1,6 @@
 # S2-P004-016 — Matric number is mandatory on the student profile
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-10); human peer review pending
 - **Date:** 2026-11-04
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4, on P001's profile module (cross-module change; P001 owner to review)
@@ -41,4 +41,4 @@ Not verified against the dev database (DB tests skip without credentials).
 
 ## 4. Changelog
 
-- 2026-11-04 — Type: Changed. The student profile requires a matric number (normalised, 4-30 letters or digits); profiles without one count as incomplete and send the student back to setup. Compatibility: no migration. Existing students without a matric number must add it before using the student pages. Outstanding: P001 owner review; uniqueness is not enforced. Status: READY_FOR_REVIEW.
+- 2026-11-04 — Type: Changed. The student profile requires a matric number (normalised, 4-30 letters or digits); profiles without one count as incomplete and send the student back to setup. Compatibility: no migration. Existing students without a matric number must add it before using the student pages. Outstanding: P001 owner review; uniqueness is not enforced. Status: MERGED.

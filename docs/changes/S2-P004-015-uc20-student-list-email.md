@@ -1,6 +1,6 @@
 # S2-P004-015 — UC20 student list shows the portal student's matric number or sign-in email
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-10); human peer review pending
 - **Date:** 2026-11-04
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4
@@ -42,4 +42,4 @@ Not verified: the live Clerk lookup and the `student_profile` query against the 
 
 ## 4. Changelog
 
-- 2026-11-04 — Type: Added. The subject student list shows the profile matric number of portal students, or their sign-in email (live, display only), instead of `PORTAL-<id>`. Compatibility: additive response fields; no migration; the forecasting handler reads `CLERK_SECRET_KEY`. Status: READY_FOR_REVIEW.
+- 2026-11-04 — Type: Added. The subject student list shows the profile matric number of portal students, or their sign-in email (live, display only), instead of `PORTAL-<id>`. Compatibility: additive response fields; no migration; the forecasting handler reads `CLERK_SECRET_KEY`. Status: MERGED.
