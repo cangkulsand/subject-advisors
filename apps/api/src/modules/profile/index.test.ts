@@ -30,7 +30,7 @@ describe('P001 optional Redis composition', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     await dependencies.profiles.options('student-a');
 
-    expect(query).toHaveBeenCalledTimes(4);
+    expect(query).toHaveBeenCalledTimes(5);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(info).not.toHaveBeenCalled();
   });
@@ -61,7 +61,7 @@ describe('P001 optional Redis composition', () => {
       await dependencies.profiles.options('student-a');
       expect(query.mock.calls.some(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')),
         scenario.name).toBe(scenario.expectedAssociation);
-      expect(query).toHaveBeenCalledTimes(scenario.expectedAssociation ? 3 : 4);
+      expect(query).toHaveBeenCalledTimes(scenario.expectedAssociation ? 4 : 5);
       expect(fetchMock).toHaveBeenCalledTimes(scenario.expectedRedis ? 4 : 0);
       vi.unstubAllGlobals();
     }
@@ -107,14 +107,14 @@ describe('P001 optional Redis composition', () => {
     expect(fetchMock).toHaveBeenCalledTimes(9);
     expect(requests.filter(command => command[0] === 'get')).toHaveLength(6);
     expect(requests.filter(command => command[0] === 'set')).toHaveLength(3);
-    expect(query).toHaveBeenCalledTimes(6); // cold 5, warm 1 live association read
+    expect(query).toHaveBeenCalledTimes(8); // cold 6 (incl. centres), warm 2 live association read
     expect(query.mock.calls.filter(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile'))).toHaveLength(2);
     const optionsKey = 'sa:local:test-data:v1:reference:curriculum-options:12';
     expect(requests.some(command => command[0] === 'set' && command[1] === optionsKey)).toBe(true);
     expect(values.get(optionsKey)).toMatchObject({ kind: 'curriculum-options', curriculumId: 12,
       data: { curriculumId: 12, subjects: [], subjectGroups: [] } });
-    expect(Object.keys(cold)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups']);
-    expect(Object.keys(warm)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups']);
+    expect(Object.keys(cold)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups', 'learningCentres']);
+    expect(Object.keys(warm)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups', 'learningCentres']);
     expect(cold).not.toHaveProperty('curriculumId');
     expect(warm).not.toHaveProperty('curriculumId');
     expect(info).toHaveBeenCalledTimes(6);

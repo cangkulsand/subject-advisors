@@ -5,7 +5,7 @@ import { createAcademicSetupRepository } from '../admin/academic-repository';
 import { createAdminIdentities } from '../admin/identities';
 import { createDbScopeProvider } from './scope-provider';
 import { createForecastingRepository } from './repository';
-import { createOfferingsRepository } from './offerings-repository';
+import { createOfferingDecisionsRepository } from './decisions-repository';
 import { createForecastRunsRepository } from './runs-repository';
 import { handleForecastingRequest } from './routes';
 import type { PortalContact } from './contracts';
@@ -19,9 +19,14 @@ export function createForecastingHandler(env: Pick<AuthBindings, 'DATABASE_URL' 
     await sql.transaction(statements.map(statement => sql.query(statement.text, statement.values))) as Record<string, unknown>[][];
   const repository = createForecastingRepository(query, transaction);
   const runs = createForecastRunsRepository(query, transaction);
-  const offerings = createOfferingsRepository(query, transaction);
+  const decisions = createOfferingDecisionsRepository(query, transaction);
   // Live, uncached reads of the admin academic setup (migration 0008): assignments, current semester, active centres.
-  const scopes = createDbScopeProvider(createAcademicSetupRepository(query, transaction));
+  // Student centre: the learning centre saved in the student's profile (S2-P004-023); null when none.
+  const studentCentre = async (studentId: number) => {
+    const rows = await query('SELECT learning_centre_id FROM public.student_profile WHERE student_id = $1', [studentId]);
+    return rows[0]?.learning_centre_id == null ? null : Number(rows[0].learning_centre_id);
+  };
+  const scopes = createDbScopeProvider(createAcademicSetupRepository(query, transaction), studentCentre);
   const identities = createAdminIdentities(env.CLERK_SECRET_KEY);
   // Portal student -> live matric number and Clerk account (student_profile), then the primary email in pages of 100 (the identity lookup's bound).
   const portalContacts = async (studentIds: number[]) => {
@@ -38,5 +43,5 @@ export function createForecastingHandler(env: Pick<AuthBindings, 'DATABASE_URL' 
     } catch { return { contacts, emailsAvailable: false }; }
     return { contacts, emailsAvailable: true };
   };
-  return (request: Request) => handleForecastingRequest(request, { auth, repository, runs, offerings, scopes, portalContacts });
+  return (request: Request) => handleForecastingRequest(request, { auth, repository, runs, decisions, scopes, portalContacts });
 }

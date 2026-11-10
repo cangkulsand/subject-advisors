@@ -3,7 +3,7 @@
   "info": {
     "title": "Subject Advisors UC20 Forecast Planning API",
     "version": "0.1.0",
-    "description": "PLANNED contract only. These endpoints are not implemented. Decided 2026-11-02 (MT8): data provision has two sources. The main source snapshots the current students in the system (student_profile / academic_record, read-only; student-entered records count as COMPLETE history, students without records are UNKNOWN); a CSV upload is the other source. Decided 2026-11-02 (MT9): the Coordinator chooses the data source PER FORECAST on the Imports screen (students in the system, CSV import, or Both); it is not an admin setting. Both builds ONE combined snapshot (system students plus the CSV students not already in the system, system record wins on a matric match; see createCombinedSnapshot). Each forecast is based on one snapshot. This replaces the earlier rule that UC20 never queries student profiles. CSV people remain external-reference cohorts and are never linked to portal students. Product owner rules 2026-11-01 (S2-P004-006): finalizing a forecast publishes nothing; the Coordinator then CONFIRMS offerings per programme + learning centre + target semester and sets a pick DEADLINE through the Offering confirmation operations below; students see only those confirmed subjects and may pick until the deadline. The target semester is the NEXT semester after the system current semester managed by the System Administrator (Academic Semesters module, planned marker). Coordinators are ASSIGNED (admin-managed, planned) to faculty, programme and learning centre and act only within their assignments (403 SCOPE_NOT_ASSIGNED). The Coordinator sees, side by side with the forecast, the pick count AND the list of students who picked each subject (name, matric number, current semester, credits completed; ordering by seniority as a display aid) for the programme and centre in their assignment only; this reverses the earlier counts-only rule. Students never see other students' picks, and the data is never an input to the forecast calculation. The cycle ends when students have picked and the Coordinator sees the counts and pickers and decides (no automatic allocation): no class-section creation from picks, no registration, no timetable. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25. Planned migrations target the development database (Neon development branch) only."
+    "description": "The coordinator forecasting API for UC20, as implemented. Three steps. (1) Data: the Coordinator chooses the data source per forecast on the Imports screen: the students in the system (read-only snapshot of student_profile / academic_record), a CSV upload, or Both (one combined snapshot; system record wins on a matric match). Each forecast is based on one accepted snapshot, and CSV people stay external-reference cohorts, never linked to portal students. (2) Forecast: generating a forecast for a snapshot is idempotent (one forecast per snapshot) and advisory; it counts the supported eligible pool per subject and is not student registration. Opening a snapshot on the Class Offering Forecast screen creates the forecast if it is missing. There are no review, finalize or version-management steps any more (S2-P004-017 to S2-P004-024). (3) Decide: for the NEXT semester after the system current semester, the Coordinator sets each subject to Pending (no row), Approved or Removed per programme + learning centre with one click and no reason; every change is audited, and removing an approved subject while students can pick withdraws their picks and reports how many students were affected. The System Administrator sets the selection window (opens / closes) on the semester: before it opens the Coordinator plans, while it is open students pick approved subjects, and after it closes decisions are locked and the Coordinator sees the pick counts and the pickers. Coordinators act only within their assignments (403 SCOPE_NOT_ASSIGNED). Student lists and picker lists are personal data and are served no-store. Class sizes: LAB maximum 35, LECTURE (non-lab) maximum 45, optimal 25."
   },
   "servers": [
     {
@@ -26,15 +26,15 @@
     },
     {
       "name": "Forecasts",
-      "description": "Initial advisory baseline, decisions and audit. A forecast (including FINALIZED) is advisory and publishes nothing; it helps the Coordinator decide which subjects to make available next semester."
+      "description": "Advisory forecast per accepted snapshot (one forecast per snapshot) and the students behind each subject count. A forecast publishes nothing; the Coordinator decides which subjects are offered through Offering decisions."
     },
     {
       "name": "Configuration",
       "description": "Forecast configuration for System Administrators only."
     },
     {
-      "name": "Offering confirmation",
-      "description": "PLANNED. Coordinator confirmation of the subjects offered for a programme + learning centre + target (next) semester, and read-only student pick counts with the list of pickers per subject (assigned coordinators only). Confirmation is deliberate, audited, and is what students see as 'Confirmed by coordinator'."
+      "name": "Offering decisions",
+      "description": "Coordinator decisions (Pending / Approved / Removed) per programme + learning centre + next semester, gated by the admin-set selection window. Replaces the review, finalize and confirm steps."
     }
   ],
   "paths": {
@@ -384,54 +384,13 @@
       }
     },
     "/api/coordinator/forecast-runs": {
-      "get": {
-        "tags": [
-          "Forecasts"
-        ],
-        "operationId": "listForecastRuns",
-        "summary": "List runs in a required programme/centre/semester scope",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProgrammeQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/CentreQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/SemesterQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastRunListResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      },
       "post": {
         "tags": [
           "Forecasts"
         ],
         "operationId": "generateInitialForecast",
         "summary": "Generate the version 1 advisory baseline",
-        "description": "Requires an ACCEPTED import snapshot matching all three scope IDs and an assigned Coordinator. Runs the deterministic UC20 engine and, in one transaction, stores the DRAFT run (next version number in the programme + centre + semester namespace; parent = the previous version), subject demand rows and proposed sections, together with the rule snapshot, engine version, original recommendations and per-subject near-graduation/breakdown/reason counts. Supported eligible-pool demand is advisory, not registration. Missing evidence creates per-student/subject uncertainty; missing capacity creates CONFIGURATION_REQUIRED for the affected subject only. Idempotency (MT5a): an import snapshot yields exactly one forecast, so a repeat for the same importBatchId returns the existing run receipt with 200; Idempotency-Key is validated (1-128 characters) but not persisted. A newer accepted snapshot of the same scope creates version N+1 (UC23 owns comparison); the older run then reports newerForecastAvailable. Deviates from the planned \"version 1 only\" rule so a corrected re-import can be forecast.",
+        "description": "Requires an ACCEPTED import snapshot matching all three scope IDs and an assigned Coordinator. Runs the deterministic UC20 engine and, in one transaction, stores the DRAFT run (next version number in the programme + centre + semester namespace; parent = the previous version), subject demand rows and proposed sections, together with the rule snapshot, engine version, original recommendations and per-subject near-graduation/breakdown/reason counts. Supported eligible-pool demand is advisory, not registration. Missing evidence creates per-student/subject uncertainty; missing capacity creates CONFIGURATION_REQUIRED for the affected subject only. Idempotency (MT5a): an import snapshot yields exactly one forecast, so a repeat for the same importBatchId returns the existing run receipt with 200; Idempotency-Key is validated (1-128 characters) but not persisted. A newer accepted snapshot of the same scope creates the next version number, so a corrected re-import can be forecast; there is no version management, and newerForecastAvailable is always null. The run status stays DRAFT.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -504,7 +463,7 @@
             "$ref": "#/components/responses/Unavailable"
           }
         },
-        "description": "Subjects with demand, uncertain counts and reasons, nearGraduationCount, configuration status, sections and recomputed flags, the run revision (body and ETag), the newerForecastAvailable indicator and the newest audit entries. Unassigned scopes are indistinguishable from absent runs (404)."
+        "description": "Subjects with demand, uncertain counts and reasons, nearGraduationCount, configuration status, sections and recomputed flags, the run revision (body and ETag), newerForecastAvailable (always null) and an empty audit list; decisions and their audit live under offering-decisions. Unassigned scopes are indistinguishable from absent runs (404)."
       }
     },
     "/api/coordinator/forecast-runs/{forecastRunId}/subjects/{subjectId}/students": {
@@ -540,164 +499,6 @@
           }
         },
         "description": "Read-only roster for judging a subject. The forecast stores only per-subject counts, so the list is recomputed by the same engine functions from the run's frozen import snapshot and stored target semester; its tallies equal the stored breakdown and nearGraduationCount unless catalogueMatchesRun is false. Never changes demand and has no per-student overrides. Same authorization and scope handling as the run detail: unassigned scopes and absent runs are 404 RUN_NOT_FOUND; a subject that is not part of the run is 404 RUN_SUBJECT_NOT_FOUND. No query parameters."
-      }
-    },
-    "/api/coordinator/forecast-runs/{forecastRunId}/decisions": {
-      "post": {
-        "tags": [
-          "Forecasts"
-        ],
-        "operationId": "recordForecastDecisions",
-        "summary": "Review or adjust sections and append audit entries",
-        "description": "Request carries all three scope IDs; server verifies them against the stored run. Requires If-Match and Idempotency-Key. Actor, before/after values and timestamp are server-derived. Changes and append-only audits commit atomically. An idempotent replay returns the original receipt after authentication, before the current revision is checked. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. MT5a: decisions are allowed in DRAFT and UNDER_REVIEW, are validated against the current run and applied all-or-nothing (a transaction guard re-checks the revision under a row lock). Errors: 409 RUN_FINALIZED, 412 RUN_REVISION_MISMATCH, 422 DECISION_REASON_REQUIRED, DECISION_DUPLICATE_SUBJECT, DECISION_SUBJECT_NOT_FOUND, DECISION_NO_SECTIONS, SUBJECT_NOT_CONFIGURED, ALLOCATION_INVALID, ALLOCATION_TOTAL_MISMATCH, ALLOCATION_EXCEEDS_CAPACITY.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ForecastRunId"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DecisionBatchRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/InvalidDecision"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/forecast-runs/{forecastRunId}/finalizations": {
-      "post": {
-        "tags": [
-          "Forecasts"
-        ],
-        "operationId": "finalizeForecastRun",
-        "summary": "Finalize a reviewed baseline",
-        "description": "Request carries all scope IDs and they must match the stored run. Requires If-Match and Idempotency-Key. Validate required reviews, append the final audit, and freeze in one transaction. Finalization is advisory and does not itself publish or confirm any offering; the Coordinator confirms offerings as a separate, later step (see Offering confirmation operations). Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Finalization is allowed only from UNDER_REVIEW after required reviews; successful finalization records non-null actor/time and freezes the run. MT5a: every proposed section must be REVIEWED, APPROVED or DEFERRED (422 REVIEWS_INCOMPLETE with details.pendingSubjectIds); 409 RUN_STATE_CONFLICT unless UNDER_REVIEW, 409 RUN_FINALIZED when already frozen. reason is optional (default \"Forecast finalized.\").",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ForecastRunId"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FinalizeForecastRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/InvalidDecision"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/forecast-runs/{forecastRunId}/audit": {
-      "get": {
-        "tags": [
-          "Forecasts"
-        ],
-        "operationId": "listForecastAudit",
-        "summary": "Read a bounded page of append-only decisions",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ForecastRunId"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastAuditResponse"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        },
-        "description": "Append-only decision history, newest first, cursor-paged. Entries carry subjectId (null for FINALIZE) and full before/after section states; proposedSectionId is always null because an entry covers all sections of a subject."
       }
     },
     "/api/admin/forecasting/configuration": {
@@ -760,357 +561,6 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/InvalidDecision"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/forecast-runs/{forecastRunId}/reviews": {
-      "post": {
-        "tags": [
-          "Forecasts"
-        ],
-        "operationId": "startForecastReview",
-        "summary": "Move an initial draft into review",
-        "description": "Explicit DRAFT to UNDER_REVIEW transition. Scope must match the stored run. Requires If-Match and Idempotency-Key. Replay lookup follows authentication and precedes current state/revision checks. Idempotency keys are server-namespaced by actor, operation and programme/centre/semester; key text need not embed scope. After auth, replay lookup precedes mutable state/revision checks. After current authorization, replay lookup returns the original receipt before mutable resource state or ETag/revision checks; same key with a different payload conflicts. Errors: 400 IF_MATCH_REQUIRED, 404 RUN_NOT_FOUND, 409 RUN_STATE_CONFLICT (not DRAFT) or RUN_FINALIZED, 412 RUN_REVISION_MISMATCH. Idempotency-Key is validated but not persisted; a retry after success sees a stale revision (412). The transition writes a run-level START_REVIEW audit entry (subjectId null, actor, reason defaulting to \"Review started.\", before {status: DRAFT}, after {status: UNDER_REVIEW}) in the same transaction; the database allows it only from DRAFT and once per run. It increments the revision audit count (DRAFT revision fr<id>.DRAFT.0 becomes fr<id>.UNDER_REVIEW.1).",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ForecastRunId"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartReviewRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/confirmed-offerings": {
-      "get": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "listConfirmedOfferings",
-        "summary": "PLANNED: read the confirmed offerings for a programme + centre + target semester",
-        "description": "Active Coordinator only. Returns the latest confirmation state per subject (CONFIRMED and WITHDRAWN) and the set revision (also as ETag). The latest confirmation for the scope is authoritative and is what students see. The target semester is the next semester for the students served. Private, no-store. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProgrammeQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/CentreQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/SemesterQueryRequired"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ConfirmedOfferingSetResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "confirmOfferings",
-        "summary": "PLANNED: confirm (or re-confirm) offered subjects",
-        "description": "Active Coordinator only. A deliberate action, never automatic. Requires a FINALIZED forecast run for the same programme + centre + target semester (recorded as provenance); excluded subjects (Projek Sarjana Muda 1/2, Latihan Industri, UKQT3001 and other non-classroom subjects) cannot be confirmed (422 SUBJECT_EXCLUDED); a subject that does not run in the forecast's semester type under the Normal/Short offering rule cannot be confirmed (422 SUBJECT_NOT_OFFERED_IN_SEMESTER_TYPE, details.subjectIds); a WITHDRAWN subject may be re-confirmed. A non-blank reason is required and a pick deadline (pickDeadline, future date-time; send the current one on re-confirmation) is part of the confirmation: students can pick and change picks only until it, after which picks are closed (read-only). Actor and time are derived server-side and appended to the audit atomically with the state change. The request carries baseRevision (null when no confirmation exists); a stale revision returns 412. Idempotency-Key replays return the original receipt. Students then see these subjects as 'Confirmed by coordinator'; this is not official registration and not a guaranteed timetable. Forecasts and pick counts are not changed by this operation. A new forecast run/version never changes, invalidates or requires re-confirmation of existing confirmations (decided); the confirmation only keeps forecastRunId as provenance. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfirmOfferingsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/InvalidDecision"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/confirmed-offerings/withdrawals": {
-      "post": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "withdrawOfferings",
-        "summary": "PLANNED: withdraw previously confirmed subjects",
-        "description": "Active Coordinator only. Marks the listed subjects WITHDRAWN for the scope with a required reason, audited atomically. Withdrawn subjects disappear from the student list; existing student picks for them are kept but excluded from the student's list and from pick counts (OP7). Requires baseRevision (stale returns 412) and Idempotency-Key. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WithdrawOfferingsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/InvalidDecision"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/confirmed-offerings/audit": {
-      "get": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "listConfirmedOfferingAudit",
-        "summary": "PLANNED: audit of confirm and withdraw actions in a scope",
-        "description": "Active Coordinator only. Append-only entries with actor, time, reason and before/after status. Bounded by limit/cursor. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProgrammeQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/CentreQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/SemesterQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ConfirmedOfferingAuditResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/offering-pick-counts": {
-      "get": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "getOfferingPickCounts",
-        "summary": "PLANNED: student pick counts and pickers per subject for a scope",
-        "description": "Active assigned Coordinator only. Per subject, the COUNT of student picks and the LIST of students who picked it, for programme + learning centre + target (next) semester, shown side by side with the forecast. Decided 2026-11-01: coordinators manage the students of their assigned centre and need to see who picked (this replaces importing names and untaken subjects from the student management system), so that senior students can be prioritised to graduate sooner. Only students whose profile programme + learning centre fall within the coordinator's assignment are returned; otherwise 403 SCOPE_NOT_ASSIGNED. No small-number suppression. Pickers carry studentId (profile ID, never a Clerk ID), studentName, matricNo, currentSemester, creditsCompleted and the planned intakeSemester. The default order is by seniority (decided 2026-11-01: credits completed toward the curriculum, highest first; tie-break the earliest intake, then the current semester); this is a display aid, the coordinator decides and nothing is allocated automatically. Students never see other students' picks. Display only: not an input to the forecast calculation. Each entry also carries classType and implied classes (ceil(picks / maximum), LAB 35 / LECTURE 45) against optimal 25 as a display aid. The cycle ends here: no class sections from picks, no registration, no timetable. Private, no-store; personal data must not be cached in shared caches or logged. Coordinator scope: the authenticated Coordinator must be assigned to the programme and learning centre. The seniority ordering is display-aid policy version 1, revisable by a new change record and an update to the single shared helper; no migration because ordering is computed, never stored.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ProgrammeQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/CentreQueryRequired"
-          },
-          {
-            "$ref": "#/components/parameters/SemesterQueryRequired"
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "seniority",
-                "name"
-              ],
-              "default": "seniority"
-            },
-            "description": "Order of pickers within each subject; display aid."
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/OfferingPickCountResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/api/coordinator/confirmed-offerings/pick-deadline": {
-      "post": {
-        "tags": [
-          "Offering confirmation"
-        ],
-        "operationId": "setOfferingPickDeadline",
-        "summary": "PLANNED: change the pick deadline for a scope",
-        "description": "Active assigned Coordinator. Sets the date-time after which students can no longer pick or change picks for the programme + learning centre + target semester (replaces the Google Form practice). A future date-time and a reason are required; actor and time are derived server-side and the change is audited (action SET_DEADLINE) atomically. Requires baseRevision (stale returns 412) and Idempotency-Key. Coordinator scope: the authenticated Coordinator must be assigned (admin-managed, planned) to the programme and learning centre; otherwise 403 SCOPE_NOT_ASSIGNED.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetPickDeadlineRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/ForecastOperationResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/ScopeNotFound"
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
@@ -1223,6 +673,184 @@
           },
           "422": {
             "$ref": "#/components/responses/ImportValidationResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/offering-decisions": {
+      "get": {
+        "tags": [
+          "Offering decisions"
+        ],
+        "operationId": "getOfferingDecisions",
+        "summary": "Decisions (Pending / Approved / Removed) for a programme + centre + semester",
+        "description": "Active Coordinator only. Returns stored decisions (no entry means Pending), the semester selection window set by admin, the selection phase computed from the server clock, and whether decisions can still be changed (editable: the semester is the next semester and selection has not closed). Private, no-store. 403 SCOPE_NOT_ASSIGNED when the Coordinator is not assigned to the programme and learning centre; 404 SCOPE_NOT_FOUND for an unknown semester.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfferingDecisionSetResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Offering decisions"
+        ],
+        "operationId": "decideOffering",
+        "summary": "Approve, remove or add back one subject",
+        "description": "Active Coordinator only. Takes effect at once; no reason is typed and no dialog is needed. status PENDING (add back) deletes the stored decision. Stale-change protection: expectedStatus must equal the current status, otherwise 409 DECISION_STALE and nothing is written; the check and the write are one transaction serialised per subject. Only the next semester can be changed (409 SEMESTER_READ_ONLY) and only until selection closes (409 SELECTION_CLOSED), both checked live against the admin dates. Approving an excluded subject is 422 SUBJECT_EXCLUDED (removing it or adding it back is allowed, so an earlier approval can always be undone); a subject outside the programme catalogue is 422 DECISION_SUBJECT_NOT_FOUND; importBatchId must be an ACCEPTED import of the scope (404 IMPORT_NOT_FOUND). Every real change appends an immutable audit row (before and after status, actor, time, snapshot). status equal to expectedStatus is a no-op that writes nothing. Optional Idempotency-Key is validated for length only. Actor and time are derived server-side. When an APPROVED subject is changed to REMOVED or back to PENDING, every student pick of that subject in the same programme + learning centre + semester is deleted in the same transaction, one offering_pick_withdrawal record is kept per student, and affectedPicks (also stored on the audit row) reports how many; other subjects, centres, programmes and semesters are untouched.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideOfferingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DecideOfferingResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ScopeNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/DecisionConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidDecision"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/offering-decisions/audit": {
+      "get": {
+        "tags": [
+          "Offering decisions"
+        ],
+        "operationId": "listOfferingDecisionAudit",
+        "summary": "Audit of decision changes in a scope",
+        "description": "Active Coordinator only. Append-only entries, newest first, keyset-paged by limit/cursor. Private, no-store.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/OfferingDecisionAuditResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/api/coordinator/offering-decisions/{subjectId}/pickers": {
+      "get": {
+        "tags": [
+          "Offering decisions"
+        ],
+        "operationId": "listDecisionPickers",
+        "summary": "Students who picked a decided subject in a scope",
+        "description": "Active Coordinator only. Lists the students whose pick of the subject counts for the scope: semester_offering rows of the target semester for students at the learning centre (student_profile.learning_centre_id) whose curriculum belongs to the programme. Shows name and matric number; the live sign-in email is added when available (emailsAvailable false otherwise). Sorted by name then student id. Personal data: private, no-store. 403 SCOPE_NOT_ASSIGNED; 404 OFFERING_DECISION_NOT_FOUND when the subject has no decision row in the scope.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SubjectIdPath"
+          },
+          {
+            "$ref": "#/components/parameters/ProgrammeQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/CentreQueryRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SemesterQueryRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DecisionPickersResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/OfferingDecisionNotFound"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
@@ -1354,6 +982,14 @@
         }
       },
       "ForecastSubjectId": {
+        "name": "subjectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Int32Id"
+        }
+      },
+      "SubjectIdPath": {
         "name": "subjectId",
         "in": "path",
         "required": true,
@@ -1501,6 +1137,22 @@
               2,
               3
             ]
+          },
+          "selectionOpensAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Admin-set time students can start picking (UTC); null when not scheduled."
+          },
+          "selectionClosesAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Admin-set time picks and coordinator decisions lock (UTC); null when open-ended."
           }
         }
       },
@@ -1756,6 +1408,13 @@
             "type": "integer",
             "nullable": true,
             "description": "The only semester an import may target: the one after the current semester (targetSemesters holds it); null when unavailable."
+          },
+          "semesters": {
+            "type": "array",
+            "description": "Every semester with its selection window.",
+            "items": {
+              "$ref": "#/components/schemas/SemesterOption"
+            }
           }
         }
       },
@@ -2549,115 +2208,6 @@
           }
         }
       },
-      "ForecastDecision": {
-        "oneOf": [
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "subjectId",
-              "action",
-              "reason"
-            ],
-            "properties": {
-              "subjectId": {
-                "$ref": "#/components/schemas/Int32Id"
-              },
-              "action": {
-                "type": "string",
-                "enum": [
-                  "REVIEW",
-                  "APPROVE",
-                  "DEFER",
-                  "REOPEN"
-                ]
-              },
-              "reason": {
-                "type": "string",
-                "minLength": 1
-              },
-              "approvalReference": {
-                "type": "string"
-              }
-            },
-            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. REVIEW, APPROVE and DEFER set every current section of the subject to REVIEWED, APPROVED or DEFERRED; REOPEN sets them back to PENDING (clearing the reviewer), for example to add back a removed subject; a subject without sections cannot be decided. A reason of 1-500 characters is required for every decision."
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "subjectId",
-              "action",
-              "reason",
-              "replacementSections"
-            ],
-            "properties": {
-              "subjectId": {
-                "$ref": "#/components/schemas/Int32Id"
-              },
-              "action": {
-                "type": "string",
-                "enum": [
-                  "REPLACE_ALLOCATION"
-                ]
-              },
-              "reason": {
-                "type": "string",
-                "minLength": 1
-              },
-              "approvalReference": {
-                "type": "string"
-              },
-              "replacementSections": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/SubjectAllocation"
-                },
-                "description": "Full replacement allocation for the subject. Omitted existing section IDs retire those sections from the current allocation; historical section/audit rows are retained."
-              }
-            },
-            "description": "subjectId is the canonical subject.subject_id, not curriculum_subject_id. The replacement must keep section numbers 1..n, may change the number and sizes of sections, but the sizes must add up to the subject forecastCount (a replacement redistributes demand, it never creates or removes it). Each size is 1..exceptionMaximum (or normalMaximum when none is configured); a size above normalMaximum is an exception and stores its justification (falling back to the decision reason). Subjects that are EXCLUDED or CONFIGURATION_REQUIRED cannot be replaced. Retired sections are removed from the editable allocation; their details stay in the audit before-state and in originalRecommendations."
-          }
-        ]
-      },
-      "DecisionBatchRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "decisions"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "decisions": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/ForecastDecision"
-            }
-          }
-        }
-      },
-      "FinalizeForecastRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "approvalReference": {
-            "type": "string"
-          }
-        }
-      },
       "OperationReceipt": {
         "type": "object",
         "additionalProperties": false,
@@ -2765,36 +2315,6 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"
             }
-          }
-        }
-      },
-      "ForecastAuditPage": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ForecastAuditEntry"
-            }
-          },
-          "nextCursor": {
-            "type": "string"
-          }
-        }
-      },
-      "ForecastAuditEnvelope": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ForecastAuditPage"
           }
         }
       },
@@ -3106,28 +2626,6 @@
           }
         }
       },
-      "ReviewForecastRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "action"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "START_REVIEW"
-            ]
-          },
-          "reason": {
-            "type": "string"
-          }
-        }
-      },
       "ImportSubjectStatus": {
         "type": "string",
         "enum": [
@@ -3371,52 +2869,6 @@
           }
         }
       },
-      "SubjectAllocation": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "sectionNumber",
-          "expectedStudents"
-        ],
-        "properties": {
-          "proposedSectionId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "sectionNumber": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "expectedStudents": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "justification": {
-            "type": "string"
-          }
-        }
-      },
-      "StartReviewRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "action"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "START_REVIEW"
-            ]
-          },
-          "reason": {
-            "type": "string"
-          }
-        }
-      },
       "ImportSummary": {
         "type": "object",
         "additionalProperties": false,
@@ -3509,560 +2961,6 @@
             ]
           }
         ]
-      },
-      "ConfirmedOfferingStatus": {
-        "type": "string",
-        "enum": [
-          "CONFIRMED",
-          "WITHDRAWN"
-        ]
-      },
-      "ConfirmedOffering": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "confirmedOfferingId",
-          "programmeId",
-          "learningCentreId",
-          "targetSemesterId",
-          "subjectId",
-          "subjectCode",
-          "subjectName",
-          "creditHours",
-          "classType",
-          "status",
-          "forecastRunId",
-          "confirmedBy",
-          "confirmedAt",
-          "reason"
-        ],
-        "properties": {
-          "confirmedOfferingId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "programmeId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "learningCentreId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "targetSemesterId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "subjectId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "subjectCode": {
-            "type": "string"
-          },
-          "subjectName": {
-            "type": "string"
-          },
-          "creditHours": {
-            "type": "number"
-          },
-          "classType": {
-            "type": "string",
-            "enum": [
-              "LECTURE",
-              "LAB"
-            ],
-            "nullable": true
-          },
-          "status": {
-            "$ref": "#/components/schemas/ConfirmedOfferingStatus"
-          },
-          "forecastRunId": {
-            "type": "integer",
-            "nullable": true,
-            "description": "FINALIZED run the confirmation was based on (provenance)."
-          },
-          "confirmedBy": {
-            "type": "string"
-          },
-          "confirmedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "withdrawnBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "withdrawnAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        }
-      },
-      "ConfirmedOfferingSet": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "revision",
-          "offerings",
-          "pickDeadline"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "revision": {
-            "type": "string",
-            "nullable": true,
-            "description": "Null before the first confirmation for the scope."
-          },
-          "offerings": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfirmedOffering"
-            }
-          },
-          "pickDeadline": {
-            "nullable": true,
-            "description": "Deadline after which student picks are closed; null before the first confirmation.",
-            "type": "string",
-            "format": "date-time"
-          },
-          "newerForecastAvailable": {
-            "$ref": "#/components/schemas/NewerForecastAvailable"
-          },
-          "forecastRunId": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Source FINALIZED run (provenance); null before the first confirmation."
-          },
-          "pickWindow": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "CLOSED"
-            ],
-            "nullable": true,
-            "description": "Derived from pickDeadline and the server clock."
-          },
-          "createdBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "updatedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        }
-      },
-      "ConfirmedOfferingSetEnvelope": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ConfirmedOfferingSet"
-          }
-        }
-      },
-      "ConfirmOfferingsRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "forecastRunId",
-          "subjectIds",
-          "reason",
-          "baseRevision",
-          "pickDeadline"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "forecastRunId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "subjectIds": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "$ref": "#/components/schemas/Int32Id"
-            },
-            "description": "Canonical subject.subject_id values."
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          },
-          "baseRevision": {
-            "type": "string",
-            "nullable": true
-          },
-          "pickDeadline": {
-            "description": "Pick deadline. Students may pick or change picks only until this time.",
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "WithdrawOfferingsRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "subjectIds",
-          "reason",
-          "baseRevision"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "subjectIds": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "$ref": "#/components/schemas/Int32Id"
-            }
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          },
-          "baseRevision": {
-            "type": "string"
-          }
-        }
-      },
-      "ConfirmedOfferingAuditEntry": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "auditId",
-          "scope",
-          "subjectId",
-          "action",
-          "beforeStatus",
-          "afterStatus",
-          "recordedBy",
-          "recordedAt",
-          "reason",
-          "forecastRunId",
-          "beforeDeadline",
-          "afterDeadline"
-        ],
-        "properties": {
-          "auditId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "subjectId": {
-            "type": "integer",
-            "nullable": true,
-            "description": "Null for SET_DEADLINE."
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "CONFIRM",
-              "WITHDRAW",
-              "SET_DEADLINE"
-            ]
-          },
-          "beforeStatus": {
-            "type": "string",
-            "enum": [
-              "CONFIRMED",
-              "WITHDRAWN"
-            ],
-            "nullable": true
-          },
-          "afterStatus": {
-            "type": "string",
-            "enum": [
-              "CONFIRMED",
-              "WITHDRAWN"
-            ],
-            "nullable": true
-          },
-          "recordedBy": {
-            "type": "string"
-          },
-          "recordedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reason": {
-            "type": "string"
-          },
-          "forecastRunId": {
-            "type": "integer",
-            "nullable": true
-          },
-          "beforeDeadline": {
-            "nullable": true,
-            "type": "string",
-            "format": "date-time"
-          },
-          "afterDeadline": {
-            "nullable": true,
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ConfirmedOfferingAuditPage": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfirmedOfferingAuditEntry"
-            }
-          },
-          "nextCursor": {
-            "type": "string"
-          }
-        }
-      },
-      "ConfirmedOfferingAuditEnvelope": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ConfirmedOfferingAuditPage"
-          }
-        }
-      },
-      "OfferingPickCount": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "subjectId",
-          "subjectCode",
-          "subjectName",
-          "pickCount",
-          "classType",
-          "implied",
-          "pickers"
-        ],
-        "properties": {
-          "subjectId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "subjectCode": {
-            "type": "string"
-          },
-          "subjectName": {
-            "type": "string"
-          },
-          "pickCount": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "classType": {
-            "type": "string",
-            "enum": [
-              "LECTURE",
-              "LAB"
-            ],
-            "nullable": true,
-            "description": "Null is treated as LECTURE (non-lab)."
-          },
-          "implied": {
-            "$ref": "#/components/schemas/ImpliedClasses"
-          },
-          "pickers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OfferingPicker"
-            },
-            "description": "Length equals pickCount. Seniority order by default."
-          }
-        }
-      },
-      "OfferingPickCountSummary": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "asOf",
-          "counts",
-          "pickDeadline"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "asOf": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "counts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OfferingPickCount"
-            }
-          },
-          "pickDeadline": {
-            "nullable": true,
-            "description": "Picks are closed (read-only) after this time.",
-            "type": "string",
-            "format": "date-time"
-          },
-          "picksAvailable": {
-            "type": "boolean",
-            "description": "False until student picks exist (P002): counts are zero and pickers empty."
-          }
-        },
-        "description": "Pick counts and the list of pickers per subject, for an assigned Coordinator only. Display only; not an input to the forecast calculation; no automatic allocation."
-      },
-      "OfferingPickCountEnvelope": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/OfferingPickCountSummary"
-          }
-        }
-      },
-      "SetPickDeadlineRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "scope",
-          "pickDeadline",
-          "reason",
-          "baseRevision"
-        ],
-        "properties": {
-          "scope": {
-            "$ref": "#/components/schemas/DecisionScope"
-          },
-          "pickDeadline": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          },
-          "baseRevision": {
-            "type": "string"
-          },
-          "forecastRunId": {
-            "$ref": "#/components/schemas/Int32Id",
-            "description": "Optional: switch the source run to another FINALIZED run of the same scope."
-          }
-        }
-      },
-      "ImpliedClasses": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Display aid only; not a class-section proposal and not a forecast input.",
-        "required": [
-          "maxPerClass",
-          "classesAtMaximum",
-          "classesAtOptimal",
-          "averageSizeAtMaximum"
-        ],
-        "properties": {
-          "maxPerClass": {
-            "type": "integer",
-            "description": "LAB 35, LECTURE (non-lab) 45."
-          },
-          "classesAtMaximum": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "ceil(picks / maxPerClass)"
-          },
-          "classesAtOptimal": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "ceil(picks / 25); optimal class size 25."
-          },
-          "averageSizeAtMaximum": {
-            "type": "number",
-            "minimum": 0,
-            "description": "picks / classesAtMaximum, to compare with the optimal size 25."
-          }
-        }
-      },
-      "OfferingPicker": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "studentId",
-          "studentName",
-          "matricNo",
-          "currentSemester",
-          "intakeSemester",
-          "creditsCompleted"
-        ],
-        "description": "A student who picked the subject, shown to an assigned Coordinator only.",
-        "properties": {
-          "studentId": {
-            "$ref": "#/components/schemas/Int32Id",
-            "description": "student_profile.student_id; never a Clerk user ID."
-          },
-          "studentName": {
-            "type": "string"
-          },
-          "matricNo": {
-            "type": "string",
-            "nullable": true
-          },
-          "currentSemester": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SemesterOption"
-              }
-            ]
-          },
-          "intakeSemester": {
-            "nullable": true,
-            "description": "PLANNED field (P001); no intake is stored today, null until recorded.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SemesterOption"
-              }
-            ]
-          },
-          "creditsCompleted": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "description": "Sum of recognized credits of COMPLETED/EXEMPTED academic records toward the curriculum; null when unavailable."
-          }
-        }
       },
       "ImportedStudentSummary": {
         "type": "object",
@@ -4228,94 +3126,6 @@
             "type": "integer",
             "minimum": 0,
             "description": "Subjects whose potential demand is under the minimum enrolment."
-          }
-        }
-      },
-      "ForecastRunSummary": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "forecastRunId",
-          "programmeId",
-          "learningCentreId",
-          "targetSemesterId",
-          "importBatchId",
-          "versionNumber",
-          "parentForecastRunId",
-          "status",
-          "revision",
-          "demandAssumption",
-          "engineVersion",
-          "generatedBy",
-          "generatedAt",
-          "finalizedBy",
-          "finalizedAt",
-          "newerForecastAvailable",
-          "summary"
-        ],
-        "properties": {
-          "forecastRunId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "programmeId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "learningCentreId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "targetSemesterId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "importBatchId": {
-            "$ref": "#/components/schemas/Int32Id"
-          },
-          "versionNumber": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "parentForecastRunId": {
-            "type": "integer",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "DRAFT",
-              "UNDER_REVIEW",
-              "FINALIZED"
-            ]
-          },
-          "revision": {
-            "type": "string",
-            "description": "Optimistic-concurrency token (also the quoted ETag). Changes on every lifecycle step and decision."
-          },
-          "demandAssumption": {
-            "$ref": "#/components/schemas/SupportedDemandAssumption"
-          },
-          "engineVersion": {
-            "type": "string"
-          },
-          "generatedBy": {
-            "type": "string"
-          },
-          "generatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "finalizedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "finalizedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "newerForecastAvailable": {
-            "$ref": "#/components/schemas/NewerForecastAvailable"
-          },
-          "summary": {
-            "$ref": "#/components/schemas/RunSummary"
           }
         }
       },
@@ -4728,36 +3538,6 @@
           }
         }
       },
-      "ForecastRunSummaryList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ForecastRunSummary"
-            }
-          },
-          "nextCursor": {
-            "type": "string"
-          }
-        }
-      },
-      "ForecastRunSummaryListEnvelope": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ForecastRunSummaryList"
-          }
-        }
-      },
       "ImportSource": {
         "type": "string",
         "enum": [
@@ -4834,7 +3614,7 @@
           },
           "centreNote": {
             "type": "string",
-            "description": "Documents the interim centre rule: until student profiles record a learning centre every student counts under KL."
+            "description": "Documents the centre rule: students are counted under the learning centre saved in their profile; students without a learning centre are excluded (counted under other centre)."
           }
         }
       },
@@ -5241,6 +4021,432 @@
             "$ref": "#/components/schemas/RunSubjectStudents"
           }
         }
+      },
+      "OfferingDecisionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "REMOVED"
+        ]
+      },
+      "SelectionPhase": {
+        "type": "string",
+        "enum": [
+          "PLANNING",
+          "OPEN",
+          "CLOSED"
+        ],
+        "description": "PLANNING until selectionOpensAt (or without one), OPEN until selectionClosesAt, then CLOSED. Computed from the server clock."
+      },
+      "OfferingDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "creditHours",
+          "classType",
+          "status",
+          "decidedBy",
+          "decidedAt"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "creditHours": {
+            "type": "integer"
+          },
+          "classType": {
+            "type": "string",
+            "enum": [
+              "LECTURE",
+              "LAB",
+              null
+            ],
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "decidedBy": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OfferingDecisionSet": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "semester",
+          "phase",
+          "asOf",
+          "editable",
+          "decisions",
+          "pickCounts"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "semester": {
+            "$ref": "#/components/schemas/SemesterOption"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/SelectionPhase"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "True only for the next semester while selection has not closed."
+          },
+          "decisions": {
+            "type": "array",
+            "description": "Stored decisions only; a subject with no entry is PENDING.",
+            "items": {
+              "$ref": "#/components/schemas/OfferingDecision"
+            }
+          },
+          "pickCounts": {
+            "type": "array",
+            "description": "Students who picked each decided subject in this scope (programme + learning centre + next semester). Subjects nobody picked are absent.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "subjectId",
+                "pickCount"
+              ],
+              "properties": {
+                "subjectId": {
+                  "$ref": "#/components/schemas/Int32Id"
+                },
+                "pickCount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "DecideOfferingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "subjectId",
+          "status",
+          "expectedStatus",
+          "importBatchId"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "expectedStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ],
+            "description": "The status the caller last saw. A different current status returns 409 DECISION_STALE. Equal to status: no change, no audit entry."
+          },
+          "importBatchId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Int32Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The accepted snapshot shown when deciding, kept in the audit; must be an ACCEPTED import of the scope (404 IMPORT_NOT_FOUND otherwise)."
+          }
+        }
+      },
+      "DecideOfferingResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId",
+          "beforeStatus",
+          "afterStatus",
+          "affectedPicks",
+          "phase"
+        ],
+        "properties": {
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "beforeStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "afterStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "affectedPicks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Always 0 until pick withdrawal is delivered with the picks API."
+          },
+          "phase": {
+            "$ref": "#/components/schemas/SelectionPhase"
+          }
+        }
+      },
+      "OfferingDecisionAuditEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auditId",
+          "scope",
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "beforeStatus",
+          "afterStatus",
+          "importBatchId",
+          "affectedPicks",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "properties": {
+          "auditId": {
+            "type": "integer"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "beforeStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "afterStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REMOVED"
+            ]
+          },
+          "importBatchId": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Int32Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "affectedPicks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OfferingDecisionAuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferingDecisionAuditEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "OfferingDecisionSetEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OfferingDecisionSet"
+          }
+        }
+      },
+      "DecideOfferingEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DecideOfferingResult"
+          }
+        }
+      },
+      "OfferingDecisionAuditEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OfferingDecisionAuditPage"
+          }
+        }
+      },
+      "DecisionPicker": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "studentId",
+          "studentName",
+          "matricNo",
+          "email"
+        ],
+        "properties": {
+          "studentId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "studentName": {
+            "type": "string"
+          },
+          "matricNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sign-in email read live; null when unavailable."
+          }
+        }
+      },
+      "DecisionPickers": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope",
+          "subjectId",
+          "subjectCode",
+          "subjectName",
+          "pickCount",
+          "emailsAvailable",
+          "pickers"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/Int32Id"
+          },
+          "subjectCode": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "pickCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "emailsAvailable": {
+            "type": "boolean",
+            "description": "False when sign-in emails could not be read; matric numbers are still returned."
+          },
+          "pickers": {
+            "type": "array",
+            "description": "Sorted by studentName, then studentId.",
+            "items": {
+              "$ref": "#/components/schemas/DecisionPicker"
+            }
+          }
+        }
+      },
+      "DecisionPickersEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DecisionPickers"
+          }
+        }
       }
     },
     "responses": {
@@ -5334,21 +4540,6 @@
           }
         }
       },
-      "ForecastRunListResponse": {
-        "description": "Bounded page of run summaries, newest first; no-store.",
-        "headers": {
-          "Cache-Control": {
-            "$ref": "#/components/headers/NoStore"
-          }
-        },
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ForecastRunSummaryListEnvelope"
-            }
-          }
-        }
-      },
       "ForecastOperationResponse": {
         "description": "Operation receipt. Replays return the original receipt, not the current mutable resource.",
         "headers": {
@@ -5363,21 +4554,6 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/OperationEnvelope"
-            }
-          }
-        }
-      },
-      "ForecastAuditResponse": {
-        "description": "Bounded audit page; no-store.",
-        "headers": {
-          "Cache-Control": {
-            "$ref": "#/components/headers/NoStore"
-          }
-        },
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ForecastAuditEnvelope"
             }
           }
         }
@@ -5535,54 +4711,6 @@
           }
         }
       },
-      "ConfirmedOfferingSetResponse": {
-        "description": "Latest confirmation state per subject for the scope; no-store.",
-        "headers": {
-          "Cache-Control": {
-            "$ref": "#/components/headers/NoStore"
-          },
-          "ETag": {
-            "$ref": "#/components/headers/ETag"
-          }
-        },
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ConfirmedOfferingSetEnvelope"
-            }
-          }
-        }
-      },
-      "ConfirmedOfferingAuditResponse": {
-        "description": "Bounded audit page; no-store.",
-        "headers": {
-          "Cache-Control": {
-            "$ref": "#/components/headers/NoStore"
-          }
-        },
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ConfirmedOfferingAuditEnvelope"
-            }
-          }
-        }
-      },
-      "OfferingPickCountResponse": {
-        "description": "Pick counts and pickers per subject (assigned coordinator only); contains personal data; no-store.",
-        "headers": {
-          "Cache-Control": {
-            "$ref": "#/components/headers/NoStore"
-          }
-        },
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/OfferingPickCountEnvelope"
-            }
-          }
-        }
-      },
       "ImportStudentListResponse": {
         "description": "Bounded page of the retained roster, including optional student names; no-store.",
         "headers": {
@@ -5609,6 +4737,96 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/RunSubjectStudentsEnvelope"
+            }
+          }
+        }
+      },
+      "OfferingDecisionSetResponse": {
+        "description": "Decisions, selection phase and editability for the scope; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfferingDecisionSetEnvelope"
+            }
+          }
+        }
+      },
+      "DecideOfferingResponse": {
+        "description": "Decision applied (or unchanged); no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DecideOfferingEnvelope"
+            }
+          }
+        }
+      },
+      "OfferingDecisionAuditResponse": {
+        "description": "Bounded audit page, newest first; no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OfferingDecisionAuditEnvelope"
+            }
+          }
+        }
+      },
+      "DecisionConflict": {
+        "description": "SEMESTER_READ_ONLY (not the next semester), SELECTION_CLOSED (selection has closed) or DECISION_STALE (the subject changed since expectedStatus was read).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "DecisionPickersResponse": {
+        "description": "Students who picked the subject; personal data, no-store.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DecisionPickersEnvelope"
+            }
+          }
+        }
+      },
+      "OfferingDecisionNotFound": {
+        "description": "The subject has no decision in this scope (error code OFFERING_DECISION_NOT_FOUND), or the scope is unavailable (SCOPE_NOT_FOUND).",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
             }
           }
         }

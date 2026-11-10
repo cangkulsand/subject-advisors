@@ -47,6 +47,11 @@
       "version": "0008",
       "file": "0008_admin_academic_setup.sql",
       "description": "Add audited academic reference setup, coordinator scopes and explicit current-semester selection"
+    },
+    {
+      "version": "0009",
+      "file": "0009_simplified_offering_flow.sql",
+      "description": "Semester selection window, student learning centre, per-scope offering decisions with append-only audit and pick withdrawals"
     }
   ],
   "historicalExcluded": [

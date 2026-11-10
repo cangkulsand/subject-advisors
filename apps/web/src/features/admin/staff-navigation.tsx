@@ -16,9 +16,6 @@ const paths: Record<string, ReactNode> = {
   data: <><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5m-16 7v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></>,
   quality: <><path d="M12 3 3 20h18L12 3Zm0 6v5m0 3h.01"/></>,
   forecast: <><path d="M3 20V4m0 16h18M6 16l4-5 4 2 6-8"/></>,
-  versions: <><path d="M4 5h16M4 12h16M4 19h16M8 3v4m8 3v4m-5 3v4"/></>,
-  compare: <><path d="M5 4h5v16H5zM14 4h5v16h-5zM10 8h4m-4 8h4"/></>,
-  decisions: <><path d="m5 12 4 4L20 5"/><path d="M20 12v7H4V5h11"/></>,
 };
 function Icon({ name }: { name: string }) { return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">{paths[name] ?? paths.data}</svg>; }
 

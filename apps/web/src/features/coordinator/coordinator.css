@@ -30,7 +30,6 @@
 .admin-shell .coordinator-expander { min-height: var(--control-min-height); padding: 4px 10px; font-size: var(--font-size-small); }
 .coordinator-reasons { margin: 8px 0 0; padding: 0 0 0 16px; font-size: var(--font-size-small); color: var(--color-body); }
 .coordinator-reasons[hidden] { display: none; }
-.coordinator-config-issue { display: block; margin-top: 6px; color: #92400e; font-size: var(--font-size-small); overflow-wrap: anywhere; }
 .coordinator-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .coordinator-table .coordinator-row-actions { margin-top: 0; }
 .admin-shell a.coordinator-link-button { display: inline-flex; align-items: center; min-height: var(--control-min-height); padding: 6px 12px; border: 1.5px solid var(--color-brand); border-radius: 8px; font-size: var(--font-size-small); font-weight: 600; white-space: nowrap; }
@@ -50,11 +49,7 @@
 .coordinator-row-pending { background: #fffbeb; box-shadow: inset 4px 0 #d97706; }
 .coordinator-row-pending th[scope="row"] { background: #fffbeb; }
 .coordinator-needed { display: block; margin-top: 6px; color: #92400e; font-size: var(--font-size-small); font-weight: 700; }
-.admin-shell .coordinator-assumption { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #bfdbfe; border-left: 4px solid #1d4ed8; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: var(--font-size-label); }
-.coordinator-assumption strong { color: #1e3a8a; }
-.coordinator-assumption .admin-audit-id { color: #1e3a8a; font-size: var(--font-size-small); margin-top: 4px; }
 .admin-shell .coordinator-readonly-note { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: var(--font-size-label); }
-.coordinator-head-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .admin-card-title { flex-wrap: wrap; }
 .admin-shell h2 .admin-pill { vertical-align: middle; margin-left: 8px; font-size: var(--font-size-small); }
 .coordinator-more { display: flex; justify-content: center; padding: 14px 0 2px; }
@@ -81,8 +76,7 @@
 }
 @media (max-width: 760px) {
   .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-grid { grid-template-columns: 1fr; }
-  .admin-card-title > button, .coordinator-head-actions { width: 100%; }
-  .coordinator-head-actions > button { flex: 1 1 140px; }
+  .admin-card-title > button { width: 100%; }
   .coordinator-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .coordinator-upload-submit button { width: 100%; }
 }
@@ -90,33 +84,6 @@
 .admin-card > .coordinator-table { margin-top: 18px; }
 .admin-shell .coordinator-scope-grid select { height: 44px; }
 
-/* Offering decisions (MT6) */
-.coordinator-pick-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 18px; }
-.coordinator-picker table { min-width: 860px; }
-.coordinator-offerings table { min-width: 1080px; }
-.coordinator-picker td, .coordinator-offerings td { vertical-align: top; }
-.coordinator-picker th[scope="row"] strong, .coordinator-picker th[scope="row"] span, .coordinator-offerings th[scope="row"] strong, .coordinator-offerings th[scope="row"] span { display: block; }
-.coordinator-picker th[scope="row"] span, .coordinator-offerings th[scope="row"] span { font-weight: 400; color: var(--color-body); }
-.admin-shell input.coordinator-check { width: 22px; height: 22px; min-height: 22px; padding: 0; margin: 0; accent-color: var(--color-brand); }
-.coordinator-row-disabled { background: var(--color-surface-subtle); color: var(--color-muted-text); }
-.coordinator-row-disabled th[scope="row"] { background: var(--color-surface-subtle); }
-.coordinator-disabled-reason { margin-top: 4px; color: #92400e !important; font-size: var(--font-size-small); overflow-wrap: anywhere; }
-.coordinator-confirm-bar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--color-outline); }
-.coordinator-deadline-field { flex: 1 1 280px; max-width: 420px; }
-.coordinator-run-select { max-width: 460px; margin-top: 18px; }
-.admin-shell .coordinator-run-select select { height: 44px; }
-.admin-shell .coordinator-newer-notice { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #c7d2fe; border-left: 4px solid #4338ca; border-radius: 8px; background: #eef2ff; color: #312e81; font-size: var(--font-size-label); }
-.coordinator-newer-notice strong { color: #312e81; }
-.coordinator-no-picks { color: var(--color-muted-text); font-size: var(--font-size-small); }
-.coordinator-picks-note { margin: 14px 0 0 !important; font-size: var(--font-size-small); }
-.coordinator-dialog-list { margin: 8px 0; padding-left: 20px; max-height: 180px; overflow: auto; font-size: var(--font-size-label); }
-.admin-shell .admin-danger-action { color: #991b1b; border-color: #fecaca; }
-@media (max-width: 760px) {
-  .coordinator-confirm-bar { flex-direction: column; align-items: stretch; }
-  .coordinator-deadline-field { max-width: none; }
-  .coordinator-confirm-bar > button { width: 100%; }
-  .coordinator-pick-tools > button { flex: 1 1 140px; }
-}
 
 .coordinator-pill-neutral { color: var(--color-body); background: var(--color-surface-subtle); }
 .coordinator-scope-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0 8px; }
@@ -149,8 +116,8 @@
 .admin-shell .coordinator-table table { font-size: var(--font-size-table); line-height: var(--line-height-table); font-variant-numeric: tabular-nums; }
 .admin-shell .coordinator-table th { padding: 14px 16px; font-size: var(--font-size-table-head); line-height: 1.4; color: var(--color-heading); }
 .admin-shell .coordinator-table td, .admin-shell .coordinator-table th[scope="row"] { padding: 18px 16px; }
-.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):not(.coordinator-row-disabled):nth-child(even) { background: rgba(0, 0, 0, 0.022); }
 .admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):hover { background: rgba(0, 0, 0, 0.045); }
+.admin-shell .coordinator-table tbody tr:not(.coordinator-row-pending):nth-child(even) { background: rgba(0, 0, 0, 0.022); }
 .admin-shell .coordinator-table th[scope="row"] { font-size: var(--font-size-table); }
 .admin-shell .coordinator-table th[scope="row"] strong { display: block; color: var(--color-heading); font-size: var(--font-size-subject-name); font-weight: 600; line-height: 1.4; }
 .admin-shell .coordinator-table th[scope="row"] span { display: block; font-weight: 400; }
@@ -204,3 +171,14 @@
 .admin-shell .coordinator-status-popover-compact { width: 12rem; }
 .admin-shell button.coordinator-decision-button { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-min-height); padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: var(--color-heading); cursor: pointer; }
 .admin-shell button.coordinator-decision-button:hover, .admin-shell button.coordinator-decision-button[aria-expanded="true"] { border-color: var(--color-brand); color: var(--color-brand); }
+
+/* Decisions table (Class Offering Forecast): Subject | Not taken yet | Eligible to take | Action. Counts right-aligned, action left. */
+.admin-shell .coordinator-decisions :is(th, td):nth-child(n+2):nth-child(-n+3) { text-align: right; }
+.admin-shell .coordinator-decisions :is(th, td):nth-child(4):nth-child(n) { text-align: left; }
+.admin-shell .coordinator-decisions th[scope="row"] .coordinator-pill-muted { display: inline-block; margin-top: 6px; }
+.admin-shell .coordinator-removed th[scope="row"] .coordinator-pill-muted { display: inline-block; margin-top: 6px; }
+.coordinator-snapshot-field { max-width: 40rem; }
+.coordinator-snapshot-field .coordinator-field-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-label); font-weight: 600; color: var(--color-body); }
+.admin-shell .coordinator-phase { margin: 16px 0 0; font-size: var(--font-size-body); font-weight: 600; color: var(--color-heading); }
+.admin-shell .coordinator-phase + .coordinator-warning { margin: 10px 0 0 !important; }
+.admin-shell .coordinator-decisions td > .coordinator-number { display: block; }

@@ -25,15 +25,13 @@ export interface ScopeProvider {
   importAliases(): Promise<ImportAliases>;
 }
 
-/**
- * TODO(Package B, migration 0009): read `student_profile.learning_centre_id`. Until that merges every student
- * counts as belonging to Kuala Lumpur (dev learning_centre_id 1), exactly as before S2-P004-011.
- */
-export const DEFAULT_STUDENT_CENTRE_ID = 1;
-
 export type ScopeSource = AcademicScopeReader & Pick<AcademicSetupRepository, 'listProgrammeFaculties'>;
 
-export function createDbScopeProvider(source: ScopeSource): ScopeProvider {
+/**
+ * `studentCentre` reads `student_profile.learning_centre_id` live (S2-P004-023); null when the student has no centre,
+ * and such a student is left out of "students in the system" snapshots.
+ */
+export function createDbScopeProvider(source: ScopeSource, studentCentre: (studentId: number) => Promise<number | null>): ScopeProvider {
   return {
     async listScopes(clerkUserId) {
       const assigned = await source.listScopes(clerkUserId);
@@ -51,7 +49,7 @@ export function createDbScopeProvider(source: ScopeSource): ScopeProvider {
     },
     isScopeAssigned: (clerkUserId, programmeId, learningCentreId) => source.isScopeAssigned(clerkUserId, programmeId, learningCentreId),
     currentSemesterId: () => source.currentSemesterId(),
-    async studentLearningCentreId() { return DEFAULT_STUDENT_CENTRE_ID; },
+    studentLearningCentreId: (studentId) => studentCentre(studentId),
     async importAliases() { return IMPORT_ALIASES; },
   };
 }

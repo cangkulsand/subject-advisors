@@ -5,6 +5,16 @@ import { ADMIN_REASON_MAX_LENGTH, normaliseReason, type AdminValidation } from '
 
 export type Values = Record<string, string>;
 export type Field = { key: string; label: string; type?: string; maxLength?: number; optional?: boolean; options?: { value: string; label: string }[] };
+/** `datetime-local` values are local wall-clock time without a zone. */
+export function toLocalInput(iso: string): string {
+  const date = new Date(iso), pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+export function localToIso(local: string): string | null {
+  if (!local) return null;
+  const date = new Date(local);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 export function checked<T>(result: AdminValidation<T>): T { if (!result.ok) throw new AdminApiError(400, 'INVALID_REQUEST', result.error); return result.value; }
 export function useSetupRead<T>(load: (signal: AbortSignal) => Promise<T>, key = '') {
   const latest = useRef(load); latest.current = load;

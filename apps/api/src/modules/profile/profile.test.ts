@@ -8,8 +8,8 @@ import { AuthError } from '../auth/errors';
 import type { Profile, ProfileRepository } from './contracts';
 import type { AccessAssignment } from '../auth/contracts';
 
-const input = { studentName: 'Demo student', matricNo: 'A22EC0001', curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
-const profile: Profile = { ...input, studentId: 1, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
+const input = { studentName: 'Demo student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
+const profile: Profile = { ...input, learningCentreLocked: false, studentId: 1, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
 const record = { subjectId: 1, semesterId: null, status: 'EXEMPTED', recognizedCredits: 0, remarks: 'DEMO credit-free exemption' };
 const cacheBindings: CacheBindings = {
   REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
@@ -32,7 +32,7 @@ function dependencies(state: 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' = 'CO
       access: { find: vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'STUDENT' as const, roles: ['STUDENT' as const], accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
       profiles: { stateFor: vi.fn(async () => state) },
     },
-    profiles: { find: vi.fn(async () => profile), save: vi.fn(async () => profile), options: vi.fn(async () => ({ curricula: [], subjects: [], semesters: [] })) },
+    profiles: { find: vi.fn(async () => profile), save: vi.fn(async () => profile), options: vi.fn(async () => ({ curricula: [], subjects: [], semesters: [], learningCentres: [] })) },
     records: { list: vi.fn(async () => []), save: vi.fn(), delete: vi.fn() },
   };
 }
@@ -41,6 +41,10 @@ function request(path: string, method = 'GET', body?: unknown) {
 }
 describe('P001 strict input validation', () => {
   it('normalizes a valid profile and permits zero working hours', () => expect(profileInput({ ...input, studentName: ' Demo ', matricNo: ' a22ec 0001 ' })).toMatchObject({ studentName: 'Demo', matricNo: 'A22EC0001' }));
+  it('profileInput requires learningCentreId', () => {
+    for (const learningCentreId of [undefined, null, 0, -1, 1.5, '1']) expect(() => profileInput({ ...input, learningCentreId })).toThrow('Learning centre must be a positive integer ID.');
+    expect(profileInput({ ...input, learningCentreId: 2 }).learningCentreId).toBe(2);
+  });
   it('requires a matric number of 4 to 30 letters or digits', () => {
     for (const matricNo of [undefined, null, '', '   ', 'A2', 'A22-EC-0001', 'X'.repeat(31), 12345]) expect(() => profileInput({ ...input, matricNo })).toThrow(/Matric number/);
     expect(profileInput({ ...input, matricNo: 'SX230001ECJHF04' }).matricNo).toBe('SX230001ECJHF04');
@@ -92,6 +96,10 @@ describe('P001 ProfileReader seam', () => {
     expect(await createProfileReader(repository(async () => ({ ...profile, matricNo: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
     expect(await createProfileReader(repository(async () => ({ ...profile, matricNo: '  ' }))).stateFor('a')).toBe('SETUP_REQUIRED');
   });
+  it('stateFor is SETUP_REQUIRED without a learning centre', async () => {
+    expect(await createProfileReader(repository(async () => ({ ...profile, learningCentreId: null }))).stateFor('a')).toBe('SETUP_REQUIRED');
+    expect(await createProfileReader(repository(async () => ({ ...profile, learningCentreId: undefined as unknown as number }))).stateFor('a')).toBe('SETUP_REQUIRED');
+  });
   it('reports unavailable on a persistence failure', async () => expect(await createProfileReader(repository(async () => { throw new Error('private details'); })).stateFor('a')).toBe('UNAVAILABLE'));
 });
 describe('P001 authenticated route boundary', () => {
@@ -108,8 +116,8 @@ describe('P001 authenticated route boundary', () => {
     const second = await handleP001Request(request('/api/profile/options'), deps);
     expect(first?.headers.get('Cache-Control')).toBe('no-store');
     expect(second?.headers.get('Cache-Control')).toBe('no-store');
-    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [] } });
-    expect(query).toHaveBeenCalledTimes(6); // cold lookup 5; warm lookup 1 live association read
+    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [], learningCentres: [] } });
+    expect(query).toHaveBeenCalledTimes(8); // cold lookup 6 (incl. centres); warm lookup 2 live association read
     expect(cache.get).toHaveBeenCalledTimes(6);
     expect(cache.set).toHaveBeenCalledTimes(3);
 
@@ -158,9 +166,9 @@ describe('P001 authenticated route boundary', () => {
     const second = await handleP001Request(request('/api/profile/options'), deps);
     expect(first?.headers.get('Cache-Control')).toBe('no-store');
     expect(second?.headers.get('Cache-Control')).toBe('no-store');
-    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [] } });
+    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [], learningCentres: [] } });
     expect(options).toHaveBeenCalledTimes(2);
-    expect(query).toHaveBeenCalledTimes(6);
+    expect(query).toHaveBeenCalledTimes(8);
     expect(cache.get).toHaveBeenCalledTimes(4);
     expect(cache.set).toHaveBeenCalledTimes(2);
 

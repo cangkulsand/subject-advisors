@@ -1,7 +1,7 @@
 import type { AuthDependencies } from '../auth/contracts';
 import type { ForecastScope, ImportedStudentSummary, ImportSummary, ImportValidationReport, SemesterOption, StoredValidationInternals } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ScopeProvider } from './scope-provider';
-import type { OfferingsRepository } from './offerings-contracts';
+import type { OfferingDecisionsRepository } from './decisions-contracts';
 import type { ForecastRunsRepository } from './runs-contracts';
 import type { CatalogueCurriculum, ImportCatalogue, RecordToStore, StudentToStore } from './validation';
 
@@ -89,8 +89,8 @@ export interface ForecastingDependencies {
   repository: ForecastingRepository;
   /** Forecast runs (UC20 Package 6). */
   runs: ForecastRunsRepository;
-  /** Coordinator offering confirmation (S2-P004-006). */
-  offerings: OfferingsRepository;
+  /** Per-scope offering decisions: Pending / Approved / Removed (S2-P004-018). */
+  decisions: OfferingDecisionsRepository;
   scopes: ScopeProvider;
   /**
    * Live matric number (student_profile) and sign-in email (primary Clerk email) of portal students by `student_id`, for display in the

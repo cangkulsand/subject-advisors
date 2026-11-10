@@ -46,7 +46,7 @@ until CGPA handling is defined.
 
 ## P002 — semesters, offerings and plans
 
-> **S2-P004-006 (2026-11-01):** offerings are now confirmed by the coordinator and students pick from them. `semester_offering` (below) is the legacy student-reported table: deprecated, read-only, not counted. Planned: `confirmed_offering` + `confirmed_offering_audit` (P004; unique programme + learning centre + target semester + subject) and `student_offering_pick` (P002; FK to `confirmed_offering`, unique student + confirmed offering). Picks are for the next semester after the profile current semester. Also planned: `offering_confirmation` (pick deadline per scope), coordinator assignments (admin-managed), an admin-managed current-semester marker on `academic_semester` (the target semester is the next one after it), and `forecast_run.programme_id`. Picks respect `academic_semester.max_subjects` / `max_credits`; already-passed subjects are hidden. See the change record for columns and migration order. Assigned coordinators see the pickers per subject (`student_profile.student_name`, `matric_no`, `current_semester_id`, credits completed derived from `academic_record.recognized_credits`) for their programme + learning centre; planned `student_profile.intake_semester_id` (P001) for the seniority tie-break; students never see others' picks. Planned migrations target the development database only.
+> **S2-P004-017 to S2-P004-024 (2026-11-10):** the coordinator-confirmation plan of S2-P004-006 was replaced by a simpler flow (migration 0009). `offering_decision` holds one row per programme + learning centre + semester + subject with status `APPROVED` or `REMOVED` (no row means Pending); `offering_decision_audit` is its append-only history and `offering_pick_withdrawal` remembers which students lost a pick when an approved subject was removed. `academic_semester.selection_opens_at` / `selection_closes_at` (admin-managed) decide when students may pick: before opening, planning; from opening until closing, open; after closing, read-only. Students pick only approved subjects of the next semester after the admin current semester, still stored in `semester_offering`, and picks respect `academic_semester.max_subjects` / `max_credits`; already-passed subjects are hidden. Assigned coordinators see the pickers per subject (`student_profile.student_name`, `matric_no`, sign-in email) for their programme + learning centre; students never see others' picks. The 0007 tables (`offering_confirmation`, `confirmed_offering` and their audit tables) stay in the database but nothing reads or writes them; `forecast_run.status` is always `DRAFT` from now on and `proposed_class_section` is only written when a run is generated.
 
 Consume academic_semester, semester_offering, academic_plan and plan_subject.
 SemesterOffering uniqueness: student_id + semester_id + curriculum_subject_id.
@@ -63,7 +63,7 @@ Read the same catalogue and academic records. Treat duplicate attempts with the
 agreed outcome/credit policy; do not count every attempt as independent earned credit.
 MANDATORY is a blocking edge, RECOMMENDED advisory, COREQUISITE distinct.
 SimulationScenario source plan must have the same owner; simulated subjects remain
-separate from academic_record. Superseded (S2-P004-006): StudentProfile gains a learning centre (`student_profile.learning_centre_id`, P001); programme, curriculum and learning centre are locked after setup.
+separate from academic_record. Superseded (S2-P004-006, S2-P004-023): StudentProfile gains a learning centre (`student_profile.learning_centre_id`, P001) that the student chooses on the profile page; programme and curriculum are locked after setup, and the centre is locked from the moment selection opens for the next semester until the admin moves the current semester forward (a student with no centre may always set one).
 The DB contains scenario/plan data structures, not scheduling/forecast algorithms.
 
 ## P004 — authentication, M6 and M7 persistence
@@ -116,8 +116,11 @@ Scope reads are uncached and join the currently ACTIVE account, COORDINATOR memb
 unended assignment, active faculty/centre and programme with matching faculty.
 Programme status uses `coalesce(upper(status),'ACTIVE')='ACTIVE'`. Consuming adapters
 must authenticate/authorize their caller; supplying an arbitrary Clerk ID is not an
-authorization mechanism. This package does not change the forecast ScopeProvider or
-implement `studentLearningCentreId`; profile learning-centre ownership remains P001.
+authorization mechanism. This package did not change the forecast ScopeProvider; `studentLearningCentreId` now
+reads `student_profile.learning_centre_id` (S2-P004-023): the student chooses the learning
+centre on the profile page (P001), migration 0009 set existing students to Kuala Lumpur, and
+students without a centre are left out of "students in the system" snapshots (counted under
+other centre).
 
 Local verification uses isolated 0000-0006+0008 only. Shared development must first
 integrate exact 0007/checksum/prefix, then 0008, then 0009; see migrations.md.

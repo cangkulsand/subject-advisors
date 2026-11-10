@@ -10,7 +10,9 @@ const centreColumns = 'learning_centre_id AS "learningCentreId", centre_code AS 
 const facultyColumns = 'faculty_id AS "facultyId", faculty_code AS "facultyCode", faculty_name AS "facultyName", is_active AS "isActive"';
 const semesterColumns = `semester_id AS "semesterId", academic_year AS "academicYear", semester_no AS "semesterNo",
   semester_type AS "semesterType", max_subjects AS "maxSubjects", max_credits AS "maxCredits",
-  start_date::text AS "startDate", end_date::text AS "endDate", is_current AS "isCurrent"`;
+  start_date::text AS "startDate", end_date::text AS "endDate", is_current AS "isCurrent",
+  to_char(selection_opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionOpensAt",
+  to_char(selection_closes_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionClosesAt"`;
 const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_code AS "programmeCode", p.programme_name AS "programmeName",
   p.faculty_id AS "facultyId", f.faculty_code AS "facultyCode", f.faculty_name AS "facultyName", f.is_active AS "isActive"
   FROM public.programme p LEFT JOIN public.faculty f ON f.faculty_id=p.faculty_id`;
@@ -27,12 +29,13 @@ const scopeSelect = `SELECT DISTINCT c.faculty_id AS "facultyId", c.programme_id
 const centre = (r: Row): C.LearningCentre => ({ learningCentreId: Number(r.learningCentreId), centreCode: String(r.centreCode), centreName: String(r.centreName), isActive: r.isActive === true });
 const faculty = (r: Row): C.Faculty => ({ facultyId: Number(r.facultyId), facultyCode: String(r.facultyCode), facultyName: String(r.facultyName), isActive: r.isActive === true });
 const semester = (r: Row): C.AcademicSemester => ({ semesterId: Number(r.semesterId), academicYear: String(r.academicYear), semesterNo: Number(r.semesterNo) as 1 | 2 | 3,
-  semesterType: r.semesterType as C.SemesterType, maxSubjects: Number(r.maxSubjects), maxCredits: Number(r.maxCredits), startDate: r.startDate == null ? null : String(r.startDate), endDate: r.endDate == null ? null : String(r.endDate), isCurrent: r.isCurrent === true });
+  semesterType: r.semesterType as C.SemesterType, maxSubjects: Number(r.maxSubjects), maxCredits: Number(r.maxCredits), startDate: r.startDate == null ? null : String(r.startDate), endDate: r.endDate == null ? null : String(r.endDate), isCurrent: r.isCurrent === true,
+  selectionOpensAt: r.selectionOpensAt == null ? null : String(r.selectionOpensAt), selectionClosesAt: r.selectionClosesAt == null ? null : String(r.selectionClosesAt) });
 const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
 const timestamp = (v: unknown) => (v instanceof Date ? v : new Date(String(v))).toISOString();
 const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });
-const semesterFields = { academicYear: 'academic_year', semesterNo: 'semester_no', semesterType: 'semester_type', maxSubjects: 'max_subjects', maxCredits: 'max_credits', startDate: 'start_date', endDate: 'end_date' };
+const semesterFields = { academicYear: 'academic_year', semesterNo: 'semester_no', semesterType: 'semester_type', maxSubjects: 'max_subjects', maxCredits: 'max_credits', startDate: 'start_date', endDate: 'end_date', selectionOpensAt: 'selection_opens_at', selectionClosesAt: 'selection_closes_at' };
 
 /** Each mutation submits context + bound statements in one non-interactive transaction. */
 export function createAcademicSetupRepository(query: AdminQuery, transaction: AdminTransaction): AcademicSetupRepository & AcademicScopeReader {
@@ -70,8 +73,9 @@ export function createAcademicSetupRepository(query: AdminQuery, transaction: Ad
     setProgrammeFaculty: (id, input, actor) => write(actor, input.reason, [statement(`UPDATE public.programme SET faculty_id=$2 WHERE programme_id=$1 RETURNING programme_id`, [id, input.facultyId]),
       statement(programmeSelect + ' WHERE p.programme_id=$1', [id])], programme),
     listAcademicSemesters: () => read(`SELECT ${semesterColumns} FROM public.academic_semester ORDER BY academic_year, semester_no, semester_id`, [], semester),
-    createAcademicSemester: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.academic_semester(academic_year,semester_no,semester_type,max_subjects,max_credits,start_date,end_date)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING ${semesterColumns}`, [input.academicYear, input.semesterNo, input.semesterType, input.maxSubjects, input.maxCredits, input.startDate, input.endDate])], semester),
+    createAcademicSemester: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.academic_semester(academic_year,semester_no,semester_type,max_subjects,max_credits,start_date,end_date,selection_opens_at,selection_closes_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${semesterColumns}`, [input.academicYear, input.semesterNo, input.semesterType, input.maxSubjects, input.maxCredits, input.startDate, input.endDate, input.selectionOpensAt ?? null, input.selectionClosesAt ?? null])], semester),
+    // A closing time without or not after the opening time is rejected atomically by academic_semester_selection_window_rule (23514 -> INVALID_REQUEST), like the other merged semester invariants.
     updateAcademicSemester: (id, input, actor) => write(actor, input.reason, [patch('academic_semester', 'semester_id', id, input, semesterFields, semesterColumns)], semester),
     async getCurrentAcademicSemester() { return (await read(`SELECT ${semesterColumns} FROM public.academic_semester WHERE is_current`, [], semester))[0] ?? null; },
     setCurrentAcademicSemester: (input, actor) => write(actor, input.reason, [statement('SELECT public.db_set_current_semester($1::integer)', [input.semesterId]),

@@ -10,6 +10,7 @@ import {
 const semester: AcademicSemester = {
   semesterId: 1, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL',
   maxSubjects: 5, maxCredits: 20, startDate: '2026-10-01', endDate: '2027-02-01', isCurrent: false,
+  selectionOpensAt: null, selectionClosesAt: null,
 };
 const createSemester = { academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL',
   maxSubjects: 5, maxCredits: 20, startDate: null, endDate: null, reason: ' calendar ' };
@@ -60,6 +61,19 @@ describe('academic semester requests', () => {
     if (datePatch.ok) expect(validateMergedSemester(semester, datePatch.value).ok).toBe(false);
     expect(validateUpdateSemesterRequest({ semesterNo: 3, semesterType: 'SHORT', reason: 'r' }).ok).toBe(true);
     expect(validateUpdateSemesterRequest({ reason: 'r' }).ok).toBe(false);
+  });
+  it('accepts ISO selection dates or null and rejects other values', () => {
+    expect(validateCreateSemesterRequest({ ...createSemester, selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: null }).ok).toBe(true);
+    expect(validateCreateSemesterRequest({ ...createSemester, selectionOpensAt: 'tomorrow', selectionClosesAt: null }).ok).toBe(false);
+    expect(validateUpdateSemesterRequest({ selectionClosesAt: 5, reason: 'r' }).ok).toBe(false);
+  });
+  it('rejects selectionClosesAt without or before selectionOpensAt', () => {
+    const reason = 'r';
+    expect(validateMergedSemester(semester, { selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }).ok).toBe(false);
+    expect(validateMergedSemester({ ...semester, selectionOpensAt: '2026-12-02T00:00:00.000Z' }, { selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }).ok).toBe(false);
+    expect(validateMergedSemester({ ...semester, selectionOpensAt: '2026-12-01T00:00:00.000Z' }, { selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }).ok).toBe(false);
+    expect(validateMergedSemester(semester, { selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }).ok).toBe(true);
+    expect(validateUpdateSemesterRequest({ selectionOpensAt: '2026-12-02T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }).ok).toBe(false);
   });
 });
 describe('current semester and coordinator assignment requests', () => {

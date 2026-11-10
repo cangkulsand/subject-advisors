@@ -60,7 +60,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
       verify: vi.fn(async () => ({ clerkUserId: COORDINATOR, sessionId: 'session_test', primaryEmail: { address: 'coord@utm.my', verified: true } })),
       access: { find: vi.fn(async (id: string) => ({ clerkUserId: id, appRole: roles[0]!, roles, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
     },
-    repository, runs: {} as ForecastingDependencies['runs'], offerings: {} as ForecastingDependencies['offerings'],
+    repository, runs: {} as ForecastingDependencies['runs'], decisions: {} as ForecastingDependencies['decisions'],
     scopes: options.scopes ?? testScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
   };
   return { deps, repository, batches, stored, setSelection: (next: PortalStudentSelection) => { selection = next; } };
@@ -119,7 +119,7 @@ describe('POST forecast-imports/system-snapshots', () => {
       status: 'VALID', source: 'SYSTEM', subsetAcknowledgementRequired: false,
       coverage: { studentsFound: 2, studentsWithRecords: 1, studentsWithoutRecords: 1, recordsMapped: 3, recordsUnmapped: 1, withdrawnStoredAsFailed: 1, excluded: { otherProgramme: 7, otherCentre: 1, inactiveAccess: 1 } },
     });
-    expect(snapshot.validationReport.coverage.centreNote).toContain('Interim');
+    expect(snapshot.validationReport.coverage.centreNote).toContain('without a learning centre');
     expect(snapshot.validationReport.issues).toEqual([expect.objectContaining({ severity: 'WARNING', code: 'HISTORY_UNKNOWN' })]);
     expect(snapshot.validationReport).not.toHaveProperty('internal');
     expect(JSON.stringify(snapshot)).not.toContain('PORTAL-4');
@@ -146,11 +146,19 @@ describe('POST forecast-imports/system-snapshots', () => {
     ]);
   });
 
-  it('uses the requested centre: with everyone in KL (interim) another centre finds nobody', async () => {
+  it('uses the requested centre: with every student in centre 1, another centre finds nobody', async () => {
     const { deps } = fixture();
     const response = await post(deps, { ...body, learningCentreId: 2 });
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ error: { code: 'SYSTEM_SNAPSHOT_EMPTY' } });
+  });
+
+  it('students without a centre are excluded and counted under otherCentre', async () => {
+    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentreId: vi.fn(async (id: number) => id === 4 ? null : 1) };
+    const { deps } = fixture({ scopes });
+    const snapshot = await data(await post(deps));
+    expect(snapshot.validationReport.coverage.excluded.otherCentre).toBe(1);
+    expect(snapshot.validationReport.coverage.studentsFound).toBe(2);
   });
 
   it('uses a custom source label when given', async () => {

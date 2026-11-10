@@ -16,7 +16,7 @@ import { bad, positive, readJson, sha256Hex } from './http';
 import type { RecordToStore, StudentToStore } from './validation';
 
 export const SYSTEM_SOURCE_LABEL = 'System students';
-export const CENTRE_NOTE = 'Interim: student profiles do not record a learning centre yet, so every student in the system counts under Kuala Lumpur (KL) until they do.';
+export const CENTRE_NOTE = 'Students are counted under the learning centre saved in their profile. Students without a learning centre are excluded (counted under other centre).';
 
 export interface SystemSnapshotInput extends ForecastScope { sourceLabel: string }
 

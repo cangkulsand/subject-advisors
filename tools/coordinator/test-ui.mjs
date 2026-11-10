@@ -1,4 +1,4 @@
-// Real coordinator screens (UC20 imports, forecasts and offering decisions) in the actual application routes with TEST-ONLY Clerk and API fixtures.
+// Real coordinator screens (UC20 imports and the class offering forecast with offering decisions) in the actual application routes with TEST-ONLY Clerk and API fixtures.
 // No credentials or database access. Screenshots go to .wrangler/coordinator-review/.
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
@@ -15,7 +15,7 @@ const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle:
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
 const css = output.outputFiles.find(file => file.path.endsWith('.css'))?.text ?? '';
 const serve = process.argv.includes('--serve');
-const serveState = createState({ seed: 'review' });
+const serveState = createState({ seed: 'run' });
 const server = createServer(async (req, res) => {
   if (req.url === '/app.js') { res.setHeader('Content-Type', 'text/javascript'); res.end(script); return; }
   if (req.url?.startsWith('/api/')) {
@@ -33,7 +33,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(done => server.listen(serve ? 5177 : 0, '127.0.0.1', done));
 const base = 'http://127.0.0.1:' + server.address().port;
-if (serve) console.log('Fictional coordinator preview: ' + base + '/coordinator/forecasts?programmeId=5&learningCentreId=1&run=1');
+if (serve) console.log('Fictional coordinator preview: ' + base + '/coordinator/forecasts?programmeId=5&learningCentreId=1&snapshot=1');
 else {
   let browser, passed = 0;
   const shots = '.wrangler/coordinator-review/';
@@ -68,29 +68,29 @@ else {
     await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
     await page.getByRole('button', { name: 'Upload and validate' }).click();
   }
-  // Subject action dropdown: open the row's menu and pick a decision (labels: Approved, Reviewed, Removed).
+  // Subject action dropdown: open the row's menu and pick a status (labels: Pending, Approved, Removed).
   async function pickAction(page, code, label) {
     await page.getByRole('button', { name: new RegExp(`^Action for ${code}: `) }).click();
     await page.getByRole('menu', { name: `Action for ${code}` }).getByRole('menuitemradio', { name: label, exact: true }).click();
   }
-  async function pickStatus(page, label) {
-    await page.getByRole('button', { name: /^Forecast status: / }).click();
-    await page.getByRole('menuitemradio', { name: label }).click();
+  /** The decisions screen is ready when its subjects table and the decision set are loaded. */
+  async function forecastReady(page) {
+    await page.getByRole('region', { name: 'Subjects table', exact: true }).waitFor();
+    await page.getByRole('status').filter({ hasText: /^Selection / }).waitFor();
   }
+  const subjectCodes = page => page.locator('[aria-label="Subjects table"] tbody tr').evaluateAll(rows => rows.map(row => row.dataset.subject));
   async function uploadBoth(page, marker, label = 'Combined export') {
     await page.getByLabel('Source label', { exact: true }).fill(label);
     await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv(marker));
     await page.getByRole('button', { name: 'Create combined snapshot' }).click();
   }
-  const reasonLabel = 'Reason (recorded in the audit history)';
-  const runUrl = '/coordinator/forecasts' + scoped + '&run=1';
-  const decisionsUrl = '/coordinator/decisions' + scoped;
+  const pickers = [
+    { studentId: 31, studentName: 'Aisyah binti Ahmad', matricNo: 'A22EC0051', email: 'aisyah@graduate.utm.my' },
+    { studentId: 32, studentName: 'Bakri bin Hassan', matricNo: null, email: 'student052@graduate.utm.my' },
+    { studentId: 33, studentName: 'Chong Wei', matricNo: 'A22EC0053', email: 'chong@graduate.utm.my' },
+  ];
+  const forecastUrl = '/coordinator/forecasts' + scoped;
   const scopeBody = { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 };
-  /** Local wall-clock value for a datetime-local input, the given number of days from now. */
-  const localInput = days => {
-    const date = new Date(Date.now() + days * 86400000), pad = value => String(value).padStart(2, '0');
-    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
-  };
   try {
     browser = await chromium.launch({ headless: true });
 
@@ -155,7 +155,7 @@ else {
       const coverage = page.getByLabel('Snapshot coverage');
       assert.match(await coverage.innerText(), /Students found\s*52/); assert.match(await coverage.innerText(), /No records \(unknown history\)\s*3/); assert.match(await coverage.innerText(), /Withdrawn, counted as failed\s*4/);
       await page.getByText('Not included: 118 in other programmes, 0 at other learning centres, 6 without active student access.').waitFor();
-      await page.getByText('Interim: student profiles do not record a learning centre yet').waitFor();
+      await page.getByText('Students are counted under the learning centre saved in their profile').waitFor();
       const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-imports/system-snapshots');
       assert.deepEqual(post.body, scopeBody); assert.ok(post.headers['idempotency-key']);
       const table = page.getByRole('region', { name: 'Student data snapshots table' });
@@ -185,11 +185,9 @@ else {
       assert.equal(state.imports.length, 1);
       await page.getByRole('button', { name: 'Generate forecast' }).first().click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const meta = page.getByRole('list', { name: 'Forecast details' });
-      assert.match(await meta.innerText(), /System students\s*Student-entered records/);
-      assert.ok(!(await meta.innerText()).includes('user_'), 'account IDs are not shown in the header');
-      await meta.getByRole('link', { name: /^Snapshot #\d+$/ }).waitFor();
+      await forecastReady(page);
+      assert.ok(page.url().includes('snapshot=1'));
+      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /System students · System students/);
       await page.screenshot({ path: shots + 'forecast-system-desktop.png', fullPage: true });
     });
 
@@ -280,7 +278,7 @@ else {
       await page.getByRole('heading', { name: 'Student data snapshots' }).waitFor();
     });
 
-    await check('generate forecast from an accepted import opens the new draft; a repeat opens the same one', async page => {
+    await check('generate forecast from an accepted import opens the decisions screen on that snapshot; a repeat opens the same one', async page => {
       const state = await mock(page, { seed: 'import' }); await page.goto(base + '/coordinator/imports' + scoped);
       const opener = page.getByRole('button', { name: 'Generate forecast from September cohort' }); await opener.click();
       const dialog = page.getByRole('dialog', { name: 'Generate forecast' }); await dialog.waitFor();
@@ -288,171 +286,251 @@ else {
       await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'hidden' });
       assert.equal(state.bodies.length, 0);
       await opener.click(); await dialog.getByRole('button', { name: 'Generate forecast' }).click();
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      assert.ok(page.url().includes('run=1'));
+      await forecastReady(page);
+      assert.ok(page.url().includes('snapshot=1'));
       const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-runs');
       assert.deepEqual(post.body, { programmeId: 5, learningCentreId: 1, targetSemesterId: 2, importBatchId: 1, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
       assert.ok(post.headers['idempotency-key']);
       await page.goBack(); await page.getByRole('button', { name: 'Generate forecast from September cohort' }).click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await forecastReady(page);
+      assert.equal(state.runs.size, 1, 'a repeat reuses the same forecast');
     });
 
-    await check('forecasts: list per scope with status, counts and a newer-forecast badge; detail shows the assumption, subjects and exclusions', async page => {
-      const state = await mock(page, { seed: 'run' }); state.newer[1] = { forecastRunId: 2, versionNumber: 2, status: 'DRAFT' };
-      await page.goto(base + '/coordinator/forecasts' + scoped);
-      const table = page.getByRole('region', { name: 'Forecasts table' }); await table.getByText('Version 1').waitFor();
-      const row = table.locator('tbody tr').first(), text = await row.innerText();
-      assert.ok(text.includes('Draft') && text.includes('161') && text.includes('Newer forecast available: version 2'));
-      await page.screenshot({ path: shots + 'forecasts-list-desktop.png', fullPage: true });
-      const toolbar = page.getByRole('search', { name: 'Filter and sort forecasts' });
-      await toolbar.getByRole('button', { name: 'Finalized', exact: true }).click();
-      await page.getByRole('heading', { name: 'No forecasts match' }).waitFor();
-      await toolbar.getByRole('button', { name: 'Clear filters' }).click();
-      await toolbar.getByLabel('Search forecasts').fill('v9');
-      await page.getByRole('heading', { name: 'No forecasts match' }).waitFor();
-      await toolbar.getByLabel('Search forecasts').fill('version 1');
-      await table.getByText('Version 1').waitFor();
-      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Version', 'Status', 'Generated', 'Subjects', 'Potential demand', 'Awaiting decision', 'Actions'], 'no Sections column; awaiting counts subjects');
-      const open = page.getByRole('link', { name: 'Open forecast version 1' });
-      assert.equal(await open.innerText(), '', 'the open action is an icon button');
-      assert.ok((await open.boundingBox()).height >= 44, 'icon buttons keep the 44px target');
-      await page.getByRole('link', { name: 'Open forecast version 1' }).click();
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      assert.equal(await page.getByText('Potential demand, not registration.').count(), 0, 'the assumption note is not shown');
-      assert.deepEqual(await page.getByLabel('Forecast summary').locator('dt').allInnerTexts(), ['Subjects', 'Potential demand', 'Below minimum']);
-      assert.equal(await page.getByText(/registered|enrolled/i).count(), 0);
-      const subjects = page.getByRole('region', { name: 'Subjects table', exact: true });
-      assert.deepEqual(await subjects.locator('thead th').allInnerTexts(), ['Subject', 'Potential demand', 'Quality', 'Action']);
-      assert.ok((await subjects.locator('tr[data-subject="SECJ1013"] th').innerText()).includes('Lab · 3 credit hours'), 'class type sits under the subject');
-      assert.equal(await subjects.locator('tbody tr').count(), 4);
-      const lab = subjects.locator('tr[data-subject="SECJ1013"]'), second = subjects.locator('tr[data-subject="SECJ1023"]');
-      assert.ok(!(await lab.innerText()).includes('Section 1') && !(await lab.innerText()).includes('Below optimal'), 'no section list and no Below optimal flag');
-      const text2 = await second.innerText();
-      assert.ok(text2.includes('Below minimum') && !text2.includes('Below optimal'));
-      const view = lab.getByRole('button', { name: 'View students for SECJ1013' });
-      assert.equal((await view.innerText()).replace(/\s+/g, ' ').trim(), '3 uncertain · View students');
-      assert.equal(await page.locator('.coordinator-reasons, .coordinator-expander[aria-expanded]').count(), 0, 'the inline reasons expander is gone');
-      assert.equal((await subjects.locator('tr[data-subject="SECJ1023"]').getByRole('button', { name: 'View students for SECJ1023' }).innerText()).trim(), 'View students', 'no uncertain students: plain label');
-      assert.ok((await subjects.locator('tr[data-subject="SECD2523"]').innerText()).includes('Configuration required: The subject has no class type.'));
-      assert.equal(await page.getByRole('heading', { name: 'Excluded subjects' }).count(), 0, 'the excluded subjects card is gone');
-      assert.equal(await page.getByRole('heading', { name: 'Not offered in this semester type' }).count(), 0, 'the not-offered card is gone');
-      assert.equal(await page.getByText('SECJ4118').count(), 0); assert.equal(await page.getByText('SECD3761').count(), 0);
-      assert.equal(await page.locator('.admin-pagination').count(), 0, 'no pager when the subjects fit on one page');
-      const sizes = await page.locator('.coordinator-subjects').evaluate(table => {
-        const small = [...table.querySelectorAll('*')].filter(node => [...node.childNodes].some(child => child.nodeType === 3 && child.textContent.trim()) && parseFloat(getComputedStyle(node).fontSize) < 12).map(node => node.textContent.trim().slice(0, 30));
-        return { small, body: [...table.querySelectorAll('tbody td')].map(cell => parseFloat(getComputedStyle(cell).fontSize)), header: [...table.querySelectorAll('thead th')].map(cell => parseFloat(getComputedStyle(cell).fontSize)) };
-      });
-      assert.deepEqual(sizes.small, [], 'no text below 12px in the subjects table'); assert.ok(sizes.body.every(size => size >= 14), 'body cells are at least 14px'); assert.ok(sizes.header.every(size => size >= 13), 'header labels are at least 13px');
-      const controls = await page.getByRole('search', { name: 'Filter and sort subjects' }).evaluate(bar => ({ labels: [...bar.querySelectorAll('label')].map(item => parseFloat(getComputedStyle(item).fontSize)), fields: [...bar.querySelectorAll('.tt-search, .tt-menu-button')].map(item => [parseFloat(getComputedStyle(item.querySelector('input') ?? item).fontSize), item.getBoundingClientRect().height]) }));
-      assert.ok(controls.labels.every(size => size >= 13) && controls.fields.length === 3, 'filter controls are readable'); assert.ok(controls.fields.every(([size, height]) => size >= 14 && height >= 44), 'filter inputs and selects are at least 14px and 44px tall');
-      const first = await page.locator('tr[data-subject="SECJ1013"] th[scope="row"]').evaluate(cell => [...cell.children].map(child => child.textContent.trim()));
-      assert.deepEqual(first, ['Programming Technique I', 'SECJ1013', 'Lab · 3 credit hours'], 'subject name first, then the code, then class type and credit hours');
-      assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '4', 'the Subjects tile counts the subjects in the table, not the hidden ones');
-      await page.getByRole('link', { name: /Newer forecast available: version 2/ }).first().waitFor();
-      const statusButton = page.getByRole('button', { name: 'Forecast status: Draft' }); await statusButton.click();
-      await page.screenshot({ path: shots + 'forecast-status-menu-desktop.png' });
-      const options = page.getByRole('menu', { name: 'Forecast status' }).getByRole('menuitemradio');
-      await options.first().waitFor({ timeout: 3000 });
-      assert.deepEqual(await options.evaluateAll(list => list.map(item => [item.querySelector('.coordinator-status-label').textContent, item.getAttribute('aria-checked'), item.getAttribute('aria-disabled')])),
-        [['Draft', 'true', null], ['Under review', 'false', null], ['Finalized', 'false', 'true']], 'only the next status can be picked');
-      await options.nth(2).click({ force: true }); assert.equal(await page.getByRole('dialog').count(), 0, 'a status two steps ahead does nothing');
-      await page.keyboard.press('Escape'); assert.equal(await statusButton.evaluate(element => element === document.activeElement), true);
-      assert.equal(await page.getByRole('button', { name: /Approve SECJ1013|Action for SECJ1013/ }).count(), 0, 'no actions before review starts');
-      await page.screenshot({ path: shots + 'forecast-draft-desktop.png', fullPage: true });
+    await check('forecast: the newest snapshot is pre-selected, its forecast is generated when missing, and subjects are sorted by eligible students', async page => {
+      const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-runs');
+      assert.deepEqual(post.body, { ...scopeBody, importBatchId: 1, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
+      assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013', 'SECD2523', 'SECJ1023']);
+      const table = page.getByRole('region', { name: 'Subjects table', exact: true });
+      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Subject', 'Not taken yet', 'Eligible to take', 'Action']);
+      assert.deepEqual(await table.locator('tr[data-subject="SCSJ1013"] .coordinator-number').allInnerTexts(), ['78', '71'], 'not taken yet = in curriculum minus passed; eligible to take');
+      assert.deepEqual(await page.locator('tr[data-subject="SECJ1013"] th > *').evaluateAll(items => items.map(item => item.textContent.trim())), ['Programming Technique I', 'SECJ1013', 'Lab · 3 credit hours'], 'name first, then code and class type');
+      assert.ok(!(await page.locator('body').innerText()).includes('Potential demand'), 'the potential demand label is gone');
+      assert.ok(page.url().includes('snapshot=1'));
+      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /^September cohort · CSV upload · 2026-10-30$/);
+      assert.equal(await page.getByRole('button', { name: /^Action for SECJ1013: Pending$/ }).count(), 1);
+      await page.screenshot({ path: shots + 'forecast-decisions-desktop.png', fullPage: true });
     });
 
-    await check('forecasts: the subjects table is paged (20 per page) and the finalize highlight jumps to the page with the pending subjects', async page => {
-      await mock(page, { seed: 'review', manySubjects: true }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const rows = page.locator('.coordinator-subjects tbody tr'), pager = page.locator('.admin-pagination');
-      await pager.getByText('25 subjects · Page 1 of 2').waitFor();
-      assert.equal(await page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd').innerText(), '25');
-      assert.equal(await rows.count(), 20); assert.equal(await page.locator('tr[data-subject="SECJ1013"]').count(), 0);
-      assert.equal(await pager.getByRole('button', { name: 'Previous' }).isDisabled(), true);
-      await pager.getByRole('button', { name: 'Next' }).click();
-      await pager.getByText('25 subjects · Page 2 of 2').waitFor();
-      assert.equal(await rows.count(), 5); assert.equal(await pager.getByRole('button', { name: 'Next' }).isDisabled(), true);
-      await page.locator('tr[data-subject="SECJ1013"]').waitFor();
+    await check('forecast: choosing Approved, Removed and Pending takes effect at once with a toast and an audit row, no dialog, no reason', async page => {
+      const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      const posts = () => state.bodies.filter(item => item.path === '/api/coordinator/offering-decisions');
+      const subjects = page.getByRole('region', { name: 'Subjects table', exact: true }), removed = page.getByRole('region', { name: 'Removed subjects table' });
+      const auditFirst = () => page.getByRole('region', { name: 'Audit history table' }).locator('tbody tr').first();
       await pickAction(page, 'SECJ1013', 'Approved');
-      const decide = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await decide.getByLabel(reasonLabel).fill('Checked on page 2');
-      await decide.getByRole('button', { name: 'Approve subject' }).click(); await decide.waitFor({ state: 'hidden' });
-      await page.locator('tr[data-subject="SECJ1013"]').getByText('Approved', { exact: true }).waitFor();
-      await pager.getByText('Page 2 of 2').waitFor();
-      await pager.getByRole('button', { name: 'Previous' }).click(); await pager.getByText('Page 1 of 2').waitFor();
-      await pickStatus(page, 'Finalized');
-      const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
-      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
-      await pager.getByText('Page 2 of 2').waitFor();
-      assert.equal(await page.locator('.coordinator-row-pending').count(), 2, 'the pending subjects are visible after the jump');
-      assert.ok(await noOverflow(page));
+      await page.getByText('SECJ1013 approved.').waitFor();
+      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: 1 });
+      assert.ok(posts().at(-1).headers['idempotency-key']);
+      assert.equal(await page.getByRole('dialog').count(), 0, 'no dialog');
+      await page.getByRole('button', { name: /^Action for SECJ1013: Approved$/ }).waitFor();
+      await auditFirst().getByText('Pending → Approved').waitFor();
+      assert.match(await auditFirst().innerText(), /Programming Technique I\s*SECJ1013[\s\S]*user_test[\s\S]*Snapshot #1/);
+      await pickAction(page, 'SECD2523', 'Removed');
+      await page.getByText('SECD2523 removed.').waitFor();
+      assert.equal(await subjects.locator('tr[data-subject="SECD2523"]').count(), 0, 'a removed subject leaves the main table');
+      await removed.locator('tr[data-subject="SECD2523"]').waitFor();
+      await auditFirst().getByText('Pending → Removed').waitFor();
+      await page.screenshot({ path: shots + 'forecast-decisions-removed-desktop.png', fullPage: true });
+      await page.getByRole('button', { name: 'Add back SECD2523' }).click();
+      await page.getByText('SECD2523 added back.').waitFor();
+      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 104, status: 'PENDING', expectedStatus: 'REMOVED', importBatchId: 1 });
+      await subjects.locator('tr[data-subject="SECD2523"]').getByRole('button', { name: /^Action for SECD2523: Pending$/ }).waitFor();
+      assert.equal(await removed.count(), 0, 'the Removed subjects table disappears when empty');
+      await auditFirst().getByText('Removed → Pending').waitFor();
+      await pickAction(page, 'SECJ1013', 'Pending');
+      await page.getByText('SECJ1013 set back to pending.').waitFor();
+      assert.equal(await page.getByRole('dialog').count(), 0, 'no dialog');
+      assert.equal(state.decisions.size, 0, 'Pending removes the stored decision');
+      assert.equal(state.decisionAudit.length, 4);
     });
 
-    await check('forecasts: the subjects table can be searched, filtered and sorted; clearing and the finalize jump reset the filters', async page => {
-      await mock(page, { seed: 'review', manySubjects: true }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const rows = page.locator('.coordinator-subjects tbody tr'), pager = page.locator('.admin-pagination'), bar = page.getByRole('search', { name: 'Filter and sort subjects' });
-      const tile = page.getByLabel('Forecast summary').locator('div').filter({ hasText: /^Subjects/ }).locator('dd');
-      const codes = async () => rows.evaluateAll(items => items.map(item => item.getAttribute('data-subject')));
-      const choose = async (menu, group, option) => { await bar.locator('button[aria-haspopup="menu"]').nth(menu).click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
-      const tab = name => bar.getByRole('group', { name: 'Decision' }).getByRole('button', { name, exact: true });
-      await bar.waitFor(); assert.equal(await bar.getByRole('button', { name: 'Clear filters' }).count(), 0, 'no clear button while nothing is filtered');
-      assert.equal(await bar.locator('button[aria-haspopup="menu"]').nth(1).innerText(), 'Sort: Subject name (A–Z)', 'name A–Z is the default sort'); assert.equal(await tab('All').getAttribute('aria-pressed'), 'true');
-      await bar.locator('button[aria-haspopup="menu"]').nth(0).click(); await page.getByRole('menu', { name: 'Filter' }).waitFor();
-      const toolbarDesktop = shots + 'forecast-subjects-menu-open-desktop.png'; await page.screenshot({ path: toolbarDesktop, fullPage: false });
-      await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' }); assert.ok(await bar.locator('button[aria-haspopup="menu"]').nth(0).evaluate(el => el === document.activeElement), 'Escape returns focus to the menu button');
-      await page.screenshot({ path: shots + 'forecast-subjects-filters-desktop.png', fullPage: true });
-      await bar.getByLabel('Search subjects').fill('DATABASE'); // case-insensitive, matches the name
-      assert.deepEqual(await codes(), ['SECD2523']); assert.equal(await pager.count(), 0); assert.equal(await tile.innerText(), '25', 'the summary tile stays unfiltered');
-      await bar.getByLabel('Search subjects').fill('secj10'); assert.deepEqual(await codes(), ['SECJ1013', 'SECJ1023']); // matches the code
-      await bar.getByRole('button', { name: 'Clear filters' }).click();
-      await pager.getByText('25 subjects · Page 1 of 2').waitFor(); assert.equal(await bar.getByLabel('Search subjects').inputValue(), '');
-      await pager.getByRole('button', { name: 'Next' }).click(); await pager.getByText('Page 2 of 2').waitFor();
-      await choose(0, 'Class type', 'Lab');
-      assert.deepEqual(await codes(), ['SECJ1013', 'SECJ1023']); assert.equal(await pager.count(), 0, 'filtering returns to page 1 and hides the pager when one page is enough');
-      await choose(0, 'Class type', 'Not set'); assert.deepEqual(await codes(), ['SECD2523']);
-      await choose(0, 'Class type', 'All'); await choose(0, 'Flags', 'Configuration required'); assert.deepEqual(await codes(), ['SECD2523']);
-      await choose(0, 'Flags', 'Has uncertain students'); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013']);
-      await choose(0, 'Flags', 'All'); await tab('Pending').click(); assert.deepEqual(await codes(), ['SCSJ1013', 'SECJ1013', 'SECJ1023']);
-      await pager.count(); await tab('Approved').click(); await pager.getByText('21 of 25 subjects · Page 1 of 2').waitFor();
-      // Finalize while a filter hides every pending subject: the filters are cleared and the table jumps to their page.
-      await pickStatus(page, 'Finalized');
-      const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
-      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('alert').filter({ hasText: 'still need a decision' }).waitFor();
-      await pager.getByText('25 subjects · Page 2 of 2').waitFor();
-      assert.equal(await tab('All').getAttribute('aria-pressed'), 'true'); assert.equal(await page.locator('.coordinator-row-pending').count(), 3);
-      await choose(0, 'Other decisions', 'No sections'); assert.deepEqual(await codes(), ['SECD2523']);
+    await check('forecast: the status line counts pending subjects and warns during planning', async page => {
+      const state = await mock(page, { seed: 'decided' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.equal((await page.getByRole('status').filter({ hasText: /^Selection / }).innerText()).trim(), 'Selection not scheduled · 2 subjects still pending');
+      await page.getByText("2 subjects still pending; they won't be shown to students unless approved.").waitFor();
+      await pickAction(page, 'SCSJ1013', 'Approved');
+      await page.getByText("1 subject still pending; it won't be shown to students unless approved.").waitFor();
+      assert.equal((await page.getByRole('status').filter({ hasText: /^Selection / }).innerText()).trim(), 'Selection not scheduled · 1 subject still pending');
+      assert.equal(state.decisions.get(103).status, 'APPROVED');
+      await pickAction(page, 'SECD2523', 'Approved');
+      await page.getByText('SECD2523 approved.').waitFor();
+      assert.equal(await page.getByText(/still pending; (it|they) won't be shown/).count(), 0, 'no warning when nothing is pending');
+      assert.equal((await page.getByRole('status').filter({ hasText: /^Selection / }).innerText()).trim(), 'Selection not scheduled · 0 subjects still pending');
+    });
+
+    await check('forecast: the status line shows when selection opens', async page => {
+      await mock(page, { seed: 'decided', scheduled: true }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.match(await page.getByRole('status').filter({ hasText: /^Selection / }).innerText(), /^Selection opens .+ · 2 subjects still pending$/);
+      await page.getByText("2 subjects still pending; they won't be shown to students unless approved.").waitFor();
+    });
+    await check('forecast: while selection is open there is no planning warning and the dropdown stays enabled', async page => {
+      await mock(page, { seed: 'decided', phase: 'open' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.match(await page.getByRole('status').filter({ hasText: /^Selection / }).innerText(), /^Selection open until .+ · 2 subjects still pending$/);
+      assert.equal(await page.getByText(/still pending; (it|they) won't be shown/).count(), 0);
+      assert.equal(await page.getByRole('button', { name: /^Action for / }).count(), 4);
+    });
+    await check('forecast: after selection closes the decisions are read-only', async page => {
+      const state = await mock(page, { seed: 'decided', phase: 'closed' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.match(await page.getByRole('status').filter({ hasText: /^Selection / }).innerText(), /^Selection closed .+ · 2 subjects still pending$/);
+      assert.equal(await page.getByRole('button', { name: /^Action for / }).count(), 0, 'no dropdown');
+      assert.equal(await page.getByRole('button', { name: /^Add back / }).count(), 0, 'no add back');
+      assert.match(await page.locator('tr[data-subject="SECJ1013"]').innerText(), /Approved/);
+      assert.equal(state.bodies.filter(item => item.method === 'POST' && item.path.includes('offering-decisions')).length, 0);
+    });
+
+    await check('forecast: while selection is open, removing an approved subject reports the affected students and the change goes live', async page => {
+      const state = await mock(page, { seed: 'decided', phase: 'open' }); state.picks.set(101, pickers);
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.match(await page.getByRole('status').filter({ hasText: /^Selection / }).innerText(), /^Selection open until /);
+      await pickAction(page, 'SECJ1013', 'Removed');
+      await page.getByText('SECJ1013 withdrawn. 3 students who picked it will see a note.').waitFor();
+      assert.equal(await page.getByText('SECJ1013 removed.').count(), 0, 'one toast: the withdrawn one');
+      assert.equal(state.picks.has(101), false, 'the picks were withdrawn on the server');
+      assert.equal(state.decisions.get(101).status, 'REMOVED');
+      await pickAction(page, 'SCSJ1013', 'Approved'); await page.getByText('SCSJ1013 approved.').waitFor();
+      await pickAction(page, 'SCSJ1013', 'Removed'); await page.getByText('SCSJ1013 withdrawn.', { exact: true }).waitFor();
+      await page.screenshot({ path: shots + 'forecast-open-withdrawn-desktop.png' });
+    });
+    await check('forecast: removing an approved subject that one student picked says 1 student', async page => {
+      const state = await mock(page, { seed: 'decided', phase: 'open' }); state.picks.set(101, pickers.slice(0, 1));
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      await pickAction(page, 'SECJ1013', 'Pending');
+      await page.getByText('SECJ1013 withdrawn. 1 student who picked it will see a note.').waitFor();
+    });
+    await check('forecast: after selection closes the Picked column shows counts and the pickers dialog lists names, matric numbers and emails', async page => {
+      const state = await mock(page, { seed: 'decided', phase: 'closed' }); state.picks.set(101, pickers);
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.equal(await page.getByRole('button', { name: /^Action for / }).count(), 0, 'no dropdown');
+      assert.equal(await page.getByRole('button', { name: /^Add back / }).count(), 0, 'no add back');
+      await page.getByRole('columnheader', { name: /^Picked/ }).waitFor();
+      assert.equal((await page.locator('tr[data-subject="SECJ1013"] td').nth(3).innerText()).replace(/\s+/g, ' ').trim().startsWith('3'), true, 'approved subject shows its count');
+      assert.equal((await page.locator('tr[data-subject="SCSJ1013"] td').nth(3).innerText()).trim(), '—', 'a pending subject shows a dash');
+      await page.screenshot({ path: shots + 'forecast-closed-picked-desktop.png' });
+      const pickerRequests = () => state.requests.filter(item => /offering-decisions\/101\/pickers/.test(JSON.stringify(item))).length;
+      await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Picked · SECJ1013' }); await dialog.waitFor();
+      await dialog.getByRole('region', { name: 'Pickers table' }).waitFor();
+      const rows = dialog.locator('tbody tr');
+      assert.equal(await rows.count(), 3);
+      assert.match(await rows.nth(0).innerText(), /Aisyah binti Ahmad\s+A22EC0051/);
+      assert.match(await rows.nth(1).innerText(), /Bakri bin Hassan\s+student052@graduate\.utm\.my/);
+      assert.equal(await dialog.getByRole('columnheader').count(), 1, 'only the Student column');
+      await dialog.getByLabel('Search pickers').fill('chong'); assert.equal(await rows.count(), 1);
+      await dialog.getByLabel('Search pickers').fill('nobody'); await dialog.getByText('No students match this search.').waitFor();
+      await dialog.locator('.tt-clear').click(); assert.equal(await rows.count(), 3);
+      await page.screenshot({ path: shots + 'forecast-pickers-dialog-desktop.png' });
+      assert.equal(pickerRequests(), 1);
+      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
+      await page.getByRole('dialog', { name: 'Picked · SECJ1013' }).getByRole('region', { name: 'Pickers table' }).waitFor();
+      assert.equal(pickerRequests(), 1, 'reopening uses the page cache');
+      await page.keyboard.press('Escape'); await page.getByRole('dialog').waitFor({ state: 'detached' });
+      await page.getByRole('button', { name: 'Refresh' }).click(); await forecastReady(page);
+      await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
+      await page.getByRole('dialog', { name: 'Picked · SECJ1013' }).getByRole('region', { name: 'Pickers table' }).waitFor();
+      assert.equal(pickerRequests(), 2, 'Refresh drops the cache');
+      assert.equal(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]).includes('A22EC0051')), false, 'no personal data in browser storage');
+    });
+    await check('forecast: the pickers dialog says so when nobody picked the subject, and Escape closes it', async page => {
+      await mock(page, { seed: 'decided', phase: 'closed' });
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Picked · SECJ1013' });
+      await dialog.getByText('No student picked this subject.').waitFor();
+      await page.screenshot({ path: shots + 'forecast-pickers-empty-desktop.png' });
+      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
+    });
+
+    await check('forecast: decisions carry over when another snapshot is chosen and a decided subject missing from it is marked', async page => {
+      const state = await mock(page, { seed: 'decided', secondImport: true }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.equal(await page.getByLabel('Student data snapshot', { exact: true }).inputValue(), '2', 'the newest snapshot is chosen first');
+      await page.waitForURL(/snapshot=2/);
+      await page.getByLabel('Student data snapshot', { exact: true }).selectOption('1');
+      await page.waitForURL(/snapshot=1/); await forecastReady(page);
+      assert.equal(state.runs.size, 2, 'the forecast of the other snapshot is created when chosen');
+      await page.locator('tr[data-subject="SECJ1013"]').getByRole('button', { name: /^Action for SECJ1013: Approved$/ }).waitFor();
+      const missing = page.locator('tr[data-subject="SECJ2203"]');
+      assert.ok((await missing.innerText()).includes('not in this snapshot'));
+      assert.deepEqual(await missing.locator('.coordinator-number').allInnerTexts(), ['—', '—']);
+      assert.equal(await missing.getByRole('button', { name: /View students/ }).count(), 0, 'no student list without a snapshot count');
+      await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1023"]').waitFor();
+      await page.screenshot({ path: shots + 'forecast-decisions-carry-over-desktop.png', fullPage: true });
+    });
+
+    await check('forecast: tabs, class type, uncertain filter, sort and search use the shared toolbar', async page => {
+      await mock(page, { seed: 'decided' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      const bar = page.getByRole('search', { name: 'Filter and sort subjects' }), menu = index => bar.locator('button[aria-haspopup="menu"]').nth(index);
+      const choose = async (index, group, option) => { await menu(index).click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
+      const tab = name => bar.getByRole('group', { name: 'Status' }).getByRole('button', { name, exact: true });
+      assert.deepEqual(await tab('All').evaluate(item => [...item.parentElement.querySelectorAll('button')].map(button => button.textContent)), ['All', 'Pending', 'Approved']);
+      assert.equal(await tab('All').getAttribute('aria-pressed'), 'true');
+      assert.equal(await menu(1).innerText(), 'Sort: Eligible to take', 'eligible students is the default sort');
+      assert.equal(await bar.getByRole('button', { name: 'Clear filters' }).count(), 0);
+      assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013', 'SECD2523', 'SECJ2203'], 'subjects outside the snapshot come last');
+      await tab('Pending').click(); assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECD2523']);
+      await tab('Approved').click(); assert.deepEqual(await subjectCodes(page), ['SECJ1013', 'SECJ2203']);
       await tab('All').click();
-      await choose(1, 'Sort by', 'Potential demand (high to low)'); await pager.getByText('Page 1 of 2').waitFor();
-      assert.deepEqual((await codes()).slice(0, 3), ['SCSJ1013', 'SECJ1013', 'SECD2523']); // 71, 46, 30
-      await choose(1, 'Sort by', 'Subject name (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
-      await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ1023'], 'page 2 in name order: Database, Discrete, Programming I, Programming II');
-      await choose(1, 'Sort by', 'Subject code (A–Z)'); await pager.getByText('Page 1 of 2').waitFor(); assert.equal((await codes())[0], 'FILL1001');
-      await pager.getByRole('button', { name: 'Next' }).click(); assert.deepEqual(await codes(), ['FILL1021', 'SCSJ1013', 'SECD2523', 'SECJ1013', 'SECJ1023'], 'page 2 in code order');
+      await menu(0).click(); await page.getByRole('menu', { name: 'Filter' }).waitFor();
+      await page.screenshot({ path: shots + 'forecast-decisions-menu-open-desktop.png' });
+      await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' });
+      await choose(0, 'Class type', 'Lab'); assert.deepEqual(await subjectCodes(page), ['SECJ1013']);
+      await choose(0, 'Class type', 'Not set'); assert.deepEqual(await subjectCodes(page), ['SECD2523']);
+      await choose(0, 'Class type', 'All'); await choose(0, 'Flags', 'Has uncertain students'); assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013']);
+      await choose(0, 'Flags', 'All');
+      await choose(1, 'Sort by', 'Subject name'); assert.deepEqual(await subjectCodes(page), ['SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ2203']);
+      await choose(1, 'Sort by', 'Subject code'); assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECD2523', 'SECJ1013', 'SECJ2203']);
+      await bar.getByLabel('Search subjects').fill('SECD'); assert.deepEqual(await subjectCodes(page), ['SECD2523']);
       await bar.getByLabel('Search subjects').fill('zzz-no-match');
-      await page.getByText('No subjects match these filters.').waitFor(); assert.equal(await rows.count(), 0);
-      await page.getByRole('status').getByRole('button', { name: 'Clear filters' }).click(); await pager.getByText('25 subjects · Page 1 of 2').waitFor();
-      assert.ok(await noOverflow(page));
+      await page.getByText('No subjects match these filters.').waitFor();
+      await page.getByRole('status').getByRole('button', { name: 'Clear filters' }).click();
+      assert.equal((await subjectCodes(page)).length, 4, 'clearing the filters restores every subject');
+      assert.equal(await menu(1).innerText(), 'Sort: Subject code', 'clearing keeps the chosen sort');
+    });
+
+    await check('forecast: 409 DECISION_STALE reloads the decisions and says so', async page => {
+      const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      const reads = () => state.requests.filter(request => request.method === 'GET' && request.path === '/api/coordinator/offering-decisions').length, before = reads();
+      state.staleDecision = true;
+      await pickAction(page, 'SECJ1013', 'Approved');
+      await page.getByText('This subject was changed by someone else; reloaded.').waitFor();
+      await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1013"]').waitFor();
+      assert.equal(reads(), before + 1, 'the decisions were read again');
+      assert.equal(state.decisions.get(101).status, 'REMOVED', 'the other session\'s decision is what is shown');
+    });
+
+    await check('forecast: a failed save shows an error toast and keeps the screen', async page => {
+      const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
+      await pickAction(page, 'SECJ1013', 'Approved');
+      await page.getByText('Forecasting data is unavailable. Please retry.').waitFor();
+      await page.getByRole('button', { name: /^Action for SECJ1013: Pending$/ }).waitFor();
+      assert.equal(state.decisions.size, 0);
+    });
+
+    await check('forecast: without a snapshot the screen asks for a data import first', async page => {
+      const state = await mock(page, { seed: 'empty' }); await page.goto(base + forecastUrl);
+      await page.getByRole('heading', { name: 'No student data snapshots yet' }).waitFor();
+      await page.getByRole('link', { name: 'Go to Data Imports' }).waitFor();
+      assert.equal(state.bodies.length, 0, 'no forecast is generated without a snapshot');
     });
 
     await check('forecast: info icons show a popover on hover and focus, inside the viewport, and Escape closes it', async page => {
-      await mock(page, { seed: 'review' });
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await mock(page, { seed: 'run' });
+      await page.goto(base + forecastUrl); await forecastReady(page);
       const subjects = page.getByRole('region', { name: 'Subjects table', exact: true });
-      const icon = subjects.getByRole('button', { name: 'About Quality' });
-      const tip = page.getByRole('tooltip').filter({ hasText: 'How sure the count is' });
+      const icon = subjects.getByRole('button', { name: 'About Eligible to take' });
+      const tip = page.getByRole('tooltip').filter({ hasText: 'This is the number you decide on' });
       assert.equal(await tip.isVisible(), false, 'hidden until hover');
       await icon.hover(); await tip.waitFor();
-      assert.ok((await tip.innerText()).startsWith('Quality'), 'popover has a title');
+      assert.ok((await tip.innerText()).startsWith('Eligible to take'), 'popover has a title');
       assert.equal(await icon.getAttribute('aria-describedby'), await tip.getAttribute('id'));
       const box = await tip.boundingBox(), viewport = page.viewportSize();
       assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width, 'popover stays in the viewport');
       await page.screenshot({ path: shots + 'forecast-info-tip-desktop.png' });
       await page.mouse.move(0, 0); await tip.waitFor({ state: 'hidden' });
-      await page.getByLabel('Forecast summary').getByRole('button', { name: 'About Potential demand' }).focus();
-      const demand = page.getByRole('tooltip').filter({ hasText: 'not registration' }); await demand.waitFor();
+      await subjects.getByRole('button', { name: 'About Not taken yet' }).focus();
+      const demand = page.getByRole('tooltip').filter({ hasText: 'not passed it or been exempted' }); await demand.waitFor();
       await page.keyboard.press('Escape'); await demand.waitFor({ state: 'hidden' });
       await assertReadable(page, 'info tip');
       await page.locator('tr[data-subject="SECJ1013"]').getByRole('button', { name: 'View students for SECJ1013' }).click();
@@ -466,8 +544,8 @@ else {
     });
 
     await check('forecast: View students opens a read-only dialog with filters, search and the saved counts', async page => {
-      const state = await mock(page, { seed: 'review' });
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const state = await mock(page, { seed: 'run' });
+      await page.goto(base + forecastUrl); await forecastReady(page);
       const lab = page.locator('tr[data-subject="SECJ1013"]'), button = lab.getByRole('button', { name: 'View students for SECJ1013' });
       await button.click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
@@ -519,8 +597,8 @@ else {
     });
 
     await check('forecast: the students dialog shows an error with retry, the recomputed-catalogue note and an empty reasons list', async page => {
-      const state = await mock(page, { seed: 'review', catalogueChanged: true });
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const state = await mock(page, { seed: 'run', catalogueChanged: true });
+      await page.goto(base + forecastUrl); await forecastReady(page);
       state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
@@ -540,15 +618,15 @@ else {
       await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByLabel('Student counts').waitFor();
       assert.equal(listCalls(), before, 'reopening a subject uses the page cache, no new request');
       await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByRole('button', { name: 'Close' }).click();
-      await page.getByRole('button', { name: 'Refresh' }).click(); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.getByRole('button', { name: 'Refresh' }).click(); await page.getByRole('button', { name: 'View students for SECJ1013' }).waitFor();
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByLabel('Student counts').waitFor();
       assert.equal(listCalls(), before + 1, 'Refresh clears the cache');
     });
 
     await check('forecast: students show their portal reference when sign-in emails cannot be loaded', async page => {
-      const state = await mock(page, { seed: 'review' }); state.emailsUnavailable = true;
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      const state = await mock(page, { seed: 'run' }); state.emailsUnavailable = true;
+      await page.goto(base + forecastUrl); await forecastReady(page);
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.getByLabel('Student counts').waitFor();
       await dialog.getByText('Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.').waitFor();
@@ -559,8 +637,8 @@ else {
     });
 
     for (const width of [320, 375]) await check('mobile: the students dialog fits without page overflow at ' + width, async page => {
-      await mock(page, { seed: 'review' }); await page.setViewportSize({ width, height: 800 });
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await mock(page, { seed: 'run' }); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + forecastUrl); await forecastReady(page);
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
       assert.ok(await noOverflow(page), 'page does not overflow with the dialog open');
@@ -572,9 +650,26 @@ else {
       await dialog.getByRole('button', { name: 'Close' }).focus(); await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
     });
 
+    for (const width of [320, 375]) await check('mobile: the pickers dialog fits without page overflow at ' + width, async page => {
+      const state = await mock(page, { seed: 'decided', phase: 'closed' }); state.picks.set(101, pickers); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.ok(await noOverflow(page), 'the Picked column does not overflow the page');
+      if (width === 375) await page.screenshot({ path: shots + 'forecast-closed-picked-mobile.png', fullPage: true });
+      await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Picked · SECJ1013' }); await dialog.waitFor();
+      await dialog.getByRole('region', { name: 'Pickers table' }).waitFor();
+      assert.ok(await noOverflow(page), 'page does not overflow with the dialog open');
+      const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 800, 'dialog inside the viewport');
+      const bar = dialog.getByRole('search', { name: 'Filter pickers' }); const barBox = await bar.boundingBox(); assert.ok(barBox.x >= 0 && barBox.x + barBox.width <= width);
+      await dialog.getByLabel('Search pickers').fill('A22'); assert.ok(await noOverflow(page));
+      assert.ok(await dialog.getByRole('button', { name: 'Close' }).isVisible());
+      if (width === 375) await page.screenshot({ path: shots + 'forecast-pickers-dialog-mobile.png' });
+      await dialog.getByRole('button', { name: 'Close' }).focus(); await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
+    });
+
     for (const width of [320, 375]) await check('mobile: the subjects filter toolbar wraps without horizontal overflow at ' + width, async page => {
-      await mock(page, { seed: 'review', manySubjects: true }); await page.setViewportSize({ width, height: 800 });
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await mock(page, { seed: 'run', manySubjects: true }); await page.setViewportSize({ width, height: 800 });
+      await page.goto(base + forecastUrl); await forecastReady(page);
       const bar = page.getByRole('search', { name: 'Filter and sort subjects' }); await bar.waitFor();
       await bar.getByLabel('Search subjects').fill('FILL'); assert.ok(await noOverflow(page));
       await bar.locator('button[aria-haspopup="menu"]').nth(0).click(); await page.getByRole('menu', { name: 'Filter' }).waitFor(); assert.ok(await noOverflow(page), 'open filter menu does not overflow at ' + width);
@@ -582,352 +677,6 @@ else {
       await page.screenshot({ path: shots + 'forecast-subjects-menu-open-mobile-' + width + '.png' });
       const box = await bar.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width);
       if (width === 320) await page.screenshot({ path: shots + 'forecast-subjects-filters-mobile-320.png', fullPage: true });
-    });
-
-    await check('forecasts: start review sends the DRAFT revision; a decision needs a reason and records an audit row', async page => {
-      const state = await mock(page, { seed: 'run' }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      const opener = page.getByRole('button', { name: /^Forecast status: / }); await pickStatus(page, 'Under review');
-      const start = page.getByRole('dialog', { name: 'Start review' }); await start.waitFor();
-      await page.keyboard.press('Escape'); await start.waitFor({ state: 'hidden' });
-      assert.equal(await opener.evaluate(element => element === document.activeElement), true);
-      await pickStatus(page, 'Under review'); await start.getByRole('button', { name: 'Start review' }).click(); await start.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Review started.' }).waitFor();
-      await page.getByRole('button', { name: 'Forecast status: Under review' }).waitFor();
-      const startPost = state.bodies.find(item => item.path.endsWith('/reviews'));
-      assert.equal(startPost.headers['if-match'], '"fr1.DRAFT.0"'); assert.equal(startPost.body.action, 'START_REVIEW');
-      const actionButton = page.getByRole('button', { name: 'Action for SECJ1013: Pending' }); await actionButton.click();
-      const actionMenu = page.getByRole('menu', { name: 'Action for SECJ1013' });
-      assert.deepEqual(await actionMenu.getByRole('menuitemradio').evaluateAll(list => list.map(item => [item.textContent, item.getAttribute('aria-checked'), item.querySelector('.coordinator-status-help') === null])),
-        [['Approved', 'false', true], ['Reviewed', 'false', true], ['Removed', 'false', true]], 'action menu: three choices, no helper text');
-      await page.screenshot({ path: shots + 'forecast-action-menu-desktop.png' });
-      await page.keyboard.press('Escape'); assert.equal(await actionButton.evaluate(element => element === document.activeElement), true);
-      await pickAction(page, 'SECJ1013', 'Approved');
-      const dialog = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await dialog.waitFor();
-      assert.equal(await dialog.getByLabel(reasonLabel).evaluate(element => element === document.activeElement), true);
-      await dialog.getByRole('button', { name: 'Approve subject' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'A reason of 1-500 characters is required.' }).waitFor();
-      await dialog.getByLabel(reasonLabel).fill('Fits the lab timetable.');
-      await dialog.getByRole('button', { name: 'Approve subject' }).dblclick(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Approve: SECJ1013 recorded.' }).waitFor();
-      assert.equal(state.bodies.filter(item => item.path.endsWith('/decisions')).length, 1);
-      const decision = state.bodies.find(item => item.path.endsWith('/decisions'));
-      assert.equal(decision.headers['if-match'], '"fr1.UNDER_REVIEW.1"');
-      assert.deepEqual(decision.body.decisions, [{ subjectId: 101, action: 'APPROVE', reason: 'Fits the lab timetable.' }]);
-      assert.ok((await page.locator('tr[data-subject="SECJ1013"]').innerText()).includes('Approved'));
-      const audit = page.getByRole('region', { name: 'Audit history table' });
-      await audit.getByText('Fits the lab timetable.').waitFor();
-      assert.ok((await audit.locator('tbody tr').first().innerText()).includes('SECJ1013'));
-      assert.equal(await page.getByText('Review started', { exact: false }).count() > 0, true);
-    });
-
-    await check('forecasts: finalize reports incomplete reviews with highlighted subjects, then succeeds and becomes read-only', async page => {
-      const state = await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await pickStatus(page, 'Finalized');
-      const dialog = page.getByRole('dialog', { name: 'Finalize forecast' }); await dialog.waitFor();
-      assert.ok((await dialog.innerText()).includes('subjects still pending'));
-      await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
-      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
-      const alert = page.getByRole('alert').filter({ hasText: '3 subjects still need a decision before this forecast can be finalized: SECJ1013, SECJ1023, SCSJ1013.' }); await alert.waitFor();
-      assert.equal(await page.locator('.coordinator-row-pending').count(), 3);
-      assert.equal(await page.getByText('Decision needed').count(), 3);
-      assert.equal(await page.locator('tr[data-subject="SECD2523"]').evaluate(element => element.classList.contains('coordinator-row-pending')), false);
-      await page.screenshot({ path: shots + 'forecast-finalize-incomplete-desktop.png', fullPage: true });
-      for (const [action, code, label] of [['Approve', 'SECJ1013', 'Approve subject'], ['Remove', 'SECJ1023', 'Remove subject'], ['Mark reviewed', 'SCSJ1013', 'Mark reviewed']]) {
-        await pickAction(page, code, { Approve: 'Approved', Remove: 'Removed', 'Mark reviewed': 'Reviewed' }[action]);
-        const decide = page.getByRole('dialog', { name: `${action} ${code}` }); await decide.getByLabel(reasonLabel).fill('Checked: ' + code);
-        await decide.getByRole('button', { name: label }).click(); await decide.waitFor({ state: 'hidden' });
-        if (action === 'Remove') await page.getByRole('region', { name: 'Removed subjects table' }).locator(`tr[data-subject="${code}"]`).waitFor();
-        else await page.getByRole('region', { name: 'Subjects table', exact: true }).locator(`tr[data-subject="${code}"]`).getByText(action === 'Approve' ? 'Approved' : 'Reviewed', { exact: true }).waitFor();
-      }
-      assert.equal(await page.getByRole('region', { name: 'Subjects table', exact: true }).locator('tr[data-subject="SECJ1023"]').count(), 0, 'a removed subject leaves the main table');
-      assert.equal(await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1023"]').innerText().then(text => text.replace(/\s+/g, ' ').trim()), 'Programming Technique II SECJ1023', 'name and code only');
-      await page.screenshot({ path: shots + 'forecast-removed-desktop.png', fullPage: true });
-      await page.getByRole('button', { name: 'Add back SECJ1023' }).click();
-      const back = page.getByRole('dialog', { name: 'Add back SECJ1023' }); await back.getByLabel(reasonLabel).fill('Needed after all.');
-      await back.getByRole('button', { name: 'Add back subject' }).click(); await back.waitFor({ state: 'hidden' });
-      const restored = page.getByRole('region', { name: 'Subjects table', exact: true }).locator('tr[data-subject="SECJ1023"]');
-      await restored.getByText('Pending', { exact: true }).waitFor(); await restored.getByText('Decision needed').waitFor();
-      assert.equal(await page.getByRole('region', { name: 'Removed subjects table' }).count(), 0, 'the side table disappears when nothing is removed');
-      await pickAction(page, 'SECJ1023', 'Approved');
-      const again = page.getByRole('dialog', { name: 'Approve SECJ1023' }); await again.getByLabel(reasonLabel).fill('Approved after adding back.');
-      await again.getByRole('button', { name: 'Approve subject' }).click(); await again.waitFor({ state: 'hidden' });
-      await restored.getByText('Approved', { exact: true }).waitFor();
-      assert.equal(await page.locator('.coordinator-row-pending').count(), 0);
-      await pickStatus(page, 'Finalized');
-      await dialog.getByLabel(reasonLabel).fill('Ready for confirmation.');
-      await dialog.getByRole('button', { name: 'Finalize forecast' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Forecast finalized. It is now read-only.' }).waitFor();
-      await page.getByRole('button', { name: 'Forecast status: Finalized' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Remove|Add back|Mark reviewed|Action for/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
-      await page.getByRole('link', { name: 'Confirm offerings' }).waitFor();
-      const post = state.bodies.filter(item => item.path.endsWith('/finalizations')).at(-1);
-      assert.deepEqual(post.body, { scope: { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 }, reason: 'Ready for confirmation.' });
-      await page.getByRole('region', { name: 'Audit history table' }).getByText('Finalized').first().waitFor();
-      await page.screenshot({ path: shots + 'forecast-finalized-desktop.png', fullPage: true });
-    });
-
-    await check('forecasts: a finalized run opens read-only', async page => {
-      await mock(page, { seed: 'finalized' }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await page.getByText('This forecast is finalized and read-only.').waitFor();
-      assert.equal(await page.getByRole('button', { name: /Finalize forecast|Start review|Approve|Remove|Add back|Mark reviewed|Action for/ }).filter({ hasNotText: /^Approved$/ }).count(), 0);
-    });
-
-    await check('forecasts: 412 RUN_REVISION_MISMATCH reloads the forecast and says so', async page => {
-      const state = await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      await pickAction(page, 'SECJ1013', 'Approved');
-      const dialog = page.getByRole('dialog', { name: 'Approve SECJ1013' }); await dialog.getByLabel(reasonLabel).fill('Fine.');
-      state.staleNext = true; const before = state.requests.filter(request => request.path === '/api/coordinator/forecast-runs/1' && request.method === 'GET').length;
-      await dialog.getByRole('button', { name: 'Approve subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('alert').filter({ hasText: 'This forecast changed; reloaded.' }).waitFor();
-      assert.ok(state.requests.filter(request => request.path === '/api/coordinator/forecast-runs/1' && request.method === 'GET').length > before);
-      assert.ok((await page.locator('tr[data-subject="SECJ1013"]').innerText()).includes('Pending'));
-      await page.getByRole('region', { name: 'Audit history table' }).getByText('Changed by another session.').waitFor();
-      await pickAction(page, 'SECJ1013', 'Approved');
-      await dialog.getByLabel(reasonLabel).fill('Retry after reload.'); await dialog.getByRole('button', { name: 'Approve subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Approve: SECJ1013 recorded.' }).waitFor();
-    });
-
-    await check('forecasts: audit history is paged', async page => {
-      await mock(page, { seed: 'review' }); await page.goto(base + runUrl);
-      const audit = page.getByRole('region', { name: 'Audit history table' }); await audit.waitFor();
-      assert.equal(await audit.locator('tbody tr').count(), 20);
-      await page.getByRole('button', { name: 'Load older entries' }).click();
-      await page.waitForFunction(() => document.querySelectorAll('[aria-label="Audit history table"] tbody tr').length === 25);
-      assert.equal(await page.getByRole('button', { name: 'Load older entries' }).count(), 0);
-      await audit.locator('summary').first().click();
-      assert.ok((await audit.locator('pre').first().innerText()).includes('"before"'));
-    });
-
-    await check('decisions: no finalized forecast explains why and links to the forecasts', async page => {
-      await mock(page, { seed: 'run' }); await page.goto(base + decisionsUrl);
-      await page.getByRole('heading', { name: 'Offering Decisions', exact: true }).first().waitFor();
-      await page.getByRole('heading', { name: 'No finalized forecast yet' }).waitFor();
-      assert.ok((await page.locator('.admin-empty').innerText()).includes('finalized forecast'));
-      await page.getByRole('link', { name: 'Go to Class Offering Forecast' }).click();
-      await page.getByRole('heading', { name: 'Forecasts', exact: true }).waitFor();
-      assert.ok(page.url().includes('/coordinator/forecasts'));
-    });
-
-    await check('decisions: scope pickers follow assignments and the target semester is read-only', async page => {
-      const state = await mock(page, { seed: 'finalized' }); await page.goto(base + '/coordinator/decisions');
-      await page.getByRole('heading', { name: 'Offering Decisions', exact: true }).first().waitFor();
-      assert.equal(await page.getByLabel('Learning centre', { exact: true }).isDisabled(), true);
-      assert.equal(await page.getByRole('heading', { name: 'Choose a scope' }).count(), 1);
-      await page.getByLabel('Programme', { exact: true }).selectOption('5');
-      await page.getByLabel('Learning centre', { exact: true }).selectOption('1');
-      await page.getByRole('heading', { name: 'Confirm offerings for this semester' }).waitFor();
-      assert.equal(await page.getByLabel('Target semester').evaluate(element => element.tagName), 'OUTPUT');
-      assert.equal(await page.locator('output.coordinator-readonly-value').innerText(), '2026/2027 · Semester 2');
-      assert.ok(state.requests.some(request => request.path === '/api/coordinator/confirmed-offerings' && request.search.includes('targetSemesterId=2')));
-    });
-
-    await check('decisions: first confirmation from a finalized forecast with forecast numbers, excluded subjects disabled, deadline and reason required', async page => {
-      const state = await mock(page, { seed: 'finalized' }); await page.goto(base + decisionsUrl);
-      await page.getByRole('heading', { name: 'Confirm offerings for this semester' }).waitFor();
-      assert.equal(await page.getByLabel('Finalized forecast').inputValue(), '1');
-      const table = page.getByRole('region', { name: 'Subjects to confirm table' }); await table.waitFor();
-      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Confirm', 'Subject', 'Class type', 'Potential demand', 'Proposed classes', 'Near graduation']);
-      assert.equal(await table.locator('tbody tr').count(), 6);
-      const lab = await table.locator('tr[data-subject="SECJ1013"]').innerText();
-      assert.ok(lab.includes('46') && lab.includes('2 classes (23 + 23)') && lab.includes('4'));
-      const excluded = table.locator('tr[data-subject="SECJ4118"]');
-      assert.equal(await page.getByLabel('Select SECJ4118').isDisabled(), true);
-      assert.ok((await excluded.innerText()).includes('Cannot be confirmed: Final year project is not offered through the forecast.'));
-      assert.equal(await page.getByLabel('Select SECD3761').isDisabled(), true);
-      assert.ok((await table.locator('tr[data-subject="SECD3761"]').innerText()).includes('Cannot be confirmed: Runs only in Short semesters'));
-      assert.ok((await table.locator('tr[data-subject="SECD2523"]').innerText()).includes('No classes proposed: configuration required.'));
-      const confirm = page.getByRole('button', { name: 'Select subjects to confirm' }); assert.equal(await confirm.isDisabled(), true);
-      await page.getByLabel('Select SECJ1013').check(); await page.getByLabel('Select SCSJ1013').check();
-      await page.getByText('2 subjects selected').waitFor();
-      await page.getByRole('button', { name: 'Confirm 2 subjects' }).click();
-      await page.getByRole('alert').filter({ hasText: 'Choose the date and time students can pick until.' }).waitFor();
-      assert.equal(await page.getByLabel('Pick deadline').evaluate(element => element === document.activeElement), true);
-      assert.equal(await page.getByLabel('Pick deadline').getAttribute('aria-invalid'), 'true');
-      await page.getByLabel('Pick deadline').fill(localInput(-1));
-      await page.getByRole('button', { name: 'Confirm 2 subjects' }).click();
-      await page.getByRole('alert').filter({ hasText: 'The pick deadline must be in the future.' }).waitFor();
-      assert.equal(state.bodies.length, 0);
-      await page.getByLabel('Pick deadline').fill(localInput(14));
-      await page.screenshot({ path: shots + 'decisions-create-desktop.png', fullPage: true });
-      const opener = page.getByRole('button', { name: 'Confirm 2 subjects' }); await opener.click();
-      const dialog = page.getByRole('dialog', { name: 'Confirm offerings' }); await dialog.waitFor();
-      const text = await dialog.innerText();
-      assert.ok(text.includes('SECJ1013') && text.includes('SCSJ1013') && text.includes('not an official registration'));
-      await dialog.getByRole('button', { name: 'Confirm 2 subjects' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'A reason of 1-500 characters is required.' }).waitFor();
-      assert.equal(state.bodies.length, 0);
-      await dialog.getByLabel(reasonLabel).fill('Strong demand for the September intake.');
-      await dialog.getByRole('button', { name: 'Confirm 2 subjects' }).dblclick(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: '2 subjects confirmed by coordinator.' }).waitFor();
-      const posts = state.bodies.filter(item => item.path === '/api/coordinator/confirmed-offerings');
-      assert.equal(posts.length, 1);
-      assert.deepEqual(posts[0].body, { scope: scopeBody, forecastRunId: 1, subjectIds: [101, 103], reason: 'Strong demand for the September intake.', baseRevision: null, pickDeadline: new Date(localInput(14)).toISOString() });
-      assert.equal(posts[0].headers['if-match'], undefined); assert.ok(posts[0].headers['idempotency-key']);
-      await page.getByRole('heading', { name: /Confirmed offerings/ }).waitFor();
-      await page.getByText('Pick window open').waitFor();
-      const offerings = page.getByRole('region', { name: 'Confirmed offerings table' });
-      assert.equal(await offerings.locator('tbody tr').count(), 2);
-      assert.equal(await offerings.getByText('No student picks yet').count(), 2);
-      await page.screenshot({ path: shots + 'decisions-confirmed-first-desktop.png', fullPage: true });
-    });
-
-    await check('decisions: an existing confirmation shows the window state, forecast numbers, student picks placeholder and the newer-forecast notice', async page => {
-      const state = await mock(page, { seed: 'confirmed', secondFinalized: true, bulkConfAudit: true }); state.newerConf = { forecastRunId: 2, versionNumber: 2, status: 'FINALIZED' };
-      await page.goto(base + decisionsUrl);
-      await page.getByRole('heading', { name: /Confirmed offerings/ }).waitFor();
-      assert.equal(await page.getByRole('heading', { name: /Confirmed offerings/ }).evaluate(element => element === document.activeElement), true);
-      assert.ok((await page.locator('#decisions-summary-heading').locator('..').innerText()).includes('Open until'));
-      await page.getByText('Pick window open').waitFor();
-      const table = page.getByRole('region', { name: 'Confirmed offerings table' }); await table.waitFor();
-      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Subject', 'Status', 'Potential demand', 'Proposed classes', 'Near graduation', 'Student picks', 'Last change', 'Actions']);
-      assert.equal(await table.locator('tbody tr').count(), 2);
-      const row = await table.locator('tr[data-subject="SECJ1013"]').innerText();
-      assert.ok(row.includes('Confirmed by coordinator') && row.includes('46') && row.includes('2 classes (23 + 23)') && row.includes('No student picks yet') && row.includes('Demand is clear.'));
-      assert.equal(await page.getByText('Student picks arrive with the student offerings page.', { exact: false }).count(), 1);
-      const note = page.locator('.coordinator-newer-notice'); await note.waitFor();
-      assert.ok((await note.innerText()).includes('Version 2 (finalized)') && (await note.innerText()).includes('not changed'));
-      assert.ok((await note.getByRole('link').getAttribute('href')).includes('/coordinator/forecasts?') && (await note.getByRole('link').getAttribute('href')).includes('run=2'));
-      assert.equal(await page.getByText(/official registration/i).count() >= 1, true);
-      assert.equal(await page.getByRole('region', { name: 'Offering audit history table' }).locator('tbody tr').count(), 20);
-      await page.getByRole('button', { name: 'Load older entries' }).click();
-      await page.waitForFunction(() => document.querySelectorAll('[aria-label="Offering audit history table"] tbody tr').length === 27);
-      assert.equal(state.bodies.length, 0);
-      await page.screenshot({ path: shots + 'decisions-existing-desktop.png', fullPage: true });
-    });
-
-    await check('decisions: withdraw and re-confirm each need a reason, send the revision and are audited', async page => {
-      const state = await mock(page, { seed: 'confirmed' }); await page.goto(base + decisionsUrl);
-      const table = page.getByRole('region', { name: 'Confirmed offerings table' }); await table.waitFor();
-      const opener = page.getByRole('button', { name: 'Withdraw SECJ1013' }); await opener.click();
-      const dialog = page.getByRole('dialog', { name: 'Withdraw SECJ1013' }); await dialog.waitFor();
-      await dialog.getByRole('button', { name: 'Withdraw subject' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'A reason of 1-500 characters is required.' }).waitFor();
-      assert.equal(state.bodies.length, 0);
-      await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
-      assert.equal(await opener.evaluate(element => element === document.activeElement), true);
-      await opener.click(); await dialog.getByLabel(reasonLabel).fill('Lab room unavailable.'); await dialog.getByRole('button', { name: 'Withdraw subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'SECJ1013 withdrawn.' }).waitFor();
-      const withdrawal = state.bodies.find(item => item.path.endsWith('/withdrawals'));
-      assert.equal(withdrawal.headers['if-match'], '"oc1.3"');
-      assert.deepEqual(withdrawal.body, { scope: scopeBody, subjectIds: [101], reason: 'Lab room unavailable.', baseRevision: 'oc1.3' });
-      const withdrawn = table.locator('tr[data-subject="SECJ1013"]');
-      assert.ok((await withdrawn.innerText()).includes('Withdrawn') && (await withdrawn.innerText()).includes('Lab room unavailable.'));
-      assert.equal(await page.getByRole('button', { name: 'Withdraw SECJ1013' }).count(), 0);
-      await page.getByRole('region', { name: 'Offering audit history table' }).getByText('Withdrawn').first().waitFor();
-      await page.getByRole('button', { name: 'Re-confirm SECJ1013' }).click();
-      const again = page.getByRole('dialog', { name: 'Re-confirm SECJ1013' }); await again.waitFor();
-      await again.getByLabel(reasonLabel).fill('Demand recovered.'); await again.getByRole('button', { name: 'Re-confirm subject' }).click(); await again.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'SECJ1013 re-confirmed.' }).waitFor();
-      const reconfirm = state.bodies.filter(item => item.path === '/api/coordinator/confirmed-offerings').at(-1);
-      assert.equal(reconfirm.headers['if-match'], '"oc1.4"');
-      assert.deepEqual(reconfirm.body.subjectIds, [101]); assert.equal(reconfirm.body.forecastRunId, 1); assert.equal(reconfirm.body.baseRevision, 'oc1.4');
-      assert.ok((await table.locator('tr[data-subject="SECJ1013"]').innerText()).includes('Confirmed by coordinator'));
-      const audit = page.getByRole('region', { name: 'Offering audit history table' });
-      await audit.getByText('Re-confirmed').waitFor();
-      assert.ok((await audit.locator('tbody tr').first().innerText()).includes('Demand recovered.'));
-    });
-
-    await check('decisions: add more subjects from the forecast, excluded ones disabled', async page => {
-      const state = await mock(page, { seed: 'confirmed' }); await page.goto(base + decisionsUrl);
-      const add = page.getByRole('region', { name: 'Subjects to add table' }); await add.waitFor();
-      assert.deepEqual(await add.locator('tbody tr').evaluateAll(rows => rows.map(row => row.getAttribute('data-subject'))), ['SECJ1023', 'SECD2523', 'SECJ4118', 'SECD3761']);
-      assert.equal(await page.getByLabel('Select SECD3761').isDisabled(), true);
-      assert.equal(await page.getByLabel('Select SECJ4118').isDisabled(), true);
-      assert.equal(await page.getByRole('button', { name: 'Select subjects to add' }).isDisabled(), true);
-      await page.getByLabel('Select SECJ1023').check();
-      await page.getByRole('button', { name: 'Add 1 subject' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Add subjects' }); await dialog.waitFor();
-      assert.ok((await dialog.innerText()).includes('SECJ1023 Programming Technique II'));
-      await dialog.getByLabel(reasonLabel).fill('Second lab group needed.');
-      await dialog.getByRole('button', { name: 'Add 1 subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: '1 subject added.' }).waitFor();
-      const post = state.bodies.filter(item => item.path === '/api/coordinator/confirmed-offerings').at(-1);
-      assert.deepEqual(post.body.subjectIds, [102]); assert.equal(post.headers['if-match'], '"oc1.3"');
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).locator('tr[data-subject="SECJ1023"]').waitFor();
-      assert.equal(await add.locator('tbody tr').count(), 3);
-    });
-
-    await check('decisions: change the deadline with a reason, optionally switching to another finalized forecast', async page => {
-      const state = await mock(page, { seed: 'confirmed', secondFinalized: true }); await page.goto(base + decisionsUrl);
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).waitFor();
-      const opener = page.getByRole('button', { name: 'Change pick deadline' }); await opener.click();
-      const dialog = page.getByRole('dialog', { name: 'Change pick deadline' }); await dialog.waitFor();
-      await dialog.getByLabel(reasonLabel).fill('No change.'); await dialog.getByRole('button', { name: 'Change deadline' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'Nothing to change' }).waitFor();
-      await dialog.getByLabel('New pick deadline').fill(localInput(-3));
-      await dialog.getByRole('button', { name: 'Change deadline' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'The pick deadline must be in the future.' }).waitFor();
-      assert.equal(state.bodies.length, 0);
-      await dialog.getByLabel('New pick deadline').fill(localInput(20));
-      await dialog.getByLabel('Forecast this confirmation is based on').selectOption('2');
-      await page.screenshot({ path: shots + 'decisions-deadline-dialog-desktop.png' });
-      await dialog.getByRole('button', { name: 'Change deadline' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Pick deadline and forecast updated.' }).waitFor();
-      const post = state.bodies.find(item => item.path.endsWith('/pick-deadline'));
-      assert.equal(post.headers['if-match'], '"oc1.3"');
-      assert.deepEqual(post.body, { scope: scopeBody, pickDeadline: new Date(localInput(20)).toISOString(), reason: 'No change.', baseRevision: 'oc1.3', forecastRunId: 2 });
-      await page.getByText('based on forecast version 2', { exact: false }).waitFor();
-      const audit = page.getByRole('region', { name: 'Offering audit history table' });
-      await audit.getByText('Pick deadline changed').waitFor();
-      assert.ok((await audit.locator('tbody tr').first().innerText()).includes('forecast #2'));
-      assert.equal(await opener.evaluate(element => element === document.activeElement || document.activeElement?.id === 'coordinator-action-status'), true);
-    });
-
-    await check('decisions: a deadline-only change sends just the new deadline', async page => {
-      const state = await mock(page, { seed: 'confirmed' }); await page.goto(base + decisionsUrl);
-      await page.getByRole('button', { name: 'Change pick deadline' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Change pick deadline' }); await dialog.waitFor();
-      await dialog.getByLabel('New pick deadline').fill(localInput(30)); await dialog.getByLabel(reasonLabel).fill('Registry asked for more time.');
-      await dialog.getByRole('button', { name: 'Change deadline' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'Pick deadline changed to' }).waitFor();
-      assert.equal('forecastRunId' in state.bodies.find(item => item.path.endsWith('/pick-deadline')).body, false);
-    });
-
-    await check('decisions: 412 reloads the confirmation and says so', async page => {
-      const state = await mock(page, { seed: 'confirmed' }); await page.goto(base + decisionsUrl);
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).waitFor();
-      await page.getByRole('button', { name: 'Withdraw SECJ1013' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Withdraw SECJ1013' }); await dialog.getByLabel(reasonLabel).fill('Not needed.');
-      state.staleConf = true;
-      const before = state.requests.filter(request => request.path === '/api/coordinator/confirmed-offerings' && request.method === 'GET').length;
-      await dialog.getByRole('button', { name: 'Withdraw subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('alert').filter({ hasText: 'This confirmation changed; reloaded.' }).waitFor();
-      assert.ok(state.requests.filter(request => request.path === '/api/coordinator/confirmed-offerings' && request.method === 'GET').length > before);
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).locator('tr[data-subject="SECJ1023"]').waitFor();
-      assert.ok((await page.locator('tr[data-subject="SECJ1013"]').innerText()).includes('Confirmed by coordinator'));
-      await page.getByRole('button', { name: 'Withdraw SECJ1013' }).click();
-      await dialog.getByLabel(reasonLabel).fill('Retry after reload.'); await dialog.getByRole('button', { name: 'Withdraw subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('status').filter({ hasText: 'SECJ1013 withdrawn.' }).waitFor();
-    });
-
-    await check('decisions: server errors stay inside the dialog; a closed window is shown as closed', async page => {
-      const state = await mock(page, { seed: 'finalized' }); await page.goto(base + decisionsUrl);
-      await page.getByLabel('Select SECJ1013').check(); await page.getByLabel('Pick deadline').fill(localInput(5));
-      state.forceConfirmError = { code: 'SUBJECT_EXCLUDED', message: 'Subjects excluded from the offering forecast cannot be confirmed.' };
-      await page.getByRole('button', { name: 'Confirm 1 subject' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Confirm offerings' }); await dialog.getByLabel(reasonLabel).fill('Try.');
-      await dialog.getByRole('button', { name: 'Confirm 1 subject' }).click();
-      await dialog.getByRole('alert').filter({ hasText: 'Subjects excluded from the offering forecast cannot be confirmed.' }).waitFor();
-      assert.equal(await dialog.isVisible(), true);
-      await dialog.getByRole('button', { name: 'Cancel' }).click();
-      const closed = await browser.newPage({ viewport: { width: 1440, height: 960 } }); await mock(closed, { seed: 'confirmed', closedWindow: true });
-      await closed.goto(base + decisionsUrl); await closed.getByText('Pick window closed').waitFor();
-      assert.ok((await closed.locator('#decisions-summary-heading').locator('..').innerText()).includes('Closed on'));
-      await closed.close();
-    });
-
-    await check('decisions: a service error shows a retryable alert', async page => {
-      const state = await mock(page, { seed: 'confirmed' }); await page.goto(base + decisionsUrl);
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).waitFor();
-      state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
-      await page.getByRole('button', { name: 'Refresh' }).click();
-      await page.getByRole('alert').filter({ hasText: 'Forecasting data is unavailable. Please retry.' }).waitFor();
-      await page.getByRole('button', { name: 'Retry', exact: true }).click();
-      await page.getByRole('region', { name: 'Confirmed offerings table' }).waitFor();
     });
 
     await check('imports: the data source toggle is a keyboard-accessible radio group and each mode shows only its own card', async page => {
@@ -995,8 +744,8 @@ else {
       assert.equal(state.imports.length, 1);
       await page.getByRole('button', { name: 'Generate forecast' }).first().click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
-      await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
-      assert.match(await page.getByRole('list', { name: 'Forecast details' }).innerText(), /Combined\s*Student-entered records \+ CSV/);
+      await forecastReady(page);
+      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /· Combined ·/);
       await page.screenshot({ path: shots + 'forecast-combined-desktop.png', fullPage: true });
     });
 
@@ -1043,18 +792,17 @@ else {
       await page.goto(base + '/coordinator/forecasts' + scoped);
       await page.getByRole('alert').filter({ hasText: 'Forecasting data is unavailable. Please retry.' }).waitFor();
       await page.getByRole('button', { name: 'Retry', exact: true }).click();
-      await page.getByRole('heading', { name: 'Forecasts', exact: true }).waitFor();
+      await forecastReady(page);
     });
 
-    for (const width of [320, 375]) await check('mobile: imports and forecasts have no horizontal overflow at ' + width, async page => {
-      await mock(page, { seed: 'review' }); await page.setViewportSize({ width, height: 800 });
+    for (const width of [320, 375]) await check('mobile: imports and the forecast decisions screen have no horizontal overflow at ' + width, async page => {
+      await mock(page, { seed: 'run' }); await page.setViewportSize({ width, height: 800 });
       await page.goto(base + '/coordinator/imports' + scoped); await page.getByRole('heading', { name: 'Students in the system', exact: true }).waitFor();
       assert.ok(await noOverflow(page));
       if (width === 320) await page.screenshot({ path: shots + 'imports-toggle-mobile-320.png', fullPage: true });
       await page.getByRole('button', { name: 'Create snapshot' }).click(); await page.getByRole('heading', { name: 'Snapshot created' }).waitFor();
       assert.ok(await noOverflow(page));
       if (width === 375) await page.screenshot({ path: shots + 'imports-system-mobile.png', fullPage: true });
-      await page.goto(base + '/coordinator/forecasts' + scoped); await page.getByRole('region', { name: 'Forecasts table' }).waitFor();
       await page.goto(base + '/coordinator/imports' + csvScoped); await page.getByRole('heading', { name: 'CSV import', exact: true }).waitFor();
       await upload(page, 'BADROWS', 'Needs fixes'); await page.getByRole('heading', { name: 'Validation report' }).waitFor();
       assert.ok(await noOverflow(page));
@@ -1064,70 +812,29 @@ else {
       const box = await subset.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 800);
       assert.ok(await noOverflow(page));
       await page.keyboard.press('Escape');
-      await page.goto(base + '/coordinator/forecasts' + scoped); await page.getByRole('region', { name: 'Forecasts table' }).waitFor();
-      assert.ok(await noOverflow(page));
-      await page.goto(base + runUrl); await page.getByRole('heading', { name: /Forecast version 1/ }).waitFor();
+      await page.goto(base + forecastUrl); await forecastReady(page);
       assert.ok(await noOverflow(page));
       const table = page.getByRole('region', { name: 'Subjects table', exact: true });
-      assert.ok(await table.evaluate(element => element.scrollWidth > element.clientWidth)); // local horizontal scrolling only
-      await table.focus(); await page.keyboard.press('ArrowRight');
-      await page.waitForFunction(() => document.querySelector('[aria-label="Subjects table"]').scrollLeft > 0);
-      if (width === 375) await page.screenshot({ path: shots + 'forecast-detail-mobile.png', fullPage: true });
-      await pickStatus(page, 'Finalized');
-      const finalize = page.getByRole('dialog', { name: 'Finalize forecast' }); await finalize.waitFor();
-      const finalizeBox = await finalize.boundingBox(); assert.ok(finalizeBox.x >= 0 && finalizeBox.x + finalizeBox.width <= width);
-      await page.keyboard.press('Escape');
-    }, width);
-
-    for (const width of [320, 375]) await check('mobile: offering decisions have no horizontal overflow at ' + width, async page => {
-      const state = await mock(page, { seed: 'finalized', secondFinalized: true }); await page.setViewportSize({ width, height: 800 });
-      await page.goto(base + decisionsUrl); await page.getByRole('heading', { name: 'Confirm offerings for this semester' }).waitFor();
+      assert.ok(await table.evaluate(element => element.scrollWidth >= element.clientWidth)); // local horizontal scrolling only
+      if (width === 375) await page.screenshot({ path: shots + 'forecast-mobile.png', fullPage: true });
+      await page.getByRole('button', { name: /^Action for SECJ1013: / }).click();
+      const menu = page.getByRole('menu', { name: 'Action for SECJ1013' }); await menu.waitFor();
+      const menuBox = await menu.boundingBox(); assert.ok(menuBox.x >= 0 && menuBox.x + menuBox.width <= width, 'action menu inside the viewport');
       assert.ok(await noOverflow(page));
-      const table = page.getByRole('region', { name: 'Subjects to confirm table' });
-      assert.ok(await table.evaluate(element => element.scrollWidth > element.clientWidth));
-      await page.getByLabel('Select SECJ1013').check();
-      await page.getByLabel('Pick deadline').fill(localInput(14));
-      assert.ok(await noOverflow(page));
-      if (width === 375) await page.screenshot({ path: shots + 'decisions-create-mobile.png', fullPage: true });
-      await page.getByRole('button', { name: 'Confirm 1 subject' }).click();
-      const dialog = page.getByRole('dialog', { name: 'Confirm offerings' }); await dialog.waitFor();
-      let box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 800);
-      assert.ok(await noOverflow(page));
-      if (width === 375) await page.screenshot({ path: shots + 'decisions-confirm-dialog-mobile.png' });
-      await dialog.getByLabel(reasonLabel).fill('Demand is clear.'); await dialog.getByRole('button', { name: 'Confirm 1 subject' }).click(); await dialog.waitFor({ state: 'hidden' });
-      await page.getByRole('heading', { name: /Confirmed offerings/ }).waitFor();
-      state.newerConf = { forecastRunId: 2, versionNumber: 2, status: 'FINALIZED' };
-      await page.getByRole('button', { name: 'Refresh' }).click(); await page.locator('.coordinator-newer-notice').waitFor();
-      assert.ok(await noOverflow(page));
-      const offerings = page.getByRole('region', { name: 'Confirmed offerings table' });
-      assert.ok(await offerings.evaluate(element => element.scrollWidth > element.clientWidth));
-      await offerings.focus(); await page.keyboard.press('ArrowRight');
-      await page.waitForFunction(() => document.querySelector('[aria-label="Confirmed offerings table"]').scrollLeft > 0);
-      if (width === 375) await page.screenshot({ path: shots + 'decisions-existing-mobile.png', fullPage: true });
-      await page.getByRole('button', { name: 'Change pick deadline' }).click();
-      const change = page.getByRole('dialog', { name: 'Change pick deadline' }); await change.waitFor();
-      box = await change.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width);
-      assert.ok(await noOverflow(page));
-      if (width === 375) await page.screenshot({ path: shots + 'decisions-deadline-dialog-mobile.png' });
-      await page.keyboard.press('Escape');
-      await page.getByRole('button', { name: 'Withdraw SECJ1013' }).scrollIntoViewIfNeeded();
-      await page.getByRole('button', { name: 'Withdraw SECJ1013' }).click();
-      const withdraw = page.getByRole('dialog', { name: 'Withdraw SECJ1013' }); await withdraw.waitFor();
-      box = await withdraw.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width);
       await page.keyboard.press('Escape');
     }, width);
 
     const noAssignmentText = 'You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.';
     const noSemesterText = 'No current semester is set. Ask a system administrator to set it in Academic Semesters.';
-    for (const [path, heading, shot] of [['/coordinator/imports', 'Data Imports', 'imports'], ['/coordinator/forecasts', 'Class Offering Forecast', 'forecasts'], ['/coordinator/decisions', 'Offering Decisions', 'decisions']]) {
+    for (const [path, heading, shot] of [['/coordinator/imports', 'Data Imports', 'imports'], ['/coordinator/forecasts', 'Class Offering Forecast', 'forecasts']]) {
       await check(`${shot}: a coordinator without assignments sees the empty state and no actions`, async page => {
         const state = await mock(page, { noAssignments: true }); await page.goto(base + path);
         await page.getByRole('heading', { name: heading, exact: true }).first().waitFor();
         await page.getByRole('status').filter({ hasText: noAssignmentText }).waitFor();
         assert.deepEqual(await page.getByLabel('Programme', { exact: true }).locator('option').allInnerTexts(), ['Select a programme']);
         assert.equal(await page.getByLabel('Learning centre', { exact: true }).isDisabled(), true);
-        assert.equal(await page.getByRole('button', { name: /Upload and validate|Create combined snapshot|Generate forecast|Create confirmation/ }).count(), 0);
-        assert.ok(!state.requests.some(request => request.path.startsWith('/api/coordinator/forecast-imports') || request.path.includes('forecast-runs') || request.path.includes('confirmed-offerings')), 'no scoped request without a scope');
+        assert.equal(await page.getByRole('button', { name: /Upload and validate|Create combined snapshot|Generate forecast/ }).count(), 0);
+        assert.ok(!state.requests.some(request => request.path.startsWith('/api/coordinator/forecast-imports') || request.path.includes('forecast-runs') || request.path.includes('offering-decisions')), 'no scoped request without a scope');
         assert.equal(await page.getByText('Choose a scope', { exact: true }).count(), 0, 'no misleading scope prompt');
         assert.equal(await page.getByText(/Select a programme and a learning centre to/).count(), 0);
         await page.screenshot({ path: shots + `${shot}-no-assignments-desktop.png`, fullPage: true });
@@ -1141,6 +848,16 @@ else {
         await page.screenshot({ path: shots + `${shot}-no-current-semester-desktop.png`, fullPage: true });
       });
     }
+
+    await check('the removed review, versions, comparison and offering decisions pages no longer exist', async page => {
+      await mock(page, { seed: 'run' });
+      for (const path of ['/coordinator/decisions', '/coordinator/versions', '/coordinator/comparison']) {
+        await page.goto(base + path + scoped);
+        await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
+      }
+      const links = await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link').allInnerTexts();
+      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Data Quality', 'Class Offering Forecast', 'Decision Audit']);
+    });
 
     console.log('PASS ' + passed + ' coordinator browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }

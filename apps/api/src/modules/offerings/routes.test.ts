@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AccessAssignment, VerifiedIdentity } from '../auth/contracts';
 import { AuthError } from '../auth/errors';
 import { demoContext } from '../../../../../tools/offerings/demo/fixtures';
-import type { OfferingDependencies } from './contracts';
+import type { OfferingDependencies, StudentOfferingContext } from './contracts';
 import { handleOfferingRequest } from './routes';
 
 function fixture() {
@@ -10,7 +10,8 @@ function fixture() {
     primaryEmail: { address: 'fictional@graduate.utm.my', verified: true } };
   const assignment: AccessAssignment = { clerkUserId: identity.clerkUserId, appRole: 'STUDENT', roles: ['STUDENT'], accessStatus: 'ACTIVE' };
   const values = new Map<string, string[]>();
-  const context = { ...structuredClone(demoContext), studentId: '301' };
+  const context: StudentOfferingContext = { ...structuredClone(demoContext), studentId: '301', programmeId: '501', learningCentreId: '601',
+    withdrawnSubjects: [], window: structuredClone(demoContext.window!), limits: { maxSubjects: 6, maxCredits: 18 } };
   const deps: OfferingDependencies = {
     auth: {
       verify: vi.fn(async () => identity),
@@ -59,7 +60,7 @@ describe('authenticated UC08 offering routes', () => {
     const result = await (await f.get(f.request(undefined, '?semesterId=' + f.semesterId))).json();
     expect(result.data.selection).toEqual(input);
     expect(f.values.size).toBe(1);
-    expect(f.deps.repository.replace).toHaveBeenCalledWith({ clerkUserId: 'fictional_a', studentId: f.context.studentId, curriculumId: f.context.curriculum.curriculumId }, input);
+    expect(f.deps.repository.replace).toHaveBeenCalledWith({ clerkUserId: 'fictional_a', studentId: f.context.studentId, curriculumId: f.context.curriculum.curriculumId, programmeId: '501', learningCentreId: '601' }, input);
     expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a', { includePrerequisites: false });
   });
   it('isolates students and semesters using verified identity', async () => {
@@ -76,12 +77,75 @@ describe('authenticated UC08 offering routes', () => {
     expect((await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: [], [field]: 'other' }))).status).toBe(400);
     expect(f.deps.repository.replace).not.toHaveBeenCalled();
   });
-  it('rejects subjects outside the current curriculum and duplicates without writes', async () => {
+  it('rejects duplicates with 400 and any subject that is not approved with 409 OFFERING_NOT_APPROVED, without writes', async () => {
     const f = fixture();
-    for (const ids of [['601'], [f.subjectId, f.subjectId]]) {
-      expect((await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: ids }))).status).toBe(400);
-    }
+    expect((await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: [f.subjectId, f.subjectId] }))).status).toBe(400);
+    const outside = await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: ['601'] }));
+    expect(outside.status).toBe(409);
+    expect((await outside.json()).error.code).toBe('OFFERING_NOT_APPROVED');
     expect(f.deps.repository.replace).not.toHaveBeenCalled();
+  });
+  it('PUT rejects a subject that is no longer approved', async () => {
+    const f = fixture();
+    // The coordinator withdrew the subject: the fresh context no longer lists it.
+    f.context.subjects = f.context.subjects.filter(subject => subject.curriculumSubjectId !== f.subjectId);
+    const response = await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: [f.subjectId] }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({ code: 'OFFERING_NOT_APPROVED', message: 'A subject you picked is no longer offered. Reload offerings.' });
+    expect(f.deps.repository.replace).not.toHaveBeenCalled();
+  });
+  it('PUT rejects picks over max_subjects or max_credits', async () => {
+    const f = fixture();
+    f.context.limits = { maxSubjects: 1, maxCredits: 18 };
+    const ids = f.context.subjects.slice(0, 2).map(subject => subject.curriculumSubjectId);
+    const bySubjects = await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: ids }));
+    expect(bySubjects.status).toBe(409);
+    expect((await bySubjects.json()).error).toMatchObject({ code: 'PICK_LIMIT_EXCEEDED', message: 'You can pick at most 1 subjects and 18 credits for this semester.' });
+    f.context.limits = { maxSubjects: 6, maxCredits: 5 };
+    const byCredits = await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: ids }));
+    expect(byCredits.status).toBe(409);
+    expect((await byCredits.json()).error.code).toBe('PICK_LIMIT_EXCEEDED');
+    expect(f.deps.repository.replace).not.toHaveBeenCalled();
+  });
+  it('PUT is 409 PICKS_CLOSED after closing and 409 PICKS_NOT_OPEN during planning', async () => {
+    const closed = fixture(); closed.context.window.status = 'CLOSED';
+    const response = await closed.get(closed.request({ semesterId: closed.semesterId, curriculumSubjectIds: [closed.subjectId] }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({ code: 'PICKS_CLOSED', message: 'Picking is closed. The selection period has ended.' });
+    for (const status of ['NOT_OPEN', 'NOT_SCHEDULED', 'NO_NEXT_SEMESTER', 'NO_LEARNING_CENTRE'] as const) {
+      const f = fixture(); f.context.window.status = status;
+      const planning = await f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: [] }));
+      expect(planning.status).toBe(409);
+      expect((await planning.json()).error).toMatchObject({ code: 'PICKS_NOT_OPEN', message: 'Picking has not opened yet.' });
+      expect(f.deps.repository.replace).not.toHaveBeenCalled();
+    }
+  });
+  it('GET with another semesterId is 409 SEMESTER_NOT_TARGET', async () => {
+    const f = fixture(); const other = demoContext.semesters[1]!.semesterId;
+    const response = await f.get(f.request(undefined, '?semesterId=' + other));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({ code: 'SEMESTER_NOT_TARGET', message: 'Offerings are only available for the next semester.' });
+  });
+  it('no learning centre shows the profile prompt', async () => {
+    const f = fixture();
+    f.context.learningCentreId = null; f.context.subjects = []; f.context.window = { ...f.context.window, status: 'NO_LEARNING_CENTRE', learningCentreName: null };
+    const response = await f.get(f.request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.window.status).toBe('NO_LEARNING_CENTRE');
+    expect(body.data.subjects).toEqual([]);
+    expect(body.data.selection).toBeNull();
+    expect(f.deps.repository.read).not.toHaveBeenCalled();
+  });
+  it('returns the window, limits and withdrawal notes, and lists only picks that are still offered', async () => {
+    const f = fixture();
+    f.context.withdrawnSubjects = [{ subjectId: '9', code: 'DEMO204', name: 'Human–computer interaction', withdrawnAt: '2026-11-09T10:00:00.000Z' }];
+    f.values.set('fictional_a' + f.semesterId, [f.subjectId, '999']);
+    const body = await (await f.get(f.request())).json();
+    expect(body.data).toMatchObject({ window: { status: 'OPEN', targetSemesterId: f.semesterId }, limits: { maxSubjects: 6, maxCredits: 18 },
+      withdrawnSubjects: [{ code: 'DEMO204' }], selection: { curriculumSubjectIds: [f.subjectId] } });
+    expect(body.data.programmeId).toBeUndefined();
+    expect(body.data.learningCentreId).toBeUndefined();
   });
   it('rejects unconfigured semester and unexpected/ambiguous queries', async () => {
     const f = fixture();
@@ -90,14 +154,17 @@ describe('authenticated UC08 offering routes', () => {
       expect((await f.get(f.request(undefined, query))).status).toBe(400);
     }
   });
-  it('uses only the profile semester for reads and writes', async () => {
+  it('uses only the target semester for reads and writes and tolerates a missing next semester', async () => {
     const f = fixture();
     const other = demoContext.semesters[1]!.semesterId;
     expect((await f.get(f.request(undefined, '?semesterId=' + other))).status).toBe(409);
     expect((await f.get(f.request({ semesterId: other, curriculumSubjectIds: [f.subjectId] }))).status).toBe(409);
     expect(f.deps.repository.replace).not.toHaveBeenCalled();
-    const incomplete = fixture(); incomplete.context.currentSemesterId = '';
-    expect((await incomplete.get(incomplete.request())).status).toBe(403);
+    const none = fixture(); delete none.context.currentSemesterId;
+    none.context.subjects = []; none.context.window = { status: 'NO_NEXT_SEMESTER', targetSemesterId: null, selectionOpensAt: null, selectionClosesAt: null, learningCentreName: 'Demonstration centre' };
+    const response = await none.get(none.request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({ window: { status: 'NO_NEXT_SEMESTER' }, selection: null });
   });
   it.each(['COORDINATOR', 'SYSTEM_ADMIN'] as const)('denies %s access', async role => {
     const f = fixture(); f.assignment.appRole = role; f.assignment.roles = [role];

@@ -17,7 +17,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
   let accounts: AdminRepository;
   const actor = 'user_academic_test_admin';
   const reason = 'Reviewed test change';
-  const input = { academicYear: '2080/2081', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: '2080-01-01', endDate: '2080-05-01', reason };
+  const input = { academicYear: '2080/2081', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: '2080-01-01', endDate: '2080-05-01', selectionOpensAt: null, selectionClosesAt: null, reason };
   beforeAll(async () => {
     const moduleName = 'pg';
     const pg = await import(/* @vite-ignore */ moduleName) as { default?: { Client: new (config: unknown) => PgClient }; Client?: new (config: unknown) => PgClient };
@@ -99,6 +99,11 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     await expect(repository.updateAcademicSemester(row.semesterId, { semesterNo: 3, reason }, actor)).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
     await expect(repository.updateAcademicSemester(row.semesterId, { startDate: '2080-06-01', reason }, actor)).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
     expect(await repository.updateAcademicSemester(row.semesterId, { semesterNo: 3, semesterType: 'SHORT', reason }, actor)).toMatchObject({ semesterNo: 3, semesterType: 'SHORT', maxSubjects: 0, startDate: null });
+  });
+  it('stores and returns selection dates as UTC ISO text and rejects a closing time before the opening time', async () => {
+    const row = await repository.createAcademicSemester({ ...input, semesterNo: 2, selectionOpensAt: '2080-01-10T02:00:00.000Z', selectionClosesAt: '2080-02-10T02:00:00.000Z' }, actor);
+    expect(row).toMatchObject({ selectionOpensAt: '2080-01-10T02:00:00.000Z', selectionClosesAt: '2080-02-10T02:00:00.000Z' });
+    await expect(repository.updateAcademicSemester(row.semesterId, { selectionClosesAt: '2080-01-01T00:00:00.000Z', reason }, actor)).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
   });
   it('creates, filters and ends assignment history, with direct missing and duplicate codes', async () => {
     const data = await seed();

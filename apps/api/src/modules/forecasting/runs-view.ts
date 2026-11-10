@@ -1,10 +1,9 @@
-import type { ForecastAuditEntry } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ConfigurationIssueCode, DemandBreakdown, UncertaintyReasonCount } from '../../../../../packages/shared/src/forecasting/engine/types';
-import { RUN_LIMITS, runRevision, sectionFlags, subjectDecisionStatus } from '../../../../../packages/shared/src/forecasting/runs';
+import { runRevision, sectionFlags, subjectDecisionStatus } from '../../../../../packages/shared/src/forecasting/runs';
 import type {
-  ForecastRunDetail, ForecastRunHeader, ForecastRunSummary, NewerForecastAvailable, RunSection, RunSubject, RunSummary,
+  ForecastRunDetail, ForecastRunHeader, RunSection, RunSubject, RunSummary,
 } from '../../../../../packages/shared/src/forecasting/runs';
-import type { RunDetailRows, RunListRow, RunRecord, RunSectionRow, RunSubjectRow } from './runs-contracts';
+import type { RunDetailRows, RunRecord, RunSectionRow, RunSubjectRow } from './runs-contracts';
 
 /** Per-subject data the engine produces that has no column of its own; stored in `forecast_run.scenario_assumptions.subjects`. */
 export interface StoredSubjectAssumptions {
@@ -22,20 +21,14 @@ export interface StoredSubjectAssumptions {
 
 export const revisionOf = (run: Pick<RunRecord, 'forecastRunId' | 'status' | 'auditCount'>) => runRevision(run.forecastRunId, run.status, run.auditCount);
 
-export function headerOf(run: RunRecord, newer: NewerForecastAvailable | null): ForecastRunHeader {
+/** The "newer forecast" notice belonged to the removed forecast-version flow; a snapshot has exactly one forecast. */
+export function headerOf(run: RunRecord): ForecastRunHeader {
   return {
     forecastRunId: run.forecastRunId, programmeId: run.programmeId, learningCentreId: run.learningCentreId, targetSemesterId: run.targetSemesterId,
     importBatchId: run.importBatchId, versionNumber: run.versionNumber, parentForecastRunId: run.parentForecastRunId, status: run.status, revision: revisionOf(run),
     demandAssumption: 'SUPPORTED_ELIGIBLE_POOL', engineVersion: run.engineVersion, generatedBy: run.generatedBy, generatedAt: run.generatedAt,
-    finalizedBy: run.finalizedBy, finalizedAt: run.finalizedAt, newerForecastAvailable: newer,
+    finalizedBy: run.finalizedBy, finalizedAt: run.finalizedAt, newerForecastAvailable: null,
   };
-}
-
-export const newerOf = (latest: { forecastRunId: number; versionNumber: number; status: NewerForecastAvailable['status'] } | null, run: Pick<RunRecord, 'versionNumber'>): NewerForecastAvailable | null =>
-  latest && latest.versionNumber > run.versionNumber ? { forecastRunId: latest.forecastRunId, versionNumber: latest.versionNumber, status: latest.status } : null;
-
-export function summaryOfList(row: RunListRow, newer: NewerForecastAvailable | null): ForecastRunSummary {
-  return { ...headerOf(row, newer), summary: row.summary };
 }
 
 function sectionOf(row: RunSectionRow): RunSection {
@@ -81,11 +74,11 @@ export function summaryOf(subjects: RunSubject[]): RunSummary {
   };
 }
 
-export function detailOf(rows: RunDetailRows, newer: NewerForecastAvailable | null, audit: ForecastAuditEntry[], auditTruncated: boolean): ForecastRunDetail {
+export function detailOf(rows: RunDetailRows): ForecastRunDetail {
   const subjects = rows.subjects.map((row) => subjectOf(row, assumptionsFor(rows, row.subjectId), rows.sections));
   return {
-    ...headerOf(rows.run, newer), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' || rows.scenarioAssumptions.importSource === 'COMBINED' ? rows.scenarioAssumptions.importSource : 'CSV', summary: summaryOf(subjects), subjects,
+    ...headerOf(rows.run), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' || rows.scenarioAssumptions.importSource === 'COMBINED' ? rows.scenarioAssumptions.importSource : 'CSV', summary: summaryOf(subjects), subjects,
     ruleSnapshot: rows.ruleSnapshot, originalRecommendations: rows.originalRecommendations,
-    audit: audit.slice(0, RUN_LIMITS.embeddedAuditEntries), auditTruncated,
+    audit: [], auditTruncated: false,
   };
 }

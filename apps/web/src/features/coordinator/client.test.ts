@@ -89,8 +89,8 @@ it('generates a run: 201 is new, 200 is a replay of the existing run, ETag wins 
 
 it('uses a fresh Idempotency-Key for each mutation', async () => {
   const fetcher = vi.fn<Fetch>(async () => reply(receipt)); vi.stubGlobal('fetch', fetcher);
-  await client().startReview(3, 'fr3.DRAFT.0', scope); const first = headersOf(fetcher)['Idempotency-Key'];
-  await client().startReview(3, 'fr3.DRAFT.0', scope); expect(headersOf(fetcher)['Idempotency-Key']).not.toBe(first);
+  await client().generateRun({ ...scope, importBatchId: 9, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' }); const first = headersOf(fetcher)['Idempotency-Key'];
+  await client().generateRun({ ...scope, importBatchId: 9, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' }); expect(headersOf(fetcher)['Idempotency-Key']).not.toBe(first);
 });
 
 it('reads a run with its revision from the ETag header, falling back to the body', async () => {
@@ -100,29 +100,12 @@ it('reads a run with its revision from the ETag header, falling back to the body
   expect((await client().getRun(3)).revision).toBe('fr3.UNDER_REVIEW.1');
 });
 
-it.each([
-  ['startReview', (c: ReturnType<typeof client>) => c.startReview(3, 'fr3.DRAFT.0', scope, 'Begin'), '/api/coordinator/forecast-runs/3/reviews', { scope, action: 'START_REVIEW', reason: 'Begin' }, '"fr3.DRAFT.0"'],
-  ['decide', (c: ReturnType<typeof client>) => c.decide(3, 'fr3.UNDER_REVIEW.1', scope, [{ subjectId: 7, action: 'APPROVE', reason: 'Ok' }]), '/api/coordinator/forecast-runs/3/decisions', { scope, decisions: [{ subjectId: 7, action: 'APPROVE', reason: 'Ok' }] }, '"fr3.UNDER_REVIEW.1"'],
-  ['finalize', (c: ReturnType<typeof client>) => c.finalize(3, 'fr3.UNDER_REVIEW.4', scope, { reason: 'Done' }), '/api/coordinator/forecast-runs/3/finalizations', { scope, reason: 'Done' }, '"fr3.UNDER_REVIEW.4"'],
-])('%s posts JSON with a quoted If-Match', async (_name, call, path, body, ifMatch) => {
-  const fetcher = vi.fn<Fetch>(async () => reply(receipt)); vi.stubGlobal('fetch', fetcher);
-  await call(client());
-  expect(fetcher.mock.calls[0]![0]).toBe(path);
-  expect(headersOf(fetcher)).toMatchObject({ Authorization: 'Bearer TEST_ONLY', 'Content-Type': 'application/json', 'If-Match': ifMatch });
-  expect(JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string)).toEqual(body);
-});
-
 it('keeps the stable error code, safe details and a readable message', async () => {
-  const error = { error: { code: 'REVIEWS_INCOMPLETE', message: 'Every proposed section must be reviewed.', details: { pendingSubjectIds: [4, 9] } } };
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(error), { status: 422, headers: { 'Content-Type': 'application/json' } })));
-  const failure = await client().finalize(3, 'fr3.UNDER_REVIEW.4', scope, { reason: 'x' }).catch(value => value);
+  const error = { error: { code: 'IMPORT_NOT_FOUND', message: 'Import not found.', details: { importBatchId: 9 } } };
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(error), { status: 404, headers: { 'Content-Type': 'application/json' } })));
+  const failure = await client().getImport(9).catch(value => value);
   expect(failure).toBeInstanceOf(CoordinatorApiError);
-  expect(failure).toMatchObject({ status: 422, code: 'REVIEWS_INCOMPLETE', details: { pendingSubjectIds: [4, 9] } });
-});
-
-it('reports a 412 as RUN_REVISION_MISMATCH', async () => {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'RUN_REVISION_MISMATCH', message: 'Changed.' } }), { status: 412, headers: { 'Content-Type': 'application/json' } })));
-  await expect(client().decide(3, 'fr3.DRAFT.0', scope, [])).rejects.toMatchObject({ status: 412, code: 'RUN_REVISION_MISMATCH' });
+  expect(failure).toMatchObject({ status: 404, code: 'IMPORT_NOT_FOUND', details: { importBatchId: 9 } });
 });
 
 it.each([401, 403])('turns an unreadable %s into a typed error', async status => {
@@ -138,7 +121,7 @@ it('rejects a malformed success body instead of rendering it', async () => {
 it('does not publish a response after the signed-in account changes', async () => {
   let finish!: (value: Response) => void;
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
-  const pending = client().listRuns(scope).then(() => null, error => error);
+  const pending = client().listImports(scope).then(() => null, error => error);
   await vi.waitFor(() => expect(finish).toBeDefined());
   keepAccountSession({ userId: 'someone_else', sessionId: 'another_session' });
   finish(reply({ items: [] }));
@@ -151,63 +134,6 @@ it('bounds a stalled token and never sends a late request', async () => {
   await vi.advanceTimersByTimeAsync(20000);
   expect(await pending).toMatchObject({ code: 'FORECASTING_TIMEOUT' });
   token('LATE'); await Promise.resolve(); expect(fetcher).not.toHaveBeenCalled();
-});
-
-const confirmationSet = { scope, pickDeadline: '2026-11-20T04:00:00.000Z', revision: 'oc1.3', forecastRunId: 3, pickWindow: 'OPEN', newerForecastAvailable: null, offerings: [] };
-const confirmationReceipt = { resourceId: 1, ...scope, acceptedAt: '2026-11-01T00:00:00Z', revision: 'oc1.3' };
-
-it('reads a confirmation, preferring the ETag as revision, and reports no revision before the first confirmation', async () => {
-  const fetcher = vi.fn<Fetch>(async () => reply(confirmationSet, { headers: { ETag: '"oc1.9"' } })); vi.stubGlobal('fetch', fetcher);
-  expect(await client().getConfirmation(scope)).toMatchObject({ revision: 'oc1.9', set: { forecastRunId: 3 } });
-  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/confirmed-offerings?programmeId=5&learningCentreId=1&targetSemesterId=2');
-  fetcher.mockResolvedValueOnce(reply({ ...confirmationSet, revision: null, pickDeadline: null, offerings: [] }));
-  expect(await client().getConfirmation(scope)).toMatchObject({ revision: null });
-  fetcher.mockResolvedValueOnce(reply({ scope }));
-  await expect(client().getConfirmation(scope)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
-});
-
-it('creates the first confirmation without If-Match and with baseRevision null', async () => {
-  const fetcher = vi.fn<Fetch>(async () => reply(confirmationReceipt, { status: 201, headers: { ETag: '"oc1.3"' } })); vi.stubGlobal('fetch', fetcher);
-  const result = await client().confirmOfferings({ scope, forecastRunId: 3, subjectIds: [101, 102], reason: 'Offered', pickDeadline: '2026-11-20T04:00:00.000Z', revision: null });
-  expect(result).toMatchObject({ created: true, revision: 'oc1.3' });
-  const init = fetcher.mock.calls[0]![1] as RequestInit;
-  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/confirmed-offerings');
-  expect(headersOf(fetcher)).toEqual({ Authorization: 'Bearer TEST_ONLY', 'Content-Type': 'application/json', 'Idempotency-Key': expect.any(String) });
-  expect(JSON.parse(init.body as string)).toEqual({ scope, forecastRunId: 3, subjectIds: [101, 102], reason: 'Offered', baseRevision: null, pickDeadline: '2026-11-20T04:00:00.000Z' });
-});
-
-it('sends the quoted revision in If-Match and baseRevision for later confirm, withdraw and deadline changes', async () => {
-  const fetcher = vi.fn<Fetch>(async () => reply(confirmationReceipt)); vi.stubGlobal('fetch', fetcher);
-  await client().confirmOfferings({ scope, forecastRunId: 3, subjectIds: [103], reason: 'Add', pickDeadline: '2026-11-20T04:00:00.000Z', revision: 'oc1.3' });
-  expect(headersOf(fetcher)['If-Match']).toBe('"oc1.3"');
-  expect(JSON.parse((fetcher.mock.calls.at(-1)![1] as RequestInit).body as string).baseRevision).toBe('oc1.3');
-  await client().withdrawOfferings(scope, 'oc1.3', [101], 'Not enough demand');
-  expect(fetcher.mock.calls.at(-1)![0]).toBe('/api/coordinator/confirmed-offerings/withdrawals');
-  expect(headersOf(fetcher)['If-Match']).toBe('"oc1.3"');
-  expect(JSON.parse((fetcher.mock.calls.at(-1)![1] as RequestInit).body as string)).toEqual({ scope, subjectIds: [101], reason: 'Not enough demand', baseRevision: 'oc1.3' });
-  await client().setPickDeadline(scope, 'oc1.3', { pickDeadline: '2026-11-25T04:00:00.000Z', reason: 'More time', forecastRunId: 4 });
-  expect(fetcher.mock.calls.at(-1)![0]).toBe('/api/coordinator/confirmed-offerings/pick-deadline');
-  expect(JSON.parse((fetcher.mock.calls.at(-1)![1] as RequestInit).body as string)).toEqual({ scope, pickDeadline: '2026-11-25T04:00:00.000Z', reason: 'More time', baseRevision: 'oc1.3', forecastRunId: 4 });
-  await client().setPickDeadline(scope, 'oc1.3', { pickDeadline: '2026-11-25T04:00:00.000Z', reason: 'More time' });
-  expect(JSON.parse((fetcher.mock.calls.at(-1)![1] as RequestInit).body as string)).not.toHaveProperty('forecastRunId');
-});
-
-it('surfaces confirmation errors with their stable code, status and safe details', async () => {
-  const body = { error: { code: 'SUBJECT_EXCLUDED', message: 'Excluded.', details: { subjectIds: [104] } } };
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json' } })));
-  await expect(client().confirmOfferings({ scope, forecastRunId: 3, subjectIds: [104], reason: 'x', pickDeadline: '2026-11-20T04:00:00.000Z', revision: null }))
-    .rejects.toMatchObject({ status: 422, code: 'SUBJECT_EXCLUDED', details: { subjectIds: [104] } });
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'CONFIRMATION_REVISION_MISMATCH', message: 'Changed.' } }), { status: 412, headers: { 'Content-Type': 'application/json' } })));
-  await expect(client().withdrawOfferings(scope, 'oc1.1', [101], 'x')).rejects.toBeInstanceOf(CoordinatorApiError);
-});
-
-it('pages the confirmation audit and reads honest pick counts', async () => {
-  const fetcher = vi.fn<Fetch>(async () => reply({ items: [{ auditId: 5, action: 'CONFIRM', recordedAt: '2026-11-01T00:00:00Z' }], nextCursor: 'NQ' })); vi.stubGlobal('fetch', fetcher);
-  expect(await client().listConfirmationAudit(scope, { limit: 20, cursor: 'abc' })).toMatchObject({ nextCursor: 'NQ' });
-  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/confirmed-offerings/audit?programmeId=5&learningCentreId=1&targetSemesterId=2&limit=20&cursor=abc');
-  fetcher.mockResolvedValueOnce(reply({ scope, asOf: '2026-11-01T00:00:00Z', pickDeadline: null, picksAvailable: false, counts: [] }));
-  expect(await client().pickCounts(scope)).toMatchObject({ picksAvailable: false });
-  expect(fetcher.mock.calls.at(-1)![0]).toBe('/api/coordinator/offering-pick-counts?programmeId=5&learningCentreId=1&targetSemesterId=2');
 });
 
 it('creates a system-students snapshot with a JSON body, an idempotency key and 201 or 200 replay', async () => {
@@ -244,4 +170,54 @@ it('uploads the combined snapshot as multipart to its own endpoint, with replay 
   const body = { error: { code: 'IMPORT_CORRECTION_REQUIRED', message: 'Correct', report: { ...report, source: 'COMBINED' } } };
   fetcher.mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json', ETag: '"sha256:combined"' } }));
   expect(await client().uploadCombined(input)).toMatchObject({ kind: 'CORRECTION_REQUIRED', revision: 'sha256:combined' });
+});
+
+const decisionSet = {
+  scope, semester: { semesterId: 2, academicYear: '2026/2027', semesterNumber: 2, selectionOpensAt: null, selectionClosesAt: null }, phase: 'PLANNING', asOf: '2026-11-01T00:00:00Z', editable: true,
+  decisions: [{ subjectId: 7, subjectCode: 'SECJ1013', subjectName: 'Programming Technique I', creditHours: 3, classType: 'LAB', status: 'APPROVED', decidedBy: 'user_test', decidedAt: '2026-11-01T00:00:00Z' }], pickCounts: [],
+};
+
+it('reads the offering decisions of a scope with the phase', async () => {
+  const fetcher = vi.fn<Fetch>(async () => reply(decisionSet)); vi.stubGlobal('fetch', fetcher);
+  const set = await client().getDecisions(scope);
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/offering-decisions?programmeId=5&learningCentreId=1&targetSemesterId=2');
+  expect(set).toMatchObject({ phase: 'PLANNING', editable: true, decisions: [{ subjectId: 7, status: 'APPROVED' }], pickCounts: [] });
+});
+
+it('rejects a decision set without a phase or without the lists', async () => {
+  const { phase: _phase, ...withoutPhase } = decisionSet; void _phase;
+  vi.stubGlobal('fetch', vi.fn(async () => reply(withoutPhase)));
+  await expect(client().getDecisions(scope)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  vi.stubGlobal('fetch', vi.fn(async () => reply({ ...decisionSet, pickCounts: undefined })));
+  await expect(client().getDecisions(scope)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+});
+
+it('decides with an Idempotency-Key, the exact body and no If-Match', async () => {
+  const fetcher = vi.fn<Fetch>(async () => reply({ subjectId: 7, beforeStatus: 'PENDING', afterStatus: 'APPROVED', affectedPicks: 0, phase: 'PLANNING' })); vi.stubGlobal('fetch', fetcher);
+  const result = await client().decide({ scope: { ...scope, programmeLabel: 'x' } as typeof scope, subjectId: 7, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: 9 });
+  expect(result).toMatchObject({ afterStatus: 'APPROVED', affectedPicks: 0 });
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/offering-decisions');
+  expect((fetcher.mock.calls[0]![1] as RequestInit).method).toBe('POST');
+  expect(headersOf(fetcher)).toMatchObject({ 'Content-Type': 'application/json', 'Idempotency-Key': expect.any(String) });
+  expect(headersOf(fetcher)).not.toHaveProperty('If-Match');
+  expect(JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string)).toEqual({ scope, subjectId: 7, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: 9 });
+});
+
+it('keeps the DECISION_STALE code and reads the decision audit', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'DECISION_STALE', message: 'Changed.' } }), { status: 409, headers: { 'Content-Type': 'application/json' } })));
+  await expect(client().decide({ scope, subjectId: 7, status: 'REMOVED', expectedStatus: 'PENDING', importBatchId: null })).rejects.toMatchObject({ status: 409, code: 'DECISION_STALE' });
+  const fetcher = vi.fn<Fetch>(async () => reply({ items: [{ auditId: 1, beforeStatus: 'PENDING', afterStatus: 'APPROVED', recordedAt: '2026-11-01T00:00:00Z' }] })); vi.stubGlobal('fetch', fetcher);
+  expect((await client().listDecisionAudit(scope, { limit: 20 })).items).toHaveLength(1);
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/offering-decisions/audit?programmeId=5&learningCentreId=1&targetSemesterId=2&limit=20');
+});
+
+it('reads the pickers of a subject and rejects a body without the list', async () => {
+  const body = { scope, subjectId: 7, subjectCode: 'SECJ1013', subjectName: 'Programming Technique I', pickCount: 1, emailsAvailable: true, pickers: [{ studentId: 3, studentName: 'Aisyah', matricNo: null, email: 'a@graduate.utm.my' }] };
+  const fetcher = vi.fn<Fetch>(async () => reply(body)); vi.stubGlobal('fetch', fetcher);
+  expect(await client().getPickers(scope, 7)).toMatchObject({ pickCount: 1, pickers: [{ studentId: 3 }] });
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/offering-decisions/7/pickers?programmeId=5&learningCentreId=1&targetSemesterId=2');
+  vi.stubGlobal('fetch', vi.fn(async () => reply({ ...body, pickers: undefined })));
+  await expect(client().getPickers(scope, 7)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'OFFERING_DECISION_NOT_FOUND', message: 'None.' } }), { status: 404, headers: { 'Content-Type': 'application/json' } })));
+  await expect(client().getPickers(scope, 8)).rejects.toMatchObject({ status: 404, code: 'OFFERING_DECISION_NOT_FOUND' });
 });

@@ -74,7 +74,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
     },
     repository: fake.repository,
     runs: {} as ForecastingDependencies["runs"],
-    offerings: {} as ForecastingDependencies["offerings"],
+    decisions: {} as ForecastingDependencies["decisions"],
     scopes: options.scopes ?? testScopeProvider,
     now: () => new Date('2026-11-01T12:00:00.000Z'),
   };
@@ -146,6 +146,14 @@ describe('template and context', () => {
     expect(body.data).toMatchObject({ currentSemesterId: 1, targetSemesterId: 2, assignedScopes: [{ programmeId: 5, learningCentreId: 2 }] });
     expect(body.data.targetSemesters).toEqual([{ semesterId: 2, academicYear: '2026/2027', semesterNumber: 2 }]);
     expect(body.data.subjects).toEqual([]);
+  });
+  it('forecast-context lists every semester with its selection window', async () => {
+    const { deps } = fixture();
+    deps.repository.semesters = vi.fn(async () => semesters.map((s) => ({ ...s, selectionOpensAt: s.semesterId === 2 ? '2026-11-20T00:00:00.000Z' : null, selectionClosesAt: null })));
+    const body = await (await send(deps, 'forecast-context', { method: 'GET' })).json();
+    expect(body.data.semesters).toHaveLength(3);
+    expect(body.data.semesters[1]).toMatchObject({ semesterId: 2, selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: null });
+    expect(body.data.targetSemesters[0]).toMatchObject({ semesterId: 2, selectionOpensAt: '2026-11-20T00:00:00.000Z' });
   });
   it('adds curricula, subjects and prerequisite links for an assigned programme', async () => {
     const body = await (await send(fixture().deps, 'forecast-context?programmeId=5', { method: 'GET' })).json();

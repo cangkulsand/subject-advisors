@@ -5,7 +5,7 @@ export function academicStore(state) {
     centres: state.empty ? [] : [{ learningCentreId: 1, centreCode: 'TEST', centreName: 'Fictional learning centre', isActive: true }],
     faculties: state.empty ? [] : [{ facultyId: 1, facultyCode: 'TEST', facultyName: 'Fictional faculty', isActive: true }, { facultyId: 2, facultyCode: 'OTHER', facultyName: 'Fictional other faculty', isActive: true }],
     programmes: state.empty ? [] : [{ programmeId: 1, programmeCode: 'TEST', programmeName: 'Fictional programme', facultyId: 1 }],
-    semesters: state.empty ? [] : [1, 2, 3].map(n => ({ semesterId: n, academicYear: '2026/2027', semesterNo: n, semesterType: n === 3 ? 'SHORT' : 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false })),
+    semesters: state.empty ? [] : [1, 2, 3].map(n => ({ semesterId: n, academicYear: '2026/2027', semesterNo: n, semesterType: n === 3 ? 'SHORT' : 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null })),
     assignments: state.empty ? [] : [{ assignmentId: 1, accountId: 2, facultyId: 1, programmeId: 1, learningCentreId: 1, startedAt: '2026-11-01T00:00:00Z', endedAt: null }],
   };
 }

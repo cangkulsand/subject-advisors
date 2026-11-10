@@ -76,7 +76,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
       verify: vi.fn(async () => ({ clerkUserId: COORDINATOR, sessionId: 'session_test', primaryEmail: { address: 'coord@utm.my', verified: true } })),
       access: { find: vi.fn(async (id: string) => ({ clerkUserId: id, appRole: roles[0]!, roles, accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
     },
-    repository, runs: {} as ForecastingDependencies['runs'], offerings: {} as ForecastingDependencies['offerings'],
+    repository, runs: {} as ForecastingDependencies['runs'], decisions: {} as ForecastingDependencies['decisions'],
     scopes: options.scopes ?? testScopeProvider, now: () => new Date('2026-11-02T12:00:00.000Z'),
   };
   return { deps, repository, batches, stored, setData: (next: PortalStudentSelection) => { data = next; } };

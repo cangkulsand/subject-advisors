@@ -771,6 +771,16 @@
                                                                                  "endDate":  {
                                                                                                  "$ref":  "#/components/schemas/NullableDate"
                                                                                              },
+                                                                             "selectionOpensAt":  {
+                                                                                 "type":  ["string", "null"],
+                                                                                 "format":  "date-time",
+                                                                                 "description":  "Time from which students may pick offered subjects; null means selection is not scheduled."
+                                                                             },
+                                                                             "selectionClosesAt":  {
+                                                                                 "type":  ["string", "null"],
+                                                                                 "format":  "date-time",
+                                                                                 "description":  "Time at which picking closes and coordinator decisions lock. Requires selectionOpensAt and must be after it."
+                                                                             },
                                                                                  "reason":  {
                                                                                                 "$ref":  "#/components/schemas/Reason"
                                                                                             }
@@ -789,7 +799,9 @@
                                                                          "maxCredits",
                                                                          "startDate",
                                                                          "endDate",
-                                                                         "isCurrent"
+                                                                         "isCurrent",
+                                                                             "selectionOpensAt",
+                                                                             "selectionClosesAt"
                                                                      ],
                                                         "properties":  {
                                                                            "semesterId":  {
@@ -816,6 +828,16 @@
                                                                            "endDate":  {
                                                                                            "$ref":  "#/components/schemas/NullableDate"
                                                                                        },
+                                                                             "selectionOpensAt":  {
+                                                                                 "type":  ["string", "null"],
+                                                                                 "format":  "date-time",
+                                                                                 "description":  "UTC ISO date-time or null."
+                                                                             },
+                                                                             "selectionClosesAt":  {
+                                                                                 "type":  ["string", "null"],
+                                                                                 "format":  "date-time",
+                                                                                 "description":  "UTC ISO date-time or null."
+                                                                             },
                                                                            "isCurrent":  {
                                                                                              "type":  "boolean"
                                                                                          }

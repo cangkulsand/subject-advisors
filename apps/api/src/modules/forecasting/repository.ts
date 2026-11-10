@@ -14,6 +14,7 @@ const integer = (value: unknown): number => {
   return number;
 };
 const text = (value: unknown): string => String(value ?? '');
+const isoSql = (column: string) => `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
 /** Identity value of the batch inserted earlier in the same transaction (one connection, so currval is exact). */
 const CURRENT_BATCH = "currval(pg_get_serial_sequence('public.academic_import_batch','import_batch_id'))";
@@ -41,8 +42,12 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
     try { return await operation(); } catch (error) { throw mapForecastingDatabaseError(error); }
   };
   return {
-    semesters: () => read(async () => (await query('SELECT semester_id, academic_year, semester_no FROM public.academic_semester ORDER BY academic_year, semester_no', []))
-      .map((row) => ({ semesterId: integer(row.semester_id), academicYear: text(row.academic_year), semesterNumber: integer(row.semester_no) as 1 | 2 | 3 }))),
+    semesters: () => read(async () => (await query(`SELECT semester_id, academic_year, semester_no, ${isoSql('selection_opens_at')} AS selection_opens_at,
+        ${isoSql('selection_closes_at')} AS selection_closes_at FROM public.academic_semester ORDER BY academic_year, semester_no`, []))
+      .map((row) => ({
+        semesterId: integer(row.semester_id), academicYear: text(row.academic_year), semesterNumber: integer(row.semester_no) as 1 | 2 | 3,
+        selectionOpensAt: row.selection_opens_at == null ? null : text(row.selection_opens_at), selectionClosesAt: row.selection_closes_at == null ? null : text(row.selection_closes_at),
+      }))),
 
     catalogue: (programmeId) => read(async (): Promise<ProgrammeCatalogue | null> => {
       const [programme, curricula, subjects, prerequisites, codes, semesters] = await Promise.all([

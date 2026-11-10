@@ -20,7 +20,7 @@ function programme(v: unknown): Contract.ProgrammeFaculty {
 }
 function semester(v: unknown): Contract.AcademicSemester {
   const item = row<Contract.AcademicSemester>(v, ['semesterId'], ['academicYear', 'semesterType'], ['isCurrent']);
-  const checked = Contract.validateCreateSemesterRequest({ academicYear: item.academicYear, semesterNo: item.semesterNo, semesterType: item.semesterType, maxSubjects: item.maxSubjects, maxCredits: item.maxCredits, startDate: item.startDate, endDate: item.endDate, reason: 'Response validation' });
+  const checked = Contract.validateCreateSemesterRequest({ academicYear: item.academicYear, semesterNo: item.semesterNo, semesterType: item.semesterType, maxSubjects: item.maxSubjects, maxCredits: item.maxCredits, startDate: item.startDate, endDate: item.endDate, selectionOpensAt: item.selectionOpensAt, selectionClosesAt: item.selectionClosesAt, reason: 'Response validation' });
   return checked.ok ? item : invalid();
 }
 function assignment(v: unknown): Contract.AdminCoordinatorAssignment {

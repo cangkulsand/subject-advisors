@@ -37,7 +37,7 @@ const graph = {
   })),
 };
 const profile = {
-  studentId: 1, studentName: 'FICTIONAL PATHWAY TEST', matricNo: null, curriculumId: 900,
+  studentId: 1, studentName: 'FICTIONAL PATHWAY TEST', matricNo: null, learningCentreId: null, learningCentreLocked: false, curriculumId: 900,
   currentSemesterId: 1, weeklyWorkingHours: 0, availableStudyHours: 8,
   programmeCode: 'DEMO', programmeName: graph.programmeName, curriculumVersion: 'FICTIONAL',
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
@@ -48,7 +48,7 @@ function fixture(path) {
     studentProfileState: 'COMPLETE', accessStatus: 'ACTIVE', profileState: 'COMPLETE', landingPath: '/student',
   };
   if (path === '/api/profile') return profile;
-  if (path === '/api/profile/options') return { curricula: [], subjects: [], semesters: [] };
+  if (path === '/api/profile/options') return { curricula: [], subjects: [], semesters: [], learningCentres: [] };
   if (path === '/api/academic-records') return [];
   if (path === '/api/pathway/graph') return graph;
   return {};

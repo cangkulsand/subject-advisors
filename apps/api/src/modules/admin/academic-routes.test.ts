@@ -12,8 +12,8 @@ const reason = 'Reviewed correction';
 const centre = { learningCentreId: 7, centreCode: 'TEST', centreName: 'Test only', isActive: true };
 const faculty = { facultyId: 8, facultyCode: 'TEST', facultyName: 'Test faculty', isActive: true };
 const programme = { programmeId: 9, programmeCode: 'TEST', programmeName: 'Test programme', facultyId: 8, faculty };
-const semester = { semesterId: 10, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false };
-const semesterInput = { academicYear: semester.academicYear, semesterNo: semester.semesterNo, semesterType: semester.semesterType, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, reason };
+const semester = { semesterId: 10, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null };
+const semesterInput = { academicYear: semester.academicYear, semesterNo: semester.semesterNo, semesterType: semester.semesterType, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason };
 const assignment = { assignmentId: 11, accountId: 12, facultyId: 8, programmeId: 9, learningCentreId: 7, startedAt: '2026-11-02T00:00:00Z', endedAt: null };
 const assignmentInput = { accountId: 12, facultyId: 8, programmeId: 9, learningCentreId: 7, reason };
 function fixture(): AcademicSetupDependencies {
@@ -57,6 +57,7 @@ const operations: Operation[] = [
   { path: '/semesters', method: 'GET', repo: 'listAcademicSemesters', args: [], data: [semester] },
   { path: '/semesters', method: 'POST', repo: 'createAcademicSemester', body: semesterInput, args: [semesterInput, ACTOR], data: semester, status: 201 },
   { path: '/semesters/10', method: 'PATCH', repo: 'updateAcademicSemester', body: { maxSubjects: 5, reason }, args: [10, { maxSubjects: 5, reason }, ACTOR], data: semester },
+  { path: '/semesters/10', method: 'PATCH', repo: 'updateAcademicSemester', body: { selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }, args: [10, { selectionOpensAt: '2026-11-20T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z', reason }, ACTOR], data: semester },
   { path: '/current-semester', method: 'GET', repo: 'getCurrentAcademicSemester', args: [], data: null },
   { path: '/current-semester', method: 'PUT', repo: 'setCurrentAcademicSemester', body: { semesterId: 10, reason }, args: [{ semesterId: 10, reason }, ACTOR], data: { ...semester, isCurrent: true } },
   { path: '/coordinator-assignments', method: 'GET', repo: 'listCoordinatorAssignments', args: [{}], data: [assignment] },
@@ -147,6 +148,12 @@ describe('academic API boundaries', () => {
     await send(deps, '/semesters/10', 'PATCH', { endDate: '2026-12-01', reason: '  Reviewed correction  ' });
     expect(deps.repository.updateAcademicSemester).toHaveBeenCalledExactlyOnceWith(10, { endDate: '2026-12-01', reason }, ACTOR);
     expect(deps.repository.listAcademicSemesters).not.toHaveBeenCalled();
+  });
+  it('rejects a semester selection window whose closing time is not after the opening time', async () => {
+    const deps = fixture();
+    expect((await send(deps, '/semesters/10', 'PATCH', { selectionOpensAt: '2026-12-02T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z', reason })).status).toBe(400);
+    expect((await send(deps, '/semesters/10', 'PATCH', { selectionOpensAt: 'tomorrow', reason })).status).toBe(400);
+    noCalls(deps);
   });
   it.each(ACADEMIC_SETUP_ERROR_CODES)('maps stable domain error %s', async code => {
     const deps = fixture(), error = new AcademicSetupDomainError(code);

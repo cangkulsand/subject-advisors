@@ -73,6 +73,18 @@ Supply a dedicated DB_FOUNDATION_URL and an ignored explicit target file:
   npm.cmd run db:verify -- --target .wrangler/db-foundation/target.json
   npm.cmd run db:test -- --target .wrangler/db-foundation/target.json
 
+Networks that block PostgreSQL port 5432 (for example the UKM campus network, which
+resets the connection with ECONNRESET) can add --websocket to status, migrate, verify or
+test. The same commands then run over the Neon WebSocket driver on port 443 with identical
+target validation, checksums and migration records. It is allowed only for
+kind:neon-development targets:
+
+  npm.cmd run db:status -- --target .wrangler/db-foundation/target.json --websocket
+
+The runner never reads env files, so load DB_FOUNDATION_URL into the shell first (it
+is kept in the ignored .wrangler/db-foundation/neon-dev.env). When a check script raises
+an error, the output names the check file and its message.
+
 Copy db/target.example.json only after actual approval. Set development:true,
 approvedForSchemaCreation:true and approvedBy to the real decision.
 Local targets must be disposable loopback databases named utm_db_foundation_*.

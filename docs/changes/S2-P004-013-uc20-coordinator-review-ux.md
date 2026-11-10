@@ -7,6 +7,7 @@
 - **Related UC / FR:** UC20 forecast review; builds on [S2-P004-007](S2-P004-007-uc20-forecast-and-confirmation-build.md) (history kept as is) and the toolbar of [S2-INT-004](S2-INT-004-shared-table-toolbar.md).
 - **Branch / PR:** `feature/p004-s2-uc20-review-ux` (from `main` 7b4b9af); no PR
 - **Reviewer:** Coordinator review
+- **Superseded by S2-P004-017 to S2-P004-024 (2026-11-10):** the Offering Decisions page, forecast versions and review lifecycle UI described here were replaced by the single Class Offering Forecast decisions screen. See [S2-P004-024](S2-P004-024-remove-review-confirm-flow.md). History below is kept as written.
 
 ## 1. Plan
 

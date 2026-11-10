@@ -39,7 +39,11 @@ export interface ForecastScope {
 }
 export interface ProgrammeOption { programmeId: Int32Id; programmeCode: string; programmeName: string }
 export interface CentreOption { learningCentreId: Int32Id; centreCode: string; centreName: string }
-export interface SemesterOption { semesterId: Int32Id; academicYear: string; semesterNumber: 1 | 2 | 3 }
+export interface SemesterOption {
+  semesterId: Int32Id; academicYear: string; semesterNumber: 1 | 2 | 3;
+  /** Admin-set selection window (UTC ISO); null when not scheduled. */
+  selectionOpensAt?: string | null; selectionClosesAt?: string | null;
+}
 export interface CurriculumOption { curriculumId: Int32Id; programmeId: Int32Id; curriculumVersion: string; effectiveYear?: number | null }
 
 export type ConditionalPrerequisiteAvailability =
@@ -68,6 +72,8 @@ export interface ForecastContext {
   programmes: ProgrammeOption[];
   learningCentres: CentreOption[];
   targetSemesters: SemesterOption[];
+  /** Every semester with its selection window, so a screen can show phases. */
+  semesters?: SemesterOption[];
   /** Assigned programme x centre pairs (the Coordinator may only use these). */
   assignedScopes?: Array<{ programmeId: Int32Id; learningCentreId: Int32Id }>;
   /** System current semester (admin-managed marker); null when none is set. */

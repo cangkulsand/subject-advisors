@@ -165,6 +165,16 @@
         { "table": "academic_semester", "name": "is_current", "sqlType": "boolean", "nullable": false, "default": false, "purpose": "Explicit system current-semester marker" }
       ],
       "purpose": "P004 academic reference administration, coordinator scope and immutable audit; excluded from the frozen SRS baseline"
+    },
+    {
+      "migration": "0009",
+      "tables": ["offering_decision", "offering_decision_audit", "offering_pick_withdrawal"],
+      "columns": [
+        { "table": "academic_semester", "name": "selection_opens_at", "sqlType": "timestamptz", "nullable": true, "purpose": "Admin-set time from which students may pick offered subjects" },
+        { "table": "academic_semester", "name": "selection_closes_at", "sqlType": "timestamptz", "nullable": true, "purpose": "Admin-set time at which student picking closes and coordinator decisions lock" },
+        { "table": "student_profile", "name": "learning_centre_id", "sqlType": "integer", "nullable": true, "purpose": "Learning centre of the student; scopes coordinator decisions and student offerings" }
+      ],
+      "purpose": "P004 simplified UC20 offering flow: per-scope offering decisions, immutable decision audit and pick withdrawals; excluded from the frozen SRS baseline"
     }
   ]
 }

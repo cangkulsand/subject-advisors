@@ -1,5 +1,7 @@
 import { AuthError } from '../auth/errors';
-import type { OfferingContext, OfferingRequirementType, OfferingSemester, OfferingSubject } from '../../../../../packages/shared/src/offerings/offerings';
+import type { OfferingContext, OfferingRequirementType, OfferingSemester, OfferingSubject, OfferingWindow, WithdrawnOffering } from '../../../../../packages/shared/src/offerings/offerings';
+import { nextSemesterAfter } from '../../../../../packages/shared/src/offerings/confirmed-offerings';
+import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 import type { OfferingSql } from './repository';
 import type { StudentOfferingContext } from './contracts';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
@@ -16,32 +18,88 @@ function requiredCredits(value: unknown): number {
   return credits;
 }
 
-/** Read-only consumer of the agreed FOUNDATION/P001 tables; creates no profile or reference data. */
-export function createOfferingContextReader(query: OfferingSql['query']) {
+const ISO = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
+function optionalIso(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const iso = text(value);
+  if (Number.isNaN(Date.parse(iso))) throw new Error('Invalid configured selection date');
+  return iso;
+}
+function limit(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error('Invalid configured semester pick limit');
+  return parsed;
+}
+
+/**
+ * Read-only consumer of the agreed FOUNDATION/P001 tables; creates no profile or reference data.
+ * S2-P004-022: the target is always the semester after the admin current semester (the profile's
+ * current_semester_id is not read), and only coordinator-approved subjects are listed.
+ */
+export function createOfferingContextReader(query: OfferingSql['query'], now: () => Date = () => new Date()) {
   return async (clerkUserId: string, options: { includePrerequisites?: boolean } = {}): Promise<StudentOfferingContext | null> => {
     const profiles = await query(`
-      SELECT p.student_id, p.curriculum_id, p.current_semester_id, c.curriculum_version, c.total_credit_required, g.programme_name
+      SELECT p.student_id, p.curriculum_id, p.learning_centre_id, c.programme_id, c.curriculum_version, c.total_credit_required, g.programme_name, lc.centre_name
       FROM student_profile p
       JOIN curriculum c ON c.curriculum_id = p.curriculum_id
       JOIN programme g ON g.programme_id = c.programme_id
+      LEFT JOIN learning_centre lc ON lc.learning_centre_id = p.learning_centre_id
       WHERE p.clerk_user_id = $1`, [clerkUserId]);
     const profile = profiles[0];
     if (!profile) return null;
     if (profiles.length !== 1) throw new Error('Ambiguous student offering context');
     const studentId = offeringId(profile.student_id);
     const curriculumId = offeringId(profile.curriculum_id);
-    if (profile.current_semester_id === null || profile.current_semester_id === undefined) {
-      throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Choose a current academic year and semester in your academic profile before entering offerings.');
+    const programmeId = offeringId(profile.programme_id);
+    const learningCentreId = profile.learning_centre_id === null || profile.learning_centre_id === undefined ? null : offeringId(profile.learning_centre_id);
+    const learningCentreName = typeof profile.centre_name === 'string' && profile.centre_name.trim() ? profile.centre_name : null;
+    // Semesters first: the target decides which approved subjects and withdrawals are read.
+    const semesterRows = await query(`SELECT semester_id, academic_year, semester_no, is_current, max_subjects, max_credits,
+        to_char(selection_opens_at AT TIME ZONE 'UTC', ${ISO}) AS selection_opens_at,
+        to_char(selection_closes_at AT TIME ZONE 'UTC', ${ISO}) AS selection_closes_at
+      FROM academic_semester ORDER BY academic_year, semester_no`, []);
+    const semesters: OfferingSemester[] = semesterRows.map(row => {
+      if (row.semester_no !== 1 && row.semester_no !== 2 && row.semester_no !== 3) throw new Error('Invalid configured semester number');
+      return { semesterId: offeringId(row.semester_id), academicYear: text(row.academic_year), semesterNo: row.semester_no };
+    });
+    const adminCurrent = semesterRows.find(row => row.is_current === true);
+    const target = adminCurrent ? nextSemesterAfter(offeringId(adminCurrent.semester_id), semesters) : null;
+    const targetRow = target ? semesterRows.find(row => offeringId(row.semester_id) === target.semesterId) : undefined;
+    const selectionOpensAt = targetRow ? optionalIso(targetRow.selection_opens_at) : null;
+    const selectionClosesAt = targetRow ? optionalIso(targetRow.selection_closes_at) : null;
+    let status: OfferingWindow['status'];
+    if (!target) status = 'NO_NEXT_SEMESTER';
+    else if (learningCentreId === null) status = 'NO_LEARNING_CENTRE';
+    else {
+      const phase = selectionPhase({ selectionOpensAt, selectionClosesAt }, now());
+      status = phase === 'OPEN' ? 'OPEN' : phase === 'CLOSED' ? 'CLOSED' : selectionOpensAt === null ? 'NOT_SCHEDULED' : 'NOT_OPEN';
     }
-    const currentSemesterId = offeringId(profile.current_semester_id);
-    const [subjectRows, semesterRows] = await Promise.all([
-      query(`SELECT cs.curriculum_subject_id, cs.subject_id, cs.subject_category, cs.is_compulsory,
+    const window: OfferingWindow = { status, targetSemesterId: target?.semesterId ?? null, selectionOpensAt, selectionClosesAt, learningCentreName };
+    const showSubjects = target !== null && (status === 'OPEN' || status === 'CLOSED');
+    const [subjectRows, approvedRows, withdrawnRows] = await Promise.all([
+      // The whole curriculum is read so prerequisites can be resolved to names even when the
+      // required subject is not offered; only approved subjects are listed (filtered below).
+      showSubjects ? query(`SELECT cs.curriculum_subject_id, cs.subject_id, cs.subject_category, cs.is_compulsory,
           s.subject_code, COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS subject_name, s.credit_hours,
           to_jsonb(cs)->'prerequisite_details' AS prerequisite_details
         FROM curriculum_subject cs JOIN subject s ON s.subject_id = cs.subject_id
-        WHERE cs.curriculum_id = $1 ORDER BY s.subject_code`, [curriculumId]),
-      query('SELECT semester_id, academic_year, semester_no FROM academic_semester ORDER BY academic_year, semester_no', []),
+        WHERE cs.curriculum_id = $1 ORDER BY s.subject_code`, [curriculumId]) : Promise.resolve([]),
+      target && showSubjects ? query(`SELECT d.subject_id FROM offering_decision d
+        WHERE d.status = 'APPROVED' AND d.programme_id = $1 AND d.learning_centre_id = $2 AND d.semester_id = $3`,
+      [programmeId, learningCentreId, target.semesterId]) : Promise.resolve([]),
+      target ? query(`SELECT DISTINCT ON (w.subject_id) w.subject_id, s.subject_code, s.subject_name,
+          to_char(w.withdrawn_at AT TIME ZONE 'UTC', ${ISO}) AS withdrawn_at, w.withdrawal_id
+        FROM offering_pick_withdrawal w JOIN subject s ON s.subject_id = w.subject_id
+        WHERE w.student_id = $1 AND w.semester_id = $2
+          AND NOT EXISTS (SELECT 1 FROM offering_decision d WHERE d.subject_id = w.subject_id AND d.status = 'APPROVED'
+            AND d.programme_id = $3 AND d.learning_centre_id = $4 AND d.semester_id = $2)
+        ORDER BY w.subject_id, w.withdrawn_at DESC, w.withdrawal_id DESC`, [studentId, target.semesterId, programmeId, learningCentreId]) : Promise.resolve([]),
     ]);
+    const approvedSubjectIds = new Set(approvedRows.map(row => offeringId(row.subject_id)));
+    const withdrawnSubjects: WithdrawnOffering[] = withdrawnRows.map(row => ({
+      subjectId: offeringId(row.subject_id), code: text(row.subject_code), name: text(row.subject_name), withdrawnAt: text(optionalIso(row.withdrawn_at)),
+    })).sort((a, b) => b.withdrawnAt.localeCompare(a.withdrawnAt));
+    const limits = targetRow ? { maxSubjects: limit(targetRow.max_subjects), maxCredits: limit(targetRow.max_credits) } : undefined;
     const rawDetailsById = new Map<string, unknown>();
     let subjects: OfferingContext['subjects'] = subjectRows.map(row => {
       const creditHours = typeof row.credit_hours === 'number' ? row.credit_hours :
@@ -60,10 +118,6 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
         subjectCategory: subjectCategory as string | null | undefined,
         ...(isCompulsory === 0 || isCompulsory === 1 ? { isCompulsory } : {}),
       };
-    });
-    const semesters: OfferingSemester[] = semesterRows.map(row => {
-      if (row.semester_no !== 1 && row.semester_no !== 2 && row.semester_no !== 3) throw new Error('Invalid configured semester number');
-      return { semesterId: offeringId(row.semester_id), academicYear: text(row.academic_year), semesterNo: row.semester_no };
     });
     if (options.includePrerequisites) {
       const unavailable: OfferingSubject['prerequisites'] = { status: 'unavailable' };
@@ -118,18 +172,21 @@ export function createOfferingContextReader(query: OfferingSql['query']) {
         subjects = subjects.map(subject => ({ ...subject, prerequisites: unavailable }));
       }
     }
-    // Reject a concurrent curriculum change instead of returning a stale mixed context.
-    if (!semesters.some(semester => semester.semesterId === currentSemesterId)) throw new AuthError(409, 'PROFILE_SEMESTER_UNAVAILABLE', 'Your selected semester is no longer configured. Update your academic profile.');
-    const current = await query('SELECT curriculum_id, current_semester_id FROM student_profile WHERE student_id = $1 AND clerk_user_id = $2', [studentId, clerkUserId]);
+    const prerequisiteCatalogue = subjects.map(({ prerequisites: _prerequisites, ...subject }) => { void _prerequisites; return subject; });
+    subjects = subjects.filter(subject => subject.subjectId !== undefined && approvedSubjectIds.has(subject.subjectId));
+    // Reject a concurrent curriculum or learning centre change instead of returning a stale mixed context.
+    const current = await query('SELECT curriculum_id, learning_centre_id FROM student_profile WHERE student_id = $1 AND clerk_user_id = $2', [studentId, clerkUserId]);
     if (!current[0] || offeringId(current[0].curriculum_id) !== curriculumId) throw new AuthError(409, 'CURRICULUM_CHANGED', 'Your academic profile changed. Reload offerings.');
-    if (current[0].current_semester_id === null || offeringId(current[0].current_semester_id) !== currentSemesterId) throw new AuthError(409, 'PROFILE_SEMESTER_CHANGED', 'Your selected semester changed. Reload offerings.');
+    const currentCentre = current[0].learning_centre_id === null || current[0].learning_centre_id === undefined ? null : offeringId(current[0].learning_centre_id);
+    if (currentCentre !== learningCentreId) throw new AuthError(409, 'PROFILE_CHANGED', 'Your learning centre changed. Reload offerings.');
     return {
       studentId,
       curriculum: {
         curriculumId, name: text(profile.curriculum_version), programmeName: text(profile.programme_name),
         totalCreditRequired: requiredCredits(profile.total_credit_required),
       },
-      currentSemesterId, subjects, semesters,
+      ...(target ? { currentSemesterId: target.semesterId } : {}), subjects, semesters,
+      window, ...(limits ? { limits } : {}), ...(prerequisiteCatalogue.length ? { prerequisiteCatalogue } : {}), withdrawnSubjects, programmeId, learningCentreId,
     };
   };
 }

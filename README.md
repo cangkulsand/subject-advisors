@@ -77,7 +77,8 @@ against `main`; keep each PR within its selected owner scope.
 
 | Owner | Feature | Record |
 | --- | --- | --- |
-| P004 | UC20 coordinator forecast: data source toggle (system / CSV / both), coordinator export CSV format, forecast review and offering confirmation (`/coordinator/*`) | S2-P004-007, S2-P004-009, S2-P004-010 |
+| P004 | UC20 coordinator forecast: data source toggle (system / CSV / both), coordinator export CSV format, and one Class Offering Forecast screen where each subject is Pending, Approved or Removed per programme, learning centre and semester (`/coordinator/*`); the review, finalize and confirm flow was removed | S2-P004-007, S2-P004-009, S2-P004-010, S2-P004-017 to S2-P004-024 |
+| P004 / P002 / P001 | Simplified offering flow: admin-set selection window on each semester, students pick only approved subjects of the next semester while it is open, learning centre chosen on the student profile; migration 0009 | S2-P004-017 to S2-P004-024 |
 | P003 | UC17 graduation eligibility, projected pathway, flowchart layout and highlighting | S2-INT-001 (S2-P003-001..004) |
 | P004 | Admin academic setup: semesters (current semester), faculties, programmes, learning centres, coordinator assignments (`/admin/*`); migration 0008 | S2-P004-008 |
 | P001 | UC05 progress and UC06 curriculum mapping, as a separate overlay launched with `node tools/p001-sprint2/dev.mjs` (not yet in the shared router) | S2-INT-002 (S2-P001-001..002) |

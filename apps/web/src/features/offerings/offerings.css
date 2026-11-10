@@ -29,6 +29,7 @@
 .offerings h2 { font-size: 19px; line-height: 1.4; letter-spacing: -.02em; font-weight: 650; }
 .offerings h3 { font-size: 16px; }
 .offerings button, .offerings input, .offerings select { font: inherit; }
+.offerings small { font-size: var(--font-size-small); }
 .offerings button, .offerings select, .offerings a { min-height: 44px; }
 .offerings button { cursor: pointer; padding: 10px 16px; border: 1.5px solid var(--off-accent); border-radius: 8px; background: transparent; color: var(--off-accent); font-weight: 600; line-height: 1.5; }
 .offerings button:hover { background: var(--off-subtle); }
@@ -105,7 +106,7 @@
 .offerings-prerequisites { display: grid; gap: 6px; min-width: 0; margin-top: 5px; color: var(--off-muted); font-size: var(--font-size-control); line-height: 1.4; text-align: left; white-space: normal; }
 .offerings-prerequisites-note { margin: 0; overflow-wrap: anywhere; }
 .offerings-prerequisite-group { display: grid; gap: 2px; min-width: 0; }
-.offerings-prerequisite-label { color: var(--off-heading); font-size: var(--font-size-small); font-weight: 650; overflow-wrap: anywhere; }
+.offerings-prerequisite-label { color: var(--off-heading); font-size: var(--font-size-table); font-weight: 650; overflow-wrap: anywhere; }
 .offerings-prerequisite-group > ul { display: grid; gap: 2px; list-style: none; min-width: 0; padding: 0; margin: 0; }
 .offerings-prerequisite-group > ul > li { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 4px; min-width: 0; overflow-wrap: anywhere; }
 .offerings-prerequisite-code { font-weight: 650; overflow-wrap: anywhere; }
@@ -164,6 +165,14 @@
 .offerings-success strong { color: var(--off-success-text); }
 .offerings-success p { margin-top: 8px; }
 .offerings-loading { margin-top: 24px; }
+.offerings-state { margin-top: 24px; display: grid; gap: 8px; justify-items: start; }
+.offerings-state p { max-width: 640px; color: var(--off-body); font-size: var(--font-size-body, 16px); }
+.offerings-withdrawn { margin: 16px 0 0; padding: 14px 18px; border-radius: 8px; background: var(--off-warning-bg); color: var(--off-warning-text); font-size: var(--font-size-label); }
+.offerings-withdrawn strong { color: var(--off-warning-text); }
+.offerings-withdrawn ul { margin: 6px 0 0; padding-left: 20px; }
+.offerings .offerings-deadline-hint { margin: 12px 24px 0; color: var(--off-muted); font-size: var(--font-size-label); }
+.offerings .offerings-limit-counter { margin: 0 0 12px; font-size: var(--font-size-label); font-weight: 600; color: var(--off-heading); font-variant-numeric: tabular-nums; }
+.offerings .offerings-limit-message { margin: 12px 24px; padding: 12px 14px; border-radius: 8px; background: var(--off-danger-bg); color: var(--off-danger-text); font-size: var(--font-size-label); }
 .offerings-notice { background: var(--off-subtle); padding: 16px; border-radius: 8px; margin-bottom: 20px !important; }
 .offerings-warning { background: var(--off-warning-bg); color: var(--off-warning-text); border: 1px solid var(--off-warning-text); border-radius: 8px; padding: 20px; }
 .offerings-warning strong { color: var(--off-warning-text); }
@@ -214,7 +223,7 @@
   .offerings-provenance { padding: 16px; }
   .offerings-filters { grid-template-columns: 1fr; padding: 20px 16px 12px; }
   .offerings-display-rule { margin: 0 16px 14px; }
-  .offerings-data-note, .offerings-hidden-selection { margin-left: 16px; margin-right: 16px; }
+  .offerings-data-note, .offerings-hidden-selection, .offerings .offerings-limit-message, .offerings .offerings-deadline-hint { margin-left: 16px; margin-right: 16px; }
 }
 @media (max-width: 440px) {
   .offerings-semester { grid-template-columns: 1fr; }

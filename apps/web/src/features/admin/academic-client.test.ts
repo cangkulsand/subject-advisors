@@ -7,7 +7,7 @@ afterEach(() => { keepAccountSession(null); vi.unstubAllGlobals(); vi.useRealTim
 const centre = { learningCentreId: 1, centreCode: 'TEST', centreName: 'Fictional centre', isActive: true };
 const faculty = { facultyId: 2, facultyCode: 'TEST', facultyName: 'Fictional faculty', isActive: true };
 const programme = { programmeId: 3, programmeCode: 'TEST', programmeName: 'Fictional programme', facultyId: 2, faculty };
-const semester = { semesterId: 4, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: true };
+const semester = { semesterId: 4, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: true, selectionOpensAt: null, selectionClosesAt: null };
 const assignment = { assignmentId: 5, accountId: 6, facultyId: 2, programmeId: 3, learningCentreId: 1, startedAt: '2026-11-02T00:00:00Z', endedAt: null };
 const prefix = '/api/admin/academic-setup';
 type Client = ReturnType<typeof createAcademicSetupClient>;
@@ -29,7 +29,7 @@ it.each([
   [(c: Client) => c.createFaculty({ facultyCode: 'TEST', facultyName: 'Fictional faculty', reason: 'Why' }), 'POST', '/faculties', faculty],
   [(c: Client) => c.updateFaculty(2, { isActive: false, reason: 'Why' }), 'PATCH', '/faculties/2', { ...faculty, isActive: false }],
   [(c: Client) => c.setProgrammeFaculty(3, { facultyId: null, reason: 'Why' }), 'PATCH', '/programmes/3/faculty', { ...programme, facultyId: null, faculty: null }],
-  [(c: Client) => c.createSemester({ academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, reason: 'Why' }), 'POST', '/semesters', semester],
+  [(c: Client) => c.createSemester({ academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason: 'Why' }), 'POST', '/semesters', semester],
   [(c: Client) => c.updateSemester(4, { maxCredits: 15, reason: 'Why' }), 'PATCH', '/semesters/4', { ...semester, maxCredits: 15 }],
   [(c: Client) => c.setCurrentSemester({ semesterId: 4, reason: 'Why' }), 'PUT', '/current-semester', semester],
   [(c: Client) => c.createAssignment({ accountId: 6, facultyId: 2, programmeId: 3, learningCentreId: 1, reason: 'Why' }), 'POST', '/coordinator-assignments', assignment],
