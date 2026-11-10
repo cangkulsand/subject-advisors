@@ -11,7 +11,7 @@ export const HELP = {
   uncertain: 'Students who might take the subject, but their records are incomplete or a prerequisite is not proven. They are not in the potential demand.',
   nearGraduation: 'Counted students who can finish their programme within two semesters at the maximum credit load, so they are likely to register.',
   notCounted: 'Students who already passed the subject, have not met a prerequisite, or whose curriculum does not offer it this semester.',
-  student: 'Name and student reference. Students from a CSV show the matric number from the file. Students who entered their records in the portal show PORTAL- and their portal record number, because the snapshot does not store matric numbers.',
+  student: 'Name, then the matric number: from the CSV, or from the profile of students who entered their records in the portal. A portal student who has not added a matric number yet shows their sign-in email, or PORTAL- and their portal record number when no email is known.',
 } as const;
 
 /** A label followed by its info tip; the icon stays on the line of the label's last word. */

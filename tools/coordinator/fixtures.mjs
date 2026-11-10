@@ -88,7 +88,8 @@ function subject(id, code, name, classType, supported, uncertain, reasons, near,
 /** Roster behind a subject, consistent with its counts: supported (first `nearGraduationCount` of them near graduation), uncertain (reasons spread over the reason counts) and a few not counted. */
 function subjectStudents(state, run, subjectRow) {
   const students = [];
-  const make = (index, patch) => { const n = String(students.length + 1).padStart(3, '0'); students.push({ externalReference: `A22EC${n}`, studentName: `${subjectRow.subjectCode} Student ${n}`, outcome: 'SUPPORTED', uncertaintyReasons: [], nearGraduation: false, remainingCredits: 60, passedByRetake: false, ...patch }); void index; };
+  // Students 001-050 come from a CSV (matric reference); later ones entered their records in the portal (PORTAL-<id>): 051 has a matric number, 052-053 only a sign-in email, 054 neither.
+  const make = (index, patch) => { const k = students.length + 1, n = String(k).padStart(3, '0'), portal = k > 50; students.push({ externalReference: portal ? `PORTAL-${k}` : `A22EC${n}`, matricNo: portal && k === 51 ? `A22EC9${n}` : null, email: portal && k !== 54 ? `student${n}@graduate.utm.my` : null, studentName: `${subjectRow.subjectCode} Student ${n}`, outcome: 'SUPPORTED', uncertaintyReasons: [], nearGraduation: false, remainingCredits: 60, passedByRetake: false, ...patch }); void index; };
   for (let i = 0; i < subjectRow.supportedEligibleCount; i++) make(i, i < subjectRow.nearGraduationCount ? { nearGraduation: true, remainingCredits: 12 + i } : {});
   const reasonList = subjectRow.uncertaintyReasonCounts;
   const reasons = Array.from({ length: subjectRow.uncertainStudentCount }, () => []);
@@ -103,9 +104,9 @@ function subjectStudents(state, run, subjectRow) {
   const count = (kind) => students.filter(student => student.outcome === kind).length;
   const breakdown = { inCurriculum: students.length, alreadyPassed: count('PASSED'), notOfferedInSemesterType: count('NOT_OFFERED'), prerequisiteNotMet: count('PREREQUISITE_NOT_MET'), supported: count('SUPPORTED'), uncertain: count('UNCERTAIN'), retakeResolvedAsPassed: students.filter(student => student.passedByRetake).length };
   return ok({
-    forecastRunId: run.forecastRunId, subjectId: subjectRow.subjectId, subjectCode: subjectRow.subjectCode, subjectName: subjectRow.subjectName, catalogueMatchesRun: !state.catalogueChanged,
+    forecastRunId: run.forecastRunId, subjectId: subjectRow.subjectId, subjectCode: subjectRow.subjectCode, subjectName: subjectRow.subjectName, catalogueMatchesRun: !state.catalogueChanged, emailsAvailable: !state.emailsUnavailable,
     summary: { inCurriculum: students.length, counted: breakdown.supported, uncertain: breakdown.uncertain, nearGraduation: subjectRow.nearGraduationCount, notCounted: breakdown.alreadyPassed + breakdown.prerequisiteNotMet + breakdown.notOfferedInSemesterType, breakdown, uncertaintyReasonCounts: reasonList },
-    students,
+    students: state.emailsUnavailable ? students.map(student => ({ ...student, email: null })) : students,
   });
 }
 function addRun(state, importBatchId) {

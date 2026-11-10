@@ -30,7 +30,7 @@ try{
   let queue=Promise.resolve();
   const query=(text,parameters)=>{const next=queue.then(async()=>(await client.query(text,parameters)).rows);queue=next.catch(()=>{});return next;};
   const profiles=createProfileRepository(query),records=createRecordsRepository(query);
-  const profileInput={studentName:'DEMO A',matricNo:null,curriculumId:base+1,weeklyWorkingHours:0,availableStudyHours:12};
+  const profileInput={studentName:'DEMO A',matricNo:'A22EC0001',curriculumId:base+1,weeklyWorkingHours:0,availableStudyHours:12};
   const recordInput={subjectId:base+3,semesterId:base+6,status:'COMPLETED',grade:null,recognizedCredits:null,remarks:null};
   await check('initial setup persists with integer IDs and no invented profile fields',async()=>{const p=await profiles.save(a,profileInput);assert.equal(p.studentName,'DEMO A');assert.equal(p.curriculumId,base+1);assert.equal((await profiles.find(a)).availableStudyHours,12);});
   await check('setup retry is an idempotent upsert',async()=>{const before=await profiles.find(a);assert.equal((await profiles.save(a,{...profileInput,studentName:'DEMO A UPDATED'})).studentId,before.studentId);});

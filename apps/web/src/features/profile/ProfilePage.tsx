@@ -48,7 +48,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     event.preventDefault(); if (saving || !resolvedCurriculumId) return; setSaving(true); setError(''); setSuccess('');
     try {
       const profile = await api<Profile>('/api/profile', { method: 'PUT', body: {
-        studentName: draft.studentName.trim(), matricNo: draft.matricNo.trim() || null, curriculumId: resolvedCurriculumId,
+        studentName: draft.studentName.trim(), matricNo: draft.matricNo.replace(/\s+/g, '').toUpperCase(), curriculumId: resolvedCurriculumId,
         currentSemesterId: Number(draft.currentSemesterId),
         weeklyWorkingHours: Number(draft.weeklyWorkingHours), availableStudyHours: Number(draft.availableStudyHours),
       } });
@@ -71,6 +71,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     <header><p className="p001-eyebrow">Academic records</p><h1>{setup ? 'Complete your academic profile' : 'Your academic profile'}</h1>
       <p>Choose your programme and tell us about your weekly work and study availability.</p></header>
     {error && <p className="p001-alert" role="alert" tabIndex={-1} ref={alert}>{error}</p>}
+    {loaded && initial.studentName && !initial.matricNo && <p className="p001-alert" role="status">Add your matric number to continue using the student pages.</p>}
     {!loaded && (error ? <button className="p001-action" type="button" onClick={() => setAttempt(n => n + 1)}>Retry loading profile</button> : <p role="status">Loading your profile…</p>)}
     {loaded && !options.curricula.length && <div className="p001-card" role="status"><h2>No programme is configured</h2>
       <p>The maintainer needs to configure approved programme data before you can complete setup. Your account remains available.</p>
@@ -78,11 +79,12 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     {loaded && options.curricula.length > 0 && <form className="p001-card" onSubmit={event => { void save(event); }} aria-busy={saving}>
       <fieldset disabled={saving}><legend>Programme and identity</legend><div className="p001-grid">
         <label>Student name<input name="studentName" required maxLength={255} value={draft.studentName} onChange={e => field('studentName', e.target.value)} autoComplete="name" /></label>
-        <label>Matric number (optional)<input name="matricNo" maxLength={30} value={draft.matricNo} onChange={e => field('matricNo', e.target.value)} /></label>
+        <label>Matric number<input name="matricNo" required maxLength={30} pattern="\s*([A-Za-z0-9]\s*){4,30}" title="4 to 30 letters or digits, for example A22EC0001" autoCapitalize="characters" spellCheck={false} aria-describedby="profile-matric-help" value={draft.matricNo} onChange={e => field('matricNo', e.target.value)} /></label>
         <label>Programme<select aria-label="Programme" required value={programme} onChange={e => selectProgramme(e.target.value)}>
           <option value="">Select a programme</option>{programmes.map(c => <option key={c.programmeId} value={c.programmeId}>{c.programmeCode} — {c.programmeName}</option>)}
         </select></label>
         </div>
+        <p className="p001-help" id="profile-matric-help">Your university matric number, for example A22EC0001. Coordinators use it to identify you when they plan class offerings.</p>
         {programme && !resolvedCurriculumId && <p className="p001-help" role="status">This programme has multiple active configurations. Ask the maintainer to resolve the programme setup before saving.</p>}
         <p className="p001-help">Your institutional email is managed through your account. Changing programmes while academic data is saved may require maintainer assistance.</p>
       </fieldset>

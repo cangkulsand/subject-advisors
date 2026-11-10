@@ -82,6 +82,8 @@ export interface ForecastingRepository {
   acceptValidated(importBatchId: number, actor: string): Promise<ImportBatchRow | null>;
 }
 
+export interface PortalContact { matricNo: string | null; email: string | null }
+
 export interface ForecastingDependencies {
   auth: AuthDependencies;
   repository: ForecastingRepository;
@@ -90,6 +92,12 @@ export interface ForecastingDependencies {
   /** Coordinator offering confirmation (S2-P004-006). */
   offerings: OfferingsRepository;
   scopes: ScopeProvider;
+  /**
+   * Live matric number (student_profile) and sign-in email (primary Clerk email) of portal students by `student_id`, for display in the
+   * subject student list only; never stored. Absent in tests and local tools: the list then shows the student reference.
+   * `emailsAvailable` is false when the identity provider could not be read (matric numbers are still returned).
+   */
+  portalContacts?: (studentIds: number[]) => Promise<{ contacts: Map<number, PortalContact>; emailsAvailable: boolean }>;
   now?: () => Date;
 }
 
