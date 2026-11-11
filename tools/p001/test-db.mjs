@@ -23,7 +23,6 @@ try{
   if((await migrationStatus(client,await loadMigrations())).pending.length)throw new Error('Canonical migrations must already be applied');
   await client.query('BEGIN');await client.query("SET LOCAL lock_timeout='5s'");await client.query("SET LOCAL statement_timeout='10s'");
   await client.query("INSERT INTO public.programme(programme_id,programme_code,programme_name) VALUES($1,$2,'DEMO NOT OFFICIAL')",[base,'P001_DEMO_'+nonce]);
-  await client.query("INSERT INTO public.learning_centre(learning_centre_id,centre_code,centre_name) VALUES($1,$2,'DEMO NOT OFFICIAL')",[base+8,'T'+nonce]);
   await client.query("INSERT INTO public.curriculum(curriculum_id,curriculum_version,total_credit_required,programme_id) VALUES($1,'DEMO_A',99,$3),($2,'DEMO_B',99,$3)",[base+1,base+2,base]);
   for(const [offset,credits] of [[3,3],[4,2],[5,4]])await client.query("INSERT INTO public.subject(subject_id,subject_code,subject_name,credit_hours) VALUES($1,$2,'DEMO NOT OFFICIAL',$3)",[base+offset,'P001_'+nonce+'_'+offset,credits]);
   for(const [curr,sub] of [[1,3],[1,4],[2,5]])await client.query("INSERT INTO public.curriculum_subject(is_compulsory,subject_category,curriculum_id,subject_id) VALUES(1,'DEMO',$1,$2)",[base+curr,base+sub]);
@@ -31,7 +30,7 @@ try{
   let queue=Promise.resolve();
   const query=(text,parameters)=>{const next=queue.then(async()=>(await client.query(text,parameters)).rows);queue=next.catch(()=>{});return next;};
   const profiles=createProfileRepository(query),records=createRecordsRepository(query);
-  const profileInput={studentName:'DEMO A',matricNo:'A22EC0001',learningCentreId:base+8,curriculumId:base+1,weeklyWorkingHours:0,availableStudyHours:12};
+  const profileInput={studentName:'DEMO A',matricNo:null,curriculumId:base+1,weeklyWorkingHours:0,availableStudyHours:12};
   const recordInput={subjectId:base+3,semesterId:base+6,status:'COMPLETED',grade:null,recognizedCredits:null,remarks:null};
   await check('initial setup persists with integer IDs and no invented profile fields',async()=>{const p=await profiles.save(a,profileInput);assert.equal(p.studentName,'DEMO A');assert.equal(p.curriculumId,base+1);assert.equal((await profiles.find(a)).availableStudyHours,12);});
   await check('setup retry is an idempotent upsert',async()=>{const before=await profiles.find(a);assert.equal((await profiles.save(a,{...profileInput,studentName:'DEMO A UPDATED'})).studentId,before.studentId);});
