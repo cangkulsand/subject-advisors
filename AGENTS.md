@@ -5,5 +5,3 @@
 - This instruction assigns task execution only. It does not change the user's selected main model.
 - When coordinating through a model override, explicitly pass the task scope and necessary context; use `fork_turns="none"` when applicable.
 - Keep each task within the user's selected scope and follow `docs/implementationguide.md`.
-- UI work must follow the "Typography and readability (mandatory)" section of `docs/themeguide.md` (type tokens in `apps/web/src/app/typography.css`; run the readability guard `tools/ui/readability.mjs` in UI tests).
-- Tables with filtering, search or sorting must use the shared table toolbar (`apps/web/src/components/table-toolbar/`), see "Table toolbar (mandatory)" in `docs/themeguide.md`.

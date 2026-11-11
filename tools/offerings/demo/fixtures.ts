@@ -8,8 +8,6 @@ export const demoContext: OfferingContext = {
     programmeName: 'Demonstration programme',
   },
   currentSemesterId: '201',
-  // The demo is always inside an open selection window with no limits.
-  window: { status: 'OPEN', targetSemesterId: '201', selectionOpensAt: null, selectionClosesAt: null, learningCentreName: 'Demonstration centre' },
   subjects: [
     ['DEMO101', 'Programming foundations', 3],
     ['DEMO102', 'Discrete structures', 3],

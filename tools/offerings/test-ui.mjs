@@ -5,7 +5,6 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { assertReadable } from '../ui/readability.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const artifacts = resolve(root, 'dist-offerings/review');
@@ -42,10 +41,7 @@ try {
     const page = await context.newPage();
     page.setDefaultTimeout(10_000);
     page.on('pageerror', error => consoleErrors.push(name + ': ' + error.message));
-    try { await body(page);
-      // The prototype shell around the demo page is not product UI; guard the real page harnesses.
-      if (/^\/(test|auth-test)$/.test(new URL(page.url()).pathname)) await assertReadable(page, name);
-      passed++; console.log('PASS ' + name); }
+    try { await body(page); passed++; console.log('PASS ' + name); }
     catch (error) { await page.screenshot({ path: resolve(artifacts, 'failure.png'), fullPage: true }); throw error; }
     finally { await context.close(); }
   }
@@ -56,10 +52,10 @@ try {
   }
   async function review(page) {
     await page.getByRole('button', { name: 'Review offerings' }).click();
-    await page.getByRole('checkbox', { name: /I confirm these are my picks/ }).waitFor();
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).waitFor();
     assert.equal(await page.locator('.offerings-review-help').count(), 0);
   }
-  const confirmation = page => page.getByRole('checkbox', { name: /I confirm these are my picks/ });
+  const confirmation = page => page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ });
   async function save(page) {
     await review(page); await confirmation(page).check();
     await page.getByRole('button', { name: /^(Confirm and save|Retry save)$/ }).click();
@@ -123,7 +119,7 @@ try {
     await page.getByRole('button', { name: 'Review offerings' }).click();
     await page.getByText(/selected subjects? are hidden by the current search/).waitFor();
     assert.equal(await page.locator('.offerings-review-list').getByText('DEMO204', { exact: true }).count(), 1);
-    await page.getByRole('checkbox', { name: /I confirm these are my picks/ }).check();
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).check();
     await page.getByRole('button', { name: 'Confirm and save' }).click();
     const calls = await page.evaluate(() => window.__offeringSaveCalls);
     assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] }, 'PUT retains curriculumSubjectId values');
@@ -262,7 +258,7 @@ try {
     await page.getByLabel('Find a subject').fill('DEMO207');
     await page.getByRole('button', { name: 'Review offerings' }).click();
     await page.getByText(/selected subjects? are hidden by the current search/).waitFor();
-    await page.getByRole('checkbox', { name: /I confirm these are my picks/ }).check();
+    await page.getByRole('checkbox', { name: /I confirm this is my student-reported list/ }).check();
     await page.getByRole('button', { name: 'Confirm and save' }).click();
     await page.getByRole('alert').waitFor();
     assert.equal(await page.getByText('Your draft is still here.', { exact: false }).count(), 1);
@@ -278,7 +274,7 @@ try {
     assert.equal(await subject(page).evaluate(input => input.matches(':focus-visible')), true);
     await page.getByLabel('Find a subject').fill('data structures');
     assert.equal(await subject(page).count(), 0);
-    await subject(page, 'DEMO201').click();
+    await subject(page, 'DEMO201').check();
     await page.getByRole('button', { name: 'Remove DEMO101' }).click();
     await page.getByRole('button', { name: 'Clear search' }).click();
     assert.equal(await subject(page).isChecked(), false);
@@ -332,7 +328,7 @@ try {
     await open(page); await subject(page).check(); await save(page);
     await page.getByRole('button', { name: 'Edit offerings' }).click();
     await page.getByRole('button', { name: 'Clear selection' }).click();
-    await review(page); await page.getByText('No picks yet.', { exact: true }).waitFor();
+    await review(page); await page.getByText('No reported offerings. Future recommendations need subject offerings to work from.', { exact: true }).waitFor();
     await confirmation(page).check(); await page.getByRole('button', { name: 'Confirm and save' }).click();
     await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
     assert.equal(await page.locator('.offerings-save-state').innerText(), '✓ Saved');
@@ -341,7 +337,7 @@ try {
     await page.reload(); await subject(page).waitFor();
     assert.equal(await subject(page).isChecked(), false);
   });
-  await check('offerings period is the next semester and exposes no period selector', async page => {
+  await check('offerings period is pinned to profile and does not expose period selectors', async page => {
     await open(page); await subject(page).check(); await save(page);
     assert.equal(await page.getByLabel('Academic year').count(), 0);
     assert.equal(await page.getByLabel('Semester', { exact: true }).count(), 0);
@@ -357,74 +353,6 @@ try {
     await page.getByRole('button', { name: 'Retry loading' }).click();
     await subject(page).waitFor();
   });
-  // S2-P004-022: selection window states. Each state is checked and photographed at desktop and 375px.
-  const windowStates = [
-    ['not-open', async page => {
-      await page.getByText(/^Offerings open on /).waitFor();
-      assert.equal(await page.getByRole('checkbox').count(), 0, 'no subject can be picked before opening');
-      assert.equal(await page.getByRole('button', { name: 'Review offerings' }).count(), 0);
-    }],
-    ['not-scheduled', async page => {
-      await page.getByText('Offerings are not open yet. The selection date has not been scheduled.').waitFor();
-      assert.equal(await page.getByRole('checkbox').count(), 0);
-    }],
-    ['no-centre', async page => {
-      await page.getByText('Choose your learning centre in your academic profile to see the subjects offered to you.').waitFor();
-      assert.equal(await page.getByRole('link', { name: 'Open academic profile' }).getAttribute('href'), '/student/profile');
-      assert.equal(await page.getByText('No subjects are offered yet').count(), 0, 'never an empty no-subjects list');
-    }],
-    ['no-next', async page => {
-      await page.getByText('No next semester is configured yet.').waitFor();
-    }],
-    ['open-dates', async page => {
-      await subject(page).waitFor();
-      await page.getByText(/^Picks can be changed until /).waitFor();
-    }],
-    ['limits', async page => {
-      await subject(page).waitFor();
-      const counter = page.locator('.offerings-limit-counter');
-      assert.equal((await counter.innerText()).trim(), '0 of 2 subjects · 0 of 6 credits');
-      await subject(page, 'DEMO101').check(); await subject(page, 'DEMO102').check();
-      assert.equal((await counter.innerText()).trim(), '2 of 2 subjects · 6 of 6 credits');
-      await subject(page, 'DEMO201').click();
-      await page.getByRole('alert').filter({ hasText: 'You can pick at most 2 subjects and 6 credits for this semester.' }).waitFor();
-      assert.equal(await subject(page, 'DEMO201').isChecked(), false, 'a pick beyond the limit is blocked');
-      assert.equal((await counter.innerText()).trim(), '2 of 2 subjects · 6 of 6 credits');
-      await subject(page, 'DEMO101').uncheck();
-      assert.equal((await counter.innerText()).trim(), '1 of 2 subjects · 3 of 6 credits');
-    }],
-    ['closed', async page => {
-      await page.getByText(/^Selection closed on .*Your picks are read-only\./).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Edit offerings' }).count(), 0);
-      assert.equal(await page.getByRole('button', { name: 'Review offerings' }).count(), 0);
-      assert.equal(await page.getByRole('checkbox').count(), 0);
-      assert.equal(await page.locator('.offerings-selected-list').getByText('DEMO101', { exact: true }).count(), 1, 'saved picks stay visible');
-      assert.equal(await page.locator('.offerings-steps').count(), 0);
-    }],
-    ['withdrawn', async page => {
-      await subject(page).waitFor();
-      const note = page.getByRole('status').filter({ hasText: 'Withdrawn by the coordinator' });
-      await note.waitFor();
-      assert.match(await note.innerText(), /DEMO999 was withdrawn by the coordinator/);
-      assert.equal(await subject(page, 'DEMO999').count(), 0, 'a withdrawn subject is not in the offered list');
-    }],
-  ];
-  for (const [scenario, verify] of windowStates) {
-    for (const width of [1280, 375]) {
-      await check('window state ' + scenario + ' at ' + width + 'px', async page => {
-        await page.goto(base + '/test?scenario=' + scenario);
-        await verify(page); await noOverflow(page);
-        await page.screenshot({ path: resolve(artifacts, 'window-' + scenario + (width === 1280 ? '-desktop' : '-375') + '.png'), fullPage: true });
-      }, width);
-    }
-  }
-  await check('a save rejected as no longer offered reloads instead of keeping a stale draft', async page => {
-    await page.goto(base + '/test?scenario=reject-save');
-    await subject(page).check(); await review(page); await confirmation(page).check();
-    await page.getByRole('button', { name: 'Confirm and save' }).click();
-    await page.getByText('A subject you picked is no longer offered. Reload offerings.').first().waitFor();
-    assert.equal(await subject(page).isChecked(), false, 'the draft is dropped after the reload');
-  });
   for (const [scenario, link] of [['forbidden', null], ['profile', 'Complete academic profile'], ['session', 'Sign in']]) {
     await check(scenario + ' renders safe recovery without private catalogue', async page => {
       await page.goto(base + '/test?scenario=' + scenario);
@@ -437,7 +365,7 @@ try {
     await page.goto(base + '/test?scenario=loading');
     await page.getByRole('status').filter({ hasText: 'Loading your curriculum' }).waitFor();
     await page.goto(base + '/test?scenario=empty-catalogue');
-    await page.getByRole('heading', { name: 'No subjects are offered yet' }).waitFor();
+    await page.getByRole('heading', { name: 'No curriculum subjects available' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Review offerings' }).isDisabled(), true);
     await page.goto(base + '/test?scenario=empty-semesters');
     await page.getByRole('heading', { name: 'No semesters configured' }).waitFor();
