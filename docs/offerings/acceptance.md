@@ -1,7 +1,5 @@
 # UC08 verification
 
-> **Superseded in part by [S2-P004-006](../changes/S2-P004-006-confirmed-offerings-rule.md) (2026-11-01).** The results below verify the legacy student-reported implementation. The planned P002 package must add acceptance checks for: only confirmed subjects listed; target semester is the next semester after the profile current semester; "Offerings not yet confirmed by the coordinator" state with no picking; picks rejected unless currently confirmed (`OFFERING_NOT_CONFIRMED`, 409); duplicate picks rejected; withdrawn subjects disappear from the list and counts; picks scoped to the verified student; wording "Confirmed by coordinator" with no claim of official registration or a guaranteed timetable; cache marker bumped.
-
 Run root typecheck:offerings, lint:offerings, test:offerings, test:ui:offerings and
 build:offerings commands. Run acceptance:offerings with an explicit unpooled
 OFFERINGS_TEST_DATABASE_URL to include all eight PostgreSQL TEMP-fixture checks.

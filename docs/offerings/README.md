@@ -1,7 +1,5 @@
 # P002 semester offerings (UC08)
 
-> **Superseded in part by [S2-P004-006](../changes/S2-P004-006-confirmed-offerings-rule.md) (2026-11-01).** UC08 is no longer student-reported. The page will list only subjects **confirmed by the coordinator** for the student's programme + learning centre + next semester ("Confirmed by coordinator"); students pick from that list. The table, GET/PUT adapters and tests described below are the legacy implementation until the planned P002 package replaces them. See [integration](integration.md).
-
 Start with [the root handoff guide](../../P002-HANDOFF.md). No manual file relocation,
 import edits or package-script merge is needed for the recorded Git baseline.
 
