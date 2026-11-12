@@ -22,10 +22,10 @@ No official curriculum, capacities, prerequisite links or academic policies are 
 | D03 | Attempts allowed across semesters; one undated record per owner/subject via partial unique indexes | Policy for repeated unknown-semester attempts remains unresolved |
 | D04 | Access assignment first; profile only with a valid curriculum | P001 owns setup logic |
 | D05 | Globally unique subject_code; shared catalogue across curricula | Duplicate legitimate institutional codes need reviewed change |
-| D06 | Learning centre belongs to imported cohorts **and, from 2026-11-01 (S2-P004-006), to StudentProfile** (`learning_centre_id`, chosen by the student; locked while selection for the next semester is open, S2-P004-023) and to offering decisions (S2-P004-018, replacing confirmed offerings) | Superseded in part: the original "no student learning-centre FK" decision is replaced by the product owner rule; column added by migration 0009 (existing students set to Kuala Lumpur) |
-| D07 | Semester limits (`max_subjects`, `max_credits`) are required configuration, not hard-coded 10/6 credit limits; they are also enforced on student picks (S2-P004-006) | Approved curriculum/exception data not supplied |
+| D06 | Learning centre belongs to imported cohorts, not StudentProfile | No invented student learning-centre FK |
+| D07 | Semester limits are required configuration, not hard-coded 10/6 credit limits | Approved curriculum/exception data not supplied |
 | D08 | include_in_offering_forecast stored, defaults true per source | Confirm actual non-classroom subjects before flags/import |
-| D09 | Capacities explicit; nonnegative values and sensible bounds checked | No unapproved example capacities seeded. Product owner values decided 2026-11-01 (LAB max 35, LECTURE max 45, optimal 25) are entered as configuration, not seeded by migration |
+| D09 | Capacities explicit; nonnegative values and sensible bounds checked | No unapproved example capacities seeded |
 | D10 | Unique centre/semester/version; parent has same scope and a lower version | New source/assumptions require a new row |
 | D11 | Finalized payload/delete/reopen blocked; FINALIZED -> SUPERSEDED/ARCHIVED and SUPERSEDED -> ARCHIVED only | Service must audit final decisions before finalizing; concurrent tests pending |
 | D12 | Role/status checks, last-admin DB backstop and append-only audits | Verified actor authorization, atomic audit coupling and least-privilege runtime provisioning remain service/deployment responsibilities |
