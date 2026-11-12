@@ -4,7 +4,7 @@ import { fields, jsonBody, positiveId, P001Error } from '../profile/validation';
 import type { Sprint2Repository } from './contracts';
 import { calculateProgress } from './progress';
 import { databaseError } from './repository';
-import { linkInput, revision, subjectInput, validateDependency } from './validation';
+import { linkInput, revision, subjectInput, validateDependency, validatePrerequisites } from './validation';
 export interface Sprint2Dependencies { auth: AuthDependencies; repository: Sprint2Repository }
 const prefix = '/api/p001-sprint2';
 export async function handleSprint2Request(request: Request, deps: Sprint2Dependencies): Promise<Response | null> {
@@ -32,6 +32,7 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
       const snapshot=await deps.repository.curriculum(id);
       if (!snapshot) throw new P001Error(404,'CURRICULUM_NOT_FOUND','The curriculum is unavailable.');
       if (item!==null && !snapshot.data.subjects.some(s=>s.mappingId===item)) throw new P001Error(404,'SUBJECT_NOT_FOUND','The mapped subject is unavailable.');
+      if (item===null && input.prerequisites) validatePrerequisites(snapshot.data,input.prerequisites);
       return authJson({data:await deps.repository.subject(id,item,input)},item===null?201:200);
     }
     if (match[2]==='dependencies' && request.method===(item===null?'POST':'PUT')) {

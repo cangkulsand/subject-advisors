@@ -39,6 +39,41 @@ try{
  await check('relationship editing and removal return current snapshots',async()=>{snapshot=await repo.curriculum(1);const link=snapshot.data.links.find(l=>l.kind==='COREQUISITE');snapshot=await repo.dependency(1,link.id,{revision:snapshot.revision,from:1,required:2,kind:'RECOMMENDED'});assert.equal(snapshot.data.links.find(l=>l.id===link.id).kind,'RECOMMENDED');snapshot=await repo.removeDependency(1,link.id,snapshot.revision);assert.ok(!snapshot.data.links.some(l=>l.id===link.id));});
  await check('existing global subject attaches without duplicating metadata',async()=>{let other=await repo.curriculum(2);other=await repo.subject(2,null,{...draft,existingSubjectId:1,revision:other.revision});assert.equal(other.data.subjects[0].subjectId,1);assert.equal((await pg.query('SELECT count(*)::integer AS n FROM subject')).rows[0].n,4);});
  await check('cross-curriculum prerequisites are rejected by database integrity',async()=>{snapshot=await repo.curriculum(1);const other=await repo.curriculum(2);await assert.rejects(()=>repo.dependency(1,null,{revision:snapshot.revision,from:1,required:other.data.subjects[0].mappingId,kind:'MANDATORY'}),e=>e.code==='CURRICULUM_CONFLICT');});
+ const uc24={revision:'',existingSubjectId:null,code:'DEMO5',name:'Fictional UC24 subject',credits:3,category:'ELECTIVE',compulsory:false,semesterTypes:['NORMAL'],confirmSharedChanges:false};
+ await check('UC24: subject with multiple initial mandatory prerequisites saves atomically',async()=>{snapshot=await repo.curriculum(1);snapshot=await repo.subject(1,null,{...uc24,revision:snapshot.revision,prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:2,code:'DEMO2'}]});
+  const created=snapshot.data.subjects.find(s=>s.code==='DEMO5');assert.ok(created);
+  const edges=snapshot.data.links.filter(l=>l.from===created.mappingId);assert.equal(edges.length,2);
+  assert.ok(edges.every(l=>l.kind==='MANDATORY'));assert.deepEqual(edges.map(l=>l.required).sort(),[1,2]);});
+ await check('UC24: subject without prerequisites still saves',async()=>{snapshot=await repo.curriculum(1);snapshot=await repo.subject(1,null,{...uc24,code:'DEMO6',category:'ELECTIVE',compulsory:false,revision:snapshot.revision,prerequisites:[]});
+  const created=snapshot.data.subjects.find(s=>s.code==='DEMO6');assert.ok(created);assert.equal(snapshot.data.links.filter(l=>l.from===created.mappingId).length,0);});
+ for(const [label,prerequisites] of [['missing reference',[{mappingId:999,code:'DEMO1'}]],['foreign curriculum reference',(await repo.curriculum(2)).data.subjects.map(s=>({mappingId:s.mappingId,code:s.code})).slice(0,1)],['mismatched canonical code',[{mappingId:1,code:'WRONG'}]]])
+  await check('UC24: '+label+' rolls back the entire subject, mapping and semester rules',async()=>{const before=await repo.curriculum(1);
+   await assert.rejects(()=>repo.subject(1,null,{...uc24,code:'BADREF',revision:before.revision,prerequisites}),e=>['INVALID_PREREQUISITE','CURRICULUM_CONFLICT','REFERENCE_CONFLICT'].includes(e.code));
+   const after=await repo.curriculum(1);assert.equal(after.revision,before.revision);assert.ok(!after.data.subjects.some(s=>s.code==='BADREF'));
+   assert.equal((await pg.query('SELECT count(*)::integer AS n FROM subject WHERE subject_code=$1',['BADREF'])).rows[0].n,0);});
+ await check('UC24: a late failing prerequisite edge rolls back the whole creation',async()=>{
+  await pg.exec(`CREATE OR REPLACE FUNCTION public.uc24_test_reject() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN IF NEW.required_curriculum_subject_id=3 THEN RAISE EXCEPTION 'test-only late failure' USING ERRCODE='23514'; END IF; RETURN NEW; END $fn$;
+  CREATE TRIGGER uc24_test_late BEFORE INSERT ON public.subject_prerequisite FOR EACH ROW EXECUTE FUNCTION public.uc24_test_reject();`);
+  const before=await repo.curriculum(1);const edgesBefore=(await pg.query('SELECT count(*)::integer AS n FROM subject_prerequisite')).rows[0].n;
+  await assert.rejects(()=>repo.subject(1,null,{...uc24,code:'LATEFAIL',revision:before.revision,prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:3,code:'DEMO3'}]}),e=>e.code==='CURRICULUM_CONFLICT');
+  const after=await repo.curriculum(1);assert.equal(after.revision,before.revision);assert.ok(!after.data.subjects.some(s=>s.code==='LATEFAIL'));
+  assert.equal((await pg.query('SELECT count(*)::integer AS n FROM subject_prerequisite')).rows[0].n,edgesBefore);
+  await pg.exec('DROP TRIGGER uc24_test_late ON public.subject_prerequisite');});
+ await check('UC24: duplicate mandatory edge attempt is rejected by uniqueness',async()=>{const before=await repo.curriculum(1);
+  await assert.rejects(()=>repo.subject(1,null,{...uc24,code:'DUPEDGE',revision:before.revision,prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:1,code:'DEMO1'}]}),e=>['DUPLICATE_CURRICULUM_DATA','INVALID_PREREQUISITE','CURRICULUM_CONFLICT'].includes(e.code));
+  assert.equal((await repo.curriculum(1)).revision,before.revision);assert.ok(!(await repo.curriculum(1)).data.subjects.some(s=>s.code==='DUPEDGE'));});
+ await check('UC24: stale create with prerequisites leaves snapshot and catalogue unchanged',async()=>{const before=await repo.curriculum(1);
+  await assert.rejects(()=>repo.subject(1,null,{...uc24,code:'STALEC',revision:'0'.repeat(32),prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:2,code:'DEMO2'}]}),e=>e.code==='STALE_CURRICULUM');
+  assert.equal((await repo.curriculum(1)).revision,before.revision);
+  assert.equal((await pg.query('SELECT count(*)::integer AS n FROM subject WHERE subject_code=$1',['STALEC'])).rows[0].n,0);});
+ await check('UC24: catalogue reuse with prerequisites shares the subject and persists edges',async()=>{
+  let other=await repo.curriculum(2);const requiredMapping=other.data.subjects[0].mappingId;
+  const existing=(await repo.catalogue()).subjects.find(s=>s.code==='DEMO6');assert.ok(existing);
+  const subjectCount=(await pg.query('SELECT count(*)::integer AS n FROM subject')).rows[0].n;
+  other=await repo.subject(2,null,{...uc24,existingSubjectId:existing.subjectId,revision:other.revision,prerequisites:[{mappingId:requiredMapping,code:'DEMO1'}]});
+  const added=other.data.subjects.find(s=>s.code==='DEMO6');assert.ok(added);assert.equal(added.subjectId,existing.subjectId);
+  assert.equal((await pg.query('SELECT count(*)::integer AS n FROM subject')).rows[0].n,subjectCount);
+  const edge=other.data.links.find(l=>l.from===added.mappingId);assert.ok(edge);assert.equal(edge.kind,'MANDATORY');assert.equal(edge.required,requiredMapping);});
  await pg.exec(`INSERT INTO academic_semester(semester_id,academic_year,semester_no,semester_type,max_subjects,max_credits) VALUES(1,'1001/1002',1,'NORMAL',3,10),(2,'1001/1002',3,'SHORT',3,6);
  INSERT INTO academic_record(student_id,subject_id,semester_id,status,recognized_credits,remarks)
  SELECT student_id,1,1,'COMPLETED',3,NULL FROM student_profile WHERE clerk_user_id='demo_a';

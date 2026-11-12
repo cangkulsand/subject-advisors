@@ -1,6 +1,7 @@
 import { describe,it,expect,vi } from 'vitest';
+import { AuthError } from '../auth/errors';
 import { calculateProgress } from './progress';
-import { subjectInput,linkInput,validateDependency } from './validation';
+import { subjectInput,linkInput,validateDependency,validatePrerequisites } from './validation';
 import { createSprint2Repository,databaseError,progressSql,snapshotSql,type Database,type Command } from './repository';
 import { handleSprint2Request,type Sprint2Dependencies } from './routes';
 import type { CurriculumData,ProgressSource,SubjectInput } from './contracts';
@@ -40,6 +41,25 @@ describe('UC06 validation and relationship semantics',()=>{
  it('supports the explicit English 1 to 2 to 3 chain',()=>{const data=structuredClone(curriculum);data.links=[{id:1,from:2,required:1,kind:'MANDATORY'}];expect(()=>validateDependency(data,{revision:rev,from:3,required:2,kind:'MANDATORY'})).not.toThrow();});
  it('rejects duplicates while allowing a link to be edited in place',()=>{const data=structuredClone(curriculum);data.links=[{id:7,from:2,required:1,kind:'MANDATORY'}];const input={revision:rev,from:2,required:1,kind:'MANDATORY' as const};expect(()=>validateDependency(data,input)).toThrow(/exists/);expect(()=>validateDependency(data,input,7)).not.toThrow();});
 });
+describe('UC24 initial prerequisite validation',()=>{
+ const pick=(mappingId:number,code='DEMO'+mappingId)=>({mappingId,code});
+ it('normalizes an absent, empty, single and multiple prerequisite selection',()=>{
+  expect(subjectInput(newSubject,false).prerequisites).toBeUndefined();
+  expect(subjectInput({...newSubject,prerequisites:[]},false).prerequisites).toEqual([]);
+  expect(subjectInput({...newSubject,prerequisites:[pick(1)]},false).prerequisites).toEqual([pick(1)]);
+  expect(subjectInput({...newSubject,prerequisites:[pick(1),pick(2)]},false).prerequisites).toHaveLength(2);
+ });
+ it.each([null,{},'DEMO1'] )('rejects a non-array prerequisites value %j',prerequisites=>expect(()=>subjectInput({...newSubject,prerequisites},false)).toThrow());
+ it.each([{mappingId:0,code:'DEMO1'},{mappingId:1.5,code:'DEMO1'},{mappingId:'1',code:'DEMO1'},{mappingId:1},{mappingId:1,code:''},{mappingId:1,code:'X'.repeat(21)},{mappingId:1,code:'DEMO1',extra:true},['DEMO1']])('rejects malformed selection %j',entry=>expect(()=>subjectInput({...newSubject,prerequisites:[entry]},false)).toThrow());
+ it('rejects duplicate selections by mapping ID',()=>expect(()=>subjectInput({...newSubject,prerequisites:[pick(1),{mappingId:1,code:'OTHER'}]},false)).toThrow(/duplicate/i));
+ it('rejects initial prerequisites on subject edits',()=>expect(()=>subjectInput({...newSubject,confirmSharedChanges:true,prerequisites:[pick(1)]},true)).toThrow());
+ it('accepts prerequisites together with an existing catalogue subject',()=>expect(subjectInput({...newSubject,existingSubjectId:9,prerequisites:[pick(2)]},false).prerequisites).toEqual([pick(2)]));
+ it('rejects mismatched, missing or foreign selections against the snapshot',()=>{
+  expect(()=>validatePrerequisites(curriculum,[{mappingId:1,code:'WRONG'}])).toThrow();
+  expect(()=>validatePrerequisites(curriculum,[{mappingId:99,code:'DEMO99'}])).toThrow();
+  expect(()=>validatePrerequisites(curriculum,[pick(1),pick(3)])).not.toThrow();
+ });
+});
 describe('backend roles and scope',()=>{
  it('reads progress only for verified identity and returns private no-store data',async()=>{const d=deps();const r=await handleSprint2Request(request('/progress?studentId=999'),d);expect(r?.status).toBe(200);expect(d.repository.progress).toHaveBeenCalledWith('student_a');expect(r?.headers.get('Cache-Control')).toBe('no-store');});
  it('requires completed student setup',async()=>{const d=deps();d.auth.profiles={stateFor:vi.fn(async()=>'SETUP_REQUIRED' as const)};expect((await handleSprint2Request(request('/progress'),d))?.status).toBe(403);expect(d.repository.progress).not.toHaveBeenCalled();});
@@ -47,6 +67,19 @@ describe('backend roles and scope',()=>{
  it('allows an administrator to read curriculum metadata without a student profile',async()=>{const d=admin(deps());expect((await handleSprint2Request(request('/curricula'),d))?.status).toBe(200);expect(d.auth.profiles?.stateFor).not.toHaveBeenCalled();});
  it('denies suspended administrators',async()=>{const d=admin(deps());d.auth.access.find=vi.fn(async()=>({clerkUserId:'student_a',appRole:'SYSTEM_ADMIN' as const,accessStatus:'SUSPENDED' as const,roles:['SYSTEM_ADMIN' as const]}));expect((await handleSprint2Request(request('/curricula'),d))?.status).toBe(403);});
  it('allows subject creation with validated data',async()=>{const d=admin(deps());d.repository.subject=vi.fn(async()=>({revision:rev,data:curriculum}));expect((await handleSprint2Request(request('/curricula/1/subjects','POST',newSubject),d))?.status).toBe(201);expect(d.repository.subject).toHaveBeenCalledWith(1,null,expect.objectContaining({credits:2,semesterTypes:['SHORT']}));});
+ it('creates a subject with validated initial prerequisites and returns 201',async()=>{const d=admin(deps());d.repository.subject=vi.fn(async()=>({revision:rev,data:curriculum}));const r=await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:3,code:'DEMO3'}]}),d);expect(r?.status).toBe(201);expect(d.repository.subject).toHaveBeenCalledWith(1,null,expect.objectContaining({prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:3,code:'DEMO3'}]}));});
+ it('allows creation without prerequisites or with an empty list',async()=>{const d=admin(deps());d.repository.subject=vi.fn(async()=>({revision:rev,data:curriculum}));expect((await handleSprint2Request(request('/curricula/1/subjects','POST',newSubject),d))?.status).toBe(201);expect((await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[]}),d))?.status).toBe(201);});
+ it.each([{p:[{mappingId:1,code:'DEMO2'}]},{p:[{mappingId:9,code:'DEMO9'}]},{p:[{mappingId:1,code:'DEMO1'},{mappingId:1,code:'DEMO1'}]}])('rejects invalid initial prerequisite references %j before writing',async ({p:prerequisites})=>{const d=admin(deps());const r=await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites}),d);expect(r?.status).toBe(400);expect(d.repository.subject).not.toHaveBeenCalled();});
+ it('requires curriculum mapping IDs rather than shared subject IDs',async()=>{const d=admin(deps());const data={...structuredClone(curriculum),subjects:[{...curriculum.subjects[0]!,mappingId:55}]};d.repository.curriculum=vi.fn(async()=>({revision:rev,data}));d.repository.subject=vi.fn(async()=>({revision:rev,data}));
+  expect((await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[{mappingId:1,code:'DEMO1'}]}),d))?.status).toBe(400);expect(d.repository.subject).not.toHaveBeenCalled();
+  expect((await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[{mappingId:55,code:'DEMO1'}]}),d))?.status).toBe(201);});
+ it('denies suspended and unauthenticated subject creation before writing',async()=>{
+  const d=admin(deps());d.auth.access.find=vi.fn(async()=>({clerkUserId:'student_a',appRole:'SYSTEM_ADMIN' as const,accessStatus:'SUSPENDED' as const,roles:['SYSTEM_ADMIN' as const]}));
+  expect((await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[{mappingId:1,code:'DEMO1'}]}),d))?.status).toBe(403);expect(d.repository.subject).not.toHaveBeenCalled();
+  const d2=admin(deps());d2.auth.verify=vi.fn(async()=>{throw new AuthError(401,'SESSION_INVALID','Sign in again.');});
+  expect((await handleSprint2Request(request('/curricula/1/subjects','POST',newSubject),d2))?.status).toBe(401);expect(d2.repository.subject).not.toHaveBeenCalled();});
+ it('rejects initial prerequisites on subject PUT before writing',async()=>{const d=admin(deps());const r=await handleSprint2Request(request('/curricula/1/subjects/1','PUT',{...newSubject,confirmSharedChanges:true,prerequisites:[{mappingId:2,code:'DEMO2'}]}),d);expect(r?.status).toBe(400);expect(d.repository.subject).not.toHaveBeenCalled();});
+ it('denies coordinators initial-prerequisite creation before writing',async()=>{const d=deps();d.auth.access.find=vi.fn(async()=>({clerkUserId:'student_a',appRole:'COORDINATOR' as const,accessStatus:'ACTIVE' as const,roles:['COORDINATOR' as const]}));expect((await handleSprint2Request(request('/curricula/1/subjects','POST',{...newSubject,prerequisites:[{mappingId:1,code:'DEMO1'}]}),d))?.status).toBe(403);expect(d.repository.subject).not.toHaveBeenCalled();});
  it('rejects dependency cycles without calling the write',async()=>{const d=admin(deps());d.repository.curriculum=vi.fn(async()=>({revision:rev,data:{...curriculum,links:[{id:1,from:2,required:1,kind:'MANDATORY' as const}]}}));expect((await handleSprint2Request(request('/curricula/1/dependencies','POST',{revision:rev,from:1,required:2,kind:'MANDATORY'}),d))?.status).toBe(400);expect(d.repository.dependency).not.toHaveBeenCalled();});
  it('does not implement UC07 or other owners routes',async()=>{const d=admin(deps());expect(await handleSprint2Request(new Request('https://test/api/graduation-requirements'),d)).toBeNull();expect((await handleSprint2Request(request('/curricula/1/requirements','PUT',{}),d))?.status).toBe(404);});
  it('redacts unexpected database errors',async()=>{const d=admin(deps());d.repository.catalogue=vi.fn(async()=>{throw new Error('PRIVATE_CREDENTIAL');});const r=await handleSprint2Request(request('/curricula'),d);expect(r?.status).toBe(503);expect(await r?.text()).not.toContain('PRIVATE');});
@@ -59,5 +92,8 @@ describe('atomic repository contract',()=>{
  it('propagates a transaction failure as a safe conflict',async()=>{const {db}=database();db.transaction=vi.fn(async()=>{throw{code:'23514',detail:'PRIVATE'};});await expect(createSprint2Repository(db).subject(1,null,subjectInput(newSubject,false))).rejects.toMatchObject({status:409,code:'CURRICULUM_CONFLICT'});});
  it.each(['23505','23503','40001','40P01'])('maps database conflict %s',code=>expect(()=>databaseError({code})).toThrow());
  it('sends dependency deletes with curriculum ownership and revision guards',async()=>{const {db,commands}=database();await createSprint2Repository(db).removeDependency(1,7,rev);expect(commands[0]?.[3]).toMatchObject({params:[7,1]});expect(commands[0]?.[3]?.text).toContain('curriculum_id=$2');});
+ it('inserts initial prerequisites inside the same guarded transaction with bound selections',async()=>{const {db,commands}=database();await createSprint2Repository(db).subject(1,null,{...subjectInput(newSubject,false),prerequisites:[{mappingId:1,code:'DEMO1'},{mappingId:2,code:'DEMO2'}]});const c=commands[0]!;const edge=c.find(v=>v.text.includes('jsonb_to_recordset'));expect(edge?.text).toContain('subject_prerequisite');expect(edge?.text).toContain("'MANDATORY'");expect(edge?.text).toContain("current_setting('p001s2.allowed'");expect(edge?.params).toEqual([JSON.stringify([{mappingId:1,code:'DEMO1'},{mappingId:2,code:'DEMO2'}]),1]);expect(c.indexOf(edge!)).toBeLessThan(c.length-1);});
+ it('sends no prerequisite selection when legacy callers omit the field',async()=>{const {db,commands}=database();await createSprint2Repository(db).subject(1,null,subjectInput(newSubject,false));const edge=commands[0]!.find(v=>v.text.includes('jsonb_to_recordset'));expect(edge?.params).toEqual(['[]',1]);});
+ it('maps a null prerequisite identity to a safe 400',()=>expect(()=>databaseError({code:'23502'})).toThrow(expect.objectContaining({status:400,code:'INVALID_PREREQUISITE'})));
  it('never changes programme totals or semester loads',async()=>{const {db,commands}=database();await createSprint2Repository(db).subject(1,null,subjectInput(newSubject,false) as SubjectInput);const sql=commands.flat().map(c=>c.text).join('\n');expect(sql).not.toMatch(/(?:UPDATE|INSERT INTO|DELETE FROM) public\.(curriculum_requirement|academic_semester|curriculum)\b/);});
 });

@@ -24,9 +24,11 @@ export interface Progress {
   outstandingCompulsory: number; noHistory: boolean; warnings: string[];
   subjects: ProgressSubject[]; requirements: (Requirement & { earnedCredits: number | null; satisfiedSubjects: number | null; status: 'MET' | 'OUTSTANDING' | 'UNASSESSED' })[];
 }
+export interface PrerequisiteSelection { mappingId: number; code: string }
 export interface SubjectInput {
   revision: string; existingSubjectId: number | null; code: string; name: string; credits: number;
   category: string; compulsory: boolean; semesterTypes: SemesterType[]; confirmSharedChanges: boolean;
+  prerequisites?: PrerequisiteSelection[];
 }
 export interface LinkInput { revision: string; from: number; required: number; kind: LinkKind }
 export interface Sprint2Repository {

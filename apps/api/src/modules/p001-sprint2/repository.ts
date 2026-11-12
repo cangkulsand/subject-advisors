@@ -35,6 +35,7 @@ export function databaseError(error: unknown): never {
   const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : '';
   if (code === '23505') throw new P001Error(409,'DUPLICATE_CURRICULUM_DATA','This subject code, mapping or relationship already exists.');
   if (code === '23503') throw new P001Error(409,'REFERENCE_CONFLICT','A selected subject is unavailable or still referenced. Reload the curriculum.');
+  if (code === '23502') throw new P001Error(400,'INVALID_PREREQUISITE','A selected prerequisite no longer matches a subject in this curriculum. Reload and select it again.');
   if (code === '23514') throw new P001Error(409,'CURRICULUM_CONFLICT','This change violates curriculum rules or would alter recorded credit history. Review prerequisites and existing records.');
   if (code === '40001' || code === '40P01') throw new P001Error(409,'CONCURRENT_EDIT','Another change is being saved. Reload and retry.');
   throw new P001Error(503,'SPRINT2_UNAVAILABLE','Academic information is temporarily unavailable. Please retry.');
@@ -93,6 +94,14 @@ export function createSprint2Repository(db: Database): Sprint2Repository {
         operations.push({ text: `WITH inserted AS (INSERT INTO public.curriculum_subject(curriculum_id,subject_id,subject_category,is_compulsory)
           SELECT $1,${subject},$2,$3 WHERE ${subject} IS NOT NULL AND ${permitted} RETURNING curriculum_subject_id)
           SELECT set_config('p001s2.mapping_id',curriculum_subject_id::text,true) FROM inserted`,params:[id,input.category,input.compulsory?1:0] });
+        // Initial mandatory prerequisites (UC24). Identity and canonical code are rechecked
+        // against live rows here; an unresolvable selection violates NOT NULL and rolls back.
+        operations.push({ text: `INSERT INTO public.subject_prerequisite(curriculum_subject_id,required_curriculum_subject_id,requirement_type)
+          SELECT ${mapping},CASE WHEN cs.curriculum_id=$2 AND s.subject_code=selection.code THEN cs.curriculum_subject_id ELSE NULL END,'MANDATORY'
+          FROM jsonb_to_recordset($1::jsonb) AS selection("mappingId" integer,code text)
+          LEFT JOIN public.curriculum_subject cs ON cs.curriculum_subject_id=selection."mappingId"
+          LEFT JOIN public.subject s ON s.subject_id=cs.subject_id
+          WHERE ${mapping} IS NOT NULL AND ${permitted}`,params:[JSON.stringify(input.prerequisites??[]),id] });
       }
       const result = await mutate(id,input.revision,[...operations,...semesterCommands(input)]);
       if (mappingId !== null && !result.data.subjects.some(s => s.mappingId === mappingId)) throw new P001Error(404,'SUBJECT_NOT_FOUND','The mapped subject is unavailable.');

@@ -48,6 +48,25 @@ it('fails closed when the pathway feature is absent',async()=>{
   const response=await dispatchIntegratedRequest(new Request('https://example.test/api/pathway/graph'),services());
   expect(response.status).toBe(503);expect(await response.json()).toMatchObject({error:{code:'FEATURE_NOT_INSTALLED'}});
 });
+it.each(['/api/p001-sprint2/curricula','/api/p001-sprint2/curricula/1','/api/p001-sprint2/curricula/1/subjects'])('dispatches P003 curriculum route %s with the original request',async path=>{
+  const deps=services();deps.curriculum=vi.fn(async req=>Response.json({owner:'P003',path:new URL(req.url).pathname}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test'+path),deps);
+  expect(await response.json()).toEqual({owner:'P003',path});expect(deps.curriculum).toHaveBeenCalled();
+});
+it('does not dispatch the student progress route to the curriculum handler',async()=>{
+  const deps=services();deps.curriculum=vi.fn();
+  expect((await dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/progress'),deps)).status).toBe(404);
+  expect(deps.curriculum).not.toHaveBeenCalled();
+});
+it('fails closed with admin authorization when the curriculum feature is absent',async()=>{
+  const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',appRole:'SYSTEM_ADMIN' as const,roles:['SYSTEM_ADMIN' as const],accessStatus:'ACTIVE' as const}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/curricula'),deps);
+  expect(response.status).toBe(503);expect(await response.json()).toMatchObject({error:{code:'FEATURE_NOT_INSTALLED'}});
+});
+it('denies non-admin roles before the absent curriculum response',async()=>{
+  const deps=services();
+  await expect(dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/curricula'),deps)).rejects.toMatchObject({status:403});
+});
 it('leaves unknown routes unimplemented and preserves auth body rejection',async()=>{
   const deps=services();expect((await dispatchIntegratedRequest(new Request('https://example.test/api/unknown'),deps)).status).toBe(404);
   const response=await dispatchIntegratedRequest(new Request('https://example.test/api/me/initialize',{method:'POST',body:'{}'}),deps);expect(response.status).toBe(400);
