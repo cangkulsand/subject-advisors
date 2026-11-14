@@ -16,6 +16,7 @@ function fixture() {
     if (sql.includes('FROM offering_decision')) return [{ subject_id: 501 }, { subject_id: 502 }, { subject_id: 503 }];
     if (sql.includes('JOIN subject')) return [{ curriculum_subject_id: 101, subject_id: 501, subject_category: 'Elective U1', is_compulsory: 0, subject_code: 'FIX101', subject_name: 'Fictional subject', credit_hours: '3.0' }];
     if (sql.includes('FROM subject_prerequisite')) return [];
+    if (sql.includes('FROM academic_record')) return [{ subject_id: 501, status: 'COMPLETED', recognized_credits: '3' }, { subject_id: 502, status: 'FAILED', recognized_credits: 0 }];
     if (sql.includes('FROM academic_semester')) return semesters();
     return [{ curriculum_id: 401, learning_centre_id: 601 }];
   });
@@ -152,6 +153,19 @@ describe('read-only offering context adapter', () => {
     expect(f.query.mock.calls.find(([sql]) => sql.includes('FROM subject_prerequisite'))).toEqual([
       expect.stringContaining('WHERE src.curriculum_id = $1'), ['401'],
     ]);
+  });
+  it('reads the student academic history for eligibility, only when prerequisites are requested', async () => {
+    const f = fixture(); const result = await f.reader('verified-user-a', { includePrerequisites: true });
+    expect(result?.history).toEqual({ status: 'available', records: [
+      { subjectId: '501', status: 'COMPLETED', recognizedCredits: 3 }, { subjectId: '502', status: 'FAILED', recognizedCredits: 0 },
+    ] });
+    expect(f.query).toHaveBeenCalledWith(expect.stringContaining('SELECT subject_id, status, recognized_credits FROM academic_record WHERE student_id = $1'), ['301']);
+    const plain = fixture(); expect((await plain.reader('verified-user-a'))?.history).toBeUndefined();
+  });
+  it('marks history unavailable, without failing the context, when the records query fails', async () => {
+    const f = fixture(); const base = f.query.getMockImplementation()!;
+    f.query.mockImplementation(async (sql, parameters) => { if (sql.includes('FROM academic_record')) throw new Error('records down'); return base(sql, parameters); });
+    expect(await f.reader('verified-user-a', { includePrerequisites: true })).toMatchObject({ studentId: '301', history: { status: 'unavailable' } });
   });
   it('passes validated full AND/OR curriculum details alongside legacy direct edges', async () => {
     const f = fixture();
