@@ -1,12 +1,12 @@
 # S2-P001-004 — Improve admin academic-semester page actions
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-10
 - **Sprint:** Sprint 2
 - **Owner:** P001 / Aisar (P001 Programmer 1); merged into the current codebase by P004 on 2026-11-11
 - **Renumbered:** the handoff named this record S2-P004-013-admin-academic-semester-actions; S2-P004-013 already exists (uc20-coordinator-review-ux), so it is S2-P001-004 here.
 - **Related UC / FR:** UC20 admin academic setup; current-semester administration
-- **Branch / PR:** `feature/student-profile-admin-academic-year` (handoff, based on `7b4b9af`); merged into `feature/s2-continue` / no PR
+- **Branch / PR:** `feature/student-profile-admin-academic-year` (handoff, based on `7b4b9af`); merged into `feature/s2-continue`, into `main` on 2026-11-14 / no PR
 - **Reviewer:** Coordinator review PASS after source and desktop/mobile screenshot review; human peer review pending
 
 ## 1. Plan
@@ -80,3 +80,4 @@ Improve the visual hierarchy and accessibility of the `/admin/semesters` page's 
 - **Verification summary:** Admin UI 44 checks, typecheck, lint, full unit suite (1,374 passed / 59 skipped), build and build:local passed. Read-only UI fixtures only; no database writes.
 - **Outstanding blockers / follow-up:** Human peer review pending. No commit or push.
 - **Final status:** READY_FOR_REVIEW.
+- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 4d7c0b8) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.
