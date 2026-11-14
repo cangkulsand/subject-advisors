@@ -1,11 +1,11 @@
 # S2-P004-027 — UC09 offering eligibility (student subject picking)
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-14
 - **Sprint:** Sprint 2
 - **Owner:** P002 (UC09 / FR-C2, FR-C5); built by P004
 - **Related UC / FR:** UC09 / FR-C2, FR-C5; UC24 prerequisites (P003); UC20 simplified offering flow (S2-P004-017 to S2-P004-024)
-- **Branch / PR:** `feature/s2-uc09-eligibility`; no PR yet
+- **Branch / PR:** `feature/s2-uc09-eligibility`; merged into `main` on 2026-11-14 (merge commit c1f426d); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -45,5 +45,6 @@ Not verified: no database was used; the academic-history query was only unit-tes
 
 ## 4. Changelog
 
+- 2026-11-14 - Merged: `feature/s2-uc09-eligibility` into `main` (merge commit c1f426d). Checks on merged main: typecheck, lint, unit tests (1616 passed, 65 skipped), integration 11/11, db-tooling 26/26, build, check:cloudflare, offerings UI (57), UC24 UI (14), admin UI (50). Status: MERGED; human peer review pending.
 - 2026-11-14 - Type: Changed. CGPA rules are hidden from students: CGPA is not stored, so imported CGPA conditions (and notes mentioning CGPA) no longer appear on the offerings page or the student pathway, and no longer make a subject "Check with your coordinator" or pathway-unknown. The coordinator forecast keeps reporting CGPA as missing evidence. Checks: typecheck, lint, unit tests (1616 passed, 65 skipped).
 - 2026-11-14 - Type: Added. UC09 offering eligibility: students see Eligible / Check with your coordinator / Not eligible with reasons on offerings, and `PUT /api/semester-offerings` rejects ineligible picks with `409 OFFERING_NOT_ELIGIBLE`. Compatibility: no migration; GET response unchanged; PUT may now reject picks that were previously accepted (unmet mandatory prerequisite/corequisite or credits). Outstanding: human peer review; SRS/SDD not updated by owner instruction.
