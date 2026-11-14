@@ -7,7 +7,13 @@ const pending = new Map<string, Promise<unknown>>();
 let generation = 0;
 function storage(): Storage | undefined { try { return typeof window === 'undefined' ? undefined : window.sessionStorage; } catch { return undefined; } }
 function pruneStorage(keep: (key: string) => boolean) {
-  try { const store = storage(); if (store) for (let i = store.length - 1; i >= 0; i--) { const key = store.key(i); if (key?.startsWith(prefix) && !keep(key.slice(prefix.length))) store.removeItem(key); } } catch { /* Storage is optional. */ }
+  // Collect first: removing while iterating by index skips keys because browsers may reorder Web Storage keys after a removal.
+  try {
+    const store = storage(); if (!store) return;
+    const keys: string[] = [];
+    for (let i = 0; i < store.length; i++) { const key = store.key(i); if (key?.startsWith(prefix) && !keep(key.slice(prefix.length))) keys.push(key); }
+    for (const key of keys) store.removeItem(key);
+  } catch { /* Storage is optional. */ }
 }
 /** Preserve this identity's snapshots across reloads; discard other identities. */
 export function keepAcademicSession(identity: string) {
@@ -15,6 +21,12 @@ export function keepAcademicSession(identity: string) {
   const belongs = (key: string) => { try { return JSON.parse(key)[0] === identity; } catch { return false; } };
   for (const key of entries.keys()) if (!belongs(key)) entries.delete(key);
   pruneStorage(belongs);
+}
+
+/** Forget one stored snapshot (memory and tab storage) so the next read loads from the server; a read already in flight is shared. */
+export function dropAcademicEntry(key: string) {
+  entries.delete(key);
+  try { storage()?.removeItem(prefix + key); } catch { /* Storage is optional. */ }
 }
 
 export function clearAcademicCache() {

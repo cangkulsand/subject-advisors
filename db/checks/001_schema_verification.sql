@@ -22,7 +22,8 @@ FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
    + CASE WHEN t->>'table'='curriculum_subject' THEN 2 ELSE 0 END
    + CASE t->>'table' WHEN 'academic_import_batch' THEN 6 WHEN 'imported_student' THEN 2 WHEN 'imported_subject_record' THEN 1
      WHEN 'forecast_run' THEN 4 WHEN 'forecast_subject_demand' THEN 3 ELSE 0 END
-   + CASE WHEN t->>'table' IN ('programme','learning_centre','academic_semester') THEN 1 ELSE 0 END)
+   + CASE WHEN t->>'table' IN ('programme','learning_centre','academic_semester') THEN 1 ELSE 0 END
+   + CASE WHEN t->>'table'='programme' THEN 1 ELSE 0 END) -- programme.department_id (0010)
    THEN RAISE EXCEPTION 'Unexpected columns in %',t->>'table'; END IF;
  FOR c IN SELECT * FROM jsonb_array_elements(t->'columns') LOOP
    SELECT a.attnum,a.attnotnull,format_type(a.atttypid,a.atttypmod) AS type,a.attidentity
@@ -43,8 +44,8 @@ END LOOP;
 SELECT count(*) INTO actual_count FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace
 WHERE n.nspname='public' AND c.contype='f'
   AND c.conrelid IN (SELECT to_regclass('public.'||(value->>'table')) FROM jsonb_array_elements(expected));
--- The one additional 0003 FK is checked by the explicit extension check. 0005 adds no FK on a source-contract table. 0007 adds three (batch programme, batch target semester, run programme); 0008 adds programme.faculty_id; 0009 adds student_profile.learning_centre_id.
-IF actual_count<>45 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK, three 0007 FKs, the 0008 faculty FK and the 0009 profile learning centre FK'; END IF;
+-- The one additional 0003 FK is checked by the explicit extension check. 0005 adds no FK on a source-contract table. 0007 adds three (batch programme, batch target semester, run programme); 0008 adds programme.faculty_id; 0009 adds student_profile.learning_centre_id; 0010 adds programme.department_id.
+IF actual_count<>46 THEN RAISE EXCEPTION 'Expected 39 source FKs plus the registered 0003 profile semester FK, three 0007 FKs, the 0008 faculty FK, the 0009 profile learning centre FK and the 0010 programme department FK'; END IF;
 END $verify$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.student_profile'::regclass AND tgname='touch_student_profile' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_student_profile'; END IF; END $v$;
 DO $v$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.academic_plan'::regclass AND tgname='touch_academic_plan' AND tgenabled='O') THEN RAISE EXCEPTION 'Missing/disabled trigger touch_academic_plan'; END IF; END $v$;

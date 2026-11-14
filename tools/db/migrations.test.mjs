@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -58,7 +58,7 @@ test('0005 is additive only and registers the approved nullable curriculum metad
  assert.match(migration.sql,/REVOKE ALL ON migration_meta\.reference_data_imports FROM PUBLIC/i);
  assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
- const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,24);
+ const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,25);
 });
 test('0006 audits access-status changes and adds a protected pending-invitation table',async()=>{
  const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0006');
@@ -85,7 +85,7 @@ test('0007 adds programme-scoped forecast persistence and protected offering con
  assert.match(migration.sql,/REVOKE ALL ON public\.confirmed_offering_audit FROM PUBLIC/);
  assert.doesNotMatch(migration.sql.replace(/--.*$/gm,''),/coordinator_assignment|public\.faculty|is_current|ALTER TABLE public\.student_profile|student_offering_pick|DROP\s+(?:TABLE|COLUMN)|DELETE\s+FROM|INSERT\s+INTO/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.forecast_adjustment_audit','public.offering_confirmation','public.confirmed_offering','public.confirmed_offering_audit']);
- const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,24);
+ const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,25);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));
@@ -171,11 +171,38 @@ test('0008 follows the exact 0007 prefix and shared history remains enforced',as
  await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0007'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });
 test('0009 follows the exact 0008 prefix and stays additive',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0008','0009']);
+ const entries=(await loadMigrations()).slice(0,10);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0008','0009']);
  assert.doesNotMatch(entries.at(-1).sql,/DROP\s|TRUNCATE\s+TABLE|ALTER\s+TABLE\s+public\.(offering_confirmation|confirmed_offering)/i);
  const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0009']);
  const nine=entries.at(-1);
  await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0008').concat([{version:'0009',filename:nine.file,sha256:nine.sha256}])}),entries),/NOT_A_PREFIX/);
  await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0008'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
+});
+test('0010 follows the exact 0009 prefix, adds only the department level and stays additive',async()=>{
+ const entries=(await loadMigrations()).slice(0,11);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0009','0010']);
+ const sql=entries.at(-1).sql;
+ assert.doesNotMatch(sql.replace(/--.*$/gm,''),/DROP\s+(?:TABLE|COLUMN)|TRUNCATE\s+TABLE|DELETE\s+FROM|INSERT\s+INTO\s+public\.(?:department|faculty|programme)/i);
+ assert.deepEqual([...sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.department']);
+ assert.match(sql,/ADD COLUMN department_id integer NULL REFERENCES public\.department\(department_id\) ON DELETE RESTRICT/);
+ assert.match(sql,/DEPARTMENT_HAS_PROGRAMMES/);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0010']);
+ const ten=entries.at(-1);
+ await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0009').concat([{version:'0010',filename:ten.file,sha256:ten.sha256}])}),entries),/NOT_A_PREFIX/);
+ await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0009'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
+});
+test('0011 follows the exact 0010 prefix, adds no public table and keeps the programme change audited',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0010','0011']);
+ const sql=entries.at(-1).sql;
+ assert.deepEqual([...sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.programme_change_context']);
+ assert.doesNotMatch(sql.replace(/--.*$/gm,''),/DROP\s+(?:TABLE|COLUMN)|TRUNCATE\s+TABLE|ALTER\s+TABLE/i);
+ assert.match(sql,/CREATE FUNCTION public\.db_change_student_programme\(target_student_id integer, target_curriculum_id integer\)/);
+ assert.match(sql,/'student_programme',target_student_id,'CHANGE_PROGRAMME'/);
+ assert.match(sql,/REVOKE EXECUTE ON FUNCTION public\.db_change_student_programme\(integer,integer\) FROM PUBLIC/);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0011']);
+ const eleven=entries.at(-1);
+ await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0010').concat([{version:'0011',filename:eleven.file,sha256:eleven.sha256}])}),entries),/NOT_A_PREFIX/);
+ await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0010'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });

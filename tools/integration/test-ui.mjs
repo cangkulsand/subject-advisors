@@ -26,7 +26,7 @@ async function mock(page,state={}){
   const role=state.role??'STUDENT',roles=state.roles??[role],availableRoles=state.availableRoles??roles;
   const studentProfileState=availableRoles.includes('STUDENT')?(state.setup?'SETUP_REQUIRED':'COMPLETE'):'NOT_APPLICABLE';
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:role,roles,availableRoles,studentProfileState,accessStatus:'ACTIVE',profileState:role==='STUDENT'?studentProfileState:'NOT_APPLICABLE',landingPath:role==='SYSTEM_ADMIN'?'/admin':role==='COORDINATOR'?'/coordinator':state.setup?'/student/setup':'/student'}
-   :path==='/api/profile'?profile:path==='/api/profile/options'?{learningCentres:[{learningCentreId:1,centreCode:'KL',centreName:'DEMO Kuala Lumpur'},{learningCentreId:2,centreCode:'JB',centreName:'DEMO Johor Bahru'}],curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
+   :path==='/api/profile'?(state.setup?null:profile):path==='/api/profile/options'?{learningCentres:[{learningCentreId:1,centreCode:'KL',centreName:'DEMO Kuala Lumpur'},{learningCentreId:2,centreCode:'JB',centreName:'DEMO Johor Bahru'}],curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],currentSemester:{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'},currentAcademicYear:'1001/1002',semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
    :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',window:{status:'OPEN',targetSemesterId:'1',selectionOpensAt:null,selectionClosesAt:null,learningCentreName:'KL'},curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}
    :path==='/api/pathway/graph'?{curriculumId:1,curriculumVersion:'DEMO',programmeName:'Fictional demo programme',demo:true,nodes:[
     {id:'10',subjectCode:'DEMO101',subjectName:'Foundations',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'COMPLETED',grade:'A',recognizedCredits:3},
@@ -149,7 +149,7 @@ try{
   });
   await check('saving setup reaches records in the same initialized document',async page=>{
    const state=await mock(page,{setup:true});await page.goto(base+'/student/setup');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();const mounts=await page.evaluate(()=>document.documentElement.dataset.clerkMounts);
-   await page.getByLabel('Student name',{exact:true}).fill('DEMO new student');await page.getByLabel('Matric number',{exact:true}).fill('A22EC0001');await page.getByLabel('Programme',{exact:true}).selectOption('1');await page.getByLabel('Learning centre',{exact:true}).selectOption('1');await page.getByLabel('Weekly working hours',{exact:true}).fill('0');await page.getByLabel('Available study hours per week').fill('8');await page.getByLabel('Academic year').selectOption('1001/1002');await page.getByLabel('Semester',{exact:true}).selectOption('1');
+   await page.getByLabel('Student name',{exact:true}).fill('DEMO new student');await page.getByLabel('Matric number',{exact:true}).fill('A22EC0001');await page.getByLabel('Programme',{exact:true}).selectOption('1');await page.getByLabel('Learning centre',{exact:true}).selectOption('1');await page.getByLabel('Weekly working hours',{exact:true}).fill('0');await page.getByLabel('Available study hours per week').fill('8');assert.equal(await page.getByLabel('Academic year').inputValue(),'1001/1002');
    await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('table',{name:'Subject records'}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
   });
  }
@@ -197,19 +197,19 @@ try{
  await check('signed-out pathway navigation requires sign-in',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway?scenario=signed-out');await page.waitForURL('**/sign-in');assert.equal(state.requests?.length??0,0);assert.equal(await page.getByRole('heading',{name:'Academic pathway',exact:true}).count(),0);
  });
- if(installed)await check('academic navigation reuses cached profile, options and records; save invalidates',async page=>{
+ if(installed)await check('academic navigation reuses cached options and records, the profile page always rereads the profile (admin programme change); save invalidates',async page=>{
   await mock(page);const reads={};page.on('request',request=>{const path=new URL(request.url()).pathname;if(request.method()==='GET'&&['/api/profile','/api/profile/options','/api/academic-records'].includes(path))reads[path]=(reads[path]??0)+1;});
   await page.goto(base+'/student/profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
   await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
   await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
-  assert.deepEqual(reads,{'/api/profile':1,'/api/profile/options':1,'/api/academic-records':1});
+  assert.deepEqual(reads,{'/api/profile':2,'/api/profile/options':2,'/api/academic-records':1});
   await page.reload();await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();
-  assert.deepEqual(reads,{'/api/profile':1,'/api/profile/options':1,'/api/academic-records':1});
+  assert.deepEqual(reads,{'/api/profile':3,'/api/profile/options':3,'/api/academic-records':1});
   await clickStudentLink(page,'Academic profile');await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.getByText('Profile saved.',{exact:true}).waitFor();
   await clickStudentLink(page,'Subject records');await page.getByLabel('Taken for DEMO101 DEMO Subject',{exact:true}).waitFor();
-  assert.equal(reads['/api/academic-records'],2);assert.equal(reads['/api/profile/options'],2);
+  assert.equal(reads['/api/academic-records'],2);assert.equal(reads['/api/profile/options'],4);
  },1440);
  console.log(JSON.stringify({passed,installedOwnerPages:installed,clerkAndApi:'MOCKED'}));
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

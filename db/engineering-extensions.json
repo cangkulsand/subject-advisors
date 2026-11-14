@@ -175,6 +175,19 @@
         { "table": "student_profile", "name": "learning_centre_id", "sqlType": "integer", "nullable": true, "purpose": "Learning centre of the student; scopes coordinator decisions and student offerings" }
       ],
       "purpose": "P004 simplified UC20 offering flow: per-scope offering decisions, immutable decision audit and pick withdrawals; excluded from the frozen SRS baseline"
+    },
+    {
+      "migration": "0010",
+      "tables": ["department"],
+      "columns": [
+        { "table": "programme", "name": "department_id", "sqlType": "integer", "nullable": true, "purpose": "Optional department link; the programme faculty follows from the department" }
+      ],
+      "purpose": "P004 Department level between faculty and programme (S2-P004-025, P001 UC25/FR-B9); excluded from the frozen SRS baseline"
+    },
+    {
+      "migration": "0011",
+      "tables": [],
+      "purpose": "P004 admin-controlled student programme change (S2-P004-026, P001 UC03/FR-A3); adds only a migration_meta context table and one function, no public table or column"
     }
   ]
 }

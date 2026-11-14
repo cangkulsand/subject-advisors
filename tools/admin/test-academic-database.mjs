@@ -40,7 +40,7 @@ try{
   assert.deepEqual(await applyMigrations(db,entries),[]);
   console.log('PASS ordered migrations and repeated no-op');
   for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql',
-    '007_network_security_reference.sql','008_admin_user_management.sql','010_uc20_forecast_and_confirmation.sql','012_admin_academic_setup.sql',
+    '007_network_security_reference.sql','008_admin_user_management.sql','010_uc20_forecast_and_confirmation.sql','012_admin_academic_setup.sql','015_department.sql','016_student_programme_change.sql',
     '002_behavior_tests.sql','003_role_boundary_tests.sql','006_multi_role_behavior_tests.sql',
     '009_admin_user_management_behavior_tests.sql','011_uc20_forecast_and_confirmation_behavior_tests.sql','013_admin_academic_setup_behavior.sql']){
     const response=await db.query(await readFile('db/checks/'+file,'utf8'));
