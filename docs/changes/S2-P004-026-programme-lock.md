@@ -1,11 +1,11 @@
 # S2-P004-026 — Student programme lock; admin changes the programme with a reason
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-11
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4 (admin and profile API), delivering P001's UC03 / FR-A3 programme restriction (cross-module change on the P001 profile module; the P001 owner should review)
 - **Related UC / FR:** UC03 / FR-A3 (P001: "The programme is shown, but students cannot change it freely"; exception "Unauthorized programme change: reject and preserve the saved assignment"); admin user management S2-P004-004; follows [S2-P004-023](S2-P004-023-profile-learning-centre.md) (same page, same lock pattern) and [S2-P004-025](S2-P004-025-department-hierarchy.md)
-- **Branch / PR:** `feature/s2-department-programme-lock`; no PR
+- **Branch / PR:** `feature/s2-department-programme-lock` (also handed off as ZIP); merged via `feature/s2-continue` into `main` on 2026-11-14; no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -51,3 +51,4 @@ Not verified: migration 0011 was not applied to any database and no database was
 ## 4. Changelog
 
 - 2026-11-11 - Type: Changed. Students choose their programme only when they create their profile; afterwards the profile page shows it read-only and `PUT /api/profile` rejects a different `curriculumId` with `409 PROFILE_PROGRAMME_LOCKED`. A System Administrator changes a student's programme on the account detail (Users & Access) with a required reason (`PATCH /api/admin/users/{id}/programme`, `GET /api/admin/curriculum-options`); academic records are kept, saved subject picks of not-yet-closed future semesters are removed (the count is shown), and the change is recorded in the append-only academic audit (migration 0011). Delivers P001's FR-A3 programme restriction. Compatibility: additive database change; new error codes `PROFILE_PROGRAMME_LOCKED`, `STUDENT_PROFILE_NOT_FOUND`, `CURRICULUM_UNAVAILABLE`, `PROGRAMME_UNCHANGED`; the profile page rereads the profile each time it opens. Outstanding: apply and verify 0011 on a database.
+- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 4d7c0b8) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.

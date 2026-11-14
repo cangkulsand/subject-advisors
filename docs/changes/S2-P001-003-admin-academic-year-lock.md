@@ -1,11 +1,11 @@
 # S2-P001-003 — Lock profile to the administrator's current academic semester
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-10 (revised scope)
 - **Sprint:** Sprint 2
 - **Owner:** P001 / Programmer 1
 - **Related UC / FR:** UC03; student profile setup and edit
-- **Branch / PR:** `feature/student-profile-admin-academic-year` (handoff, based on `7b4b9af`); merged into `feature/s2-continue` by P004 on 2026-11-11 / no PR
+- **Branch / PR:** `feature/student-profile-admin-academic-year` (handoff, based on `7b4b9af`); merged into `feature/s2-continue` by P004 on 2026-11-11, into `main` on 2026-11-14 / no PR
 - **Reviewer:** Coordinator review PASS for exact-semester profile and readonly visual treatment; human peer review pending
 
 ## 1. Plan
@@ -81,3 +81,4 @@ Keep the student's profile period locked to the exact academic semester selected
 - **Verification summary:** Full unit suite 1,374 passed / 59 skipped; typecheck, lint, build, build:local, P001 UI 45 checks and integration UI 30 checks passed. Coordinator SQL EXPLAIN and 54-profile alignment were read-only. No live DB writes, commit or push.
 - **Outstanding blockers / follow-up:** Admin semester table UI is tracked separately in `S2-P001-004-admin-semester-page-actions.md` (renumbered from his S2-P004-013, which clashed with the existing S2-P004-013). Human peer review remains pending. Keep work on the existing local feature branch; do not commit or push.
 - **Final status:** READY_FOR_REVIEW.
+- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 4d7c0b8) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.

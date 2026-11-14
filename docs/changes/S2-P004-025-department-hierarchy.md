@@ -1,11 +1,11 @@
 # S2-P004-025 — Department level in the admin Academic Setup (Faculty → Department → Programme)
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-11
 - **Sprint:** Sprint 2
 - **Owner:** P004 / Programmer 4 (admin academic setup), delivering the Department part of P001's UC25 / FR-B9
 - **Related UC / FR:** UC25 / FR-B9 (P001); admin academic setup S2-P004-008
-- **Branch / PR:** `feature/s2-department-programme-lock`; no PR
+- **Branch / PR:** `feature/s2-department-programme-lock` (also handed off as ZIP); merged via `feature/s2-continue` into `main` on 2026-11-14; no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -48,3 +48,4 @@ Not verified: migration 0010 was not applied to any database. `db/checks/015`, t
 ## 4. Changelog
 
 - 2026-11-11 - Type: Added. Department level between faculty and programme in the admin Academic Setup (migration 0010, `/api/admin/academic-setup/departments`, `/admin/departments`); programmes are assigned by department and their faculty follows from it, enforced in PostgreSQL. Delivers the Department part of P001's UC25 / FR-B9. Compatibility: additive; existing programme faculty links are kept until a department is assigned; the endpoint `PATCH /programmes/{id}/faculty` and `setProgrammeFaculty` were removed in favour of `.../department`. Outstanding: apply and verify 0010 on a database.
+- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 4d7c0b8) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.
