@@ -33,7 +33,7 @@ try{
         if(status.pending.length)throw new GateError('APPLY_CANONICAL_MIGRATIONS_FIRST');
         if(command==='verify'){
           await client.query('BEGIN READ ONLY');
-          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql','007_network_security_reference.sql','008_admin_user_management.sql','010_uc20_forecast_and_confirmation.sql','012_admin_academic_setup.sql','014_simplified_offering_flow.sql']){let response;try{response=await client.query(await readFile('db/checks/'+file,'utf8'));}catch(error){error.checkFile=file;throw error;}checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
+          try{const checks=[];for(const file of ['001_schema_verification.sql','004_profile_current_semester.sql','005_multi_role_access.sql','007_network_security_reference.sql','008_admin_user_management.sql','010_uc20_forecast_and_confirmation.sql','012_admin_academic_setup.sql','014_simplified_offering_flow.sql','015_department.sql','016_student_programme_change.sql']){let response;try{response=await client.query(await readFile('db/checks/'+file,'utf8'));}catch(error){error.checkFile=file;throw error;}checks.push(...(Array.isArray(response)?response.flatMap(r=>r.rows??[]):response.rows));}result={checks};}
           finally{await client.query('ROLLBACK');}
         }else{
           if(target.allowRollbackOnlyTests!==true)throw new GateError('ROLLBACK_ONLY_TEST_APPROVAL_REQUIRED');

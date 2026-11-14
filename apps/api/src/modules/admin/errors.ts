@@ -2,7 +2,8 @@ import type { AdminMutationErrorCode } from '../../../../../packages/shared/src/
 
 /** MT1 shared codes plus codes that only the data-access layer can raise. */
 export type AdminErrorCode = AdminMutationErrorCode | 'INVALID_REQUEST' | 'NOT_FOUND' | 'ROLE_NOT_ASSIGNED' |
-  'INVITATION_NOT_PENDING' | 'INVITATION_EXPIRED' | 'CONFLICT' | 'MUTATION_FAILED';
+  'INVITATION_NOT_PENDING' | 'INVITATION_EXPIRED' | 'CONFLICT' | 'MUTATION_FAILED' |
+  'STUDENT_PROFILE_NOT_FOUND' | 'CURRICULUM_UNAVAILABLE' | 'PROGRAMME_UNCHANGED';
 
 const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   ROLE_ALREADY_ASSIGNED: { status: 409, message: 'The account already holds this role.' },
@@ -22,6 +23,9 @@ const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   INVITATION_NOT_PENDING: { status: 409, message: 'The invitation is no longer pending.' },
   INVITATION_EXPIRED: { status: 409, message: 'The invitation has expired.' },
   CONFLICT: { status: 409, message: 'The change conflicts with the current state. Reload and retry.' },
+  STUDENT_PROFILE_NOT_FOUND: { status: 404, message: 'This account has no student profile yet.' },
+  CURRICULUM_UNAVAILABLE: { status: 409, message: 'The selected programme is not available. Choose an active programme.' },
+  PROGRAMME_UNCHANGED: { status: 409, message: 'The student is already on this programme.' },
   MUTATION_FAILED: { status: 500, message: 'The change could not be completed. Please retry.' },
 };
 
@@ -60,6 +64,10 @@ export function mapAdminDatabaseError(error: unknown): AdminMutationError {
     return new AdminMutationError('CONFLICT');
   }
   if (code === '23514') {
+    const change = /programme_change:([a-z_]+)/.exec(lower)?.[1];
+    if (change === 'student_not_found') return new AdminMutationError('STUDENT_PROFILE_NOT_FOUND');
+    if (change === 'curriculum_unavailable') return new AdminMutationError('CURRICULUM_UNAVAILABLE');
+    if (change === 'unchanged') return new AdminMutationError('PROGRAMME_UNCHANGED');
     if (lower.includes('last active system administrator')) return new AdminMutationError('LAST_ACTIVE_ADMIN');
     if (lower.includes('protected owner')) return new AdminMutationError('PROTECTED_OWNER');
     if (lower.includes('expired invitation cannot be accepted')) return new AdminMutationError('INVITATION_EXPIRED');

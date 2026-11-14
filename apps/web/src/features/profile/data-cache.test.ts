@@ -24,6 +24,29 @@ it('bypasses old profile snapshots when current semester and configured total co
   const profile = await createAcademicClient(async () => 'token')<{studentName:string,currentSemesterId:number,totalCreditRequired:number}>('/api/profile');
   expect(profile).toEqual({ studentName: 'Profile with semester', currentSemesterId: 201, totalCreditRequired: 131 }); expect(fetcher).toHaveBeenCalledOnce();
 });
+it('a fresh options read always hits the network and stores the administrator current semester for later callers', async () => {
+  let currentSemester = { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' as const };
+  const response = () => ({ currentSemester, currentAcademicYear: currentSemester.academicYear });
+  const fetcher = vi.fn(async () => Response.json({ data: response() })); vi.stubGlobal('fetch', fetcher);
+  const api = createAcademicClient(async () => 'token');
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 30, semesterNo: 1 } });
+  currentSemester = { ...currentSemester, semesterId: 32, semesterNo: 2 };
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 30, semesterNo: 1 } });
+  expect(await api('/api/profile/options', { fresh: true })).toMatchObject({ currentSemester: { semesterId: 32, semesterNo: 2 } });
+  currentSemester = { semesterId: 40, academicYear: '2027/2028', semesterNo: 1, semesterType: 'NORMAL' };
+  expect(await api('/api/profile/options', { fresh: true })).toMatchObject({ currentSemester: { semesterId: 40, academicYear: '2027/2028' } });
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 40, academicYear: '2027/2028' } });
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+it('does not reuse profile-options snapshots from the previous response contract marker', async () => {
+  const oldKey = JSON.stringify([accountSessionStamp(), '', '/api/profile/options', 'current-semester-required-v1', 'programme-admin-change-v1']);
+  await cachedAcademicRead(oldKey, async () => ({ currentSemester: { semesterId: 9 } }), undefined, ACADEMIC_CACHE_TTL);
+  const currentSemester = { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' };
+  const fetcher = vi.fn(async () => Response.json({ data: { currentSemester, currentAcademicYear: currentSemester.academicYear } })); vi.stubGlobal('fetch', fetcher);
+  const result = await createAcademicClient(async () => 'token')<{currentSemester:{semesterId:number}}>('/api/profile/options');
+  expect(result.currentSemester.semesterId).toBe(30);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
 it('refreshes records and curriculum options after a successful save', async () => {
   const fetcher = vi.fn(async () => Response.json({ data: [] })); vi.stubGlobal('fetch', fetcher);
   const api = createAcademicClient(async () => 'token');
@@ -66,4 +89,21 @@ it('an older read cannot repopulate cache after a save', async () => {
   const old=api('/api/academic-records');const rejected=expect(old).rejects.toMatchObject({name:'AbortError'});await Promise.resolve();
   await api('/api/academic-records/1',{method:'PUT',body:{}});finish(Response.json({data:[{recordId:1}]}));await rejected;
   expect(await api('/api/academic-records')).toEqual([]);expect(fetcher).toHaveBeenCalledTimes(3);
+});
+it('a fresh read replaces a stored profile snapshot and a programme lock rejection clears snapshots', async () => {
+  let name = 'Before admin change';
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'PUT'
+    ? Response.json({ error: { code: 'PROFILE_PROGRAMME_LOCKED', message: 'Your programme is set. Contact the admin to change it.' } }, { status: 409 })
+    : Response.json({ data: { programmeName: name } }));
+  vi.stubGlobal('fetch', fetcher);
+  const api = createAcademicClient(async () => 'token');
+  expect(await api('/api/profile')).toEqual({ programmeName: 'Before admin change' });
+  name = 'After admin change';
+  expect(await api('/api/profile')).toEqual({ programmeName: 'Before admin change' });
+  expect(await api('/api/profile', { fresh: true })).toEqual({ programmeName: 'After admin change' });
+  expect(await api('/api/profile')).toEqual({ programmeName: 'After admin change' });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  name = 'Third';
+  await expect(api('/api/profile', { method: 'PUT', body: {} })).rejects.toMatchObject({ status: 409, code: 'PROFILE_PROGRAMME_LOCKED' });
+  expect(await api('/api/profile')).toEqual({ programmeName: 'Third' });
 });

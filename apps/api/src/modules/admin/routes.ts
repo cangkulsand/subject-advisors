@@ -1,5 +1,5 @@
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
-import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest } from '../../../../../packages/shared/src/admin/admin';
+import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest, validateChangeProgrammeRequest } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminIdentity, AdminInvitationStatus, AdminUsersQuery, AdminAuditQuery, AdminValidation } from '../../../../../packages/shared/src/admin/admin';
 import type { AccountDetailRow, AccountRow, AdminDependencies } from './contracts';
 import { AdminMutationError } from './errors';
@@ -106,6 +106,23 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       if (!checkRoleEligibility({ address: found.verifiedEmail, verified: true }, input.roles).eligible) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
       const created = await deps.repository.createAccount(found.clerkUserId, input.roles, actor, input.reason);
       return authJson({ data: await detail(created, deps) }, 201);
+    }
+    const programmeRoute = /^\/api\/admin\/users\/([1-9]\d*)\/programme$/.exec(url.pathname);
+    if (programmeRoute) {
+      const denied = allow('GET', 'PATCH'); if (denied) return denied;
+      parameters(url, []);
+      const accountId = positive(programmeRoute[1]!, 'account ID');
+      if (method === 'GET') {
+        if (!await deps.repository.account(accountId)) throw new AuthError(404, 'ACCOUNT_NOT_FOUND', 'This application account was not found.');
+        return authJson({ data: await deps.repository.studentProgramme(accountId) });
+      }
+      const input = validated(validateChangeProgrammeRequest(await readJson(request)));
+      return authJson({ data: await deps.repository.changeStudentProgramme(accountId, input.curriculumId, actor, input.reason) });
+    }
+    if (url.pathname === '/api/admin/curriculum-options') {
+      const denied = allow('GET'); if (denied) return denied;
+      parameters(url, []);
+      return authJson({ data: await deps.repository.curriculumOptions() });
     }
     if (usersMutation && usersMutation[2] === 'roles') {
       const denied = allow('POST'); if (denied) return denied;

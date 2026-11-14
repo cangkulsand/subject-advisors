@@ -52,6 +52,16 @@
       "version": "0009",
       "file": "0009_simplified_offering_flow.sql",
       "description": "Semester selection window, student learning centre, per-scope offering decisions with append-only audit and pick withdrawals"
+    },
+    {
+      "version": "0010",
+      "file": "0010_department.sql",
+      "description": "Department between faculty and programme: audited department table, programme.department_id and faculty-consistency guards"
+    },
+    {
+      "version": "0011",
+      "file": "0011_student_programme_change.sql",
+      "description": "Admin-controlled student programme change: audited db_change_student_programme() and a context-aware curriculum preservation guard"
     }
   ],
   "historicalExcluded": [

@@ -4,7 +4,7 @@ import type { CoordinatorAssignment } from '../forecasting/confirmed-offerings';
 export const ACADEMIC_SETUP_ERROR_CODES = [
   'INVALID_REQUEST', 'NOT_FOUND', 'CONFLICT', 'DEPENDENCY_UNAVAILABLE',
   'COORDINATOR_ROLE_REQUIRED', 'ACCOUNT_INACTIVE', 'REFERENCE_INACTIVE',
-  'PROGRAMME_FACULTY_MISMATCH', 'ASSIGNMENT_ACTIVE', 'ASSIGNMENT_ENDED',
+  'PROGRAMME_FACULTY_MISMATCH', 'ASSIGNMENT_ACTIVE', 'ASSIGNMENT_ENDED', 'DEPARTMENT_HAS_PROGRAMMES',
 ] as const;
 export type AcademicSetupErrorCode = typeof ACADEMIC_SETUP_ERROR_CODES[number];
 export interface AcademicSetupError { error: { code: AcademicSetupErrorCode; message: string } }
@@ -16,9 +16,15 @@ export interface LearningCentre {
 export interface Faculty {
   facultyId: number; facultyCode: string; facultyName: string; isActive: boolean;
 }
+/** A department belongs to exactly one faculty (Faculty -> Department -> Programme). */
+export interface Department {
+  departmentId: number; departmentCode: string; departmentName: string; facultyId: number; isActive: boolean;
+}
+/** Programme with its department and the faculty that follows from it (faculty is derived once a department is assigned). */
 export interface ProgrammeFaculty {
   programmeId: number; programmeCode: string; programmeName: string;
   facultyId: number | null; faculty: Faculty | null;
+  departmentId: number | null; department: Department | null;
 }
 export type SemesterType = 'NORMAL' | 'SHORT';
 export interface AcademicSemester {
@@ -35,7 +41,10 @@ export interface CreateLearningCentreRequest { centreCode: string; centreName: s
 export interface UpdateLearningCentreRequest { centreCode?: string; centreName?: string; isActive?: boolean; reason: string }
 export interface CreateFacultyRequest { facultyCode: string; facultyName: string; reason: string }
 export interface UpdateFacultyRequest { facultyCode?: string; facultyName?: string; isActive?: boolean; reason: string }
-export interface SetProgrammeFacultyRequest { facultyId: number | null; reason: string }
+export interface CreateDepartmentRequest { departmentCode: string; departmentName: string; facultyId: number; reason: string }
+export interface UpdateDepartmentRequest { departmentCode?: string; departmentName?: string; facultyId?: number; isActive?: boolean; reason: string }
+/** Assigning a department also sets the programme faculty to the department's faculty; null clears both when the programme had a department. */
+export interface SetProgrammeDepartmentRequest { departmentId: number | null; reason: string }
 export type SemesterFields = Pick<AcademicSemester, 'academicYear' | 'semesterNo' | 'semesterType' | 'maxSubjects' | 'maxCredits' | 'startDate' | 'endDate' | 'selectionOpensAt' | 'selectionClosesAt'>;
 export interface CreateSemesterRequest extends SemesterFields { reason: string }
 export type UpdateSemesterRequest = Partial<SemesterFields> & { reason: string };
@@ -103,12 +112,35 @@ export const validateCreateFacultyRequest = (body: unknown): AdminValidation<Cre
 export const validateUpdateFacultyRequest = (body: unknown): AdminValidation<UpdateFacultyRequest> =>
   reference(body, 'faculty', true) as AdminValidation<UpdateFacultyRequest>;
 
-export function validateSetProgrammeFacultyRequest(body: unknown): AdminValidation<SetProgrammeFacultyRequest> {
-  const parsed = record(body, ['facultyId', 'reason']);
+function department(body: unknown, update: boolean): AdminValidation<CreateDepartmentRequest | UpdateDepartmentRequest> {
+  const parsed = record(body, ['departmentCode', 'departmentName', 'facultyId', ...(update ? ['isActive'] : []), 'reason']);
   if (!parsed.ok) return parsed;
-  if (parsed.value.facultyId !== null && !id(parsed.value.facultyId)) return fail('Invalid facultyId.');
+  const r = parsed.value, fields = ['departmentCode', 'departmentName', 'facultyId', 'isActive'];
+  if (update && !fields.some(k => own(r, k))) return fail('At least one change is required.');
+  if ((!update || own(r, 'departmentCode')) && !label(r.departmentCode, 20)) return fail('Invalid departmentCode.');
+  if ((!update || own(r, 'departmentName')) && !label(r.departmentName, 255)) return fail('Invalid departmentName.');
+  if ((!update || own(r, 'facultyId')) && !id(r.facultyId)) return fail('Invalid facultyId.');
+  if (own(r, 'isActive') && typeof r.isActive !== 'boolean') return fail('Invalid isActive.');
+  const why = reason(r);
+  if (!why.ok) return why;
+  return { ok: true, value: {
+    ...(own(r, 'departmentCode') ? { departmentCode: label(r.departmentCode, 20) } : {}),
+    ...(own(r, 'departmentName') ? { departmentName: label(r.departmentName, 255) } : {}),
+    ...(own(r, 'facultyId') ? { facultyId: r.facultyId } : {}),
+    ...(own(r, 'isActive') ? { isActive: r.isActive } : {}),
+    reason: why.value,
+  } as unknown as CreateDepartmentRequest | UpdateDepartmentRequest };
+}
+export const validateCreateDepartmentRequest = (body: unknown): AdminValidation<CreateDepartmentRequest> =>
+  department(body, false) as AdminValidation<CreateDepartmentRequest>;
+export const validateUpdateDepartmentRequest = (body: unknown): AdminValidation<UpdateDepartmentRequest> =>
+  department(body, true) as AdminValidation<UpdateDepartmentRequest>;
+export function validateSetProgrammeDepartmentRequest(body: unknown): AdminValidation<SetProgrammeDepartmentRequest> {
+  const parsed = record(body, ['departmentId', 'reason']);
+  if (!parsed.ok) return parsed;
+  if (parsed.value.departmentId !== null && !id(parsed.value.departmentId)) return fail('Invalid departmentId.');
   const why = reason(parsed.value);
-  return why.ok ? { ok: true, value: { facultyId: parsed.value.facultyId as number | null, reason: why.value } } : why;
+  return why.ok ? { ok: true, value: { departmentId: parsed.value.departmentId as number | null, reason: why.value } } : why;
 }
 function selectionWindowError(opens: string | null, closes: string | null): string | null {
   if (closes === null) return null;

@@ -24,8 +24,13 @@ export interface AcademicSetupRepository {
   listFaculties(includeInactive: boolean): Promise<C.Faculty[]>;
   createFaculty(input: C.CreateFacultyRequest, actor: string): Promise<C.Faculty>;
   updateFaculty(id: number, input: C.UpdateFacultyRequest, actor: string): Promise<C.Faculty>;
+  listDepartments(includeInactive: boolean): Promise<C.Department[]>;
+  createDepartment(input: C.CreateDepartmentRequest, actor: string): Promise<C.Department>;
+  /** A department that still has programmes cannot move to another faculty (DEPARTMENT_HAS_PROGRAMMES). */
+  updateDepartment(id: number, input: C.UpdateDepartmentRequest, actor: string): Promise<C.Department>;
   listProgrammeFaculties(): Promise<C.ProgrammeFaculty[]>;
-  setProgrammeFaculty(id: number, input: C.SetProgrammeFacultyRequest, actor: string): Promise<C.ProgrammeFaculty>;
+  /** Sets the department and, in the same statement, the programme faculty from that department; null clears both when the programme had a department. */
+  setProgrammeDepartment(id: number, input: C.SetProgrammeDepartmentRequest, actor: string): Promise<C.ProgrammeFaculty>;
   listAcademicSemesters(): Promise<C.AcademicSemester[]>;
   createAcademicSemester(input: C.CreateSemesterRequest, actor: string): Promise<C.AcademicSemester>;
   updateAcademicSemester(id: number, input: C.UpdateSemesterRequest, actor: string): Promise<C.AcademicSemester>;

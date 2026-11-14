@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
 import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
+import { StudentProgrammeCard } from './StudentProgrammeCard';
 import { ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 
@@ -143,7 +144,7 @@ export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { cli
   const result = useRead(signal => client.account(accountId, signal), 'account:' + accountId);
   const [updated, setUpdated] = useState<AdminAccountDetail>();
   const [pending, setPending] = useState<PendingAction>();
-  const [notice, setNotice] = useState(''), [auditVersion, setAuditVersion] = useState(0), [grant, setGrant] = useState('');
+  const [notice, setNotice] = useState(''), [auditVersion, setAuditVersion] = useState(0), [grant, setGrant] = useState(''), [programmeVersion, setProgrammeVersion] = useState(0);
   const account = updated ?? result.data;
   const self = !!account && !!viewerClerkUserId && account.clerkUserId === viewerClerkUserId;
   const missing = account ? ADMIN_ROLES.filter(role => !account.roles.includes(role)) : [];
@@ -175,6 +176,7 @@ export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { cli
           : self ? <p className="admin-locked">You cannot suspend your own account.</p>
           : <button type="button" className="admin-danger-outline" onClick={() => setPending({ kind: 'access', status: 'SUSPENDED' })}>Suspend account</button>}
       </section>
+      <StudentProgrammeCard client={client} accountId={accountId} version={programmeVersion} onChanged={text => { setNotice(text); setProgrammeVersion(value => value + 1); }}/>
       <AdminAuditView key={auditVersion} client={client} accountId={accountId}/>
     </>}</Panel>
     {pending && copy && <ReasonDialog title={copy.title} confirmLabel={copy.confirm} danger={copy.danger} description={<p>{copy.text}</p>} onCancel={() => setPending(undefined)} onSubmit={confirm}/>}

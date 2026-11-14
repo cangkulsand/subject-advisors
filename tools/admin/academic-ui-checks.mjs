@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { academicStore } from './academic-fixtures.mjs';
 const reasonLabel = 'Reason (recorded in the audit log)';
 const reason = 'Fictional browser verification.';
-const routes = [['learning-centres', 'Learning Centres', 'Add learning centre'], ['faculties', 'Faculties', 'Add faculty'], ['semesters', 'Academic Semesters', 'Add semester'], ['coordinator-assignments', 'Coordinator Assignments', 'Add assignment']];
+const routes = [['learning-centres', 'Learning Centres', 'Add learning centre'], ['faculties', 'Faculties', 'Add faculty'], ['departments', 'Departments', 'Add department'], ['semesters', 'Academic Semesters', 'Add semester'], ['coordinator-assignments', 'Coordinator Assignments', 'Add assignment']];
 async function save(dialog) { await dialog.getByLabel(reasonLabel).fill(reason); await dialog.getByRole('button', { name: 'Save', exact: true }).click(); }
 async function confirm(page, title, action) {
   const dialog = page.getByRole('dialog', { name: title, exact: true }); await dialog.waitFor();
@@ -19,7 +19,7 @@ export async function academicUiChecks({ check, mock, base }) {
       assert.equal(await page.getByRole('button', { name: opener, exact: true }).isDisabled(), true);
       state.fail = false; state.empty = true; delete state.academic;
       await page.getByRole('button', { name: 'Retry', exact: true }).click();
-      await page.getByText(path === 'learning-centres' ? 'No learning centres configured.' : path === 'faculties' ? 'No faculties configured.' : path === 'semesters' ? 'No semesters configured.' : 'No coordinator assignments configured.', { exact: true }).waitFor();
+      await page.getByText(path === 'learning-centres' ? 'No learning centres configured.' : path === 'faculties' ? 'No faculties configured.' : path === 'departments' ? 'No departments configured.' : path === 'semesters' ? 'No semesters configured.' : 'No coordinator assignments configured.', { exact: true }).waitFor();
       assert.equal(await page.locator('.admin-card').count(), 1);
       await page.unroute(/\/api\//); const forbidden = await mock(page, { roles: ['COORDINATOR'] });
       await page.goto(base + '/admin/' + path + '?test-session=forbidden');
@@ -50,21 +50,50 @@ export async function academicUiChecks({ check, mock, base }) {
       await page.screenshot({ path: '.wrangler/admin-review/academic-' + path + '-desktop.png', fullPage: true });
     });
   }
-  await check('programme faculty: current inactive value shown, active-only alternatives, backend conflict, clear and assign', async page => {
-    const state = await mock(page); const data = academicStore(state); data.faculties[0].isActive = false;
-    data.faculties.push({ facultyId: 3, facultyCode: 'OLD', facultyName: 'Fictional unused inactive faculty', isActive: false });
-    await page.goto(base + '/admin/faculties'); await page.getByRole('button', { name: 'Assign faculty for TEST' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Assign faculty · TEST' }), select = dialog.getByLabel('Faculty (None clears the assignment)');
-    assert.deepEqual(await select.locator('option').allInnerTexts(), ['None', 'Fictional faculty (inactive)', 'Fictional other faculty']);
-    await select.selectOption('2'); await save(dialog); await dialog.getByRole('alert').filter({ hasText: 'End active coordinator assignments' }).waitFor();
-    data.assignments[0].endedAt = '2026-11-02T00:00:00Z'; await select.selectOption(''); await save(dialog); await dialog.waitFor({ state: 'hidden' });
-    await page.getByText('Unassigned', { exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Assign faculty for TEST' }).click(); await select.selectOption('2'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
-    assert.equal(data.programmes[0].facultyId, 2); assert.equal(state.bodies.at(-2).body.facultyId, null);
+  await check('department: faculty options, create/edit, move rejected while programmes exist, deactivate/reactivate and duplicate code', async page => {
+    const state = await mock(page); const data = academicStore(state); data.faculties.push({ facultyId: 3, facultyCode: 'OLD', facultyName: 'Fictional inactive faculty', isActive: false });
+    await page.goto(base + '/admin/departments'); await page.getByText('Fictional department', { exact: true }).first().waitFor();
+    await page.getByRole('button', { name: 'Add department', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add department', exact: true }); await dialog.waitFor();
+    assert.equal(await dialog.getByLabel('Department code').evaluate(el => el === document.activeElement), true);
+    assert.deepEqual(await dialog.getByLabel('Faculty', { exact: true }).locator('option').allInnerTexts(), ['Choose…', 'Fictional faculty', 'Fictional other faculty']);
+    await dialog.getByLabel('Department code').fill('DEPT'); await dialog.getByLabel('Department name').fill('Fictional duplicate'); await dialog.getByLabel('Faculty', { exact: true }).selectOption('1');
+    await page.screenshot({ path: '.wrangler/admin-review/academic-departments-dialog-desktop.png', fullPage: true });
+    await save(dialog); await dialog.getByRole('alert').filter({ hasText: 'Code already exists.' }).waitFor();
+    await dialog.getByLabel('Department code').fill('NEWD'); await dialog.getByLabel('Department name').fill('Fictional new department'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    const row = page.getByRole('row').filter({ hasText: 'Fictional new department' }); await row.getByText('Fictional faculty', { exact: true }).waitFor();
+    assert.deepEqual(state.bodies.at(-1).body, { departmentCode: 'NEWD', departmentName: 'Fictional new department', facultyId: 1, reason });
+    await row.getByRole('button', { name: 'Edit NEWD' }).click(); const edit = page.getByRole('dialog', { name: 'Edit department', exact: true });
+    await edit.getByLabel('Faculty', { exact: true }).selectOption('2'); await save(edit); await edit.waitFor({ state: 'hidden' });
+    await row.getByText('Fictional other faculty', { exact: true }).waitFor();
+    await page.getByRole('row').filter({ hasText: 'Fictional department' }).first().getByRole('button', { name: 'Edit DEPT' }).click();
+    const move = page.getByRole('dialog', { name: 'Edit department', exact: true }); await move.getByLabel('Faculty', { exact: true }).selectOption('2'); await save(move);
+    await move.getByRole('alert').filter({ hasText: 'cannot move to another faculty' }).waitFor(); await page.keyboard.press('Escape'); await move.waitFor({ state: 'hidden' });
+    await row.getByRole('button', { name: 'Deactivate NEWD' }).click(); await confirm(page, 'Deactivate department', 'Deactivate'); await row.getByText('Inactive', { exact: true }).waitFor();
+    await row.getByRole('button', { name: 'Reactivate NEWD' }).click(); await confirm(page, 'Reactivate department', 'Reactivate'); await row.getByText('Active', { exact: true }).waitFor();
+    assert.ok(state.bodies.every(b => b.body.reason === reason)); assert.ok(state.bodies.every(b => b.method !== 'DELETE'));
+    await page.screenshot({ path: '.wrangler/admin-review/academic-departments-desktop.png', fullPage: true });
+  });
+  await check('programme department: shows derived faculty, active-only alternatives, backend conflict, clear and assign', async page => {
+    const state = await mock(page); const data = academicStore(state); data.departments[0].isActive = false;
+    data.departments.push({ departmentId: 3, departmentCode: 'OLD', departmentName: 'Fictional unused inactive department', facultyId: 1, isActive: false });
+    await page.goto(base + '/admin/departments');
+    const programmeRow = page.getByRole('row').filter({ hasText: 'TEST · Fictional programme' }); await programmeRow.getByText('Fictional department (inactive)', { exact: true }).waitFor(); await programmeRow.getByText('Fictional faculty', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Assign department for TEST' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Assign department · TEST' }), select = dialog.getByLabel('Department (None clears the assignment)');
+    assert.deepEqual(await select.locator('option').allInnerTexts(), ['None', 'Fictional department · Fictional faculty (inactive)', 'Fictional other department · Fictional other faculty']);
+    await select.selectOption('2'); await dialog.getByText('Faculty will be set to Fictional other faculty.').waitFor();
+    await save(dialog); await dialog.getByRole('alert').filter({ hasText: 'End active coordinator assignments' }).waitFor();
+    data.assignments[0].endedAt = '2026-11-02T00:00:00Z'; await select.selectOption(''); await dialog.getByText('The programme will have no department and no faculty.').waitFor(); await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    await programmeRow.getByText('Unassigned').first().waitFor(); assert.equal(data.programmes[0].facultyId, null);
+    await page.getByRole('button', { name: 'Assign department for TEST' }).click(); await select.selectOption('2'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    assert.equal(data.programmes[0].departmentId, 2); assert.equal(data.programmes[0].facultyId, 2); assert.equal(state.bodies.at(-2).body.departmentId, null); assert.equal(state.bodies.at(-1).body.departmentId, 2);
+    await programmeRow.getByText('Fictional other faculty', { exact: true }).waitFor();
+    await page.screenshot({ path: '.wrangler/admin-review/academic-programme-departments-desktop.png', fullPage: true });
   });
   await check('semesters: nullable current, validated create/edit dates, set/switch/advance current and inline error', async page => {
     const state = await mock(page); await page.goto(base + '/admin/semesters');
-    await page.getByText('Not configured', { exact: true }).waitFor(); assert.equal(await page.getByRole('button', { name: 'Advance to next semester' }).count(), 0);
+    await page.getByRole('group', { name: 'Current semester', exact: true }).getByText('Not configured', { exact: true }).waitFor(); assert.equal(await page.getByRole('group', { name: 'Current semester' }).getByText('Not configured', { exact: true }).count(), 1); assert.equal(await page.getByRole('group', { name: 'Next semester' }).getByText('Not configured', { exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Advance to next semester' }).count(), 0);
     await page.getByRole('button', { name: 'Add semester', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Add semester', exact: true });
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-dialog-desktop.png', fullPage: true });
     await dialog.getByLabel('Academic year (YYYY/YYYY)', { exact: true }).fill('invalid'); await dialog.getByLabel('Semester number', { exact: true }).selectOption('1');
@@ -82,7 +111,30 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.equal(academicStore(state).semesters.find(s => s.isCurrent).semesterId, 2); assert.equal(academicStore(state).semesters.filter(s => s.isCurrent).length, 1);
     await page.getByRole('button', { name: 'Set current 2027/2028 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
     assert.equal(academicStore(state).semesters.find(s => s.isCurrent).semesterId, 4);
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
+    const add = page.getByRole('button', { name: 'Add semester', exact: true });
+    const advance = page.getByRole('button', { name: 'Advance to next semester', exact: true });
+    assert.equal(await add.locator('svg[aria-hidden="true"]').count(), 1);
+    assert.equal(await page.locator('.admin-semester-current-row').count(), 1);
+    assert.equal(await page.locator('.admin-semester-current-badge').innerText(), 'Current');
+    assert.equal(await page.getByRole('button', { name: 'Edit 2026/2027 · Semester 1', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).count(), 1);
+    for (const button of [add, advance, page.getByRole('button', { name: 'Edit 2026/2027 · Semester 1', exact: true }), page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true })]) {
+      const box = await button.boundingBox(); assert.ok(box && box.height >= 44);
+      assert.ok(Number.parseFloat(await button.evaluate(el => getComputedStyle(el).fontSize)) >= 14);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-desktop.png', fullPage: true });
+    for (const width of [375, 800, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'page should not overflow at ' + width + 'px');
+    }
+    await page.setViewportSize({ width: 375, height: 844 });
+    const tableRegion = page.getByRole('region', { name: 'Academic semesters', exact: true });
+    await tableRegion.evaluate(el => { el.scrollLeft = el.scrollWidth; });
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).waitFor();
+    await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-375.png', fullPage: true });
   });
   await check('coordinator assignments: eligible picker, search/empty, active reference filtering, duplicate, end history and add', async page => {
     const state = await mock(page), data = academicStore(state);

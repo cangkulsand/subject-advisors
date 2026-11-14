@@ -1,5 +1,5 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
-import type { AdminAccount, AdminAccountDetail, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -60,6 +60,22 @@ function invitation(value: unknown): AdminInvitation {
   if (item.acceptedAt !== null) text(item.acceptedAt);
   return item as unknown as AdminInvitation;
 }
+function id(value: unknown): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) throw new Error('Invalid administration response'); return value; }
+function curriculumOption(value: unknown): AdminCurriculumOption {
+  const item = object(value); id(item.curriculumId); id(item.programmeId); text(item.curriculumVersion); text(item.programmeCode); text(item.programmeName);
+  return item as unknown as AdminCurriculumOption;
+}
+function studentProgramme(value: unknown): AdminStudentProgramme | null {
+  if (value === null) return null;
+  const item = object(value); id(item.studentId); text(item.studentName); if (item.matricNo !== null) text(item.matricNo);
+  curriculumOption(value);
+  return item as unknown as AdminStudentProgramme;
+}
+function programmeChange(value: unknown): AdminProgrammeChange {
+  const item = object(value); const programme = studentProgramme(item.programme);
+  if (!programme || typeof item.removedPicks !== 'number' || !Number.isSafeInteger(item.removedPicks) || item.removedPicks < 0) throw new Error('Invalid administration response');
+  return item as unknown as AdminProgrammeChange;
+}
 function query(values: object) {
   const parameters = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) if (value !== undefined && value !== '') parameters.set(key, String(value));
@@ -78,6 +94,10 @@ export interface AdminClient {
   listInvitations(filters: AdminInvitationsQuery, signal?: AbortSignal): Promise<AdminPage<AdminInvitation>>;
   createInvitation(input: AdminCreateInvitationRequest): Promise<AdminInvitation>;
   revokeInvitation(id: string, input: AdminRevokeRoleRequest): Promise<AdminInvitation>;
+  /** The account's student programme; null when the account has no student profile. */
+  studentProgramme(id: number, signal?: AbortSignal): Promise<AdminStudentProgramme | null>;
+  curriculumOptions(signal?: AbortSignal): Promise<AdminCurriculumOption[]>;
+  changeProgramme(id: number, input: AdminChangeProgrammeRequest): Promise<AdminProgrammeChange>;
 }
 interface RequestInput { method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; body?: unknown }
 export function createAdminClient(getToken: () => Promise<string | null>, baseUrl = ''): AdminClient {
@@ -124,5 +144,8 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     listInvitations: (filters, signal) => request('/api/admin/invitations' + query(filters), value => paged(value, invitation), signal),
     createInvitation: input => request('/api/admin/invitations', invitation, undefined, { method: 'POST', body: input }),
     revokeInvitation: (id, input) => request('/api/admin/invitations/' + encodeURIComponent(id), invitation, undefined, { method: 'DELETE', body: input }),
+    studentProgramme: (accountId, signal) => request('/api/admin/users/' + accountId + '/programme', studentProgramme, signal),
+    curriculumOptions: signal => request('/api/admin/curriculum-options', value => { if (!Array.isArray(value)) throw new Error('Invalid administration response'); return value.map(curriculumOption); }, signal),
+    changeProgramme: (accountId, input) => request('/api/admin/users/' + accountId + '/programme', programmeChange, undefined, { method: 'PATCH', body: input }),
   };
 }

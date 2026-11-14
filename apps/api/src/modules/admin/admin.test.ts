@@ -15,7 +15,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
     repository: { overview: vi.fn(async () => ({ generatedAt: date, accounts: { total: 1, active: 1, suspended: 0 }, roles: { STUDENT: 0, COORDINATOR: 0, SYSTEM_ADMIN: 1 }, configuration: { programmes: 1, curricula: 1, subjects: 4, semesters: 3 } })),
       accounts: vi.fn(async () => ({ ...page, items: [account] })), account: vi.fn(async () => ({ ...account, memberships: [] })), audit: vi.fn(async () => page),
       createAccount: vi.fn(), grantRole: vi.fn(), revokeRole: vi.fn(), setAccessStatus: vi.fn(), createInvitation: vi.fn(), attachClerkInvitation: vi.fn(),
-      listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn() },
+      listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn(), studentProgramme: vi.fn(), curriculumOptions: vi.fn(), changeStudentProgramme: vi.fn() },
     identities: { search: vi.fn(async () => ({ ids: ['user_fixture'], total: 1 })), lookup: vi.fn(async () => new Map([['user_fixture', { state: 'available' as const, name: 'Fictional Account', email: 'fixture@graduate.utm.my', emailVerified: true }]])),
       findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn() },
   };

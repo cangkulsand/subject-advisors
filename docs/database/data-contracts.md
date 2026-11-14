@@ -79,14 +79,17 @@ Future account APIs that expose assignment IDs must adapt to integers explicitly
 
 SYSTEM_ADMIN management APIs are wired at `/api/admin/academic-setup`; see
 `docs/api/admin-academic-setup.openapi.json` and `packages/shared/src/admin/academic-setup.ts`.
-The backend repository implements reference/semester maintenance, programme faculty
-assignment, explicit current-semester selection and coordinator assignment creation/end.
+The backend repository implements reference/semester maintenance, department maintenance and programme department
+assignment (faculty derived), explicit current-semester selection and coordinator assignment creation/end.
 All mutations require a normalized 1-500 character reason and use the verified actor
 with transaction-local settings. SQL binds values, PATCH changes only supplied whitelisted
 fields and PostgreSQL validates merged semester dates/type. Failures expose fixed domain
 messages, never driver SQL. No Clerk API call is added by this academic module.
 
 `faculty` is an active/inactive reference and `programme.faculty_id` is optional.
+**Student programme lock (0011, S2-P004-026, P001 FR-A3 / UC03):** `student_profile.curriculum_id` (programme + version) is chosen by the student only when the profile is created; `PUT /api/profile` rejects any other `curriculumId` with `409 PROFILE_PROGRAMME_LOCKED` (the upsert never writes `curriculum_id` on an existing row). A SYSTEM_ADMIN changes it through `PATCH /api/admin/users/{id}/programme` which calls `public.db_change_student_programme(student_id, curriculum_id)`: the profile row is locked, the target must be an active curriculum of an active programme, the student's `semester_offering` rows of semesters after the current one whose `selection_closes_at` has not passed (or is null) are deleted, `curriculum_id` is updated and an append-only `academic_setup_audit_log` row (`entity_type='student_programme'`, `entity_id=student_id`, `action='CHANGE_PROGRAMME'`, actor, reason, before/after curriculum and programme, `removedPicks`, `removedSubjectIds`) is written. `academic_record` rows reference `subject_id` and are kept; matric number, learning centre and current semester are unchanged. `db_preserve_membership()` still blocks any other change of `curriculum_id` for a student that has records, picks, plans or scenarios.
+
+**Department (0010, S2-P004-025):** `department` (code unique, name, `faculty_id` NOT NULL, `is_active`) sits between faculty and programme; `programme.department_id` is optional like `faculty_id`. Assigning a department sets `programme.faculty_id` to that department's faculty in the same statement, and a PostgreSQL trigger rejects any programme whose faculty differs from its department's faculty (`PROGRAMME_FACULTY_MISMATCH`). Inactive departments cannot be assigned (`REFERENCE_INACTIVE`). A department that still has programmes cannot move to another faculty (`DEPARTMENT_HAS_PROGRAMMES`; reject, not cascade). Programmes that already had a faculty keep it until a department is assigned; clearing the department clears the faculty too. The admin API replaces `PATCH /programmes/{id}/faculty` with `PATCH /programmes/{id}/department` and adds `/departments` (list, create, patch); department changes are audited in `academic_setup_audit_log` (`entity_type` `department`). Coordinator scope keeps using faculty + programme + learning centre unchanged. Delivered by P004 for P001's UC25 / FR-B9 Department part.
 No institutional mapping/catalogue is seeded. `learning_centre.is_active` preserves
 historical references when deactivated; inactive references cannot be used for new links
 or assignments. Programme reassignment is rejected while live assignments reference it.

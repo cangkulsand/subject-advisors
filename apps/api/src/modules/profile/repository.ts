@@ -1,4 +1,4 @@
-import type { Profile, ProfileInput, ProfileRepository, Query } from './contracts';
+import type { CurrentSemesterOption, Profile, ProfileInput, ProfileRepository, Query } from './contracts';
 import type { ProfileReader } from '../auth/contracts';
 import type { ReferenceCache } from '../../cache/redis';
 import { P001Error, persistenceError } from './validation';
@@ -66,6 +66,7 @@ function mapped(row: Record<string, unknown>): Profile {
     createdAt: new Date(value.createdAt).toISOString(), updatedAt: new Date(value.updatedAt).toISOString() };
 }
 const ISO = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
+const PROGRAMME_LOCKED_MESSAGE = 'Your programme is set. Contact the admin to change it.';
 const CENTRE_LOCKED_MESSAGE = 'Your learning centre is locked while subject selection for the next semester is open. It unlocks when the next semester starts.';
 export function createProfileRepository(query: Query, referenceCache?: ReferenceCache, options: ProfileRepositoryOptions = {}): ProfileRepository {
   const now = options.now ?? (() => new Date());
@@ -93,21 +94,30 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
     find,
     async save(userId: string, input: ProfileInput) {
       try {
-        const existing = (await query('SELECT learning_centre_id AS "learningCentreId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0]?.learningCentreId;
+        const existingRow = (await query('SELECT learning_centre_id AS "learningCentreId",curriculum_id AS "curriculumId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0];
+        const existing = existingRow?.learningCentreId;
         const savedCentre = typeof existing === 'number' ? existing : null;
+        // The programme is chosen once, when the profile is created (S2-P004-026); only an administrator changes it afterwards.
+        if (existingRow && existingRow.curriculumId !== input.curriculumId) throw new P001Error(409, 'PROFILE_PROGRAMME_LOCKED', PROGRAMME_LOCKED_MESSAGE);
         // Changing a saved centre is blocked while selection is open; a student without one may set it at any time.
         const locked = savedCentre !== null && await selectionStarted();
         if (locked && savedCentre !== input.learningCentreId)
           throw new P001Error(409, 'PROFILE_CENTRE_LOCKED', CENTRE_LOCKED_MESSAGE);
-        const rows = await query(`WITH saved AS (
+        // The profile period is the administrator's current semester (S2-P001-003): the guard runs inside this one statement,
+        // and FOR SHARE on the current row serialises the write against an admin switching semesters.
+        const rows = await query(`WITH current_period AS MATERIALIZED (
+          SELECT semester_id FROM public.academic_semester WHERE is_current=true FOR SHARE
+        ), saved AS (
           INSERT INTO public.student_profile(clerk_user_id,student_name,matric_no,learning_centre_id,curriculum_id,current_semester_id,weekly_working_hours,available_study_hours)
-          SELECT $1,$2,$3,lc.learning_centre_id,c.curriculum_id,s.semester_id,$6,$7 FROM public.curriculum c JOIN public.programme g USING(programme_id)
+          SELECT $1,$2,$3,lc.learning_centre_id,c.curriculum_id,s.semester_id,$6,$7 FROM current_period cp
+          JOIN public.curriculum c ON true JOIN public.programme g USING(programme_id)
           JOIN public.academic_semester s ON s.semester_id=$5
           JOIN public.learning_centre lc ON lc.learning_centre_id=$8 AND (lc.is_active OR lc.learning_centre_id=$9)
-          WHERE c.curriculum_id=$4 AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE'
+          WHERE s.semester_id=cp.semester_id AND c.curriculum_id=$4 AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE'
           ON CONFLICT(clerk_user_id) DO UPDATE SET student_name=EXCLUDED.student_name,matric_no=EXCLUDED.matric_no,
-            learning_centre_id=EXCLUDED.learning_centre_id,curriculum_id=EXCLUDED.curriculum_id,current_semester_id=EXCLUDED.current_semester_id,
+            learning_centre_id=EXCLUDED.learning_centre_id,current_semester_id=EXCLUDED.current_semester_id,
             weekly_working_hours=EXCLUDED.weekly_working_hours,available_study_hours=EXCLUDED.available_study_hours
+          WHERE public.student_profile.curriculum_id=EXCLUDED.curriculum_id
           RETURNING *
         ) SELECT p.student_id AS "studentId",p.student_name AS "studentName",p.matric_no AS "matricNo",p.learning_centre_id AS "learningCentreId",
           p.curriculum_id AS "curriculumId",p.current_semester_id AS "currentSemesterId",p.weekly_working_hours AS "weeklyWorkingHours",p.available_study_hours AS "availableStudyHours",
@@ -116,10 +126,20 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           FROM saved p JOIN public.curriculum c USING(curriculum_id) JOIN public.programme g USING(programme_id)`,
         [userId,input.studentName,input.matricNo,input.curriculumId,input.currentSemesterId,input.weeklyWorkingHours,input.availableStudyHours,input.learningCentreId,savedCentre]);
         if (!rows[0]) {
+          // The upsert never writes curriculum_id on an existing profile; a row is missing when an administrator moved the programme after the check above.
+          const current = (await query('SELECT curriculum_id AS "curriculumId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0];
+          if (current && current.curriculumId !== input.curriculumId) throw new P001Error(409, 'PROFILE_PROGRAMME_LOCKED', PROGRAMME_LOCKED_MESSAGE);
           const centres = await query('SELECT learning_centre_id FROM public.learning_centre WHERE learning_centre_id=$1 AND (is_active OR learning_centre_id=$2)', [input.learningCentreId, savedCentre]);
           if (!centres[0]) throw new P001Error(400, 'INVALID_LEARNING_CENTRE', 'Select an available learning centre.');
-          const semesters = await query('SELECT semester_id FROM public.academic_semester WHERE semester_id=$1', [input.currentSemesterId]);
-          if (!semesters[0]) throw new P001Error(400, 'INVALID_SEMESTER', 'Select a configured academic year and semester.');
+          const [selected, currentSemester] = await Promise.all([
+            query('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1', [input.currentSemesterId]),
+            query('SELECT a.semester_id AS "semesterId" FROM public.academic_semester a WHERE a.is_current=true', []),
+          ]);
+          if (!selected[0]) throw new P001Error(400, 'INVALID_SEMESTER', 'Select a configured academic year and semester.');
+          if (!currentSemester[0]) throw new P001Error(503, 'ACADEMIC_SEMESTER_UNAVAILABLE', 'The administrator must configure the current academic semester before a profile can be saved.');
+          if (selected[0].semesterId !== currentSemester[0].semesterId) {
+            throw new P001Error(409, 'ACADEMIC_SEMESTER_MISMATCH', 'The current academic semester changed. Refresh your profile and save again.');
+          }
           throw new P001Error(400, 'INVALID_CURRICULUM', 'Select an available configured curriculum.');
         }
         return { ...mapped(rows[0]), learningCentreLocked: locked };
@@ -131,6 +151,16 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code,c.curriculum_version`, []);
       const loadSemesters = () => query(`SELECT semester_id AS "semesterId",academic_year AS "academicYear",semester_no AS "semesterNo",semester_type AS "semesterType"
           FROM public.academic_semester ORDER BY academic_year DESC,semester_no DESC`, []);
+      // The administrator's current semester is never cached: the profile period must follow an admin switch at once.
+      const loadCurrentSemester = async (): Promise<CurrentSemesterOption | null> => {
+        const rows = await query(`SELECT a.semester_id AS "semesterId",a.academic_year AS "academicYear",a.semester_no AS "semesterNo",a.semester_type AS "semesterType"
+          FROM public.academic_semester a WHERE a.is_current=true`, []);
+        const row = rows[0];
+        if (!row) return null;
+        const semester = { semesterId: row.semesterId, academicYear: row.academicYear, semesterNo: row.semesterNo, semesterType: row.semesterType };
+        if (!isSemesterOptionRows([semester])) throw new Error('Invalid current academic semester result');
+        return semester as unknown as CurrentSemesterOption;
+      };
       // Active centres, plus the student's saved centre even if it was deactivated so the select can still show it. Not cached: it is tiny and follows admin edits at once.
       const loadCentres = () => query(`SELECT learning_centre_id AS "learningCentreId",centre_code AS "centreCode",centre_name AS "centreName"
           FROM public.learning_centre WHERE is_active OR learning_centre_id=(SELECT learning_centre_id FROM public.student_profile WHERE clerk_user_id=$1)
@@ -139,12 +169,13 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
         const association = await query('SELECT curriculum_id AS "curriculumId" FROM public.student_profile WHERE clerk_user_id=$1', [userId]);
         const curriculumId = association[0]?.curriculumId;
         if (curriculumId === undefined || curriculumId === null) {
-          const [curricula, semesters, learningCentres] = await Promise.all([
+          const [curricula, semesters, learningCentres, currentSemester] = await Promise.all([
             referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows }),
             referenceCache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isSemesterOptionRows }),
             loadCentres(),
+            loadCurrentSemester(),
           ]);
-          return { curricula, subjects: [], semesters, subjectGroups: [], learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+          return { curricula, subjects: [], semesters, currentSemester, currentAcademicYear: currentSemester?.academicYear ?? null, subjectGroups: [], learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
         }
         if (!isDatabaseId(curriculumId)) throw new Error('Invalid curriculum association result');
         const loadSubjects = () => query(`SELECT s.subject_id AS "subjectId",s.subject_code AS "subjectCode",COALESCE(to_jsonb(cs)->>'display_name',s.subject_name) AS "subjectName",s.credit_hours AS "creditHours",
@@ -170,15 +201,16 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           const [subjects, subjectGroups] = await Promise.all([loadSubjects(), loadSubjectGroups()]);
           return { curriculumId, subjects, subjectGroups };
         };
-        const [curricula, semesters, bundle, learningCentres] = await Promise.all([
+        const [curricula, semesters, bundle, learningCentres, currentSemester] = await Promise.all([
           referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows }),
           referenceCache.getOrLoad({ kind: 'semesters', ttlSeconds: 60, load: loadSemesters, validate: isSemesterOptionRows }),
           referenceCache.getOrLoad({ kind: 'curriculum-options', curriculumId, ttlSeconds: 300, load: loadBundle, validate: isCurriculumOptionsBundle }),
           loadCentres(),
+          loadCurrentSemester(),
         ]);
-        return { curricula, subjects: bundle.subjects, semesters, subjectGroups: bundle.subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+        return { curricula, subjects: bundle.subjects, semesters, currentSemester, currentAcademicYear: currentSemester?.academicYear ?? null, subjectGroups: bundle.subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
       }
-      const [curricula, subjects, semesters, subjectGroups, learningCentres] = await Promise.all([
+      const [curricula, subjects, semesters, subjectGroups, learningCentres, currentSemester] = await Promise.all([
         referenceCache
           ? referenceCache.getOrLoad({ kind: 'curricula', ttlSeconds: 300, load: loadCurricula, validate: isCurriculumOptionRows })
           : loadCurricula(),
@@ -207,8 +239,9 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
             AND rc.requirement_type=btrim(regexp_replace(upper(cc.category),'[^A-Z0-9]+','_','g'),'_')
           ORDER BY cc.category`, [userId]),
         loadCentres(),
+        loadCurrentSemester(),
       ]);
-      return { curricula, subjects, semesters, subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
+      return { curricula, subjects, semesters, currentSemester, currentAcademicYear: currentSemester?.academicYear ?? null, subjectGroups, learningCentres } as unknown as Awaited<ReturnType<ProfileRepository['options']>>;
     },
   };
 }
