@@ -61,7 +61,7 @@ describe('authenticated UC08 offering routes', () => {
     expect(result.data.selection).toEqual(input);
     expect(f.values.size).toBe(1);
     expect(f.deps.repository.replace).toHaveBeenCalledWith({ clerkUserId: 'fictional_a', studentId: f.context.studentId, curriculumId: f.context.curriculum.curriculumId, programmeId: '501', learningCentreId: '601' }, input);
-    expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a', { includePrerequisites: false });
+    expect(f.deps.contextFor).toHaveBeenCalledWith('fictional_a', { includePrerequisites: true });
   });
   it('isolates students and semesters using verified identity', async () => {
     const f = fixture();
@@ -106,6 +106,50 @@ describe('authenticated UC08 offering routes', () => {
     expect(byCredits.status).toBe(409);
     expect((await byCredits.json()).error.code).toBe('PICK_LIMIT_EXCEEDED');
     expect(f.deps.repository.replace).not.toHaveBeenCalled();
+  });
+  describe('eligibility on save', () => {
+    const subject = (id: string, code: string, name: string, items: Array<{ requiredCurriculumSubjectId: string; requirementType: 'MANDATORY' | 'COREQUISITE' }> = []) =>
+      ({ curriculumSubjectId: id, code, name, creditHours: 3, prerequisites: { status: 'available' as const, items } });
+    function eligibilityFixture() {
+      const f = fixture();
+      f.context.subjects = [
+        subject('11', 'A001', 'Fictional A'),
+        subject('12', 'B001', 'Fictional B', [{ requiredCurriculumSubjectId: '11', requirementType: 'MANDATORY' }]),
+        subject('13', 'C001', 'Fictional C'),
+        subject('14', 'D001', 'Fictional D', [{ requiredCurriculumSubjectId: '13', requirementType: 'COREQUISITE' }]),
+      ].map((s, index) => ({ ...s, subjectId: String(900 + index) }));
+      f.context.history = { status: 'available', records: [] };
+      const put = (ids: string[]) => f.get(f.request({ semesterId: f.semesterId, curriculumSubjectIds: ids }));
+      return { f, put };
+    }
+    it('rejects a subject whose mandatory prerequisite is not passed with 409 OFFERING_NOT_ELIGIBLE', async () => {
+      const { f, put } = eligibilityFixture();
+      const response = await put(['12']);
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toEqual({ code: 'OFFERING_NOT_ELIGIBLE', message: 'B001 cannot be picked: Needs A001 Fictional A.' });
+      expect(f.deps.repository.replace).not.toHaveBeenCalled();
+    });
+    it('accepts a subject picked together with its corequisite', async () => {
+      const { put } = eligibilityFixture();
+      expect((await put(['13', '14'])).status).toBe(200);
+    });
+    it('does not block when academic history is unavailable', async () => {
+      const { f, put } = eligibilityFixture();
+      f.context.history = { status: 'unavailable' };
+      expect((await put(['12'])).status).toBe(200);
+    });
+    it('keeps approval and limit errors ahead of eligibility', async () => {
+      const { f, put } = eligibilityFixture();
+      expect((await (await put(['12', '999'])).json()).error.code).toBe('OFFERING_NOT_APPROVED');
+      f.context.limits = { maxSubjects: 0, maxCredits: 18 };
+      expect((await (await put(['12'])).json()).error.code).toBe('PICK_LIMIT_EXCEEDED');
+    });
+    it('never exposes history on GET', async () => {
+      const { f } = eligibilityFixture();
+      const body = await (await f.get(f.request())).json();
+      expect(body.data.history).toBeUndefined();
+      expect(JSON.stringify(body)).not.toContain('"records"');
+    });
   });
   it('PUT is 409 PICKS_CLOSED after closing and 409 PICKS_NOT_OPEN during planning', async () => {
     const closed = fixture(); closed.context.window.status = 'CLOSED';

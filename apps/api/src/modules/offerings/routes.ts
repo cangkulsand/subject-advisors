@@ -3,6 +3,7 @@ import { AuthError, authErrorResponse, authJson } from '../auth/errors';
 import type { OfferingDependencies, OfferingScope } from './contracts';
 import { readSave, requireId } from './validation';
 import { pickLimitMessage } from '../../../../../packages/shared/src/offerings/offerings';
+import { evaluateOfferingEligibility } from '../../../../../packages/shared/src/offerings/eligibility';
 import { OFFERING_NOT_APPROVED_MESSAGE, PICKS_CLOSED_MESSAGE, PICKS_NOT_OPEN_MESSAGE, SEMESTER_NOT_TARGET_MESSAGE } from './messages';
 
 /** FOUNDATION registers this handler; unmatched routes return null. */
@@ -16,7 +17,7 @@ export async function handleOfferingRequest(request: Request, deps: OfferingDepe
       return response;
     }
     const account = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
-    const context = await deps.contextFor(account.clerkUserId, { includePrerequisites: request.method === 'GET' });
+    const context = await deps.contextFor(account.clerkUserId, { includePrerequisites: true });
     if (!context) throw new AuthError(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile before entering offerings.');
     const { window } = context;
     const target = window.targetSemesterId;
@@ -50,6 +51,14 @@ export async function handleOfferingRequest(request: Request, deps: OfferingDepe
       const credits = input.curriculumSubjectIds.reduce((total, id) => total + (offered.get(id)?.creditHours ?? 0), 0);
       if (context.limits && (input.curriculumSubjectIds.length > context.limits.maxSubjects || credits > context.limits.maxCredits)) {
         throw new AuthError(409, 'PICK_LIMIT_EXCEEDED', pickLimitMessage(context.limits));
+      }
+      const catalogue = context.prerequisiteCatalogue ?? context.subjects;
+      const history = context.history ?? { status: 'unavailable' as const };
+      for (const id of input.curriculumSubjectIds) {
+        const subject = offered.get(id)!;
+        const blocking = evaluateOfferingEligibility({ subject, catalogue, history, pickedCurriculumSubjectIds: input.curriculumSubjectIds })
+          .reasons.find(reason => reason.blocking);
+        if (blocking) throw new AuthError(409, 'OFFERING_NOT_ELIGIBLE', `${subject.code} cannot be picked: ${blocking.message}.`);
       }
       return authJson({ data: await deps.repository.replace(scope, input) });
     }
