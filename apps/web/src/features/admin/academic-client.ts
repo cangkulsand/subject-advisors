@@ -13,7 +13,8 @@ const centre = (v: unknown) => row<Contract.LearningCentre>(v, ['learningCentreI
 const faculty = (v: unknown) => row<Contract.Faculty>(v, ['facultyId'], ['facultyCode', 'facultyName'], ['isActive']);
 const department = (v: unknown) => row<Contract.Department>(v, ['departmentId', 'facultyId'], ['departmentCode', 'departmentName'], ['isActive']);
 function programme(v: unknown): Contract.ProgrammeFaculty {
-  const item = row<Contract.ProgrammeFaculty>(v, ['programmeId'], ['programmeCode', 'programmeName']);
+  const item = row<Contract.ProgrammeFaculty>(v, ['programmeId'], ['programmeCode', 'programmeName'], ['isActive']);
+  if (item.level !== null && typeof item.level !== 'string') return invalid();
   if (item.facultyId !== null && !Contract.isAcademicSetupId(item.facultyId)) return invalid();
   if (item.faculty !== null) faculty(item.faculty);
   if ((item.faculty?.facultyId ?? null) !== item.facultyId) return invalid();

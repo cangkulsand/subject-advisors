@@ -4,6 +4,7 @@ import {
   validateCreateFacultyRequest, validateSetProgrammeDepartmentRequest, validateCreateDepartmentRequest, validateUpdateDepartmentRequest, validateCreateSemesterRequest,
   validateUpdateSemesterRequest, validateMergedSemester, validateSetCurrentSemesterRequest,
   validateCreateCoordinatorAssignmentRequest, validateEndCoordinatorAssignmentRequest,
+  validateCreateProgrammeRequest, validateUpdateProgrammeRequest, validateCreateCurriculumRequest, validateUpdateCurriculumRequest,
   type AcademicSemester,
 } from './academic-setup';
 
@@ -111,5 +112,40 @@ describe('current semester and coordinator assignment requests', () => {
     expect(validateEndCoordinatorAssignmentRequest({ reason: '' }).ok).toBe(false);
     expect(isAcademicSetupId(2147483647)).toBe(true);
     expect(isAcademicSetupId(2147483648)).toBe(false);
+  });
+});
+describe('programme and curriculum validators', () => {
+  const prog = { programmeCode: 'SECX', programmeName: 'Fictional', level: null, departmentId: 1, reason: 'r' };
+  const cur = { programmeId: 1, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, reason: 'r' };
+  it('trims and accepts a programme create request', () => {
+    expect(validateCreateProgrammeRequest({ ...prog, programmeCode: ' SECX ' })).toEqual({ ok: true, value: prog });
+  });
+  it('rejects invalid programme create requests', () => {
+    expect(validateCreateProgrammeRequest({ ...prog, programmeCode: 'x'.repeat(21) })).toEqual({ ok: false, error: 'Invalid programmeCode.' });
+    const { departmentId: _d, ...noDept } = prog;
+    expect(validateCreateProgrammeRequest(noDept)).toEqual({ ok: false, error: 'Invalid departmentId.' });
+    expect(validateCreateProgrammeRequest({ ...prog, level: 'x'.repeat(51) })).toEqual({ ok: false, error: 'Invalid level.' });
+    expect(validateCreateProgrammeRequest({ ...prog, status: 'ACTIVE' })).toEqual({ ok: false, error: 'Unknown field: status.' });
+    expect(validateCreateProgrammeRequest({ ...prog, reason: ' ' }).ok).toBe(false);
+  });
+  it('validates programme updates', () => {
+    expect(validateUpdateProgrammeRequest({ reason: 'r' })).toEqual({ ok: false, error: 'At least one change is required.' });
+    expect(validateUpdateProgrammeRequest({ isActive: false, reason: 'r' }).ok).toBe(true);
+    expect(validateUpdateProgrammeRequest({ level: '', reason: 'r' })).toEqual({ ok: true, value: { level: null, reason: 'r' } });
+    expect(validateUpdateProgrammeRequest({ departmentId: 2, reason: 'r' }).ok).toBe(false);
+  });
+  it('validates curriculum create requests', () => {
+    expect(validateCreateCurriculumRequest(cur)).toEqual({ ok: true, value: cur });
+    for (const totalCreditRequired of [-1, 1001, 1.5]) {
+      expect(validateCreateCurriculumRequest({ ...cur, totalCreditRequired })).toEqual({ ok: false, error: 'Invalid totalCreditRequired.' });
+    }
+    expect(validateCreateCurriculumRequest({ ...cur, effectiveYear: 1899 })).toEqual({ ok: false, error: 'Invalid effectiveYear.' });
+    expect(validateCreateCurriculumRequest({ ...cur, effectiveYear: 2026 }).ok).toBe(true);
+  });
+  it('validates curriculum updates and fixes the programme', () => {
+    expect(validateUpdateCurriculumRequest({ programmeId: 1, reason: 'r' })).toEqual({ ok: false, error: 'Unknown field: programmeId.' });
+    expect(validateUpdateCurriculumRequest({ reason: 'r' }).ok).toBe(false);
+    expect(validateUpdateCurriculumRequest({ isActive: false, effectiveYear: null, reason: 'r' }))
+      .toEqual({ ok: true, value: { isActive: false, effectiveYear: null, reason: 'r' } });
   });
 });

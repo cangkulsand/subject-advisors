@@ -14,7 +14,8 @@ const semesterColumns = `semester_id AS "semesterId", academic_year AS "academic
   start_date::text AS "startDate", end_date::text AS "endDate", is_current AS "isCurrent",
   to_char(selection_opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionOpensAt",
   to_char(selection_closes_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionClosesAt"`;
-const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_code AS "programmeCode", p.programme_name AS "programmeName",
+const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_code AS "programmeCode", p.programme_name AS "programmeName", p.level AS "level",
+  coalesce(upper(p.status),'ACTIVE')='ACTIVE' AS "programmeIsActive",
   p.faculty_id AS "facultyId", f.faculty_code AS "facultyCode", f.faculty_name AS "facultyName", f.is_active AS "isActive",
   p.department_id AS "departmentId", d.department_code AS "departmentCode", d.department_name AS "departmentName",
   d.faculty_id AS "departmentFacultyId", d.is_active AS "departmentIsActive"
@@ -36,7 +37,7 @@ const semester = (r: Row): C.AcademicSemester => ({ semesterId: Number(r.semeste
   semesterType: r.semesterType as C.SemesterType, maxSubjects: Number(r.maxSubjects), maxCredits: Number(r.maxCredits), startDate: r.startDate == null ? null : String(r.startDate), endDate: r.endDate == null ? null : String(r.endDate), isCurrent: r.isCurrent === true,
   selectionOpensAt: r.selectionOpensAt == null ? null : String(r.selectionOpensAt), selectionClosesAt: r.selectionClosesAt == null ? null : String(r.selectionClosesAt) });
 const department = (r: Row): C.Department => ({ departmentId: Number(r.departmentId), departmentCode: String(r.departmentCode), departmentName: String(r.departmentName), facultyId: Number(r.facultyId), isActive: r.isActive === true });
-const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r),
+const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), level: r.level == null ? null : String(r.level), isActive: r.programmeIsActive === true, facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r),
   departmentId: r.departmentId == null ? null : Number(r.departmentId),
   department: r.departmentId == null ? null : department({ departmentId: r.departmentId, departmentCode: r.departmentCode, departmentName: r.departmentName, facultyId: r.departmentFacultyId, isActive: r.departmentIsActive }) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
