@@ -52,6 +52,7 @@ export function fixtureResponse(url, state = {}) {
     const appRole = roles.includes('SYSTEM_ADMIN') ? 'SYSTEM_ADMIN' : roles[0];
     return { clerkUserId: state.clerkUserId ?? 'user_test', appRole, roles, availableRoles: roles, accessStatus: 'ACTIVE', studentProfileState: roles.includes('STUDENT') ? 'SETUP_REQUIRED' : 'NOT_APPLICABLE', profileState: appRole === 'STUDENT' ? 'SETUP_REQUIRED' : 'NOT_APPLICABLE', landingPath: appRole === 'SYSTEM_ADMIN' ? '/admin' : appRole === 'COORDINATOR' ? '/coordinator' : '/student/setup' };
   }
+  if (url.pathname === '/api/p001-sprint2/curricula') return { curricula: [{ curriculumId: 1, programme: 'DEMO NOT OFFICIAL — Fictional Programme', version: 'DEMO' }], subjects: [] };
   if (url.pathname === '/api/admin/overview') return {
     generatedAt, accounts: { total: 23, active: 22, suspended: 1 }, roles: { STUDENT: 22, COORDINATOR: 2, SYSTEM_ADMIN: 1 },
     configuration: { programmes: 1, curricula: 1, subjects: 40, semesters: 3 },

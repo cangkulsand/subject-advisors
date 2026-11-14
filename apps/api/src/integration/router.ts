@@ -1,7 +1,7 @@
 import { authorize, authJson, handleAuthRequest } from '../modules/auth';
 import type { AuthDependencies } from '../modules/auth/contracts';
 export type FeatureHandler = (request: Request) => Promise<Response | null>;
-export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler; forecasting?: FeatureHandler }
+export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler; forecasting?: FeatureHandler; curriculum?: FeatureHandler }
 /** Owners retain validation/authorization inside their handlers. No business logic here. */
 export async function dispatchIntegratedRequest(request: Request, services: IntegratedServices): Promise<Response> {
   const path = new URL(request.url).pathname;
@@ -16,6 +16,12 @@ export async function dispatchIntegratedRequest(request: Request, services: Inte
     if (services.forecasting) return await services.forecasting(request) ?? authJson({ error: { code: 'NOT_FOUND', message: 'Route not found.' } }, 404);
     await authorize(request, services.auth, { roles: ['COORDINATOR'] });
     return authJson({ error: { code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting is not available.' } }, 503);
+  }
+  const curriculumRoute = path === '/api/p001-sprint2/curricula' || path.startsWith('/api/p001-sprint2/curricula/');
+  if (curriculumRoute) {
+    if (services.curriculum) return await services.curriculum(request) ?? authJson({ error: { code: 'FEATURE_ROUTE_UNAVAILABLE', message: 'This academic service is temporarily unavailable.' } }, 503);
+    await authorize(request, services.auth, { roles: ['SYSTEM_ADMIN'] });
+    return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
   }
   const profileRoute = path === '/api/profile' || path === '/api/profile/options' || path === '/api/academic-records' || /^\/api\/academic-records\/[^/]+$/.test(path);
   const offeringRoute = path === '/api/semester-offerings';

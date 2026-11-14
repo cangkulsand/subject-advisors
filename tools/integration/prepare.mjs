@@ -16,6 +16,7 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     p003Api:await entry('apps/api/src/modules/pathway','apps/api/src/modules/pathway/index.ts'),
     adminApi:await entry('apps/api/src/modules/admin','apps/api/src/modules/admin/index.ts'),
     forecastingApi:await entry('apps/api/src/modules/forecasting','apps/api/src/modules/forecasting/index.ts'),
+    curriculumApi:await entry('apps/api/src/modules/p001-sprint2','apps/api/src/modules/p001-sprint2/index.ts'),
   };
   if(features.p001Web)for(const file of ['apps/web/src/features/profile/client.ts','apps/web/src/features/records/RecordsPage.tsx'])if(!await exists(file))throw new Error('Incomplete P001 web overlay; missing '+file);
   const api=[
@@ -26,6 +27,7 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     ...(features.p003Api?["import { createPathwayHandler } from '../apps/api/src/modules/pathway';"]:[]),
     ...(features.adminApi?["import { createAdminHandler, createInvitationRedeemer } from '../apps/api/src/modules/admin';"]:[]),
     ...(features.forecastingApi?["import { createForecastingHandler } from '../apps/api/src/modules/forecasting';"]:[]),
+    ...(features.curriculumApi?["import { createSprint2Repository, neonDatabase } from '../apps/api/src/modules/p001-sprint2/repository';","import { handleSprint2Request } from '../apps/api/src/modules/p001-sprint2';"]:[]),
     'export function createIntegratedServices(env: AuthBindings): IntegratedServices {',
     ...(features.p001Api?['  const p001 = createP001Dependencies(env);','  const auth = p001.auth;']:['  const auth = createAuthDependencies(env);']),
     ...(features.adminApi?['  auth.invitations = createInvitationRedeemer(env, auth.access);']:[]),
@@ -35,6 +37,7 @@ export async function prepareIntegration(root=process.cwd(),quiet=false){
     ...(features.p001Api?['    profile: request => handleP001Request(request, p001),']:[]),
     ...(features.p002Api?["    offerings: createOfferingHandler(env, { profiles: auth.profiles ?? { stateFor: async () => 'UNAVAILABLE' as const } }),"]:[]),
     ...(features.p003Api?["    pathway: createPathwayHandler(env, auth),"]:[]),
+    ...(features.curriculumApi?["    curriculum: request => handleSprint2Request(request, { auth, repository: createSprint2Repository(neonDatabase(env.DATABASE_URL)) }),"]:[]),
     '  };','}',
   ].filter(line=>!(features.p001Api&&line==="import { createAuthDependencies, type AuthBindings } from '../apps/api/src/modules/auth';"));
   if(features.p001Api)api.unshift("import type { AuthBindings } from '../apps/api/src/modules/auth';");

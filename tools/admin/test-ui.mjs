@@ -68,7 +68,7 @@ else {
     finally { await page.close(); }
   }
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
     await check('aggregate overview, clickable planned setup and account filter navigation', async page => {
       const state = await mock(page); await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       assert.ok((await page.locator('.admin-metrics').innerText()).includes('23'));
@@ -90,7 +90,10 @@ else {
       await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/staff-menu-review/admin-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Administration navigation' });
-      for (const [label, title] of [['Curriculum & Prerequisites', 'Curriculum & Prerequisites'], ['Graduation Requirements', 'Graduation Requirements']]) {
+      await navigation.getByRole('link', { name: 'Curriculum & Prerequisites', exact: true }).click();
+      await page.getByRole('heading', { name: 'Subjects and prerequisites', exact: true }).waitFor();
+      await page.getByLabel('Curriculum', { exact: true }).waitFor();
+      for (const [label, title] of [['Graduation Requirements', 'Graduation Requirements']]) {
         await navigation.getByRole('link', { name: label, exact: true }).click();
         await page.getByRole('heading', { name: title, exact: true }).waitFor();
         await page.getByText('This workspace is planned.', { exact: false }).waitFor();
@@ -98,7 +101,7 @@ else {
         assert.equal(await page.getByRole('button', { name: /save|generate|upload|import|delete|grant/i }).count(), 0);
         assert.ok(!/\b(?:23|22|40)\b/.test(await page.locator('.admin-planned-page').innerText()));
       }
-      assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview']);
+      assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/p001-sprint2/curricula']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
     });
     await check('coordinator quick links: the planned routes (Data Quality, Decision Audit) use only account access', async page => {

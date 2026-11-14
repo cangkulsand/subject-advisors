@@ -1,13 +1,23 @@
 import { fields, invalid, nonnegative, positiveId, text, P001Error } from '../profile/validation';
-import type { CurriculumData, LinkInput, SubjectInput } from './contracts';
+import type { CurriculumData, LinkInput, PrerequisiteSelection, SubjectInput } from './contracts';
 export function revision(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-f0-9]{32}$/.test(value)) invalid('Reload the curriculum before saving.');
   return value;
 }
 export function subjectInput(value: unknown, editing: boolean): SubjectInput {
-  const b = fields(value, ['revision','existingSubjectId','code','name','credits','category','compulsory','semesterTypes','confirmSharedChanges']);
+  const b = fields(value, ['revision','existingSubjectId','code','name','credits','category','compulsory','semesterTypes','confirmSharedChanges','prerequisites']);
   const existingSubjectId = b.existingSubjectId == null ? null : positiveId(b.existingSubjectId, 'Existing subject');
   if (editing && existingSubjectId !== null) invalid('An existing mapping cannot be moved to another subject.');
+  if (editing && b.prerequisites !== undefined) invalid('Initial prerequisites can only be selected when creating a subject.');
+  let prerequisites: PrerequisiteSelection[] | undefined;
+  if (!editing && b.prerequisites !== undefined) {
+    if (!Array.isArray(b.prerequisites)) invalid('Prerequisites must be a list of curriculum subject selections.');
+    prerequisites = b.prerequisites.map(entry => {
+      const p = fields(entry, ['mappingId','code']);
+      return { mappingId: positiveId(p.mappingId, 'Prerequisite subject'), code: text(p.code, 'Prerequisite subject code', 20, true)! };
+    });
+    if (new Set(prerequisites.map(p => p.mappingId)).size !== prerequisites.length) invalid('Remove duplicate prerequisite selections.');
+  }
   if (typeof b.compulsory !== 'boolean') invalid('Specify whether the subject is compulsory.');
   if (!Array.isArray(b.semesterTypes) || !b.semesterTypes.length || b.semesterTypes.length > 2 ||
       b.semesterTypes.some(t => t !== 'NORMAL' && t !== 'SHORT') || new Set(b.semesterTypes).size !== b.semesterTypes.length) invalid('Select permitted semester types without duplicates.');
@@ -17,7 +27,12 @@ export function subjectInput(value: unknown, editing: boolean): SubjectInput {
     name: existingSubjectId ? '' : text(b.name, 'Subject name', 255, true)!,
     credits: existingSubjectId ? 0 : nonnegative(b.credits, 'Credit hours'),
     category: text(b.category, 'Classification', 50, true)!, compulsory: b.compulsory,
-    semesterTypes: b.semesterTypes as SubjectInput['semesterTypes'], confirmSharedChanges: b.confirmSharedChanges === true };
+    semesterTypes: b.semesterTypes as SubjectInput['semesterTypes'], confirmSharedChanges: b.confirmSharedChanges === true, prerequisites };
+}
+/** Initial prerequisites must already be mapped subjects of this curriculum and match their canonical code. */
+export function validatePrerequisites(data: CurriculumData, prerequisites: PrerequisiteSelection[]): void {
+  const codes = new Map(data.subjects.map(s => [s.mappingId, s.code]));
+  for (const p of prerequisites) if (codes.get(p.mappingId) !== p.code) invalid('Every prerequisite must be a subject in this curriculum. Reload and select it again.');
 }
 export function linkInput(value: unknown): LinkInput {
   const b = fields(value, ['revision','from','required','kind']);
