@@ -13,13 +13,20 @@ const centre = (v: unknown) => row<Contract.LearningCentre>(v, ['learningCentreI
 const faculty = (v: unknown) => row<Contract.Faculty>(v, ['facultyId'], ['facultyCode', 'facultyName'], ['isActive']);
 const department = (v: unknown) => row<Contract.Department>(v, ['departmentId', 'facultyId'], ['departmentCode', 'departmentName'], ['isActive']);
 function programme(v: unknown): Contract.ProgrammeFaculty {
-  const item = row<Contract.ProgrammeFaculty>(v, ['programmeId'], ['programmeCode', 'programmeName']);
+  const item = row<Contract.ProgrammeFaculty>(v, ['programmeId'], ['programmeCode', 'programmeName'], ['isActive']);
+  if (item.level !== null && typeof item.level !== 'string') return invalid();
   if (item.facultyId !== null && !Contract.isAcademicSetupId(item.facultyId)) return invalid();
   if (item.faculty !== null) faculty(item.faculty);
   if ((item.faculty?.facultyId ?? null) !== item.facultyId) return invalid();
   if (item.departmentId !== null && !Contract.isAcademicSetupId(item.departmentId)) return invalid();
   if (item.department !== null) department(item.department);
   if ((item.department?.departmentId ?? null) !== item.departmentId) return invalid();
+  return item;
+}
+function curriculum(v: unknown): Contract.Curriculum {
+  const item = row<Contract.Curriculum>(v, ['curriculumId', 'programmeId'], ['curriculumVersion'], ['isActive']);
+  if (typeof item.totalCreditRequired !== 'number' || !Number.isInteger(item.totalCreditRequired) || typeof item.subjectCount !== 'number' || !Number.isInteger(item.subjectCount)) return invalid();
+  if (item.effectiveYear !== null && typeof item.effectiveYear !== 'number') return invalid();
   return item;
 }
 function semester(v: unknown): Contract.AcademicSemester {
@@ -78,6 +85,11 @@ export function createAcademicSetupClient(getToken: () => Promise<string | null>
     createDepartment: (input: Contract.CreateDepartmentRequest) => request(path + '/departments', department, undefined, { method: 'POST', body: input }),
     updateDepartment: (id: number, input: Contract.UpdateDepartmentRequest) => request(path + '/departments/' + id, department, undefined, { method: 'PATCH', body: input }),
     programmes: (signal?: AbortSignal) => request(path + '/programmes', list(programme), signal),
+    createProgramme: (input: Contract.CreateProgrammeRequest) => request(path + '/programmes', programme, undefined, { method: 'POST', body: input }),
+    updateProgramme: (id: number, input: Contract.UpdateProgrammeRequest) => request(path + '/programmes/' + id, programme, undefined, { method: 'PATCH', body: input }),
+    curricula: (signal?: AbortSignal) => request(path + '/curricula', list(curriculum), signal),
+    createCurriculum: (input: Contract.CreateCurriculumRequest) => request(path + '/curricula', curriculum, undefined, { method: 'POST', body: input }),
+    updateCurriculum: (id: number, input: Contract.UpdateCurriculumRequest) => request(path + '/curricula/' + id, curriculum, undefined, { method: 'PATCH', body: input }),
     setProgrammeDepartment: (id: number, input: Contract.SetProgrammeDepartmentRequest) => request(path + '/programmes/' + id + '/department', programme, undefined, { method: 'PATCH', body: input }),
     semesters: (signal?: AbortSignal) => request(path + '/semesters', list(semester), signal),
     currentSemester: (signal?: AbortSignal) => request(path + '/current-semester', v => v === null ? null : semester(v), signal),

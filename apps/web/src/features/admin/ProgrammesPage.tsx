@@ -1,0 +1,49 @@
+import { useState } from 'react';
+import type { AcademicSetupClient } from './academic-client';
+import { ReasonDialog } from './AdminUserManagement';
+import * as C from '../../../../../packages/shared/src/admin/academic-setup';
+import { checked, SetupCard, SetupForm, SetupTable, useSetupRead } from './academic-ui';
+
+type ProgrammeAction = { kind: 'new' } | { kind: 'edit' | 'department' | 'toggle'; row: C.ProgrammeFaculty };
+type CurriculumAction = { kind: 'new' } | { kind: 'edit' | 'toggle'; row: C.Curriculum };
+const optionalNumber = (value: string | undefined) => (value ?? '').trim() === '' ? null : Number(value);
+const requiredNumber = (value: string | undefined) => (value ?? '').trim() === '' ? NaN : Number(value);
+
+/** Programmes (with department assignment) and their curriculums. */
+export function ProgrammesPage({ client }: { client: AcademicSetupClient }) {
+  const state = useSetupRead(async signal => ({ faculties: await client.faculties(signal), departments: await client.departments(signal), programmes: await client.programmes(signal), curricula: await client.curricula(signal) }), 'programmes');
+  const [programme, setProgramme] = useState<ProgrammeAction | null>(null), [curriculum, setCurriculum] = useState<CurriculumAction | null>(null), [success, setSuccess] = useState('');
+  const done = () => { setProgramme(null); setCurriculum(null); setSuccess('Academic setup saved.'); state.refresh(); };
+  const facultyName = (id: number) => state.data?.faculties.find(f => f.facultyId === id)?.facultyName ?? String(id);
+  const programmeCode = (id: number) => state.data?.programmes.find(p => p.programmeId === id)?.programmeCode ?? String(id);
+  const editing = programme?.kind === 'edit' ? programme.row : null, departing = programme?.kind === 'department' ? programme.row : null, toggled = programme?.kind === 'toggle' ? programme.row : null;
+  const editedCurriculum = curriculum?.kind === 'edit' ? curriculum.row : null, toggledCurriculum = curriculum?.kind === 'toggle' ? curriculum.row : null;
+  return <SetupCard title="Programmes" {...state} success={success} action={<button className="admin-primary" disabled={!state.data} onClick={() => setProgramme({ kind: 'new' })}>Add programme</button>}>
+    {!state.data?.programmes.length ? <p>No programmes configured.</p> : <SetupTable label="Programmes" headings={['Code', 'Name', 'Level', 'Department', 'Faculty', 'Status', 'Actions']}>{state.data.programmes.map(row => <tr key={row.programmeId}><td>{row.programmeCode}</td><td>{row.programmeName}</td><td>{row.level ?? ''}</td><td>{row.department?.departmentName ?? 'No department'}{row.department && !row.department.isActive ? ' (inactive)' : ''}</td><td>{row.faculty?.facultyName ?? 'No faculty'}{row.faculty && !row.faculty.isActive ? ' (inactive)' : ''}</td><td>{row.isActive ? 'Active' : 'Inactive'}</td><td><button onClick={() => setProgramme({ kind: 'edit', row })}>Edit {row.programmeCode}</button> <button onClick={() => setProgramme({ kind: 'department', row })}>Department {row.programmeCode}</button> <button onClick={() => setProgramme({ kind: 'toggle', row })}>{row.isActive ? 'Deactivate' : 'Reactivate'} {row.programmeCode}</button></td></tr>)}</SetupTable>}
+    <div className="admin-card-title"><h2>Curriculums</h2><button className="admin-primary" disabled={!state.data} onClick={() => setCurriculum({ kind: 'new' })}>Add curriculum</button></div>
+    {!state.data?.curricula.length ? <p>No curriculums configured.</p> : <SetupTable label="Curriculums" headings={['Programme', 'Version', 'Total credits', 'Effective year', 'Status', 'Subjects', 'Actions']}>{state.data.curricula.map(row => <tr key={row.curriculumId}><td>{programmeCode(row.programmeId)}</td><td>{row.curriculumVersion}</td><td>{row.totalCreditRequired}</td><td>{row.effectiveYear ?? ''}</td><td>{row.isActive ? 'Active' : 'Inactive'}</td><td><a href={'/admin/curriculum?curriculum=' + row.curriculumId}>{row.subjectCount} subjects</a></td><td><button onClick={() => setCurriculum({ kind: 'edit', row })}>Edit {programmeCode(row.programmeId)} {row.curriculumVersion}</button> <button onClick={() => setCurriculum({ kind: 'toggle', row })}>{row.isActive ? 'Deactivate' : 'Reactivate'} {programmeCode(row.programmeId)} {row.curriculumVersion}</button></td></tr>)}</SetupTable>}
+    {programme?.kind === 'new' && <SetupForm title="Add programme" fields={[{ key: 'code', label: 'Programme code', maxLength: 20 }, { key: 'name', label: 'Programme name', maxLength: 255 }, { key: 'level', label: 'Level', maxLength: 50, optional: true }, { key: 'department', label: 'Department', options: state.data!.departments.filter(d => d.isActive).map(d => ({ value: String(d.departmentId), label: d.departmentName + ' · ' + facultyName(d.facultyId) })) }]} initial={{}} onClose={() => setProgramme(null)} onSave={async (v, reason) => {
+      await client.createProgramme(checked(C.validateCreateProgrammeRequest({ programmeCode: v.code, programmeName: v.name, level: (v.level ?? '').trim() || null, departmentId: Number(v.department), reason }))); done();
+    }}/>}
+    {editing && <SetupForm title="Edit programme" fields={[{ key: 'code', label: 'Programme code', maxLength: 20 }, { key: 'name', label: 'Programme name', maxLength: 255 }, { key: 'level', label: 'Level', maxLength: 50, optional: true }]} initial={{ code: editing.programmeCode, name: editing.programmeName, level: editing.level ?? '' }} onClose={() => setProgramme(null)} onSave={async (v, reason) => {
+      const body: Record<string, unknown> = { reason };
+      if (v.code !== editing.programmeCode) body.programmeCode = v.code;
+      if (v.name !== editing.programmeName) body.programmeName = v.name;
+      if ((v.level ?? '') !== (editing.level ?? '')) body.level = (v.level ?? '').trim() || null;
+      await client.updateProgramme(editing.programmeId, checked(C.validateUpdateProgrammeRequest(body))); done();
+    }}/>}
+    {toggled && <ReasonDialog title={(toggled.isActive ? 'Deactivate ' : 'Reactivate ') + 'programme'} description={toggled.programmeCode + ' · ' + toggled.programmeName} confirmLabel={toggled.isActive ? 'Deactivate' : 'Reactivate'} onCancel={() => setProgramme(null)} onSubmit={async reason => { await client.updateProgramme(toggled.programmeId, { isActive: !toggled.isActive, reason }); done(); }}/>}
+    {departing && <SetupForm title={'Assign department · ' + departing.programmeCode} fields={[{ key: 'department', label: 'Department (None clears the assignment)', optional: true, options: state.data!.departments.filter(d => d.isActive || d.departmentId === departing.departmentId).map(d => ({ value: String(d.departmentId), label: d.departmentName + ' · ' + facultyName(d.facultyId) + (d.isActive ? '' : ' (inactive)') })) }]} initial={{ department: departing.departmentId === null ? '' : String(departing.departmentId) }} onClose={() => setProgramme(null)} onSave={async (v, reason) => { await client.setProgrammeDepartment(departing.programmeId, checked(C.validateSetProgrammeDepartmentRequest({ departmentId: v.department ? Number(v.department) : null, reason }))); done(); }}>{v => { const chosen = state.data!.departments.find(d => String(d.departmentId) === v.department); return <p role="note">{chosen ? 'Faculty will be set to ' + facultyName(chosen.facultyId) + '.' : departing.departmentId === null ? 'No change: the programme has no department.' : 'The programme will have no department and no faculty.'}</p>; }}</SetupForm>}
+    {curriculum?.kind === 'new' && <SetupForm title="Add curriculum" fields={[{ key: 'programme', label: 'Programme', options: state.data!.programmes.filter(p => p.isActive).map(p => ({ value: String(p.programmeId), label: p.programmeCode + ' · ' + p.programmeName })) }, { key: 'version', label: 'Version', maxLength: 20 }, { key: 'credits', label: 'Total credits', type: 'number' }, { key: 'year', label: 'Effective year', type: 'number', optional: true }]} initial={{}} onClose={() => setCurriculum(null)} onSave={async (v, reason) => {
+      await client.createCurriculum(checked(C.validateCreateCurriculumRequest({ programmeId: Number(v.programme), curriculumVersion: v.version, totalCreditRequired: requiredNumber(v.credits), effectiveYear: optionalNumber(v.year), reason }))); done();
+    }}/>}
+    {editedCurriculum && <SetupForm title="Edit curriculum" fields={[{ key: 'version', label: 'Version', maxLength: 20 }, { key: 'credits', label: 'Total credits', type: 'number' }, { key: 'year', label: 'Effective year', type: 'number', optional: true }]} initial={{ version: editedCurriculum.curriculumVersion, credits: String(editedCurriculum.totalCreditRequired), year: editedCurriculum.effectiveYear === null ? '' : String(editedCurriculum.effectiveYear) }} onClose={() => setCurriculum(null)} onSave={async (v, reason) => {
+      const body: Record<string, unknown> = { reason };
+      if (v.version !== editedCurriculum.curriculumVersion) body.curriculumVersion = v.version;
+      if (v.credits !== String(editedCurriculum.totalCreditRequired)) body.totalCreditRequired = requiredNumber(v.credits);
+      if (optionalNumber(v.year) !== editedCurriculum.effectiveYear) body.effectiveYear = optionalNumber(v.year);
+      await client.updateCurriculum(editedCurriculum.curriculumId, checked(C.validateUpdateCurriculumRequest(body))); done();
+    }}/>}
+    {toggledCurriculum && <ReasonDialog title={(toggledCurriculum.isActive ? 'Deactivate ' : 'Reactivate ') + 'curriculum'} description={programmeCode(toggledCurriculum.programmeId) + ' · ' + toggledCurriculum.curriculumVersion} confirmLabel={toggledCurriculum.isActive ? 'Deactivate' : 'Reactivate'} onCancel={() => setCurriculum(null)} onSubmit={async reason => { await client.updateCurriculum(toggledCurriculum.curriculumId, { isActive: !toggledCurriculum.isActive, reason }); done(); }}/>}
+  </SetupCard>;
+}

@@ -5,8 +5,8 @@ import { IMPORT_ALIASES } from '../../config/import-aliases';
 import { createDbScopeProvider, type ScopeSource } from './scope-provider';
 
 const programmes: ProgrammeFaculty[] = [
-  { programmeId: 5, programmeCode: 'SECJ', programmeName: 'Software Engineering', facultyId: 1, faculty: null, departmentId: null, department: null },
-  { programmeId: 7, programmeCode: 'SECRH', programmeName: 'Networks', facultyId: 1, faculty: null, departmentId: null, department: null },
+  { programmeId: 5, programmeCode: 'SECJ', programmeName: 'Software Engineering', level: null, isActive: true, facultyId: 1, faculty: null, departmentId: null, department: null },
+  { programmeId: 7, programmeCode: 'SECRH', programmeName: 'Networks', level: null, isActive: true, facultyId: 1, faculty: null, departmentId: null, department: null },
 ];
 const centres: LearningCentre[] = [
   { learningCentreId: 1, centreCode: 'KL', centreName: 'UTMSPACE Kuala Lumpur', isActive: true },

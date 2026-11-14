@@ -5,7 +5,8 @@ export function academicStore(state) {
     centres: state.empty ? [] : [{ learningCentreId: 1, centreCode: 'TEST', centreName: 'Fictional learning centre', isActive: true }],
     faculties: state.empty ? [] : [{ facultyId: 1, facultyCode: 'TEST', facultyName: 'Fictional faculty', isActive: true }, { facultyId: 2, facultyCode: 'OTHER', facultyName: 'Fictional other faculty', isActive: true }],
     departments: state.empty ? [] : [{ departmentId: 1, departmentCode: 'DEPT', departmentName: 'Fictional department', facultyId: 1, isActive: true }, { departmentId: 2, departmentCode: 'DOTHER', departmentName: 'Fictional other department', facultyId: 2, isActive: true }],
-    programmes: state.empty ? [] : [{ programmeId: 1, programmeCode: 'TEST', programmeName: 'Fictional programme', facultyId: 1, departmentId: 1 }],
+    programmes: state.empty ? [] : [{ programmeId: 1, programmeCode: 'TEST', programmeName: 'Fictional programme', level: 'Degree', isActive: true, facultyId: 1, departmentId: 1 }, { programmeId: 2, programmeCode: 'LEGACY', programmeName: 'Fictional legacy programme', level: null, isActive: true, facultyId: null, departmentId: null }],
+    curricula: state.empty ? [] : [{ curriculumId: 1, programmeId: 1, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 3 }],
     semesters: state.empty ? [] : [1, 2, 3].map(n => ({ semesterId: n, academicYear: '2026/2027', semesterNo: n, semesterType: n === 3 ? 'SHORT' : 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null })),
     assignments: state.empty ? [] : [{ assignmentId: 1, accountId: 2, facultyId: 1, programmeId: 1, learningCentreId: 1, startedAt: '2026-11-01T00:00:00Z', endedAt: null }],
   };
@@ -18,11 +19,14 @@ export function academicResponse(url, state) {
   if (path === 'faculties') return data.faculties.filter(f => url.searchParams.get('includeInactive') === 'true' || f.isActive);
   if (path === 'departments') return data.departments.filter(d => url.searchParams.get('includeInactive') === 'true' || d.isActive);
   if (path === 'programmes') return data.programmes.map(p => programme(p, data));
+  if (path === 'curricula') return data.curricula;
   if (path === 'semesters') return data.semesters;
   if (path === 'current-semester') return data.semesters.find(s => s.isCurrent) ?? null;
   if (path === 'coordinator-assignments') return data.assignments;
   return undefined;
 }
+// Mirrors the real API catalogue message for CONFLICT (academic-errors.ts).
+const conflictMessage = 'The change conflicts with the current state. Reload and retry.';
 const failure = (status, code, message) => ({ status, payload: { error: { code, message } } });
 export function academicMutation(method, url, body, state, accounts) {
   if (!url.pathname.startsWith(prefix)) return undefined;
@@ -47,6 +51,32 @@ export function academicMutation(method, url, body, state, accounts) {
       if (data.departments.some(d => d.departmentCode === body.departmentCode && d.departmentId !== id)) return failure(409, 'CONFLICT', 'Code already exists.');
       if ('facultyId' in body && body.facultyId !== row.facultyId && data.programmes.some(p => p.departmentId === id)) return failure(409, 'DEPARTMENT_HAS_PROGRAMMES', 'A department with programmes cannot move to another faculty. Reassign its programmes first.');
       for (const k of ['departmentCode', 'departmentName', 'facultyId', 'isActive']) if (k in body) row[k] = body[k]; return success(row);
+    }
+  }
+  if (path === 'programmes' && !action) {
+    const duplicate = code => data.programmes.some(p => p.programmeCode === code && p.programmeId !== id);
+    if (method === 'POST' && !rawId) {
+      if (duplicate(body.programmeCode)) return failure(409, 'CONFLICT', conflictMessage);
+      const dept = data.departments.find(d => d.departmentId === body.departmentId); if (!dept) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
+      if (!dept.isActive) return failure(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.');
+      const row = { programmeId: Math.max(0, ...data.programmes.map(p => p.programmeId)) + 1, programmeCode: body.programmeCode, programmeName: body.programmeName, level: body.level ?? null, isActive: true, facultyId: dept.facultyId, departmentId: dept.departmentId }; data.programmes.push(row); return success(programme(row, data), 201);
+    }
+    const row = data.programmes.find(p => p.programmeId === id); if (!row) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
+    if (method === 'PATCH') {
+      if ('programmeCode' in body && duplicate(body.programmeCode)) return failure(409, 'CONFLICT', conflictMessage);
+      for (const k of ['programmeCode', 'programmeName', 'level', 'isActive']) if (k in body) row[k] = body[k]; return success(programme(row, data));
+    }
+  }
+  if (path === 'curricula') {
+    if (method === 'POST' && !rawId) {
+      const owner = data.programmes.find(p => p.programmeId === body.programmeId); if (!owner) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
+      if (!owner.isActive) return failure(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.');
+      if (data.curricula.some(c => c.programmeId === body.programmeId && c.curriculumVersion === body.curriculumVersion)) return failure(409, 'CONFLICT', conflictMessage);
+      const row = { curriculumId: Math.max(0, ...data.curricula.map(c => c.curriculumId)) + 1, programmeId: body.programmeId, curriculumVersion: body.curriculumVersion, totalCreditRequired: body.totalCreditRequired, effectiveYear: body.effectiveYear ?? null, isActive: true, subjectCount: 0 }; data.curricula.push(row); return success(row, 201);
+    }
+    const row = data.curricula.find(c => c.curriculumId === id); if (!row) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
+    if (method === 'PATCH') {
+      for (const k of ['curriculumVersion', 'totalCreditRequired', 'effectiveYear', 'isActive']) if (k in body) row[k] = body[k]; return success(row);
     }
   }
   if (path === 'programmes' && method === 'PATCH' && action === 'department') {
