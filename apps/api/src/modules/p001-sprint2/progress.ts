@@ -41,5 +41,5 @@ export function calculateProgress(source: ProgressSource): Progress {
     exemptedSubjects: subjects.filter(s => s.outcome === 'EXEMPTED').length,
     zeroCreditExemptions: subjects.filter(s => s.outcome === 'EXEMPTED' && s.earnedCredits === 0).length,
     outstandingCompulsory: subjects.filter(s => s.compulsory && s.outcome === 'REMAINING').length,
-    noHistory: attempts.length === 0, warnings, subjects, requirements };
+    noHistory: attempts.length === 0, warnings, links: curriculum.links, subjects, requirements };
 }
