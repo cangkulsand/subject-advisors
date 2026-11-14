@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCurriculumPrerequisiteExpression, readCurriculumPrerequisiteDetails } from './curriculum-reference';
+import { formatCurriculumPrerequisiteExpression, readCurriculumPrerequisiteDetails, hideCgpaRules } from './curriculum-reference';
 
 const codes = new Set(['SECD2613', 'SECJ2203', 'SECR3104']);
 const details = (expression: unknown) => ({ expression, fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes',
@@ -29,5 +29,18 @@ describe('curriculum prerequisite reader', () => {
     value.conditions = [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }];
     value.conditionNote = 'Also needs CGPA >= 2.';
     expect(readCurriculumPrerequisiteDetails(value, codes, 'SECR3032')).toMatchObject({ conditions: [{ type: 'cgpa', value: 2 }], conditionNote: 'Also needs CGPA >= 2.' });
+  });
+});
+
+describe('hideCgpaRules', () => {
+  const base = { expression: null, fixedCourseEdgesShown: false, sourcePrerequisiteStatus: 'Conditional', sourceCells: { K: 'K27' } };
+  it('drops CGPA conditions and a note that mentions CGPA, keeping completed-credit conditions', () => {
+    expect(hideCgpaRules({ ...base, conditions: [{ type: 'completedCredits', operator: '>', value: 92, sourceCell: 'K27' }, { type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K27' }],
+      conditionNote: 'Industrial training: more than 92 completed credits and CGPA at least 2.0.' }))
+      .toMatchObject({ conditions: [{ type: 'completedCredits', value: 92 }], conditionNote: null });
+  });
+  it('leaves details without CGPA unchanged', () => {
+    const details = { ...base, conditions: [{ type: 'completedCredits' as const, operator: '>' as const, value: 80, sourceCell: 'K27' }], conditionNote: 'Final year project.' };
+    expect(hideCgpaRules(details)).toEqual(details);
   });
 });

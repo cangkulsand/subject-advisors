@@ -14,7 +14,8 @@ Problem: students could pick any approved subject even when its prerequisites or
 
 Decided rules (one shared evaluator, used by the API and the web page):
 - Only UC24 `MANDATORY` / `COREQUISITE` prerequisite links and the imported `completedCredits` condition can block a pick.
-- `CGPA` conditions, topic-dependent rules, an imported "any of" group that does not match the links, and unavailable academic history or prerequisites give "Check with your coordinator": the subject stays pickable.
+- Topic-dependent rules, an imported "any of" group that does not match the links, and unavailable academic history or prerequisites give "Check with your coordinator": the subject stays pickable.
+- CGPA is hidden from students (owner decision, 2026-11-14): CGPA is not stored anywhere (no table, no CSV column), so `hideCgpaRules` in `packages/shared/src/curriculum-reference.ts` drops imported CGPA conditions, and any condition note that mentions CGPA, before the offerings page and the student pathway see them. SECR4114/SECR4118 (industrial training) are then checked on completed credits (> 92) only. The coordinator forecast is unchanged and still reports CGPA as missing evidence; the database keeps the imported rule.
 - `RECOMMENDED` links are advisory only.
 - Status labels: Eligible / Check with your coordinator / Not eligible (with reasons).
 - Prerequisites are edited by the System Admin only, in UC24. Coordinators only approve or remove offered subjects; they do not edit eligibility rules.
@@ -44,4 +45,5 @@ Not verified: no database was used; the academic-history query was only unit-tes
 
 ## 4. Changelog
 
+- 2026-11-14 - Type: Changed. CGPA rules are hidden from students: CGPA is not stored, so imported CGPA conditions (and notes mentioning CGPA) no longer appear on the offerings page or the student pathway, and no longer make a subject "Check with your coordinator" or pathway-unknown. The coordinator forecast keeps reporting CGPA as missing evidence. Checks: typecheck, lint, unit tests (1616 passed, 65 skipped).
 - 2026-11-14 - Type: Added. UC09 offering eligibility: students see Eligible / Check with your coordinator / Not eligible with reasons on offerings, and `PUT /api/semester-offerings` rejects ineligible picks with `409 OFFERING_NOT_ELIGIBLE`. Compatibility: no migration; GET response unchanged; PUT may now reject picks that were previously accepted (unmet mandatory prerequisite/corequisite or credits). Outstanding: human peer review; SRS/SDD not updated by owner instruction.

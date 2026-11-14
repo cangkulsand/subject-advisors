@@ -139,7 +139,7 @@ describe('UC17 pathway graph adapter', () => {
   it('keeps condition-dependent and invalid new details unknown without a completed target record', () => {
     const subjects = raw().subjects.map(subject => subject.curriculumSubjectId !== 11 ? subject : ({ ...subject,
       prerequisiteDetails: { expression: null, fixedCourseEdgesShown: false, sourcePrerequisiteStatus: 'Yes', sourceCells: { K: 'K19' },
-        conditions: [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'CGPA requirement.' } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
+        conditions: [{ type: 'completedCredits', operator: '>', value: 92, sourceCell: 'K19' }], conditionNote: 'Credit requirement.' } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
     }));
     expect(buildPathwayGraph(raw({ subjects })).nodes.find(node => node.subjectCode === 'SECJ1023')?.status).toBe('UNKNOWN');
     const invalid = subjects.map(subject => subject.curriculumSubjectId !== 11 ? subject : ({ ...subject,
@@ -147,6 +147,16 @@ describe('UC17 pathway graph adapter', () => {
         sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4' }, conditions: [], conditionNote: null } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
     }));
     expect(buildPathwayGraph(raw({ subjects: invalid })).nodes.find(node => node.subjectCode === 'SECJ1023')?.status).toBe('UNKNOWN');
+  });
+
+  it('hides CGPA rules from the student pathway (CGPA is not stored); a CGPA-only rule no longer makes the subject unknown', () => {
+    const subjects = raw().subjects.map(subject => subject.curriculumSubjectId !== 11 ? subject : ({ ...subject,
+      prerequisiteDetails: { expression: null, fixedCourseEdgesShown: false, sourcePrerequisiteStatus: 'Yes', sourceCells: { K: 'K19' },
+        conditions: [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'CGPA at least 2.0.' } as NonNullable<RawPathwayData['subjects'][number]['prerequisiteDetails']>,
+    }));
+    const node = buildPathwayGraph(raw({ subjects })).nodes.find(item => item.subjectCode === 'SECJ1023');
+    expect(node?.status).not.toBe('UNKNOWN');
+    expect(node?.prerequisiteSummary ?? '').not.toMatch(/cgpa/i);
   });
 });
 
