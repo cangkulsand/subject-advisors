@@ -8,14 +8,18 @@ import { AcademicSetupDomainError, mapAcademicDatabaseError } from './academic-e
 type Row = Record<string, unknown>;
 const centreColumns = 'learning_centre_id AS "learningCentreId", centre_code AS "centreCode", centre_name AS "centreName", is_active AS "isActive"';
 const facultyColumns = 'faculty_id AS "facultyId", faculty_code AS "facultyCode", faculty_name AS "facultyName", is_active AS "isActive"';
+const departmentColumns = 'department_id AS "departmentId", department_code AS "departmentCode", department_name AS "departmentName", faculty_id AS "facultyId", is_active AS "isActive"';
 const semesterColumns = `semester_id AS "semesterId", academic_year AS "academicYear", semester_no AS "semesterNo",
   semester_type AS "semesterType", max_subjects AS "maxSubjects", max_credits AS "maxCredits",
   start_date::text AS "startDate", end_date::text AS "endDate", is_current AS "isCurrent",
   to_char(selection_opens_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionOpensAt",
   to_char(selection_closes_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "selectionClosesAt"`;
 const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_code AS "programmeCode", p.programme_name AS "programmeName",
-  p.faculty_id AS "facultyId", f.faculty_code AS "facultyCode", f.faculty_name AS "facultyName", f.is_active AS "isActive"
-  FROM public.programme p LEFT JOIN public.faculty f ON f.faculty_id=p.faculty_id`;
+  p.faculty_id AS "facultyId", f.faculty_code AS "facultyCode", f.faculty_name AS "facultyName", f.is_active AS "isActive",
+  p.department_id AS "departmentId", d.department_code AS "departmentCode", d.department_name AS "departmentName",
+  d.faculty_id AS "departmentFacultyId", d.is_active AS "departmentIsActive"
+  FROM public.programme p LEFT JOIN public.faculty f ON f.faculty_id=p.faculty_id
+  LEFT JOIN public.department d ON d.department_id=p.department_id`;
 const assignmentColumns = `assignment_id AS "assignmentId", access_assignment_id AS "accountId", faculty_id AS "facultyId",
   programme_id AS "programmeId", learning_centre_id AS "learningCentreId", started_at AS "startedAt", ended_at AS "endedAt"`;
 const scopeSelect = `SELECT DISTINCT c.faculty_id AS "facultyId", c.programme_id AS "programmeId", c.learning_centre_id AS "learningCentreId"
@@ -31,7 +35,10 @@ const faculty = (r: Row): C.Faculty => ({ facultyId: Number(r.facultyId), facult
 const semester = (r: Row): C.AcademicSemester => ({ semesterId: Number(r.semesterId), academicYear: String(r.academicYear), semesterNo: Number(r.semesterNo) as 1 | 2 | 3,
   semesterType: r.semesterType as C.SemesterType, maxSubjects: Number(r.maxSubjects), maxCredits: Number(r.maxCredits), startDate: r.startDate == null ? null : String(r.startDate), endDate: r.endDate == null ? null : String(r.endDate), isCurrent: r.isCurrent === true,
   selectionOpensAt: r.selectionOpensAt == null ? null : String(r.selectionOpensAt), selectionClosesAt: r.selectionClosesAt == null ? null : String(r.selectionClosesAt) });
-const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r) });
+const department = (r: Row): C.Department => ({ departmentId: Number(r.departmentId), departmentCode: String(r.departmentCode), departmentName: String(r.departmentName), facultyId: Number(r.facultyId), isActive: r.isActive === true });
+const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r),
+  departmentId: r.departmentId == null ? null : Number(r.departmentId),
+  department: r.departmentId == null ? null : department({ departmentId: r.departmentId, departmentCode: r.departmentCode, departmentName: r.departmentName, facultyId: r.departmentFacultyId, isActive: r.departmentIsActive }) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
 const timestamp = (v: unknown) => (v instanceof Date ? v : new Date(String(v))).toISOString();
 const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });
@@ -70,7 +77,11 @@ export function createAcademicSetupRepository(query: AdminQuery, transaction: Ad
     createFaculty: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.faculty(faculty_code,faculty_name) VALUES ($1,$2) RETURNING ${facultyColumns}`, [input.facultyCode, input.facultyName])], faculty),
     updateFaculty: (id, input, actor) => write(actor, input.reason, [patch('faculty', 'faculty_id', id, input, { facultyCode: 'faculty_code', facultyName: 'faculty_name', isActive: 'is_active' }, facultyColumns)], faculty),
     listProgrammeFaculties: () => read(programmeSelect + ' ORDER BY p.programme_code, p.programme_id', [], programme),
-    setProgrammeFaculty: (id, input, actor) => write(actor, input.reason, [statement(`UPDATE public.programme SET faculty_id=$2 WHERE programme_id=$1 RETURNING programme_id`, [id, input.facultyId]),
+    listDepartments: includeInactive => read(`SELECT ${departmentColumns} FROM public.department ${includeInactive ? '' : 'WHERE is_active'} ORDER BY department_code, department_id`, [], department),
+    createDepartment: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.department(department_code,department_name,faculty_id) VALUES ($1,$2,$3) RETURNING ${departmentColumns}`, [input.departmentCode, input.departmentName, input.facultyId])], department),
+    updateDepartment: (id, input, actor) => write(actor, input.reason, [patch('department', 'department_id', id, input, { departmentCode: 'department_code', departmentName: 'department_name', facultyId: 'faculty_id', isActive: 'is_active' }, departmentColumns)], department),
+    // The faculty is derived from the department in the same statement; the programme department guard re-verifies it under a row lock.
+    setProgrammeDepartment: (id, input, actor) => write(actor, input.reason, [statement(`UPDATE public.programme SET department_id=$2::integer, faculty_id=CASE WHEN $2::integer IS NULL THEN CASE WHEN department_id IS NULL THEN faculty_id END ELSE (SELECT d.faculty_id FROM public.department d WHERE d.department_id=$2::integer) END WHERE programme_id=$1 RETURNING programme_id`, [id, input.departmentId]),
       statement(programmeSelect + ' WHERE p.programme_id=$1', [id])], programme),
     listAcademicSemesters: () => read(`SELECT ${semesterColumns} FROM public.academic_semester ORDER BY academic_year, semester_no, semester_id`, [], semester),
     createAcademicSemester: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.academic_semester(academic_year,semester_no,semester_type,max_subjects,max_credits,start_date,end_date,selection_opens_at,selection_closes_at)

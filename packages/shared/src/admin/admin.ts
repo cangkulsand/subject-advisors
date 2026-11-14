@@ -166,3 +166,30 @@ export function validateChangeAccessRequest(body: unknown): AdminValidation<Admi
   if (!reason) return { ok: false, error: `Reason is required (1-${ADMIN_REASON_MAX_LENGTH} characters).` };
   return { ok: true, value: { status: record.status, reason } };
 }
+
+// ---- Student programme change (S2-P004-026) ----
+/** A student's saved programme, shown on the account detail of an account that has a student profile. */
+export interface AdminStudentProgramme {
+  studentId: number;
+  studentName: string;
+  matricNo: string | null;
+  curriculumId: number;
+  curriculumVersion: string;
+  programmeId: number;
+  programmeCode: string;
+  programmeName: string;
+}
+/** An active curriculum (programme + version) an administrator may assign. */
+export interface AdminCurriculumOption { curriculumId: number; curriculumVersion: string; programmeId: number; programmeCode: string; programmeName: string }
+export interface AdminChangeProgrammeRequest { curriculumId: number; reason: string }
+export interface AdminProgrammeChange { programme: AdminStudentProgramme; removedPicks: number }
+
+export function validateChangeProgrammeRequest(body: unknown): AdminValidation<AdminChangeProgrammeRequest> {
+  const record = asRecord(body, ['curriculumId', 'reason']);
+  if (typeof record === 'string') return { ok: false, error: record };
+  const id = record.curriculumId;
+  if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > 2147483647) return { ok: false, error: 'Choose a programme.' };
+  const reason = normaliseReason(record.reason);
+  if (!reason) return { ok: false, error: `Reason is required (1-${ADMIN_REASON_MAX_LENGTH} characters).` };
+  return { ok: true, value: { curriculumId: id, reason } };
+}

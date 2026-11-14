@@ -1,9 +1,10 @@
 import { accountSessionStamp, clearAccountCache, profileSavedForSession } from '../auth/account-cache';
-import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache } from './data-cache';
+import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache, dropAcademicEntry } from './data-cache';
 export class AcademicApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); }
 }
-type RequestOptions = { method?: 'GET' | 'PUT' | 'POST' | 'DELETE'; body?: unknown; signal?: AbortSignal };
+/** `fresh` skips a stored snapshot for this read and stores the new response (an administrator may have changed the data since). */
+type RequestOptions = { method?: 'GET' | 'PUT' | 'POST' | 'DELETE'; body?: unknown; signal?: AbortSignal; fresh?: boolean };
 export type AcademicClient = <T>(path: string, options?: RequestOptions) => Promise<T>;
 const cachedPaths = new Set(['/api/profile', '/api/profile/options', '/api/academic-records']);
 export function createAcademicClient(getToken: () => Promise<string | null>, baseUrl = ''): AcademicClient {
@@ -42,6 +43,8 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
           if (path === '/api/profile' && method === 'PUT') profileSavedForSession(base, sessionStamp);
           return value.data as T;
         }
+        // The saved programme differs from what this tab showed: an administrator changed it, so drop the stale snapshots.
+        if (response.status === 409 && 'error' in value && (value.error as { code?: unknown } | null)?.code === 'PROFILE_PROGRAMME_LOCKED') clearAcademicCache();
         if ('error' in value && value.error && typeof value.error === 'object' && 'message' in value.error && 'code' in value.error) {
           throw new AcademicApiError(response.status, String(value.error.code), String(value.error.message));
         }
@@ -51,9 +54,10 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
       throw new AcademicApiError(response.status, 'INVALID_RESPONSE', 'Academic data could not be loaded. Please retry.');
     }
     const contractVersions = path === '/api/profile'
-      ? ['current-semester-required-v1', 'configured-credit-total-v1']
-      : path === '/api/profile/options' ? ['current-semester-required-v1'] : [];
+      ? ['current-semester-required-v1', 'configured-credit-total-v1', 'programme-admin-change-v1']
+      : path === '/api/profile/options' ? ['current-semester-required-v1', 'programme-admin-change-v1', 'profile-options-admin-current-semester-v3'] : [];
     const cacheKey = JSON.stringify([sessionStamp, base, path, ...contractVersions]);
+    if (cacheable && options.fresh) dropAcademicEntry(cacheKey);
     return cacheable ? cachedAcademicRead(cacheKey, request, options.signal, path === '/api/profile/options' ? ACADEMIC_CACHE_TTL : null) : request();
   };
 }

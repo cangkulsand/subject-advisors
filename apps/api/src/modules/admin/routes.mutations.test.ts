@@ -9,6 +9,7 @@ const ADMIN = 'user_admin';
 const account = { accountId: 5, clerkUserId: 'user_target', roles: ['COORDINATOR' as const], accessStatus: 'ACTIVE' as const, protectedOwner: false, createdAt: date, updatedAt: date, memberships: [] };
 const invitation = { id: '2f1c0f0e-0000-4000-8000-000000000001', email: 'new@utm.my', roles: ['COORDINATOR' as const], status: 'PENDING' as const, invitedBy: ADMIN, reason: 'Join', createdAt: date, expiresAt: '2026-11-08T10:00:00.000Z', acceptedAt: null };
 
+const programme = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 1, curriculumVersion: 'V1', programmeId: 7, programmeCode: 'OLD', programmeName: 'Old programme' };
 function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTEM_ADMIN']) {
   const deps: AdminDependencies = {
     auth: {
@@ -21,6 +22,8 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       createInvitation: vi.fn(async () => invitation), attachClerkInvitation: vi.fn(async () => ({ ...invitation })), listInvitations: vi.fn(async () => ({ items: [invitation], total: 1, page: 1, pageSize: 20, generatedAt: date })),
       revokeInvitation: vi.fn(async () => ({ ...invitation, status: 'REVOKED' as const })), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(async () => 'inv_clerk'),
       expireInvitations: vi.fn(), acceptInvitation: vi.fn(),
+      studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
+      changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
     },
     identities: {
       search: vi.fn(), lookup: vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'Target', email: 'target@utm.my', emailVerified: true }]])),
@@ -43,6 +46,7 @@ const routes: { name: string; path: string; method: string; body: unknown; statu
   { name: 'grant role', path: '/api/admin/users/5/roles', method: 'POST', body: { role: 'COORDINATOR', reason }, status: 200, repo: 'grantRole' },
   { name: 'revoke role', path: '/api/admin/users/5/roles/COORDINATOR', method: 'DELETE', body: { reason }, status: 200, repo: 'revokeRole' },
   { name: 'change access', path: '/api/admin/users/5/access', method: 'PATCH', body: { status: 'SUSPENDED', reason }, status: 200, repo: 'setAccessStatus' },
+  { name: 'change student programme', path: '/api/admin/users/5/programme', method: 'PATCH', body: { curriculumId: 2, reason }, status: 200, repo: 'changeStudentProgramme' },
   { name: 'create invitation', path: '/api/admin/invitations', method: 'POST', body: { email: 'new@utm.my', roles: ['COORDINATOR'], reason }, status: 201, repo: 'createInvitation' },
   { name: 'revoke invitation', path: '/api/admin/invitations/2f1c0f0e-0000-4000-8000-000000000001', method: 'DELETE', body: { reason }, status: 200, repo: 'revokeInvitation' },
 ];
@@ -288,5 +292,64 @@ describe('invitations', () => {
       expect((await send(deps, '/api/admin/invitations' + path, 'GET')).status).toBe(400);
     }
     expect(deps.repository.listInvitations).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('student programme (S2-P004-026)', () => {
+  it('changes the programme as the authorized admin and returns the new programme with the removed pick count', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/users/5/programme', 'PATCH', { curriculumId: 2, reason });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { programme: { ...programme, curriculumId: 2 }, removedPicks: 3 } });
+    expect(mocked(deps, 'changeStudentProgramme')).toHaveBeenCalledWith(5, 2, ADMIN, reason);
+  });
+  it.each([
+    [{ curriculumId: 2 }], [{ curriculumId: 2, reason: '   ' }], [{ curriculumId: 2, reason: 'x'.repeat(501) }], [{ reason }],
+    [{ curriculumId: '2', reason }], [{ curriculumId: 0, reason }], [{ curriculumId: 1.5, reason }], [{ curriculumId: 2147483648, reason }],
+  ])('rejects the invalid body %j without changing anything', async body => {
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/users/5/programme', 'PATCH', body)).status).toBe(400);
+    expect(mocked(deps, 'changeStudentProgramme')).not.toHaveBeenCalled();
+  });
+  it('rejects POST, PUT and DELETE with 405 and an Allow header', async () => {
+    const deps = fixture();
+    for (const method of ['POST', 'DELETE', 'PUT']) {
+      const response = await send(deps, '/api/admin/users/5/programme', method, { curriculumId: 2, reason });
+      expect(response.status).toBe(405);
+      expect(response.headers.get('allow')).toBe('GET, PATCH');
+    }
+  });
+  it('maps programme change rule errors to their status and stable code', async () => {
+    const expected = { STUDENT_PROFILE_NOT_FOUND: 404, CURRICULUM_UNAVAILABLE: 409, PROGRAMME_UNCHANGED: 409 } as const;
+    for (const [code, status] of Object.entries(expected) as [keyof typeof expected, number][]) {
+      const deps = fixture();
+      mocked(deps, 'changeStudentProgramme').mockRejectedValue(new AdminMutationError(code));
+      const response = await send(deps, '/api/admin/users/5/programme', 'PATCH', { curriculumId: 2, reason });
+      expect(response.status).toBe(status);
+      expect((await response.json() as { error: { code: string } }).error.code).toBe(code);
+    }
+  });
+  it('GET returns the programme (or null) for an existing account and 404 for an unknown one', async () => {
+    const deps = fixture();
+    const ok = await send(deps, '/api/admin/users/5/programme', 'GET');
+    expect(ok.status).toBe(200); expect(ok.headers.get('cache-control')).toContain('no-store');
+    expect(await ok.json()).toEqual({ data: programme });
+    mocked(deps, 'studentProgramme').mockResolvedValue(null);
+    expect(await (await send(deps, '/api/admin/users/5/programme', 'GET')).json()).toEqual({ data: null });
+    mocked(deps, 'account').mockResolvedValue(null);
+    expect((await send(deps, '/api/admin/users/5/programme', 'GET')).status).toBe(404);
+  });
+  it('lists curriculum options for administrators only', async () => {
+    const deps = fixture();
+    const ok = await send(deps, '/api/admin/curriculum-options', 'GET');
+    expect(ok.status).toBe(200);
+    expect((await ok.json() as { data: unknown[] }).data).toHaveLength(1);
+    expect((await send(deps, '/api/admin/curriculum-options', 'POST', {})).status).toBe(405);
+    for (const role of ['STUDENT', 'COORDINATOR'] as const) {
+      const denied = fixture([role]);
+      expect((await send(denied, '/api/admin/curriculum-options', 'GET')).status).toBe(403);
+      expect((await send(denied, '/api/admin/users/5/programme', 'GET')).status).toBe(403);
+      expect(denied.repository.curriculumOptions).not.toHaveBeenCalled();
+    }
   });
 });

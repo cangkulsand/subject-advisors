@@ -4,17 +4,19 @@ export function academicStore(state) {
   return state.academic ??= {
     centres: state.empty ? [] : [{ learningCentreId: 1, centreCode: 'TEST', centreName: 'Fictional learning centre', isActive: true }],
     faculties: state.empty ? [] : [{ facultyId: 1, facultyCode: 'TEST', facultyName: 'Fictional faculty', isActive: true }, { facultyId: 2, facultyCode: 'OTHER', facultyName: 'Fictional other faculty', isActive: true }],
-    programmes: state.empty ? [] : [{ programmeId: 1, programmeCode: 'TEST', programmeName: 'Fictional programme', facultyId: 1 }],
+    departments: state.empty ? [] : [{ departmentId: 1, departmentCode: 'DEPT', departmentName: 'Fictional department', facultyId: 1, isActive: true }, { departmentId: 2, departmentCode: 'DOTHER', departmentName: 'Fictional other department', facultyId: 2, isActive: true }],
+    programmes: state.empty ? [] : [{ programmeId: 1, programmeCode: 'TEST', programmeName: 'Fictional programme', facultyId: 1, departmentId: 1 }],
     semesters: state.empty ? [] : [1, 2, 3].map(n => ({ semesterId: n, academicYear: '2026/2027', semesterNo: n, semesterType: n === 3 ? 'SHORT' : 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null })),
     assignments: state.empty ? [] : [{ assignmentId: 1, accountId: 2, facultyId: 1, programmeId: 1, learningCentreId: 1, startedAt: '2026-11-01T00:00:00Z', endedAt: null }],
   };
 }
-function programme(row, data) { return { ...row, faculty: data.faculties.find(f => f.facultyId === row.facultyId) ?? null }; }
+function programme(row, data) { return { ...row, faculty: data.faculties.find(f => f.facultyId === row.facultyId) ?? null, department: data.departments.find(d => d.departmentId === row.departmentId) ?? null }; }
 export function academicResponse(url, state) {
   if (!url.pathname.startsWith(prefix)) return undefined;
   const data = academicStore(state), path = url.pathname.slice(prefix.length);
   if (path === 'learning-centres') return data.centres.filter(c => url.searchParams.get('includeInactive') === 'true' || c.isActive);
   if (path === 'faculties') return data.faculties.filter(f => url.searchParams.get('includeInactive') === 'true' || f.isActive);
+  if (path === 'departments') return data.departments.filter(d => url.searchParams.get('includeInactive') === 'true' || d.isActive);
   if (path === 'programmes') return data.programmes.map(p => programme(p, data));
   if (path === 'semesters') return data.semesters;
   if (path === 'current-semester') return data.semesters.find(s => s.isCurrent) ?? null;
@@ -34,11 +36,27 @@ export function academicMutation(method, url, body, state, accounts) {
     const row = rows.find(r => r[key] === id); if (!row) return failure(404, 'NOT_FOUND', 'Record not found.');
     if (method === 'PATCH') { for (const k of [code, name, 'isActive']) if (k in body) row[k] = body[k]; return success(row); }
   }
-  if (path === 'programmes' && method === 'PATCH' && action === 'faculty') {
+  if (path === 'departments') {
+    if (method === 'POST' && !rawId) {
+      if (data.departments.some(d => d.departmentCode === body.departmentCode)) return failure(409, 'CONFLICT', 'Code already exists.');
+      if (!data.faculties.some(x => x.facultyId === body.facultyId && x.isActive)) return failure(409, 'REFERENCE_INACTIVE', 'Faculty is inactive.');
+      const row = { departmentId: Math.max(0, ...data.departments.map(d => d.departmentId)) + 1, departmentCode: body.departmentCode, departmentName: body.departmentName, facultyId: body.facultyId, isActive: true }; data.departments.push(row); return success(row, 201);
+    }
+    const row = data.departments.find(d => d.departmentId === id); if (!row) return failure(404, 'NOT_FOUND', 'Department not found.');
+    if (method === 'PATCH') {
+      if (data.departments.some(d => d.departmentCode === body.departmentCode && d.departmentId !== id)) return failure(409, 'CONFLICT', 'Code already exists.');
+      if ('facultyId' in body && body.facultyId !== row.facultyId && data.programmes.some(p => p.departmentId === id)) return failure(409, 'DEPARTMENT_HAS_PROGRAMMES', 'A department with programmes cannot move to another faculty. Reassign its programmes first.');
+      for (const k of ['departmentCode', 'departmentName', 'facultyId', 'isActive']) if (k in body) row[k] = body[k]; return success(row);
+    }
+  }
+  if (path === 'programmes' && method === 'PATCH' && action === 'department') {
     const row = data.programmes.find(p => p.programmeId === id); if (!row) return failure(404, 'NOT_FOUND', 'Programme not found.');
-    if (data.assignments.some(a => a.programmeId === id && !a.endedAt && a.facultyId !== body.facultyId)) return failure(409, 'CONFLICT', 'End active coordinator assignments before changing this faculty.');
-    if (body.facultyId !== null && !data.faculties.some(f => f.facultyId === body.facultyId && f.isActive)) return failure(409, 'REFERENCE_INACTIVE', 'Faculty is inactive.');
-    row.facultyId = body.facultyId; return success(programme(row, data));
+    const target = body.departmentId === null ? null : data.departments.find(d => d.departmentId === body.departmentId);
+    if (body.departmentId !== null && !target) return failure(404, 'NOT_FOUND', 'Department not found.');
+    if (target && !target.isActive && row.departmentId !== target.departmentId) return failure(409, 'REFERENCE_INACTIVE', 'Department is inactive.');
+    const facultyId = target ? target.facultyId : (row.departmentId === null ? row.facultyId : null);
+    if (data.assignments.some(a => a.programmeId === id && !a.endedAt && a.facultyId !== facultyId)) return failure(409, 'ASSIGNMENT_ACTIVE', 'End active coordinator assignments before changing this faculty.');
+    row.departmentId = target ? target.departmentId : null; row.facultyId = facultyId; return success(programme(row, data));
   }
   if (path === 'semesters') {
     const fields = { ...body }; delete fields.reason;

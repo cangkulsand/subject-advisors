@@ -277,3 +277,38 @@ describe('last-role guard and redemption lookups', () => {
     expect(await repository.findPendingInvitationByEmail('none@utm.my')).toBeNull();
   });
 });
+
+describe('student programme change (S2-P004-026)', () => {
+  const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' };
+  it('runs the database function in one audited transaction and returns the removed pick count', async () => {
+    const { repository, calls, query } = harness({ rows: statements => statements.map((_, index) => index === 2 ? [{ removedPicks: '4' }] : index === 3 ? [programmeRow] : []) });
+    const result = await repository.changeStudentProgramme(7, 2, 'user_admin', 'Wrong programme at setup');
+    expect(query).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    const sql = sqlOf(calls[0]!);
+    expect(sql).toHaveLength(4);
+    expect(calls[0]![0]!.values).toEqual(['user_admin', 'Wrong programme at setup']);
+    expect(sql[1]).toContain('ADMIN_GUARD:NOT_FOUND');
+    expect(sql[2]).toContain('public.db_change_student_programme(');
+    expect(calls[0]![2]!.values).toEqual([7, 2]);
+    expect(result).toEqual({ programme: programmeRow, removedPicks: 4 });
+  });
+  it('rejects a blank reason before touching the database', async () => {
+    const { repository, transaction } = harness();
+    await expect(repository.changeStudentProgramme(7, 2, 'user_admin', '  ')).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+  it.each([['PROGRAMME_CHANGE:STUDENT_NOT_FOUND', 'STUDENT_PROFILE_NOT_FOUND'], ['PROGRAMME_CHANGE:CURRICULUM_UNAVAILABLE', 'CURRICULUM_UNAVAILABLE'], ['PROGRAMME_CHANGE:UNCHANGED', 'PROGRAMME_UNCHANGED']])('maps %s to %s', async (message, code) => {
+    const { repository } = harness({ fail: Object.assign(new Error(message), { code: '23514' }) });
+    await expect(repository.changeStudentProgramme(7, 2, 'user_admin', 'Reason')).rejects.toMatchObject({ code });
+    expect(mapAdminDatabaseError(Object.assign(new Error(message), { code: '23514' })).code).toBe(code);
+  });
+  it('reads the student programme and the active curriculum options', async () => {
+    const query = vi.fn<AdminQuery>(async sql => sql.includes('student_profile') ? [programmeRow] : [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]);
+    const repository = createAdminRepository(query);
+    expect(await repository.studentProgramme(7)).toEqual(programmeRow);
+    expect(await repository.curriculumOptions()).toHaveLength(1);
+    expect(query.mock.calls[1]![0]).toContain("coalesce(upper(c.status),'ACTIVE')='ACTIVE'");
+    expect(await createAdminRepository(vi.fn<AdminQuery>(async () => [])).studentProgramme(7)).toBeNull();
+  });
+});

@@ -25,6 +25,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     client = new Client({ connectionString: databaseUrl });
     await client.connect();
     if (!(await client.query("SELECT to_regclass('public.academic_setup_audit_log') AS installed")).rows[0]?.installed) throw new Error('Migration 0008 is required.');
+    if (!(await client.query("SELECT to_regclass('public.department') AS installed")).rows[0]?.installed) throw new Error('Migration 0010 is required.');
   });
   afterAll(async () => { await client?.end(); });
   beforeEach(async () => {
@@ -49,10 +50,11 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
   async function seed() {
     const faculty = await repository.createFaculty({ facultyCode: 'TEST_F', facultyName: 'Test faculty', reason }, actor);
     const centre = await repository.createLearningCentre({ centreCode: 'TEST_C', centreName: 'Test centre', reason }, actor);
+    const department = await repository.createDepartment({ departmentCode: 'TEST_D', departmentName: 'Test department', facultyId: faculty.facultyId, reason }, actor);
     const programmeId = Number((await client.query("INSERT INTO public.programme(programme_code,programme_name) VALUES ('TEST_P','Test programme') RETURNING programme_id")).rows[0]!.programme_id);
-    await repository.setProgrammeFaculty(programmeId, { facultyId: faculty.facultyId, reason }, actor);
+    await repository.setProgrammeDepartment(programmeId, { departmentId: department.departmentId, reason }, actor);
     const account = await accounts.createAccount('user_academic_coordinator', ['COORDINATOR'], actor, reason);
-    return { faculty, centre, account, programmeId, assignment: { accountId: account.accountId, facultyId: faculty.facultyId, programmeId, learningCentreId: centre.learningCentreId, reason } };
+    return { faculty, department, centre, account, programmeId, assignment: { accountId: account.accountId, facultyId: faculty.facultyId, programmeId, learningCentreId: centre.learningCentreId, reason } };
   }
   it('creates and sparsely updates references, lists inactive rows deliberately and records normalized audit context', async () => {
     const centre = await repository.createLearningCentre({ centreCode: 'QA', centreName: 'QA centre', reason: '  Reviewed test change  ' }, actor);
@@ -71,12 +73,45 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     expect(audits.every(row => row.actor === actor && row.reason === reason)).toBe(true);
     expect((await client.query("SELECT current_setting('app.access_actor',true) AS actor,current_setting('app.access_reason',true) AS reason")).rows[0]).toEqual({ actor: '', reason: '' });
   });
-  it('links, reads and clears programme faculty without inferring a mapping', async () => {
+  it('assigns a department, derives the faculty, clears both and rejects inactive departments', async () => {
     const data = await seed();
-    expect(await repository.listProgrammeFaculties()).toContainEqual({ programmeId: data.programmeId, programmeCode: 'TEST_P', programmeName: 'Test programme', facultyId: data.faculty.facultyId, faculty: data.faculty });
-    expect(await repository.setProgrammeFaculty(data.programmeId, { facultyId: null, reason }, actor)).toMatchObject({ facultyId: null, faculty: null });
-    await repository.updateFaculty(data.faculty.facultyId, { isActive: false, reason }, actor);
-    await expect(repository.setProgrammeFaculty(data.programmeId, { facultyId: data.faculty.facultyId, reason }, actor)).rejects.toMatchObject({ code: 'REFERENCE_INACTIVE' });
+    expect(await repository.listProgrammeFaculties()).toContainEqual({ programmeId: data.programmeId, programmeCode: 'TEST_P', programmeName: 'Test programme', facultyId: data.faculty.facultyId, faculty: data.faculty, departmentId: data.department.departmentId, department: data.department });
+    expect(await repository.setProgrammeDepartment(data.programmeId, { departmentId: null, reason }, actor)).toMatchObject({ facultyId: null, faculty: null, departmentId: null, department: null });
+    await repository.updateDepartment(data.department.departmentId, { isActive: false, reason }, actor);
+    await expect(repository.setProgrammeDepartment(data.programmeId, { departmentId: data.department.departmentId, reason }, actor)).rejects.toMatchObject({ code: 'REFERENCE_INACTIVE' });
+  });
+  it('keeps the legacy faculty of a programme without a department when the department is left empty', async () => {
+    const faculty = await repository.createFaculty({ facultyCode: 'LEG_F', facultyName: 'Legacy faculty', reason }, actor);
+    const programmeId = Number((await client.query("INSERT INTO public.programme(programme_code,programme_name) VALUES ('LEG_P','Legacy programme') RETURNING programme_id")).rows[0]!.programme_id);
+    await client.query("SELECT set_config('app.access_actor',$1,true), set_config('app.access_reason',$2,true)", [actor, reason]);
+    await client.query('UPDATE public.programme SET faculty_id=$2 WHERE programme_id=$1', [programmeId, faculty.facultyId]);
+    await client.query("SELECT set_config('app.access_actor','',true), set_config('app.access_reason','',true)");
+    expect(await repository.setProgrammeDepartment(programmeId, { departmentId: null, reason }, actor)).toMatchObject({ facultyId: faculty.facultyId, departmentId: null });
+  });
+  it('creates, updates and deactivates departments with audit and refuses to move a department that has programmes', async () => {
+    const data = await seed();
+    const other = await repository.createFaculty({ facultyCode: 'DEP_F2', facultyName: 'Second faculty', reason }, actor);
+    const renamed = await repository.updateDepartment(data.department.departmentId, { departmentName: 'Renamed', reason }, actor);
+    expect(renamed).toEqual({ ...data.department, departmentName: 'Renamed' });
+    await expect(repository.updateDepartment(data.department.departmentId, { facultyId: other.facultyId, reason }, actor)).rejects.toMatchObject({ code: 'DEPARTMENT_HAS_PROGRAMMES' });
+    await expect(repository.createDepartment({ departmentCode: 'TEST_D', departmentName: 'Duplicate', facultyId: data.faculty.facultyId, reason }, actor)).rejects.toMatchObject({ code: 'CONFLICT' });
+    const empty = await repository.createDepartment({ departmentCode: 'EMPTY_D', departmentName: 'Empty', facultyId: data.faculty.facultyId, reason }, actor);
+    expect(await repository.updateDepartment(empty.departmentId, { facultyId: other.facultyId, isActive: false, reason }, actor)).toEqual({ ...empty, facultyId: other.facultyId, isActive: false });
+    expect(await repository.listDepartments(false)).not.toContainEqual(expect.objectContaining({ departmentId: empty.departmentId }));
+    expect(await repository.listDepartments(true)).toContainEqual(expect.objectContaining({ departmentId: empty.departmentId, isActive: false }));
+    await repository.updateFaculty(other.facultyId, { isActive: false, reason }, actor);
+    await expect(repository.createDepartment({ departmentCode: 'LATE_D', departmentName: 'Late', facultyId: other.facultyId, reason }, actor)).rejects.toMatchObject({ code: 'REFERENCE_INACTIVE' });
+    const audits = (await client.query('SELECT action FROM public.academic_setup_audit_log WHERE entity_type=$1 AND entity_id=$2 ORDER BY audit_id', ['department', empty.departmentId])).rows;
+    expect(audits.map(row => row.action)).toEqual(['INSERT', 'UPDATE']);
+    const programmeAudits = (await client.query('SELECT after_data FROM public.academic_setup_audit_log WHERE entity_type=$1 AND entity_id=$2', ['programme', data.programmeId])).rows;
+    expect(programmeAudits).toHaveLength(1);
+    expect(programmeAudits[0]!.after_data).toMatchObject({ department_id: data.department.departmentId, faculty_id: data.faculty.facultyId });
+  });
+  it('rejects a programme faculty that differs from its department faculty', async () => {
+    const data = await seed();
+    const other = await repository.createFaculty({ facultyCode: 'MIS_F', facultyName: 'Mismatch faculty', reason }, actor);
+    await client.query("SELECT set_config('app.access_actor',$1,true), set_config('app.access_reason',$2,true)", [actor, reason]);
+    await expect(client.query('UPDATE public.programme SET faculty_id=$2 WHERE programme_id=$1', [data.programmeId, other.facultyId])).rejects.toMatchObject({ code: '23514', message: 'ACADEMIC_SETUP:PROGRAMME_FACULTY_MISMATCH' });
   });
   it('keeps no-current explicit, atomically switches, no-ops repeated selection and preserves marker on failure', async () => {
     expect(await repository.getCurrentAcademicSemester()).toBeNull();
@@ -156,7 +191,8 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     const other = await repository.createFaculty({ facultyCode: 'OTHER', facultyName: 'Other', reason }, actor);
     await expect(repository.createCoordinatorAssignment({ ...data.assignment, facultyId: other.facultyId }, actor)).rejects.toMatchObject({ code: 'PROGRAMME_FACULTY_MISMATCH' });
     await repository.createCoordinatorAssignment(data.assignment, actor);
-    await expect(repository.setProgrammeFaculty(data.programmeId, { facultyId: other.facultyId, reason }, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_ACTIVE' });
+    const otherDepartment = await repository.createDepartment({ departmentCode: 'OTHER_D', departmentName: 'Other department', facultyId: other.facultyId, reason }, actor);
+    await expect(repository.setProgrammeDepartment(data.programmeId, { departmentId: otherDepartment.departmentId, reason }, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_ACTIVE' });
     await accounts.grantRole(data.account.accountId, 'STUDENT', actor, reason);
     await accounts.revokeRole(data.account.accountId, 'COORDINATOR', actor, reason);
     await expect(repository.createCoordinatorAssignment(data.assignment, actor)).rejects.toMatchObject({ code: 'COORDINATOR_ROLE_REQUIRED' });
@@ -170,7 +206,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
   it('returns NOT_FOUND for every missing direct mutation and keeps driver text private', async () => {
     const id = 2147483647;
     for (const operation of [() => repository.updateLearningCentre(id, { isActive: false, reason }, actor), () => repository.updateFaculty(id, { isActive: false, reason }, actor),
-      () => repository.setProgrammeFaculty(id, { facultyId: null, reason }, actor), () => repository.updateAcademicSemester(id, { maxCredits: 0, reason }, actor),
+      () => repository.setProgrammeDepartment(id, { departmentId: null, reason }, actor), () => repository.updateDepartment(id, { isActive: false, reason }, actor), () => repository.updateAcademicSemester(id, { maxCredits: 0, reason }, actor),
       () => repository.endCoordinatorAssignment(id, { reason }, actor)]) await expect(operation()).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
     await repository.createAcademicSemester(input, actor);
     await expect(repository.createAcademicSemester(input, actor)).rejects.toMatchObject({ code: 'CONFLICT', message: 'The change conflicts with the current state. Reload and retry.' });

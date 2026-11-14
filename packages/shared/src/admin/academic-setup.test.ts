@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isAcademicSetupId, validateCreateLearningCentreRequest, validateUpdateLearningCentreRequest,
-  validateCreateFacultyRequest, validateSetProgrammeFacultyRequest, validateCreateSemesterRequest,
+  validateCreateFacultyRequest, validateSetProgrammeDepartmentRequest, validateCreateDepartmentRequest, validateUpdateDepartmentRequest, validateCreateSemesterRequest,
   validateUpdateSemesterRequest, validateMergedSemester, validateSetCurrentSemesterRequest,
   validateCreateCoordinatorAssignmentRequest, validateEndCoordinatorAssignmentRequest,
   type AcademicSemester,
@@ -30,12 +30,27 @@ describe('academic setup reference requests', () => {
     expect(validateUpdateLearningCentreRequest({ isActive: 'false', reason: 'r' }).ok).toBe(false);
     expect(validateUpdateLearningCentreRequest({ isActive: false, reason: 'r' }).ok).toBe(true);
   });
-  it('allows an explicit null faculty but rejects absent or invalid IDs', () => {
-    expect(validateSetProgrammeFacultyRequest({ facultyId: null, reason: ' clear ' }))
-      .toEqual({ ok: true, value: { facultyId: null, reason: 'clear' } });
-    for (const facultyId of [undefined, 0, -1, 1.5, 2147483648, '1']) {
-      expect(validateSetProgrammeFacultyRequest({ facultyId, reason: 'r' }).ok).toBe(false);
+  it('allows an explicit null department but rejects absent or invalid IDs', () => {
+    expect(validateSetProgrammeDepartmentRequest({ departmentId: null, reason: ' clear ' }))
+      .toEqual({ ok: true, value: { departmentId: null, reason: 'clear' } });
+    for (const departmentId of [undefined, 0, -1, 1.5, 2147483648, '1']) {
+      expect(validateSetProgrammeDepartmentRequest({ departmentId, reason: 'r' }).ok).toBe(false);
     }
+    expect(validateSetProgrammeDepartmentRequest({ departmentId: 3, facultyId: 1, reason: 'r' }).ok).toBe(false);
+  });
+  it('validates department create and update requests', () => {
+    expect(validateCreateDepartmentRequest({ departmentCode: ' CS ', departmentName: ' Computer Science ', facultyId: 2, reason: ' add ' }))
+      .toEqual({ ok: true, value: { departmentCode: 'CS', departmentName: 'Computer Science', facultyId: 2, reason: 'add' } });
+    for (const bad of [{ departmentCode: 'x'.repeat(21) }, { departmentName: 'x'.repeat(256) }, { departmentName: ' ' }, { facultyId: 0 }, { facultyId: null }, { surprise: true }, { isActive: false }]) {
+      expect(validateCreateDepartmentRequest({ departmentCode: 'CS', departmentName: 'Name', facultyId: 1, reason: 'r', ...bad }).ok).toBe(false);
+    }
+    expect(validateCreateDepartmentRequest({ departmentCode: 'CS', departmentName: 'Name', reason: 'r' }).ok).toBe(false);
+    expect(validateCreateDepartmentRequest({ departmentCode: 'CS', departmentName: 'Name', facultyId: 1 }).ok).toBe(false);
+    expect(validateUpdateDepartmentRequest({ isActive: false, reason: 'r' })).toEqual({ ok: true, value: { isActive: false, reason: 'r' } });
+    expect(validateUpdateDepartmentRequest({ facultyId: 4, reason: 'move' }).ok).toBe(true);
+    expect(validateUpdateDepartmentRequest({ reason: 'r' }).ok).toBe(false);
+    expect(validateUpdateDepartmentRequest({ isActive: 'no', reason: 'r' }).ok).toBe(false);
+    expect(validateUpdateDepartmentRequest({ facultyId: 'x', reason: 'r' }).ok).toBe(false);
   });
 });
 describe('academic semester requests', () => {
