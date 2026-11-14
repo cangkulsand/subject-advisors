@@ -346,6 +346,87 @@
             "$ref": "#/components/responses/Unavailable"
           }
         }
+      },
+      "post": {
+        "operationId": "createProgramme",
+        "summary": "Create programme",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/CreateProgramme"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Programme"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Created ACTIVE under an active department; the faculty is taken from the department (404 unknown department, 409 REFERENCE_INACTIVE inactive department, 409 CONFLICT duplicate code)."
+      }
+    },
+    "/api/admin/academic-setup/programmes/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "patch": {
+        "operationId": "updateProgramme",
+        "summary": "Edit or soft-deactivate programme",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/UpdateProgramme"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Programme"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "Soft deactivation only (isActive maps to status ACTIVE/INACTIVE); students already on the programme are not moved. Department changes use PATCH /programmes/{id}/department."
       }
     },
     "/api/admin/academic-setup/programmes/{id}/department": {
@@ -390,6 +471,110 @@
             "$ref": "#/components/responses/Unavailable"
           }
         }
+      }
+    },
+    "/api/admin/academic-setup/curricula": {
+      "get": {
+        "operationId": "listCurricula",
+        "summary": "List curriculum versions with subject counts",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CurriculumList"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCurriculum",
+        "summary": "Create curriculum version",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/CreateCurriculum"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Curriculum"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "The programme must exist and be active (404 / 409 REFERENCE_INACTIVE, enforced by a database guard). (programmeId, curriculumVersion) is unique (409 CONFLICT)."
+      }
+    },
+    "/api/admin/academic-setup/curricula/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "patch": {
+        "operationId": "updateCurriculum",
+        "summary": "Edit or soft-deactivate curriculum version",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/UpdateCurriculum"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Curriculum"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "description": "The programme is fixed after creation. Soft deactivation only; students already on the curriculum are not moved."
       }
     },
     "/api/admin/academic-setup/semesters": {
@@ -787,6 +972,8 @@
           "programmeId",
           "programmeCode",
           "programmeName",
+          "level",
+          "isActive",
           "facultyId",
           "faculty",
           "departmentId",
@@ -801,6 +988,21 @@
           },
           "programmeName": {
             "type": "string"
+          },
+          "level": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "false when programme.status is INACTIVE; a NULL legacy status reads as active."
           },
           "facultyId": {
             "oneOf": [
@@ -1078,6 +1280,52 @@
           },
           "isActive": {
             "type": "boolean"
+          }
+        }
+      },
+      "Curriculum": {
+        "type": "object",
+        "required": [
+          "curriculumId",
+          "programmeId",
+          "curriculumVersion",
+          "totalCreditRequired",
+          "effectiveYear",
+          "isActive",
+          "subjectCount"
+        ],
+        "properties": {
+          "curriculumId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "programmeId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "curriculumVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "totalCreditRequired": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "effectiveYear": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "subjectCount": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
@@ -1456,6 +1704,192 @@
             }
           }
         }
+      },
+      "CreateProgramme": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "programmeCode",
+                "programmeName",
+                "level",
+                "departmentId",
+                "reason"
+              ],
+              "properties": {
+                "programmeCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                },
+                "programmeName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "level": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 50
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Trimmed; blank becomes null."
+                },
+                "departmentId": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "reason": {
+                  "$ref": "#/components/schemas/Reason"
+                }
+              }
+            }
+          }
+        }
+      },
+      "UpdateProgramme": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "programmeCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                },
+                "programmeName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "level": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 50
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Trimmed; blank becomes null."
+                },
+                "isActive": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "$ref": "#/components/schemas/Reason"
+                }
+              },
+              "minProperties": 2
+            }
+          }
+        }
+      },
+      "CreateCurriculum": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "programmeId",
+                "curriculumVersion",
+                "totalCreditRequired",
+                "effectiveYear",
+                "reason"
+              ],
+              "properties": {
+                "programmeId": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "curriculumVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                },
+                "totalCreditRequired": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "effectiveYear": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1900,
+                      "maximum": 2100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "$ref": "#/components/schemas/Reason"
+                }
+              }
+            }
+          }
+        }
+      },
+      "UpdateCurriculum": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "curriculumVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                },
+                "totalCreditRequired": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "effectiveYear": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1900,
+                      "maximum": 2100
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "isActive": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "$ref": "#/components/schemas/Reason"
+                }
+              },
+              "minProperties": 2
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -1816,6 +2250,45 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/Department"
+                  }
+                }
+              },
+              "required": [
+                "data"
+              ]
+            }
+          }
+        }
+      },
+      "Curriculum": {
+        "description": "Curriculum",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "$ref": "#/components/schemas/Curriculum"
+                }
+              },
+              "required": [
+                "data"
+              ]
+            }
+          }
+        }
+      },
+      "CurriculumList": {
+        "description": "Curriculums",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Curriculum"
                   }
                 }
               },

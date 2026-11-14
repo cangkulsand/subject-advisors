@@ -1,11 +1,11 @@
 # S2-P001-005 — Admin Programmes and Curriculums (UC25 / FR-B9)
 
-- **Status:** READY_FOR_REVIEW (not merged)
+- **Status:** MERGED to `main` (2026-11-14); human peer review pending
 - **Date:** 2026-11-14
 - **Sprint:** Sprint 2
 - **Owner:** P001 (UC25 / FR-B9); built by P004
 - **Related UC / FR:** UC25 / FR-B9 (P001); builds on [S2-P004-025](S2-P004-025-department-hierarchy.md) (department level) and admin academic setup S2-P004-008; spec `docs/superpowers/specs/2026-11-14-uc25-admin-programmes-design.md`, plan `docs/superpowers/plans/2026-11-14-uc25-admin-programmes.md`
-- **Branch / PR:** `feature/s2-uc25-admin-programmes`; no PR yet
+- **Branch / PR:** `feature/s2-uc25-admin-programmes`; merged into `main` on 2026-11-14 (merge commit f2926dd); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -54,4 +54,5 @@ Not verified: the gated repository tests in `academic-repository.database.test.t
 
 ## 4. Changelog
 
-- 2026-11-14 - Type: Added. System Administrators manage programmes and curriculum versions on a new Programmes page (`/admin/programmes`): create, edit, deactivate and reactivate (no hard delete); a new programme needs an active department and department assignment moves here from the Departments page. API: `POST /api/admin/programmes`, `PATCH /api/admin/programmes/{id}`, `GET`/`POST /api/admin/curricula`, `PATCH /api/admin/curricula/{id}`. Changes made by an admin are recorded in the append-only academic audit; creating a curriculum under an inactive programme is rejected (migration 0012). Delivers P001's UC25 / FR-B9 programme maintenance. Compatibility: additive; NULL curriculum status becomes ACTIVE; `ProgrammeFaculty` gains `level` and `isActive`. Outstanding: run the gated repository database tests on a disposable database; human peer review.
+- 2026-11-14 - Merged: `feature/s2-uc25-admin-programmes` into `main` (merge commit f2926dd). Checks before merge: typecheck, lint, unit tests (1591 passed, 65 skipped), integration 11/11, db-tooling 26/26, build, check:cloudflare, admin UI checks (50). Migration 0012 already applied to the Neon dev database. Status: MERGED; human peer review pending.
+- 2026-11-14 - Type: Added. System Administrators manage programmes and curriculum versions on a new Programmes page (`/admin/programmes`): create, edit, deactivate and reactivate (no hard delete); a new programme needs an active department and department assignment moves here from the Departments page. API: `POST /api/admin/academic-setup/programmes`, `PATCH /api/admin/academic-setup/programmes/{id}`, `GET`/`POST /api/admin/academic-setup/curricula`, `PATCH /api/admin/academic-setup/curricula/{id}`. Changes made by an admin are recorded in the append-only academic audit; creating a curriculum under an inactive programme is rejected (migration 0012). Delivers P001's UC25 / FR-B9 programme maintenance. Compatibility: additive; NULL curriculum status becomes ACTIVE; `ProgrammeFaculty` gains `level` and `isActive`. Outstanding: run the gated repository database tests on a disposable database; human peer review.
