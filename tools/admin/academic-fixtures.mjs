@@ -76,7 +76,6 @@ export function academicMutation(method, url, body, state, accounts) {
     }
     const row = data.curricula.find(c => c.curriculumId === id); if (!row) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
     if (method === 'PATCH') {
-      if (body.isActive === true && !data.programmes.find(p => p.programmeId === row.programmeId)?.isActive) return failure(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.');
       for (const k of ['curriculumVersion', 'totalCreditRequired', 'effectiveYear', 'isActive']) if (k in body) row[k] = body[k]; return success(row);
     }
   }
