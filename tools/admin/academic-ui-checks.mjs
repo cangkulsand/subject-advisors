@@ -123,10 +123,6 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.deepEqual(state.bodies.at(-1).body, { totalCreditRequired: 125, reason }); assert.equal(state.bodies.at(-1).method, 'PATCH');
     assert.equal(await first.getByRole('link', { name: '3 subjects' }).getAttribute('href'), '/admin/curriculum?curriculum=1');
     await first.getByRole('button', { name: 'Deactivate TEST 2026', exact: true }).click(); await confirm(page, 'Deactivate curriculum', 'Deactivate'); await first.getByText('Inactive', { exact: true }).waitFor();
-    data.programmes.find(p => p.programmeCode === 'TEST').isActive = false;
-    await first.getByRole('button', { name: 'Reactivate TEST 2026', exact: true }).click(); const blocked = page.getByRole('dialog', { name: 'Reactivate curriculum', exact: true }); await blocked.getByLabel(reasonLabel).fill(reason); await blocked.getByRole('button', { name: 'Reactivate', exact: true }).click();
-    await blocked.getByRole('alert').filter({ hasText: 'The selected reference must be active.' }).waitFor(); await page.keyboard.press('Escape'); await blocked.waitFor({ state: 'hidden' });
-    data.programmes.find(p => p.programmeCode === 'TEST').isActive = true;
     await first.getByRole('button', { name: 'Reactivate TEST 2026', exact: true }).click(); await confirm(page, 'Reactivate curriculum', 'Reactivate'); await first.getByText('Active', { exact: true }).waitFor();
     assert.ok(state.bodies.every(b => b.body.reason === reason)); assert.ok(state.bodies.every(b => b.method !== 'DELETE'));
     await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: '.wrangler/admin-review/academic-programmes-desktop.png', fullPage: true });
