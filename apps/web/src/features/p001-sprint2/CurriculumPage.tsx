@@ -9,16 +9,17 @@ const blankLink={from:'',required:'',kind:'MANDATORY' as LinkKind};
 const labels:Record<LinkKind,string>={MANDATORY:'Mandatory prerequisite',COREQUISITE:'Co-requisite / concurrent study',RECOMMENDED:'Recommended prior knowledge (advisory)'};
 const ACTIONS=[{id:'subjects',label:'Subject List'},{id:'create',label:'Create Subject'},{id:'relationships',label:'Prerequisite List'},{id:'prerequisites',label:'Manage Prerequisites'}] as const;
 type Action=typeof ACTIONS[number]['id'];
-export function CurriculumPage({api}:{api:Sprint2Client}) {
+export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;initialCurriculumId?:string}) {
   const [catalogue,setCatalogue]=useState<Catalogue>(),[id,setId]=useState(''),[snapshot,setSnapshot]=useState<CurriculumSnapshot>();
   const [attempt,setAttempt]=useState(0),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
   const [draft,setDraft]=useState({...blankSubject}),[editing,setEditing]=useState<number|null>(null),[link,setLink]=useState({...blankLink}),[linkId,setLinkId]=useState<number|null>(null);
   const [prerequisites,setPrerequisites]=useState<CurriculumSubject[]>([]),[prerequisiteSearch,setPrerequisiteSearch]=useState('');
   const [review,setReview]=useState<{summary:string;run:()=>Promise<CurriculumSnapshot>;done?:string}|null>(null);
+  const seeded=useRef(false);
   const [action,setAction]=useState<Action>('subjects');
   const reviewHeading=useRef<HTMLHeadingElement>(null),alert=useRef<HTMLParagraphElement>(null),workspaceHeading=useRef<HTMLHeadingElement>(null),pendingScroll=useRef(false);
   const dirty=JSON.stringify(draft)!==JSON.stringify(blankSubject)||JSON.stringify(link)!==JSON.stringify(blankLink)||editing!==null||linkId!==null||prerequisites.length>0||prerequisiteSearch!=='';
-  useEffect(()=>{const c=new AbortController();api<Catalogue>('/curricula',{signal:c.signal}).then(v=>{if(!c.signal.aborted)setCatalogue(v);}).catch(e=>{if(!c.signal.aborted)setError(errorMessage(e));});return()=>c.abort();},[api,attempt]);
+  useEffect(()=>{const c=new AbortController();api<Catalogue>('/curricula',{signal:c.signal}).then(v=>{if(!c.signal.aborted){setCatalogue(v);if(initialCurriculumId&&!seeded.current&&v.curricula.some(x=>String(x.curriculumId)===initialCurriculumId)){seeded.current=true;setId(initialCurriculumId);}}}).catch(e=>{if(!c.signal.aborted)setError(errorMessage(e));});return()=>c.abort();},[api,attempt]);
   useEffect(()=>{
     if(!id){setSnapshot(undefined);return;}
     const c=new AbortController();setLoading(true);setSnapshot(undefined);setError('');
