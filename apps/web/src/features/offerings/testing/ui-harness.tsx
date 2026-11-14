@@ -5,6 +5,7 @@ import { OfferingApiError } from '../client';
 import { demoContext } from '../../../../../../tools/offerings/demo/fixtures';
 import type { OfferingPageData, OfferingWindow, OfferingsClient } from '../../../../../../packages/shared/src/offerings/offerings';
 import { richOfferingFixture } from './rich-fixtures';
+import { eligibilityFixture } from './eligibility-fixtures';
 
 const scenario = new URLSearchParams(location.search).get('scenario');
 let failSave = scenario === 'rich-save-fail';
@@ -34,6 +35,7 @@ const client: OfferingsClient = {
     if (scenario === 'profile') throw new OfferingApiError(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile first.');
     if (scenario === 'session') throw new OfferingApiError(401, 'SESSION_REQUIRED', 'Your session has ended.');
     if (scenario === 'loading') await new Promise<void>(() => undefined);
+    if (scenario?.startsWith('eligibility')) return eligibilityFixture(scenario);
     if (['rich', 'rich-short', 'rich-save-fail', 'history-unavailable', 'progress', 'zero-progress', 'zero-total', 'over-total', 'missing-total'].includes(scenario ?? '')) {
       let fixture = scenario === 'history-unavailable'
         ? { ...richOfferingFixture, academicHistory: { status: 'unavailable' as const } }
@@ -59,6 +61,7 @@ const client: OfferingsClient = {
   },
   async save(input) {
     if (rejectSave) { rejectSave = false; throw new OfferingApiError(409, 'OFFERING_NOT_APPROVED', 'A subject you picked is no longer offered. Reload offerings.'); }
+    if (scenario === 'eligibility-409') throw new OfferingApiError(409, 'OFFERING_NOT_ELIGIBLE', 'ELIG301 cannot be picked: Needs ELIG100 Foundation requirement.');
     if (failSave) { failSave = false; throw new Error('Simulated save failure.'); }
     saveCalls.push(input);
     return input;

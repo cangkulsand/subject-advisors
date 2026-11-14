@@ -1,5 +1,6 @@
 import type { AuthDependencies } from '../auth/contracts';
 import type { OfferingContext, OfferingSelection, OfferingWindow, WithdrawnOffering } from '../../../../../packages/shared/src/offerings/offerings';
+import type { EligibilityHistory } from '../../../../../packages/shared/src/offerings/eligibility';
 
 export interface StudentOfferingContext extends OfferingContext {
   /** Resolved by P001 from the verified Clerk ID, never from request parameters. */
@@ -9,6 +10,8 @@ export interface StudentOfferingContext extends OfferingContext {
   programmeId: string;
   /** Null until the student chooses a learning centre (NO_LEARNING_CENTRE). */
   learningCentreId: string | null;
+  /** Server-only academic history for the PUT eligibility check; never part of the GET response. Loaded with prerequisites. */
+  history?: EligibilityHistory;
 }
 export interface OfferingScope {
   clerkUserId: string;

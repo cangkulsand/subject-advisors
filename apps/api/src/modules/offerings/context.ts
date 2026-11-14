@@ -4,8 +4,9 @@ import { nextSemesterAfter } from '../../../../../packages/shared/src/offerings/
 import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 import type { OfferingSql } from './repository';
 import type { StudentOfferingContext } from './contracts';
+import type { EligibilityHistory } from '../../../../../packages/shared/src/offerings/eligibility';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
-import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
+import { hideCgpaRules, readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 
 function text(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error('Invalid configured offering context');
@@ -163,13 +164,27 @@ export function createOfferingContextReader(query: OfferingSql['query'], now: ()
           return {
             ...subject,
             prerequisites: { status: 'available', items: bySource.get(subject.curriculumSubjectId) ?? [],
-              ...(details ? { details: summarizeCurriculumPrerequisiteDetails(details) } : {}) },
+              ...(details ? { details: summarizeCurriculumPrerequisiteDetails(hideCgpaRules(details)) } : {}) },
           };
         });
       } catch (error) {
         if (error instanceof AuthError && (error.status === 401 || error.status === 403)) throw error;
         // Optional catalogue metadata must never make a valid core context unavailable.
         subjects = subjects.map(subject => ({ ...subject, prerequisites: unavailable }));
+      }
+    }
+    let history: EligibilityHistory | undefined;
+    if (options.includePrerequisites) {
+      // Server-only: a failed or malformed records read degrades to unavailable instead of failing the context.
+      try {
+        const rows = await query('SELECT subject_id, status, recognized_credits FROM academic_record WHERE student_id = $1', [studentId]);
+        history = { status: 'available', records: rows.map(row => {
+          const status = row.status;
+          if (status !== 'COMPLETED' && status !== 'EXEMPTED' && status !== 'FAILED' && status !== 'WITHDRAWN') throw new Error('Invalid academic record status');
+          return { subjectId: offeringId(row.subject_id), status, recognizedCredits: requiredCredits(row.recognized_credits) };
+        }) };
+      } catch {
+        history = { status: 'unavailable' };
       }
     }
     const prerequisiteCatalogue = subjects.map(({ prerequisites: _prerequisites, ...subject }) => { void _prerequisites; return subject; });
@@ -187,6 +202,7 @@ export function createOfferingContextReader(query: OfferingSql['query'], now: ()
       },
       ...(target ? { currentSemesterId: target.semesterId } : {}), subjects, semesters,
       window, ...(limits ? { limits } : {}), ...(prerequisiteCatalogue.length ? { prerequisiteCatalogue } : {}), withdrawnSubjects, programmeId, learningCentreId,
+      ...(history ? { history } : {}),
     };
   };
 }

@@ -1,6 +1,6 @@
 import type { PathwayGraph, PathwayNodeStatus, PrerequisiteType } from './contracts';
 import type { RawPathwayData } from './repository';
-import { formatCurriculumPrerequisiteExpression, readCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
+import { formatCurriculumPrerequisiteExpression, hideCgpaRules, readCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 import type { CurriculumPrerequisiteExpression } from '../../../../../packages/shared/src/curriculum-reference';
 
 const SATISFIED = new Set(['COMPLETED', 'EXEMPTED']);
@@ -42,7 +42,7 @@ export function buildPathwayGraph(raw: RawPathwayData): PathwayGraph {
   for (const subject of raw.subjects) {
     subjectIdByCurriculumSubjectId.set(subject.curriculumSubjectId, subject.subjectId);
     detailsById.set(subject.curriculumSubjectId, subject.prerequisiteDetails == null ? null : duplicateCodes ? null :
-      readCurriculumPrerequisiteDetails(subject.prerequisiteDetails, codes, subject.subjectCode));
+      (() => { const read = readCurriculumPrerequisiteDetails(subject.prerequisiteDetails, codes, subject.subjectCode); return read ? hideCgpaRules(read) : null; })());
   }
 
   const nodes = raw.subjects.map(subject => {

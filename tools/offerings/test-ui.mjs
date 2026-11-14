@@ -36,7 +36,7 @@ let browser;
 let passed = 0;
 const consoleErrors = [];
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
   async function check(name, body, width = 1280) {
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     const page = await context.newPage();
@@ -126,7 +126,7 @@ try {
     await page.getByRole('checkbox', { name: /I confirm these are my picks/ }).check();
     await page.getByRole('button', { name: 'Confirm and save' }).click();
     const calls = await page.evaluate(() => window.__offeringSaveCalls);
-    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] }, 'PUT retains curriculumSubjectId values');
+    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509', '512'] }, 'PUT retains curriculumSubjectId values');
   });
   await check('configured prerequisite metadata uses the full catalogue in selection and review', async page => {
     await page.goto(base + '/test?scenario=rich');
@@ -140,7 +140,7 @@ try {
     assert.deepEqual((await desktopMetadata.locator('.offerings-prerequisite-group').first().locator('li').allTextContents()).map(text => text.trim()), [
       'DEMO207Unknown category', 'DEMO209Unclassified two-credit elective',
     ], 'hidden semester target resolves from the full catalogue and targets sort by subject code');
-    const checkbox = subject(page, 'DEMO201');
+    const checkbox = subject(page, 'DEMO202');
     await checkbox.focus(); await checkbox.press('Space');
     assert.equal(await checkbox.isChecked(), true, 'the original keyboard checkbox control remains usable');
     await noOverflow(page);
@@ -269,7 +269,7 @@ try {
     await page.getByRole('button', { name: 'Retry save' }).click();
     await page.getByRole('button', { name: 'Edit offerings' }).waitFor();
     const calls = await page.evaluate(() => window.__offeringSaveCalls);
-    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509'] });
+    assert.deepEqual(calls[0], { semesterId: '201', curriculumSubjectIds: ['507', '509', '512'] });
   });
   await check('search keeps selection; keyboard selects and removes subjects', async page => {
     await open(page);
@@ -350,6 +350,62 @@ try {
     await editProfile.waitFor();
     assert.equal((await page.locator('.offerings-current-semester').textContent()).trim(), 'Edit academic profile');
   });
+  await check('eligibility: status labels, disabled ineligible pick, saved ineligible pick blocks save, records-unavailable notice', async page => {
+    await page.goto(base + '/test?scenario=eligibility');
+    await subject(page, 'ELIG101').waitFor();
+    const row = code => page.locator('.offerings-subject-table tbody tr').filter({ has: subject(page, code) });
+    assert.match(await row('ELIG101').locator('.offerings-eligibility').innerText(), /Eligible/);
+    const blocked = row('ELIG201').locator('.offerings-eligibility');
+    assert.match(await blocked.innerText(), /Not eligible/);
+    assert.match(await blocked.innerText(), /Needs ELIG100 Foundation requirement/, 'reason is shown');
+    assert.match(await row('ELIG301').locator('.offerings-eligibility').innerText(), /Check with your coordinator/);
+    assert.equal(await subject(page, 'ELIG201').isDisabled(), true, 'a not-eligible subject cannot be picked');
+    assert.equal(await subject(page, 'ELIG101').isEnabled(), true);
+    assert.equal(await subject(page, 'ELIG301').isEnabled(), true, 'CHECK stays pickable');
+    assert.equal(await page.getByText('Add or reload your academic records so eligibility can be checked.').count(), 0, 'no notice while records load');
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'eligibility-desktop.png'), fullPage: true });
+    // A saved pick that is no longer eligible can be unticked and blocks saving until it is.
+    await page.goto(base + '/test?scenario=eligibility-saved');
+    await page.getByRole('button', { name: 'Edit offerings' }).click();
+    await subject(page, 'ELIG201').waitFor();
+    assert.equal(await subject(page, 'ELIG201').isChecked(), true);
+    assert.equal(await subject(page, 'ELIG201').isEnabled(), true, 'a saved pick stays untickable');
+    await page.getByRole('alert').filter({ hasText: 'Remove subjects you are not eligible for before saving.' }).waitFor();
+    await review(page);
+    assert.equal(await page.getByRole('button', { name: 'Confirm and save' }).isDisabled(), true, 'save is blocked');
+    await page.getByRole('button', { name: 'Back to selection' }).click();
+    await subject(page, 'ELIG201').uncheck();
+    assert.equal(await page.getByText('Remove subjects you are not eligible for before saving.').count(), 0);
+    assert.equal(await subject(page, 'ELIG201').isDisabled(), true, 'once removed it cannot be re-picked');
+    await save(page);
+    // Unavailable records: notice linking to /student/records, nothing is hard-blocked.
+    await page.goto(base + '/test?scenario=eligibility-no-records');
+    await subject(page, 'ELIG101').waitFor();
+    const notice = page.getByRole('link', { name: 'Add or reload your academic records so eligibility can be checked.' });
+    assert.equal(await notice.getAttribute('href'), '/student/records');
+    assert.equal(await subject(page, 'ELIG201').isEnabled(), true);
+    assert.match(await row('ELIG201').locator('.offerings-eligibility').innerText(), /Check with your coordinator/);
+    // A server 409 OFFERING_NOT_ELIGIBLE is shown to the student and does not reload the page.
+    await page.goto(base + '/test?scenario=eligibility-409');
+    await subject(page, 'ELIG301').waitFor();
+    await subject(page, 'ELIG301').check(); await review(page); await confirmation(page).check();
+    await page.getByRole('button', { name: 'Confirm and save' }).click();
+    await page.getByRole('alert').filter({ hasText: 'ELIG301 cannot be picked: Needs ELIG100 Foundation requirement.' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Retry save' }).count(), 1, 'draft is kept');
+  });
+  await check('eligibility screenshots at desktop and mobile', async page => {
+    await page.goto(base + '/test?scenario=eligibility');
+    await subject(page, 'ELIG101').waitFor();
+    await page.screenshot({ path: resolve(artifacts, 'eligibility-1440.png'), fullPage: true });
+  }, 1440);
+  await check('eligibility labels fit mobile 375px', async page => {
+    await page.goto(base + '/test?scenario=eligibility');
+    await subject(page, 'ELIG101').waitFor();
+    assert.equal(await page.locator('.offerings-eligibility-not-eligible:visible').count(), 1);
+    await noOverflow(page);
+    await page.screenshot({ path: resolve(artifacts, 'eligibility-375.png'), fullPage: true });
+  }, 375);
   await check('simulated loading failure has a successful recovery path', async page => {
     await open(page); await page.getByText('Prototype tools', { exact: true }).click();
     await page.getByRole('button', { name: 'Simulate loading error' }).click();
