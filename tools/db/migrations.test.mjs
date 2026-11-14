@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -193,16 +193,38 @@ test('0010 follows the exact 0009 prefix, adds only the department level and sta
  await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0009'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });
 test('0011 follows the exact 0010 prefix, adds no public table and keeps the programme change audited',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0010','0011']);
- const sql=entries.at(-1).sql;
+ const all=await loadMigrations();const idx=all.findIndex(m=>m.version==='0011');const entries=all.slice(0,idx+1);assert.deepEqual(entries.slice(idx-1,idx+1).map(m=>m.version),['0010','0011']);
+ const sql=entries[idx].sql;
  assert.deepEqual([...sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.programme_change_context']);
  assert.doesNotMatch(sql.replace(/--.*$/gm,''),/DROP\s+(?:TABLE|COLUMN)|TRUNCATE\s+TABLE|ALTER\s+TABLE/i);
  assert.match(sql,/CREATE FUNCTION public\.db_change_student_programme\(target_student_id integer, target_curriculum_id integer\)/);
  assert.match(sql,/'student_programme',target_student_id,'CHANGE_PROGRAMME'/);
  assert.match(sql,/REVOKE EXECUTE ON FUNCTION public\.db_change_student_programme\(integer,integer\) FROM PUBLIC/);
- const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ const applied=entries.slice(0,idx).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0011']);
- const eleven=entries.at(-1);
+ const eleven=entries[idx];
  await assert.rejects(migrationStatus(client({applied:applied.filter(m=>m.version!=='0010').concat([{version:'0011',filename:eleven.file,sha256:eleven.sha256}])}),entries),/NOT_A_PREFIX/);
  await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0010'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
+});
+test('0012 follows 0011, adds no table, activates NULL curricula and audits programme/curriculum',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0011','0012']);
+ const sql=entries.at(-1).sql, code=sql.replace(/--.*$/gm,'');
+ assert.doesNotMatch(code,/CREATE\s+TABLE|DROP\s+(?:TABLE|COLUMN)|TRUNCATE|ALTER\s+TABLE/i);
+ assert.match(code,/UPDATE public\.curriculum SET status='ACTIVE' WHERE status IS NULL;/);
+ assert.match(code,/CREATE TRIGGER academic_programme_audit AFTER INSERT OR UPDATE ON public\.programme/);
+ assert.match(code,/CREATE TRIGGER academic_curriculum_audit AFTER INSERT OR UPDATE ON public\.curriculum/);
+ assert.match(code,/CREATE TRIGGER academic_curriculum_guard BEFORE INSERT OR UPDATE OF programme_id ON public\.curriculum/);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0012']);
+});
+test('0012 follows 0011, adds no table, activates NULL curricula and audits programme/curriculum',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0011','0012']);
+ const sql=entries.at(-1).sql, code=sql.replace(/--.*$/gm,'');
+ assert.doesNotMatch(code,/CREATE\s+TABLE|DROP\s+(?:TABLE|COLUMN)|TRUNCATE|ALTER\s+TABLE/i);
+ assert.match(code,/UPDATE public\.curriculum SET status='ACTIVE' WHERE status IS NULL;/);
+ assert.match(code,/CREATE TRIGGER academic_programme_audit AFTER INSERT OR UPDATE ON public\.programme/);
+ assert.match(code,/CREATE TRIGGER academic_curriculum_audit AFTER INSERT OR UPDATE ON public\.curriculum/);
+ assert.match(code,/CREATE TRIGGER academic_curriculum_guard BEFORE INSERT OR UPDATE OF programme_id ON public\.curriculum/);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0012']);
 });
