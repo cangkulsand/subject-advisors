@@ -108,6 +108,14 @@ describe('evaluateOfferingEligibility', () => {
     expect(run(s, hist(['s1', 'COMPLETED'], ['s8', 'COMPLETED'])).status).toBe('ELIGIBLE');
   });
 
+  it('skips the imported rule reason when a link already blocks', () => {
+    const expression: CurriculumPrerequisiteExpression = { operator: 'allOf', operands: [{ operator: 'course', code: 'A001' }] };
+    const s = withDetails({ expression, conditionNote: null, conditions: [] }, [['1', 'MANDATORY']]);
+    const r = run(s, hist());
+    expect(r.status).toBe('NOT_ELIGIBLE');
+    expect(r.reasons.map(x => x.kind)).toEqual(['MISSING_PREREQUISITE']);
+  });
+
   it('lets blocking reasons win over check reasons', () => {
     expect(run(withDetails(cond('cgpa', '>=', 2), [['1', 'MANDATORY']]), hist()).status).toBe('NOT_ELIGIBLE');
   });

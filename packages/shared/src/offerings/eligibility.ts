@@ -99,7 +99,7 @@ export function evaluateOfferingEligibility(input: {
   pushCgpaTopic();
 
   const expression = details?.expression ?? null;
-  if (expression) {
+  if (expression && !reasons.some(r => r.blocking)) {
     const satisfied = (e: CurriculumPrerequisiteExpression): boolean =>
       e.operator === 'course' ? isPassed(byCode.get(e.code))
         : e.operator === 'allOf' ? e.operands.every(satisfied) : e.operands.some(satisfied);
