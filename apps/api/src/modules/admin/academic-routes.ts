@@ -80,7 +80,14 @@ export async function handleAcademicSetupRequest(request: Request, deps: Academi
         GET: () => repo.listDepartments(includeInactive(url)),
         POST: async () => repo.createDepartment(await input(request, url, C.validateCreateDepartmentRequest), actor),
       },
-      '/programmes': { GET: () => { query(url, []); return repo.listProgrammeFaculties(); } },
+      '/programmes': {
+        GET: () => { query(url, []); return repo.listProgrammeFaculties(); },
+        POST: async () => repo.createProgramme(await input(request, url, C.validateCreateProgrammeRequest), actor),
+      },
+      '/curricula': {
+        GET: () => { query(url, []); return repo.listCurricula(); },
+        POST: async () => repo.createCurriculum(await input(request, url, C.validateCreateCurriculumRequest), actor),
+      },
       '/semesters': {
         GET: () => { query(url, []); return repo.listAcademicSemesters(); },
         POST: async () => repo.createAcademicSemester(await input(request, url, C.validateCreateSemesterRequest), actor),
@@ -96,13 +103,15 @@ export async function handleAcademicSetupRequest(request: Request, deps: Academi
     };
     const suffix = path.slice(PREFIX.length);
     let route = Object.prototype.hasOwnProperty.call(routes, suffix) ? routes[suffix] : undefined;
-    const match = /^\/(learning-centres|faculties|departments|semesters|programmes|coordinator-assignments)\/([^/]+)(\/department|\/end)?$/.exec(suffix);
+    const match = /^\/(learning-centres|faculties|departments|semesters|programmes|curricula|coordinator-assignments)\/([^/]+)(\/department|\/end)?$/.exec(suffix);
     if (!route && match) {
       const rawId = match[2]!;
       if (match[1] === 'learning-centres' && !match[3]) route = { PATCH: async () => repo.updateLearningCentre(id(rawId), await input(request, url, C.validateUpdateLearningCentreRequest), actor) };
       if (match[1] === 'faculties' && !match[3]) route = { PATCH: async () => repo.updateFaculty(id(rawId), await input(request, url, C.validateUpdateFacultyRequest), actor) };
       if (match[1] === 'departments' && !match[3]) route = { PATCH: async () => repo.updateDepartment(id(rawId), await input(request, url, C.validateUpdateDepartmentRequest), actor) };
       if (match[1] === 'semesters' && !match[3]) route = { PATCH: async () => repo.updateAcademicSemester(id(rawId), await input(request, url, C.validateUpdateSemesterRequest), actor) };
+      if (match[1] === 'programmes' && !match[3]) route = { PATCH: async () => repo.updateProgramme(id(rawId), await input(request, url, C.validateUpdateProgrammeRequest), actor) };
+      if (match[1] === 'curricula' && !match[3]) route = { PATCH: async () => repo.updateCurriculum(id(rawId), await input(request, url, C.validateUpdateCurriculumRequest), actor) };
       if (match[1] === 'programmes' && match[3] === '/department') route = { PATCH: async () => repo.setProgrammeDepartment(id(rawId), await input(request, url, C.validateSetProgrammeDepartmentRequest), actor) };
       if (match[1] === 'coordinator-assignments' && match[3] === '/end') route = { POST: async () => repo.endCoordinatorAssignment(id(rawId), await input(request, url, C.validateEndCoordinatorAssignmentRequest), actor) };
     }

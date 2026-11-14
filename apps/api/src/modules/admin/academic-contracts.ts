@@ -31,6 +31,13 @@ export interface AcademicSetupRepository {
   listProgrammeFaculties(): Promise<C.ProgrammeFaculty[]>;
   /** Sets the department and, in the same statement, the programme faculty from that department; null clears both when the programme had a department. */
   setProgrammeDepartment(id: number, input: C.SetProgrammeDepartmentRequest, actor: string): Promise<C.ProgrammeFaculty>;
+  /** Creates an ACTIVE programme under the department; the faculty is taken from it in the same statement. */
+  createProgramme(input: C.CreateProgrammeRequest, actor: string): Promise<C.ProgrammeFaculty>;
+  /** Sparse edit; isActive maps to programme.status. Department changes stay on setProgrammeDepartment. */
+  updateProgramme(id: number, input: C.UpdateProgrammeRequest, actor: string): Promise<C.ProgrammeFaculty>;
+  listCurricula(): Promise<C.Curriculum[]>;
+  createCurriculum(input: C.CreateCurriculumRequest, actor: string): Promise<C.Curriculum>;
+  updateCurriculum(id: number, input: C.UpdateCurriculumRequest, actor: string): Promise<C.Curriculum>;
   listAcademicSemesters(): Promise<C.AcademicSemester[]>;
   createAcademicSemester(input: C.CreateSemesterRequest, actor: string): Promise<C.AcademicSemester>;
   updateAcademicSemester(id: number, input: C.UpdateSemesterRequest, actor: string): Promise<C.AcademicSemester>;

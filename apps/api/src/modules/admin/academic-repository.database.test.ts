@@ -75,10 +75,35 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
   });
   it('assigns a department, derives the faculty, clears both and rejects inactive departments', async () => {
     const data = await seed();
-    expect(await repository.listProgrammeFaculties()).toContainEqual({ programmeId: data.programmeId, programmeCode: 'TEST_P', programmeName: 'Test programme', facultyId: data.faculty.facultyId, faculty: data.faculty, departmentId: data.department.departmentId, department: data.department });
+    expect(await repository.listProgrammeFaculties()).toContainEqual({ programmeId: data.programmeId, programmeCode: 'TEST_P', programmeName: 'Test programme', level: null, isActive: true, facultyId: data.faculty.facultyId, faculty: data.faculty, departmentId: data.department.departmentId, department: data.department });
     expect(await repository.setProgrammeDepartment(data.programmeId, { departmentId: null, reason }, actor)).toMatchObject({ facultyId: null, faculty: null, departmentId: null, department: null });
     await repository.updateDepartment(data.department.departmentId, { isActive: false, reason }, actor);
     await expect(repository.setProgrammeDepartment(data.programmeId, { departmentId: data.department.departmentId, reason }, actor)).rejects.toMatchObject({ code: 'REFERENCE_INACTIVE' });
+  });
+  it('creates, deactivates and audits programmes and guards curricula under an inactive programme', async () => {
+    const data = await seed();
+    const created = await repository.createProgramme({ programmeCode: 'NEW_P', programmeName: 'New programme', level: 'Degree', departmentId: data.department.departmentId, reason }, actor);
+    expect(created).toMatchObject({ programmeCode: 'NEW_P', level: 'Degree', isActive: true, facultyId: data.faculty.facultyId, departmentId: data.department.departmentId });
+    await repository.createCoordinatorAssignment({ ...data.assignment, programmeId: created.programmeId }, actor);
+    expect(await repository.listScopes(data.account.clerkUserId)).toContainEqual(expect.objectContaining({ programmeId: created.programmeId }));
+    const deactivated = await repository.updateProgramme(created.programmeId, { isActive: false, reason }, actor);
+    expect(deactivated.isActive).toBe(false);
+    expect(await repository.listScopes(data.account.clerkUserId)).not.toContainEqual(expect.objectContaining({ programmeId: created.programmeId }));
+    const audits = (await client.query('SELECT action FROM public.academic_setup_audit_log WHERE entity_type=$1 AND entity_id=$2 ORDER BY audit_id', ['programme', created.programmeId])).rows;
+    expect(audits.map(row => row.action)).toEqual(['INSERT', 'UPDATE']);
+    await expect(repository.createCurriculum({ programmeId: created.programmeId, curriculumVersion: '2080', totalCreditRequired: 120, effectiveYear: null, reason }, actor)).rejects.toMatchObject({ code: 'REFERENCE_INACTIVE' });
+    await expect(repository.createProgramme({ programmeCode: 'GONE_P', programmeName: 'Gone', level: null, departmentId: 2147483647, reason }, actor)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('creates, lists and edits curricula and writes no audit row for a raw insert without actor context', async () => {
+    const data = await seed();
+    const created = await repository.createCurriculum({ programmeId: data.programmeId, curriculumVersion: '2080', totalCreditRequired: 120, effectiveYear: 2080, reason }, actor);
+    expect(created).toMatchObject({ programmeId: data.programmeId, curriculumVersion: '2080', isActive: true, subjectCount: 0 });
+    await expect(repository.createCurriculum({ programmeId: data.programmeId, curriculumVersion: '2080', totalCreditRequired: 90, effectiveYear: null, reason }, actor)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(await repository.updateCurriculum(created.curriculumId, { totalCreditRequired: 0, isActive: false, reason }, actor)).toEqual({ ...created, totalCreditRequired: 0, isActive: false });
+    expect(await repository.listCurricula()).toContainEqual(expect.objectContaining({ curriculumId: created.curriculumId, isActive: false }));
+    const raw = await client.query("INSERT INTO public.curriculum(programme_id,curriculum_version,total_credit_required) VALUES ($1,'RAW',10) RETURNING curriculum_id", [data.programmeId]);
+    const audits = await client.query("SELECT 1 FROM public.academic_setup_audit_log WHERE entity_type='curriculum' AND entity_id=$1", [raw.rows[0]!.curriculum_id]);
+    expect(audits.rows).toHaveLength(0);
   });
   it('keeps the legacy faculty of a programme without a department when the department is left empty', async () => {
     const faculty = await repository.createFaculty({ facultyCode: 'LEG_F', facultyName: 'Legacy faculty', reason }, actor);

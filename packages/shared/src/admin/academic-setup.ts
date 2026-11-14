@@ -23,6 +23,7 @@ export interface Department {
 /** Programme with its department and the faculty that follows from it (faculty is derived once a department is assigned). */
 export interface ProgrammeFaculty {
   programmeId: number; programmeCode: string; programmeName: string;
+  level: string | null; isActive: boolean;
   facultyId: number | null; faculty: Faculty | null;
   departmentId: number | null; department: Department | null;
 }
@@ -45,6 +46,14 @@ export interface CreateDepartmentRequest { departmentCode: string; departmentNam
 export interface UpdateDepartmentRequest { departmentCode?: string; departmentName?: string; facultyId?: number; isActive?: boolean; reason: string }
 /** Assigning a department also sets the programme faculty to the department's faculty; null clears both when the programme had a department. */
 export interface SetProgrammeDepartmentRequest { departmentId: number | null; reason: string }
+export interface Curriculum {
+  curriculumId: number; programmeId: number; curriculumVersion: string; totalCreditRequired: number;
+  effectiveYear: number | null; isActive: boolean; subjectCount: number;
+}
+export interface CreateProgrammeRequest { programmeCode: string; programmeName: string; level: string | null; departmentId: number; reason: string }
+export interface UpdateProgrammeRequest { programmeCode?: string; programmeName?: string; level?: string | null; isActive?: boolean; reason: string }
+export interface CreateCurriculumRequest { programmeId: number; curriculumVersion: string; totalCreditRequired: number; effectiveYear: number | null; reason: string }
+export interface UpdateCurriculumRequest { curriculumVersion?: string; totalCreditRequired?: number; effectiveYear?: number | null; isActive?: boolean; reason: string }
 export type SemesterFields = Pick<AcademicSemester, 'academicYear' | 'semesterNo' | 'semesterType' | 'maxSubjects' | 'maxCredits' | 'startDate' | 'endDate' | 'selectionOpensAt' | 'selectionClosesAt'>;
 export interface CreateSemesterRequest extends SemesterFields { reason: string }
 export type UpdateSemesterRequest = Partial<SemesterFields> & { reason: string };
@@ -142,6 +151,67 @@ export function validateSetProgrammeDepartmentRequest(body: unknown): AdminValid
   const why = reason(parsed.value);
   return why.ok ? { ok: true, value: { departmentId: parsed.value.departmentId as number | null, reason: why.value } } : why;
 }
+/** Blank level clears it (null); otherwise trimmed, at most 50 characters. Returns undefined when invalid. */
+function level(v: unknown): string | null | undefined {
+  if (v === null) return null;
+  if (typeof v !== 'string') return undefined;
+  const result = v.trim();
+  return result.length === 0 ? null : result.length <= 50 ? result : undefined;
+}
+function programme(body: unknown, update: boolean): AdminValidation<CreateProgrammeRequest | UpdateProgrammeRequest> {
+  const parsed = record(body, ['programmeCode', 'programmeName', 'level', ...(update ? ['isActive'] : ['departmentId']), 'reason']);
+  if (!parsed.ok) return parsed;
+  const r = parsed.value, fields = ['programmeCode', 'programmeName', 'level', 'isActive'];
+  if (update && !fields.some(k => own(r, k))) return fail('At least one change is required.');
+  if ((!update || own(r, 'programmeCode')) && !label(r.programmeCode, 20)) return fail('Invalid programmeCode.');
+  if ((!update || own(r, 'programmeName')) && !label(r.programmeName, 255)) return fail('Invalid programmeName.');
+  if ((!update || own(r, 'level')) && level(r.level) === undefined) return fail('Invalid level.');
+  if (!update && !id(r.departmentId)) return fail('Invalid departmentId.');
+  if (own(r, 'isActive') && typeof r.isActive !== 'boolean') return fail('Invalid isActive.');
+  const why = reason(r);
+  if (!why.ok) return why;
+  return { ok: true, value: {
+    ...(own(r, 'programmeCode') ? { programmeCode: label(r.programmeCode, 20) } : {}),
+    ...(own(r, 'programmeName') ? { programmeName: label(r.programmeName, 255) } : {}),
+    ...(own(r, 'level') ? { level: level(r.level) } : {}),
+    ...(!update ? { departmentId: r.departmentId } : {}),
+    ...(own(r, 'isActive') ? { isActive: r.isActive } : {}),
+    reason: why.value,
+  } as unknown as CreateProgrammeRequest | UpdateProgrammeRequest };
+}
+export const validateCreateProgrammeRequest = (body: unknown): AdminValidation<CreateProgrammeRequest> =>
+  programme(body, false) as AdminValidation<CreateProgrammeRequest>;
+export const validateUpdateProgrammeRequest = (body: unknown): AdminValidation<UpdateProgrammeRequest> =>
+  programme(body, true) as AdminValidation<UpdateProgrammeRequest>;
+
+const credits = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1000;
+const effectiveYear = (v: unknown): v is number | null => v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 1900 && v <= 2100);
+function curriculum(body: unknown, update: boolean): AdminValidation<CreateCurriculumRequest | UpdateCurriculumRequest> {
+  const parsed = record(body, [...(update ? ['isActive'] : ['programmeId']), 'curriculumVersion', 'totalCreditRequired', 'effectiveYear', 'reason']);
+  if (!parsed.ok) return parsed;
+  const r = parsed.value, fields = ['curriculumVersion', 'totalCreditRequired', 'effectiveYear', 'isActive'];
+  if (update && !fields.some(k => own(r, k))) return fail('At least one change is required.');
+  if (!update && !id(r.programmeId)) return fail('Invalid programmeId.');
+  if ((!update || own(r, 'curriculumVersion')) && !label(r.curriculumVersion, 20)) return fail('Invalid curriculumVersion.');
+  if ((!update || own(r, 'totalCreditRequired')) && !credits(r.totalCreditRequired)) return fail('Invalid totalCreditRequired.');
+  if ((!update || own(r, 'effectiveYear')) && !effectiveYear(r.effectiveYear)) return fail('Invalid effectiveYear.');
+  if (own(r, 'isActive') && typeof r.isActive !== 'boolean') return fail('Invalid isActive.');
+  const why = reason(r);
+  if (!why.ok) return why;
+  return { ok: true, value: {
+    ...(!update ? { programmeId: r.programmeId } : {}),
+    ...(own(r, 'curriculumVersion') ? { curriculumVersion: label(r.curriculumVersion, 20) } : {}),
+    ...(own(r, 'totalCreditRequired') ? { totalCreditRequired: r.totalCreditRequired } : {}),
+    ...(own(r, 'effectiveYear') ? { effectiveYear: r.effectiveYear } : {}),
+    ...(own(r, 'isActive') ? { isActive: r.isActive } : {}),
+    reason: why.value,
+  } as unknown as CreateCurriculumRequest | UpdateCurriculumRequest };
+}
+export const validateCreateCurriculumRequest = (body: unknown): AdminValidation<CreateCurriculumRequest> =>
+  curriculum(body, false) as AdminValidation<CreateCurriculumRequest>;
+export const validateUpdateCurriculumRequest = (body: unknown): AdminValidation<UpdateCurriculumRequest> =>
+  curriculum(body, true) as AdminValidation<UpdateCurriculumRequest>;
+
 function selectionWindowError(opens: string | null, closes: string | null): string | null {
   if (closes === null) return null;
   if (opens === null) return 'selectionClosesAt requires selectionOpensAt.';

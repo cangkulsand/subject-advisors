@@ -12,7 +12,8 @@ const reason = 'Reviewed correction';
 const centre = { learningCentreId: 7, centreCode: 'TEST', centreName: 'Test only', isActive: true };
 const faculty = { facultyId: 8, facultyCode: 'TEST', facultyName: 'Test faculty', isActive: true };
 const department = { departmentId: 13, departmentCode: 'TEST', departmentName: 'Test department', facultyId: 8, isActive: true };
-const programme = { programmeId: 9, programmeCode: 'TEST', programmeName: 'Test programme', facultyId: 8, faculty, departmentId: 13, department };
+const programme = { programmeId: 9, programmeCode: 'TEST', programmeName: 'Test programme', level: null, isActive: true, facultyId: 8, faculty, departmentId: 13, department };
+const curriculum = { curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 0 };
 const semester = { semesterId: 10, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null };
 const semesterInput = { academicYear: semester.academicYear, semesterNo: semester.semesterNo, semesterType: semester.semesterType, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason };
 const assignment = { assignmentId: 11, accountId: 12, facultyId: 8, programmeId: 9, learningCentreId: 7, startedAt: '2026-11-02T00:00:00Z', endedAt: null };
@@ -31,6 +32,8 @@ function fixture(): AcademicSetupDependencies {
       listFaculties: vi.fn(async () => [faculty]), createFaculty: vi.fn(async () => faculty), updateFaculty: vi.fn(async () => faculty),
       listDepartments: vi.fn(async () => [department]), createDepartment: vi.fn(async () => department), updateDepartment: vi.fn(async () => department),
       listProgrammeFaculties: vi.fn(async () => [programme]), setProgrammeDepartment: vi.fn(async () => programme),
+      createProgramme: vi.fn(async () => programme), updateProgramme: vi.fn(async () => programme),
+      listCurricula: vi.fn(async () => [curriculum]), createCurriculum: vi.fn(async () => curriculum), updateCurriculum: vi.fn(async () => curriculum),
       listAcademicSemesters: vi.fn(async () => [semester]), createAcademicSemester: vi.fn(async () => semester), updateAcademicSemester: vi.fn(async () => semester),
       getCurrentAcademicSemester: vi.fn(async () => null), setCurrentAcademicSemester: vi.fn(async () => ({ ...semester, isCurrent: true })),
       listCoordinatorAssignments: vi.fn(async () => [assignment]), createCoordinatorAssignment: vi.fn(async () => assignment), endCoordinatorAssignment: vi.fn(async () => ({ ...assignment, endedAt: '2026-11-02T01:00:00Z' })),
@@ -55,6 +58,11 @@ const operations: Operation[] = [
   { path: '/faculties', method: 'POST', repo: 'createFaculty', body: { facultyCode: 'TEST', facultyName: 'Test faculty', reason }, args: [{ facultyCode: 'TEST', facultyName: 'Test faculty', reason }, ACTOR], data: faculty, status: 201 },
   { path: '/faculties/8', method: 'PATCH', repo: 'updateFaculty', body: { facultyName: 'New test', reason }, args: [8, { facultyName: 'New test', reason }, ACTOR], data: faculty },
   { path: '/programmes', method: 'GET', repo: 'listProgrammeFaculties', args: [], data: [programme] },
+  { path: '/programmes', method: 'POST', repo: 'createProgramme', body: { programmeCode: 'TEST', programmeName: 'Test programme', level: null, departmentId: 13, reason }, args: [{ programmeCode: 'TEST', programmeName: 'Test programme', level: null, departmentId: 13, reason }, ACTOR], data: programme, status: 201 },
+  { path: '/programmes/9', method: 'PATCH', repo: 'updateProgramme', body: { isActive: false, reason }, args: [9, { isActive: false, reason }, ACTOR], data: programme },
+  { path: '/curricula', method: 'GET', repo: 'listCurricula', args: [], data: [curriculum] },
+  { path: '/curricula', method: 'POST', repo: 'createCurriculum', body: { programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, reason }, args: [{ programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, reason }, ACTOR], data: curriculum, status: 201 },
+  { path: '/curricula/4', method: 'PATCH', repo: 'updateCurriculum', body: { isActive: false, reason }, args: [4, { isActive: false, reason }, ACTOR], data: curriculum },
   { path: '/departments', method: 'GET', repo: 'listDepartments', args: [false], data: [department] },
   { path: '/departments', method: 'POST', repo: 'createDepartment', body: { departmentCode: 'TEST', departmentName: 'Test department', facultyId: 8, reason }, args: [{ departmentCode: 'TEST', departmentName: 'Test department', facultyId: 8, reason }, ACTOR], data: department, status: 201 },
   { path: '/departments/13', method: 'PATCH', repo: 'updateDepartment', body: { isActive: false, reason }, args: [13, { isActive: false, reason }, ACTOR], data: department },
@@ -120,13 +128,19 @@ describe.each(operations)('$method $path', operation => {
 
 describe('academic API boundaries', () => {
   it.each([
-    ['/learning-centres', 'GET, POST'], ['/faculties', 'GET, POST'], ['/departments', 'GET, POST'], ['/programmes', 'GET'],
+    ['/learning-centres', 'GET, POST'], ['/faculties', 'GET, POST'], ['/departments', 'GET, POST'], ['/programmes', 'GET, POST'], ['/curricula', 'GET, POST'], ['/curricula/1', 'PATCH'], ['/programmes/1', 'PATCH'],
     ['/semesters', 'GET, POST'], ['/current-semester', 'GET, PUT'], ['/coordinator-assignments', 'GET, POST'],
     ['/learning-centres/1', 'PATCH'], ['/faculties/1', 'PATCH'], ['/departments/1', 'PATCH'], ['/semesters/1', 'PATCH'],
     ['/programmes/1/department', 'PATCH'], ['/coordinator-assignments/1/end', 'POST'],
   ])('%s rejects unsupported methods with Allow %s', async (path, allow) => {
     const deps = fixture(), response = await send(deps, path, 'DELETE');
     expect(response.status).toBe(405); expect(response.headers.get('Allow')).toBe(allow); noCalls(deps);
+  });
+  it('rejects query parameters on curricula and unsupported curricula methods', async () => {
+    const deps = fixture();
+    expect((await send(deps, '/curricula?x=1')).status).toBe(400);
+    const put = await send(deps, '/curricula', 'PUT', {});
+    expect(put.status).toBe(405); expect(put.headers.get('Allow')).toBe('GET, POST'); noCalls(deps);
   });
   it.each(['0', '-1', '01', '1e2', '2147483648', 'abc'])('rejects invalid ID %s', async raw => {
     for (const [path, method, body] of [

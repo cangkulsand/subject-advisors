@@ -31,6 +31,11 @@ alongside this baseline. The old P004 file is historical evidence only.
    transaction-context pattern as `db_set_current_semester`); no public table or column. The change is audited in
    `academic_setup_audit_log` (`entity_type='student_programme'`). Static check
    `db/checks/016_student_programme_change.sql`.
+11. 0012_programme_curriculum_admin.sql (applies after 0011): admin programme and curriculum maintenance. No table or
+   column added; sets NULL `curriculum.status` to ACTIVE, audits programme/curriculum changes made under an admin actor
+   context in `academic_setup_audit_log` (importer writes without context stay unaudited) and rejects creating a
+   curriculum under an inactive programme (`REFERENCE_INACTIVE`). Static check
+   `db/checks/017_programme_curriculum_admin.sql`.
 
 ### Academic setup integration gate (0008)
 

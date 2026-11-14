@@ -62,6 +62,11 @@
       "version": "0011",
       "file": "0011_student_programme_change.sql",
       "description": "Admin-controlled student programme change: audited db_change_student_programme() and a context-aware curriculum preservation guard"
+    },
+    {
+      "version": "0012",
+      "file": "0012_programme_curriculum_admin.sql",
+      "description": "UC25 admin programmes and curricula: NULL curriculum status set ACTIVE, audited programme/curriculum changes and active-programme guard"
     }
   ],
   "historicalExcluded": [
