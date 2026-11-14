@@ -178,13 +178,13 @@ describe('read-only offering context adapter', () => {
             { operator: 'course', code: 'SECD2613' }, { operator: 'course', code: 'SECD2523' },
           ] },
         ] }, fixedCourseEdgesShown: true, sourcePrerequisiteStatus: 'Yes', sourceCells: { E: 'E4', K: 'K19' },
-          conditions: [{ type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'Alternative code note.' } },
+          conditions: [{ type: 'completedCredits', operator: '>', value: 80, sourceCell: 'K19' }, { type: 'cgpa', operator: '>=', value: 2, sourceCell: 'K19' }], conditionNote: 'Alternative code note.' } },
       { curriculum_subject_id: 103, subject_id: 503, subject_category: 'Core', is_compulsory: 1, subject_code: 'SECD2523', subject_name: 'Database', credit_hours: 3 },
     ] : implementation(sql, parameters));
     const result = await f.reader('verified-user-a', { includePrerequisites: true });
     expect(result?.subjects[1]?.prerequisites).toMatchObject({ status: 'available', details: {
       expression: { operator: 'allOf', operands: [ { operator: 'course', code: 'SECD2613' }, { operator: 'anyOf' } ] },
-      conditionNote: 'Alternative code note.', conditions: [{ type: 'cgpa', operator: '>=', value: 2 }],
+      conditionNote: 'Alternative code note.', conditions: [{ type: 'completedCredits', operator: '>', value: 80 }], // CGPA is hidden from students (not stored)
     } });
     expect(result?.subjects[1]?.prerequisites?.status === 'available' && result.subjects[1].prerequisites.details)
       .not.toHaveProperty('sourceCells');

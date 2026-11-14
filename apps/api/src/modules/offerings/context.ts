@@ -6,7 +6,7 @@ import type { OfferingSql } from './repository';
 import type { StudentOfferingContext } from './contracts';
 import type { EligibilityHistory } from '../../../../../packages/shared/src/offerings/eligibility';
 import { offeringId } from '../../../../../packages/shared/src/offerings/identifiers';
-import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
+import { hideCgpaRules, readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 
 function text(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error('Invalid configured offering context');
@@ -164,7 +164,7 @@ export function createOfferingContextReader(query: OfferingSql['query'], now: ()
           return {
             ...subject,
             prerequisites: { status: 'available', items: bySource.get(subject.curriculumSubjectId) ?? [],
-              ...(details ? { details: summarizeCurriculumPrerequisiteDetails(details) } : {}) },
+              ...(details ? { details: summarizeCurriculumPrerequisiteDetails(hideCgpaRules(details)) } : {}) },
           };
         });
       } catch (error) {

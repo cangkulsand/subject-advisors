@@ -129,3 +129,17 @@ export function readCurriculumPrerequisiteSummary(value: unknown, catalogueCodes
     ...(summary.topicDependent === undefined ? {} : { topicDependent: summary.topicDependent }),
   };
 }
+
+/**
+ * CGPA is not stored in the system, so student-facing views (offerings eligibility, pathway) hide imported CGPA rules:
+ * CGPA conditions are dropped, and so is a condition note that mentions CGPA. The coordinator forecast keeps them
+ * (it reports them as missing evidence) and must not call this. The database keeps the imported source unchanged.
+ */
+export function hideCgpaRules(details: CurriculumPrerequisiteDetails): CurriculumPrerequisiteDetails {
+  if (!details.conditions.some(condition => condition.type === 'cgpa')) return details;
+  return {
+    ...details,
+    conditions: details.conditions.filter(condition => condition.type !== 'cgpa'),
+    conditionNote: details.conditionNote !== null && /cgpa/i.test(details.conditionNote) ? null : details.conditionNote,
+  };
+}
