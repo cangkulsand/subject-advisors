@@ -73,7 +73,7 @@ Use the branch for your assigned owner:
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing shared files. Open feature PRs
 against `main`; keep each PR within its selected owner scope.
 
-## Sprint 2 on `main` (2026-11-02)
+## Sprint 2 on `main` (2026-11-14)
 
 | Owner | Feature | Record |
 | --- | --- | --- |
@@ -85,7 +85,8 @@ against `main`; keep each PR within its selected owner scope.
 | P004 (for P001 UC03 / FR-A3) | Programme lock: students choose their programme only when creating their profile (`409 PROFILE_PROGRAMME_LOCKED` afterwards); the admin changes it with a reason on the account detail (`PATCH /api/admin/users/{id}/programme`, `GET /api/admin/curriculum-options`), which removes stale subject picks and is audited; migration 0011 | S2-P004-026 |
 | P001 (merged by P004) | Profile period locked to the admin current semester: the student no longer picks year or semester, the profile shows `academic_semester.is_current` read-only, `ProfileOptions.currentSemester`, save guarded in one statement (`503 ACADEMIC_SEMESTER_UNAVAILABLE`, `409 ACADEMIC_SEMESTER_MISMATCH`) | S2-P001-003 |
 | P001 (merged by P004) | Admin Semesters page: clearer current/next summary, Add and Advance actions, per-row Edit / Set current controls | S2-P001-004 |
-| P001 | UC05 progress and UC06 curriculum mapping, as a separate overlay launched with `node tools/p001-sprint2/dev.mjs` (not yet in the shared router) | S2-INT-002 (S2-P001-001..002) |
+| P003 (on P001 UC06) | UC24 create subject with zero or more initial prerequisites, saved atomically; admin Curriculum & Prerequisites page (`/admin/curriculum`) with Create Subject / Manage Prerequisites tabs; the `/api/p001-sprint2/curricula*` routes are in the shared router (SYSTEM_ADMIN) | S2-P003-005, S2-P003-006 |
+| P001 | UC05 progress and UC06 curriculum mapping overlay launched with `node tools/p001-sprint2/dev.mjs`; UC05 progress is not yet in the shared router (UC06 curriculum maintenance is, via UC24 above) | S2-INT-002 (S2-P001-001..002) |
 
 Subject names are English; see `db/reference-data/subject-english-names.csv`.
 

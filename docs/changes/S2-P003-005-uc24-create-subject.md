@@ -1,12 +1,12 @@
 # S2-P003-005 - Create subject with initial prerequisites
 
-- Status: READY_FOR_REVIEW (PASS SELF-REVIEW; lead diff review complete, human approval pending)
+- Status: MERGED to `main` (2026-11-14); human peer review pending. Before merge: READY_FOR_REVIEW (PASS SELF-REVIEW; lead diff review complete, human approval pending)
 - Date: 2026-11-12
 - Owner: Harraz / P003, Sprint 2, functional module M2
 - Requirements: UC24, FR-B8; shared FR-B1/B2/B5 boundary with UC06
 - Source: UTMSPACE_SRS_SDD_v2.3 (10 Nov).docx, section 2.2.24,
   plus the user's request for prerequisite search and code validation.
-- Branch: feature/uc24-create-subject
+- Branch: feature/uc24-create-subject; merged into `main` on 2026-11-14 (merge commit 3fcc9fe), no PR
 - Human peer review: Pending
 
 ## 1. Plan
@@ -200,3 +200,5 @@ PASS SELF-REVIEW; human peer approval pending.
 - Tests added across API validation/routes/repository contract, isolated
   PostgreSQL, integration generator/router, admin UI and a new integrated
   UC24 browser harness (`tools/p001-sprint2/test-uc24-ui.mjs`).
+
+- 2026-11-14 - Merged into `main` by P004 (merge commit 3fcc9fe). One conflict in `apps/web/src/features/admin/AdminRoutes.tsx` resolved by keeping the Departments page (S2-P004-025) and adding `/admin/curriculum`. Checks after merge: typecheck, lint, unit tests (1519 passed, 63 skipped), integration (11 passed), build, admin browser checks (48 passed, system Chrome via `PLAYWRIGHT_CHANNEL=chrome`). Status: MERGED; human peer review pending.
