@@ -29,7 +29,7 @@
   closed. The selection period has ended.") after the closing time; 409 `OFFERING_NOT_APPROVED`
   ("A subject you picked is no longer offered. Reload offerings.") for any subject outside the
   approved set; 409 `PICK_LIMIT_EXCEEDED` ("You can pick at most N subjects and M credits for
-  this semester.") over `max_subjects` or `max_credits`. The route checks the fresh context; the
+  this semester.") over `max_subjects` or `max_credits`; 409 `OFFERING_NOT_ELIGIBLE` ("<CODE> cannot be picked: <reason>.") when a picked subject fails the UC09 eligibility rules (checked after the approved and limit checks; PUT now loads prerequisites and server-only academic history). The route checks the fresh context; the
   repository repeats the checks in its transaction (see below), which is what makes a stale
   five-minute snapshot harmless.
 - **Transaction.** `FOR UPDATE` on the student's profile row (curriculum and learning centre
