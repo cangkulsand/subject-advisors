@@ -8,6 +8,7 @@ const centre = { learningCentreId: 1, centreCode: 'TEST', centreName: 'Fictional
 const faculty = { facultyId: 2, facultyCode: 'TEST', facultyName: 'Fictional faculty', isActive: true };
 const department = { departmentId: 4, departmentCode: 'DEP', departmentName: 'Fictional department', facultyId: 2, isActive: true };
 const programme = { programmeId: 3, programmeCode: 'TEST', programmeName: 'Fictional programme', level: null, isActive: true, facultyId: 2, faculty, departmentId: 4, department };
+const curriculum = { curriculumId: 7, programmeId: 3, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: 5 };
 const semester = { semesterId: 4, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: true, selectionOpensAt: null, selectionClosesAt: null };
 const assignment = { assignmentId: 5, accountId: 6, facultyId: 2, programmeId: 3, learningCentreId: 1, startedAt: '2026-11-02T00:00:00Z', endedAt: null };
 const prefix = '/api/admin/academic-setup';
@@ -17,6 +18,8 @@ it.each([
   ['faculties', (c: Client) => c.faculties(), '/faculties?includeInactive=true', [faculty]],
   ['departments', (c: Client) => c.departments(), '/departments?includeInactive=true', [department]],
   ['programmes', (c: Client) => c.programmes(), '/programmes', [programme]],
+  ['curricula', (c: Client) => c.curricula(), '/curricula', [curriculum]],
+  ['legacy programme row', (c: Client) => c.programmes(), '/programmes', [{ ...programme, level: null, isActive: true, departmentId: null, department: null, facultyId: null, faculty: null }]],
   ['semesters', (c: Client) => c.semesters(), '/semesters', [semester]],
   ['current', (c: Client) => c.currentSemester(), '/current-semester', null],
   ['assignments', (c: Client) => c.assignments(), '/coordinator-assignments', [assignment]],
@@ -33,6 +36,10 @@ it.each([
   [(c: Client) => c.createDepartment({ departmentCode: 'DEP', departmentName: 'Fictional department', facultyId: 2, reason: 'Why' }), 'POST', '/departments', department],
   [(c: Client) => c.updateDepartment(4, { isActive: false, reason: 'Why' }), 'PATCH', '/departments/4', { ...department, isActive: false }],
   [(c: Client) => c.setProgrammeDepartment(3, { departmentId: null, reason: 'Why' }), 'PATCH', '/programmes/3/department', { ...programme, facultyId: null, faculty: null, departmentId: null, department: null }],
+  [(c: Client) => c.createProgramme({ programmeCode: 'TEST', programmeName: 'Fictional programme', level: null, departmentId: 4, reason: 'Why' }), 'POST', '/programmes', programme],
+  [(c: Client) => c.updateProgramme(3, { isActive: false, reason: 'Why' }), 'PATCH', '/programmes/3', { ...programme, isActive: false }],
+  [(c: Client) => c.createCurriculum({ programmeId: 3, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, reason: 'Why' }), 'POST', '/curricula', curriculum],
+  [(c: Client) => c.updateCurriculum(7, { isActive: false, reason: 'Why' }), 'PATCH', '/curricula/7', { ...curriculum, isActive: false }],
   [(c: Client) => c.createSemester({ academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason: 'Why' }), 'POST', '/semesters', semester],
   [(c: Client) => c.updateSemester(4, { maxCredits: 15, reason: 'Why' }), 'PATCH', '/semesters/4', { ...semester, maxCredits: 15 }],
   [(c: Client) => c.setCurrentSemester({ semesterId: 4, reason: 'Why' }), 'PUT', '/current-semester', semester],
@@ -49,6 +56,8 @@ it.each([
   [(c: Client) => c.programmes(), [{ ...programme, facultyId: 99 }]],
   [(c: Client) => c.programmes(), [{ ...programme, departmentId: 99 }]],
   [(c: Client) => c.programmes(), [{ ...programme, department: null }]],
+  [(c: Client) => c.curricula(), [{ ...curriculum, subjectCount: undefined }]],
+  [(c: Client) => c.programmes(), [{ ...programme, isActive: 'yes' }]],
   [(c: Client) => c.departments(), [{ ...department, facultyId: 0 }]],
   [(c: Client) => c.semesters(), [{ ...semester, semesterNo: 3 }]],
   [(c: Client) => c.currentSemester(), {}],
@@ -56,6 +65,11 @@ it.each([
 ])('rejects malformed academic response %s as a stable inline error', async (call, data) => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data })));
   await expect(call(createAcademicSetupClient(async () => 'TEST_ONLY'))).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+});
+it('sends the exact JSON body for a programme update', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: { ...programme, isActive: false } })); vi.stubGlobal('fetch', fetcher);
+  await createAcademicSetupClient(async () => 'TEST_ONLY').updateProgramme(3, { isActive: false, reason: 'r' });
+  expect(fetcher).toHaveBeenCalledWith(prefix + '/programmes/3', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ isActive: false, reason: 'r' }) }));
 });
 it('preserves stable backend mutation errors', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'ASSIGNMENT_ENDED', message: 'Assignment already ended.' } }, { status: 409 })));
