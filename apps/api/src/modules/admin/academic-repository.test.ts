@@ -76,4 +76,50 @@ describe('academic SQL boundary', () => {
     expect(transaction.mock.calls[0]![0][1]).toEqual({ text: 'SELECT public.db_set_current_semester($1::integer)', values: [4] });
     expect(query).not.toHaveBeenCalled();
   });
+  it('deactivates a programme by translating isActive to status and reading it back', async () => {
+    const row = { programmeId: 9, programmeCode: 'P', programmeName: 'Prog', level: 'Degree', programmeIsActive: false, facultyId: null, departmentId: null };
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [{ programme_id: 9 }], [row]]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    const result = await repository.updateProgramme(9, { isActive: false, reason: 'Retire' }, 'user_verified');
+    expect(result).toMatchObject({ programmeId: 9, level: 'Degree', isActive: false });
+    const [, update, readback] = transaction.mock.calls[0]![0];
+    expect(update!.text.split(' RETURNING ')[0]).toBe('UPDATE public.programme SET status=$2 WHERE programme_id=$1');
+    expect(update!.values).toEqual([9, 'INACTIVE']);
+    expect(readback!.text).toContain('WHERE p.programme_id=$1');
+  });
+  it('creates a programme with the faculty taken from the department sub-select', async () => {
+    const row = { programmeId: 10, programmeCode: 'P2', programmeName: 'Prog 2', level: null, programmeIsActive: true, facultyId: 2, facultyCode: 'F', facultyName: 'Fac', isActive: true, departmentId: 5, departmentCode: 'D', departmentName: 'Dept', departmentFacultyId: 2, departmentIsActive: true };
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [row]]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    expect(await repository.createProgramme({ programmeCode: 'P2', programmeName: 'Prog 2', level: null, departmentId: 5, reason: 'Add' }, 'user_verified')).toMatchObject({ programmeId: 10, facultyId: 2, isActive: true });
+    const statements = transaction.mock.calls[0]![0];
+    expect(statements).toHaveLength(2);
+    expect(statements[1]!.text).toContain('INSERT INTO public.programme(programme_code,programme_name,level,status,department_id,faculty_id)');
+    expect(statements[1]!.text).toContain('d.department_id,d.faculty_id FROM public.department d WHERE d.department_id=$4');
+    expect(statements[1]!.values).toEqual(['P2', 'Prog 2', null, 5]);
+  });
+  it('reports NOT_FOUND when the department of a new programme does not exist', async () => {
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], []]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    await expect(repository.createProgramme({ programmeCode: 'P', programmeName: 'N', level: null, departmentId: 99, reason: 'Add' }, 'user_verified')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('lists curricula mapping NULL status to active and the count to a number', async () => {
+    const query = vi.fn().mockResolvedValue([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: '3' }]);
+    const repository = createAcademicSetupRepository(query, vi.fn());
+    expect(await repository.listCurricula()).toEqual([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: 3 }]);
+    expect(query.mock.calls[0]![0]).toContain("coalesce(upper(c.status),'ACTIVE')='ACTIVE'");
+    expect(query.mock.calls[0]![0]).toContain('ORDER BY p.programme_code');
+  });
+  it('creates and updates curricula with bound values and status translation', async () => {
+    const row = { curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 0 };
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [row]]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    await repository.createCurriculum({ programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, reason: 'Add' }, 'user_verified');
+    expect(transaction.mock.calls[0]![0][1]!.text).toContain("VALUES ($1,$2,$3,'ACTIVE',$4)");
+    expect(transaction.mock.calls[0]![0][1]!.values).toEqual([9, '2026', 120, 2026]);
+    await repository.updateCurriculum(4, { totalCreditRequired: 0, isActive: false, reason: 'Edit' }, 'user_verified');
+    const update = transaction.mock.calls[1]![0][1]!;
+    expect(update.text.split(' RETURNING ')[0]).toBe('UPDATE public.curriculum SET total_credit_required=$2, status=$3 WHERE curriculum_id=$1');
+    expect(update.values).toEqual([4, 0, 'INACTIVE']);
+  });
 });
