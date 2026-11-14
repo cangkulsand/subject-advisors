@@ -235,3 +235,12 @@
 }
 @media (prefers-reduced-motion: reduce) {
 }
+
+/* UC09 eligibility status: label text and a glyph carry the meaning, colour only reinforces it. */
+.offerings-eligibility { display: grid; gap: 4px; min-width: 0; margin: 4px 0; font-size: var(--font-size-table); line-height: 1.45; }
+.offerings-eligibility-label { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; border: 1px solid; border-radius: 6px; padding: 3px 8px; font-weight: 650; }
+.offerings-eligibility ul { margin: 0; padding-left: 18px; color: var(--off-body); }
+.offerings-eligibility-eligible .offerings-eligibility-label { color: var(--off-success-text); background: var(--off-success-bg); border-color: var(--off-success-text); }
+.offerings-eligibility-check .offerings-eligibility-label { color: var(--off-warning-text); background: var(--off-warning-bg); border-color: var(--off-warning-text); }
+.offerings-eligibility-not-eligible .offerings-eligibility-label { color: var(--off-danger-text); background: var(--off-danger-bg); border-color: var(--off-danger-text); }
+.offerings-subject-table input[type="checkbox"]:disabled { cursor: not-allowed; }

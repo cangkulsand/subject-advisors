@@ -2,6 +2,7 @@ import { SearchField, TableToolbar } from '../../components/table-toolbar/TableT
 import { useEffect, useRef, useState } from 'react';
 import type { OfferingPageData, OfferingSubject, OfferingsClient, OfferingWindow, OfferingWindowStatus } from '../../../../../packages/shared/src/offerings/offerings';
 import { pickLimitMessage } from '../../../../../packages/shared/src/offerings/offerings';
+import { evaluateOfferingEligibility, OFFERING_ELIGIBILITY_LABELS, type OfferingEligibility } from '../../../../../packages/shared/src/offerings/eligibility';
 import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 import { OfferingApiError } from './client';
 import { offeringHistoryState } from './academic-history';
@@ -41,6 +42,16 @@ function useNow(): Date {
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(timer); }, []);
   return now;
 }
+const ELIGIBILITY_MARKS: Record<OfferingEligibility['status'], string> = { ELIGIBLE: '✓', CHECK: '!', NOT_ELIGIBLE: '✕' };
+const NOT_ELIGIBLE_SAVE_MESSAGE = 'Remove subjects you are not eligible for before saving.';
+export function EligibilityStatus({ eligibility }: { eligibility: OfferingEligibility | undefined }) {
+  if (!eligibility) return null;
+  return <div className={`offerings-eligibility offerings-eligibility-${eligibility.status.toLowerCase().replace('_', '-')}`}>
+    <span className="offerings-eligibility-label"><span aria-hidden="true">{ELIGIBILITY_MARKS[eligibility.status]}</span> {OFFERING_ELIGIBILITY_LABELS[eligibility.status]}</span>
+    {eligibility.reasons.length > 0 && <ul>{eligibility.reasons.map(reason => <li key={reason.kind + reason.message}>{reason.message}</li>)}</ul>}
+  </div>;
+}
+// Eligibility never triggers a refresh: only these codes drop the cached snapshot.
 const REFRESH_CODES = ['PICKS_CLOSED', 'PICKS_NOT_OPEN', 'OFFERING_NOT_APPROVED', 'SEMESTER_NOT_TARGET'];
 
 /** Student picks for the next semester. FOUNDATION mounts at /student/offerings with P004 AuthGate. */
@@ -139,6 +150,14 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
   const catalogue = data?.prerequisiteCatalogue ?? data?.subjects ?? [];
   const semester = data?.semesters.find(item => item.semesterId === data?.currentSemesterId);
   const categorySummary = data && semester ? summarizeOfferingCategories(data.subjects, data.academicHistory, semester.semesterNo) : null;
+  const eligibility = new Map<string, OfferingEligibility>();
+  if (data) {
+    const history = data.academicHistory ?? { status: 'unavailable' as const };
+    for (const subject of data.subjects) {
+      eligibility.set(subject.curriculumSubjectId, evaluateOfferingEligibility({ subject, catalogue, history, pickedCurriculumSubjectIds: draft }));
+    }
+  }
+  const hasIneligiblePick = draft.some(id => eligibility.get(id)?.status === 'NOT_ELIGIBLE');
   const selected = data?.subjects.filter(subject => draft.includes(subject.curriculumSubjectId)) ?? [];
   const totalCredits = selected.reduce((total, subject) => total + subject.creditHours, 0);
   const blocked = loadError instanceof OfferingApiError && [401, 403].includes(loadError.status);
@@ -224,6 +243,8 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
               {limitMessage && <p className="offerings-limit-message" role="alert">{limitMessage}</p>}
               {data.subjects.some(subject => !subject.subjectCategory?.trim()) && <p className="offerings-data-note">Unrecorded categories are shown as Other / unknown. Display rules use code or credit-hour facts where conclusive; other rows remain visible without a category-based classification.</p>}
 
+              {data.academicHistory?.status === 'unavailable' && <p className="offerings-data-note" role="status"><a href="/student/records">Add or reload your academic records so eligibility can be checked.</a></p>}
+              {hasIneligiblePick && <p className="offerings-limit-message" role="alert">{NOT_ELIGIBLE_SAVE_MESSAGE}</p>}
               {data.academicHistory?.status !== 'available' && <p className="offerings-data-note">Academic history is unavailable. Subjects with a recorded completed or exempted status cannot be identified.</p>}
               {!data.subjects.length && <div className="offerings-empty"><h3>No subjects are offered yet</h3><p>The coordinator has not approved any subject for your programme and learning centre this semester.</p></div>}
               {data.subjects.length > 0 && !remaining.length && <div className="offerings-empty"><h3>No matching subjects</h3><p>Adjust your search. Selected subjects remain available in the summary when search hides them.</p></div>}
@@ -232,10 +253,13 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
               <table className="offerings-subject-table"><thead><tr><th scope="col">Select</th><th scope="col">Subject</th><th className="offerings-prerequisites-column" scope="col">Prerequisites</th><th scope="col">Category</th><th scope="col">Credits</th></tr></thead><tbody>{remaining.map(subject => {
                 const checked = draft.includes(subject.curriculumSubjectId);
                 const state = offeringHistoryState(subject, data.academicHistory);
+                const subjectEligibility = eligibility.get(subject.curriculumSubjectId);
+                const blockedPick = subjectEligibility?.status === 'NOT_ELIGIBLE' && !checked;
                 return <tr key={subject.curriculumSubjectId} className={(checked ? 'is-selected ' : '') + (state === 'ambiguous' ? 'is-ambiguous' : '')}>
-                  <td><input type="checkbox" checked={checked} disabled={saving} onChange={() => toggle(subject.curriculumSubjectId)} aria-label={`${subject.code} ${subject.name}`} /></td>
+                  <td><input type="checkbox" checked={checked} disabled={saving || blockedPick} onChange={() => toggle(subject.curriculumSubjectId)} aria-label={`${subject.code} ${subject.name}`} /></td>
                   <td><div className="offerings-subject-copy"><strong>{subject.name}</strong><span className="offerings-subject-code">{subject.code}</span>
                     {state === 'ambiguous' && <small>History ambiguous</small>}
+                    <EligibilityStatus eligibility={subjectEligibility} />
                     <div className="offerings-prerequisite-inline"><PrerequisiteDisplay subject={subject} catalogue={catalogue} /></div>
                   </div></td>
                   <td className="offerings-prerequisites-column"><PrerequisiteDisplay subject={subject} catalogue={catalogue} /></td>
@@ -247,8 +271,9 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
             </> : <>
               {mode === 'review' && hiddenSelected.length > 0 && <div className="offerings-hidden-selection" role="status">{hiddenSelected.length} selected {hiddenSelected.length === 1 ? 'subject is' : 'subjects are'} hidden by the current search or semester/history display rule. They remain in this review and will be included in the save.</div>}
               <ul className="offerings-review-list">{selected.map(subject => <li key={subject.curriculumSubjectId}>
-                <div><strong>{subject.code}</strong><span>{subject.name}</span><small>{offeringCategoryLabel(subject)} · {historyLabel(subject, data)}</small><PrerequisiteDisplay subject={subject} catalogue={catalogue} /></div><span>{subject.creditHours} credits</span></li>)}</ul>
+                <div><strong>{subject.code}</strong><span>{subject.name}</span><small>{offeringCategoryLabel(subject)} · {historyLabel(subject, data)}</small><PrerequisiteDisplay subject={subject} catalogue={catalogue} /><EligibilityStatus eligibility={eligibility.get(subject.curriculumSubjectId)} /></div><span>{subject.creditHours} credits</span></li>)}</ul>
               {!selected.length && <p className="offerings-empty">No picks yet.</p>}
+              {mode === 'review' && hasIneligiblePick && <p className="offerings-limit-message" role="alert">{NOT_ELIGIBLE_SAVE_MESSAGE}</p>}
               {mode === 'review' && <label className="offerings-confirm"><input type="checkbox" checked={confirmed} disabled={saving}
                 onChange={event => setConfirmed(event.target.checked)} />
                 <span>I confirm these are my picks for {semester.academicYear}, Semester {semester.semesterNo}. A pick is not a registration.</span></label>}
@@ -270,7 +295,7 @@ export function OfferingsPage({ client, demonstration = false }: { client: Offer
                   onClick={() => { setMode('review'); setConfirmed(false); }}>Review offerings <span aria-hidden="true">→</span></button>
                   {dirty && <button className="offerings-cancel" type="button" onClick={cancel}>Cancel changes</button>}
                 {draft.length > 0 && <button className="offerings-text-button" type="button" disabled={saving} onClick={() => { setDraft([]); }}>Clear selection</button>}</>}
-                {mode === 'review' && <><button className="offerings-primary" type="button" disabled={!confirmed || saving} onClick={() => { void save(); }}>{saving ? 'Saving…' : saveError ? 'Retry save' : 'Confirm and save'}</button>
+                {mode === 'review' && <><button className="offerings-primary" type="button" disabled={!confirmed || saving || hasIneligiblePick} onClick={() => { void save(); }}>{saving ? 'Saving…' : saveError ? 'Retry save' : 'Confirm and save'}</button>
                   {!confirmed && <p className="offerings-caption">Tick the confirmation before saving.</p>}
                   <button type="button" disabled={saving} onClick={() => { setMode('select'); setConfirmed(false); }}>Back to selection</button>
                   <button className="offerings-cancel" type="button" disabled={saving} onClick={cancel}>Cancel changes</button></>}

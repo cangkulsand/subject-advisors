@@ -39,7 +39,7 @@ export const richOfferingFixture: OfferingPageData = {
     { curriculumSubjectId: '516', subjectId: '86', code: 'DEMO213', name: 'U2 completed fixture', creditHours: 3, subjectCategory: 'Elective U2', isCompulsory: 0 },
     { curriculumSubjectId: '517', subjectId: '87', code: 'DEMO214', name: 'Ambiguous Core fixture', creditHours: 3, subjectCategory: 'Core', isCompulsory: 1 },
   ],
-  selection: { semesterId: '201', curriculumSubjectIds: ['507', '509'] },
+  selection: { semesterId: '201', curriculumSubjectIds: ['507', '509', '512'] },
   academicHistory: {
     status: 'available',
     records: [
