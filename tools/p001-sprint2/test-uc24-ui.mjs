@@ -413,7 +413,7 @@ try {
     await mock(page); await open(page, 'create');
     await fillDraft(page);
     await page.getByLabel('Search prerequisites').fill('demo');
-    const row = page.locator('.s2-picks li').first();
+    const row = page.locator('.admin-curriculum-picks li').first();
     const box = await row.getByRole('button', { name: 'Add prerequisite' }).boundingBox();
     const nameBox = await row.locator('strong').boundingBox();
     assert.ok(nameBox.width >= 120, 'subject name column is too narrow: ' + nameBox.width);
@@ -437,7 +437,7 @@ try {
     // Longest label word must fit inside each tab's content box (no broken single letters).
     const wordFits = await page.evaluate(() => {
       const ctx = document.createElement('canvas').getContext('2d');
-      return [...document.querySelectorAll('.s2-nav [role=tab]')].map(tab => {
+      return [...document.querySelectorAll('.admin-curriculum-tabs [role=tab]')].map(tab => {
         const style = getComputedStyle(tab);
         ctx.font = style.font;
         const content = tab.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
