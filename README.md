@@ -89,7 +89,8 @@ against `main`; keep each PR within its selected owner scope.
 | P004 (for P002 UC09 / FR-C2, FR-C5) | Eligibility on student offerings: Eligible / Check with your coordinator / Not eligible with reasons; Not-eligible picks rejected (`409 OFFERING_NOT_ELIGIBLE`); CGPA rules hidden from students (not stored), coordinator forecast unchanged | S2-P004-027 |
 | P003 (on P001 UC06) | UC24 create subject with zero or more initial prerequisites, saved atomically; admin Curriculum & Prerequisites page (`/admin/curriculum`) with Create Subject / Manage Prerequisites tabs; the `/api/p001-sprint2/curricula*` routes are in the shared router (SYSTEM_ADMIN) | S2-P003-005, S2-P003-006 |
 | P004 (on P003 UC24 page) | Curriculum & Prerequisites page (`/admin/curriculum`) restyled to the admin template theme (cards, tables, buttons, tabs); behaviour unchanged | S2-INT-005 |
-| P001 | UC05 progress and UC06 curriculum mapping overlay launched with `node tools/p001-sprint2/dev.mjs`; UC05 progress is not yet in the shared router (UC06 curriculum maintenance is, via UC24 above) | S2-INT-002 (S2-P001-001..002) |
+| P001 | UC05 progress and UC06 curriculum mapping overlay launched with `node tools/p001-sprint2/dev.mjs`; UC05 progress is now in the student app (S2-P001-006 below); the overlay remains for UC06 mapping (UC06 curriculum maintenance is in the shared router, via UC24 above) | S2-INT-002 (S2-P001-001..002) |
+| P001 (UC05) / P003 (UC18); built by P004 | Academic progress in the student app: `/student/progress` (menu item after Subject records) restyled to the student template, with a read-only subject Details panel (prerequisites met/not met, unlocks, permitted semesters, status, next-semester approval); `GET /api/p001-sprint2/progress` additively returns `links`; no DB change | S2-P001-006 |
 
 Subject names are English; see `db/reference-data/subject-english-names.csv`.
 
