@@ -188,6 +188,11 @@
       "migration": "0011",
       "tables": [],
       "purpose": "P004 admin-controlled student programme change (S2-P004-026, P001 UC03/FR-A3); adds only a migration_meta context table and one function, no public table or column"
+    },
+    {
+      "migration": "0012",
+      "tables": [],
+      "purpose": "P004 admin programme and curriculum maintenance (S2-P001-005, P001 UC25/FR-B9); sets NULL curriculum status ACTIVE and adds audit/guard triggers only, no public table or column"
     }
   ]
 }
