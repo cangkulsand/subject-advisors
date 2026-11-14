@@ -217,14 +217,3 @@ test('0012 follows 0011, adds no table, activates NULL curricula and audits prog
  const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0012']);
 });
-test('0012 follows 0011, adds no table, activates NULL curricula and audits programme/curriculum',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0011','0012']);
- const sql=entries.at(-1).sql, code=sql.replace(/--.*$/gm,'');
- assert.doesNotMatch(code,/CREATE\s+TABLE|DROP\s+(?:TABLE|COLUMN)|TRUNCATE|ALTER\s+TABLE/i);
- assert.match(code,/UPDATE public\.curriculum SET status='ACTIVE' WHERE status IS NULL;/);
- assert.match(code,/CREATE TRIGGER academic_programme_audit AFTER INSERT OR UPDATE ON public\.programme/);
- assert.match(code,/CREATE TRIGGER academic_curriculum_audit AFTER INSERT OR UPDATE ON public\.curriculum/);
- assert.match(code,/CREATE TRIGGER academic_curriculum_guard BEFORE INSERT OR UPDATE OF programme_id ON public\.curriculum/);
- const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
- assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0012']);
-});
