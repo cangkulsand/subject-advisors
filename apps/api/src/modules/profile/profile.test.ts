@@ -32,7 +32,7 @@ function dependencies(state: 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' = 'CO
       access: { find: vi.fn(async () => ({ clerkUserId: 'verified_student_a', appRole: 'STUDENT' as const, roles: ['STUDENT' as const], accessStatus: 'ACTIVE' as const })), initializeStudent: vi.fn() },
       profiles: { stateFor: vi.fn(async () => state) },
     },
-    profiles: { find: vi.fn(async () => profile), save: vi.fn(async () => profile), options: vi.fn(async () => ({ curricula: [], subjects: [], semesters: [], learningCentres: [] })) },
+    profiles: { find: vi.fn(async () => profile), save: vi.fn(async () => profile), options: vi.fn(async () => ({ curricula: [], subjects: [], semesters: [], currentSemester: null, currentAcademicYear: null, learningCentres: [] })) },
     records: { list: vi.fn(async () => []), save: vi.fn(), delete: vi.fn() },
   };
 }
@@ -116,8 +116,8 @@ describe('P001 authenticated route boundary', () => {
     const second = await handleP001Request(request('/api/profile/options'), deps);
     expect(first?.headers.get('Cache-Control')).toBe('no-store');
     expect(second?.headers.get('Cache-Control')).toBe('no-store');
-    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [], learningCentres: [] } });
-    expect(query).toHaveBeenCalledTimes(8); // cold lookup 6 (incl. centres); warm lookup 2 live association read
+    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], currentSemester: null, currentAcademicYear: null, subjectGroups: [], learningCentres: [] } });
+    expect(query).toHaveBeenCalledTimes(10); // cold lookup 7 (incl. centres and live marker); warm lookup 3 live reads
     expect(cache.get).toHaveBeenCalledTimes(6);
     expect(cache.set).toHaveBeenCalledTimes(3);
 
@@ -166,9 +166,9 @@ describe('P001 authenticated route boundary', () => {
     const second = await handleP001Request(request('/api/profile/options'), deps);
     expect(first?.headers.get('Cache-Control')).toBe('no-store');
     expect(second?.headers.get('Cache-Control')).toBe('no-store');
-    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], subjectGroups: [], learningCentres: [] } });
+    expect(await second?.json()).toEqual({ data: { curricula: [], subjects: [], semesters: [], currentSemester: null, currentAcademicYear: null, subjectGroups: [], learningCentres: [] } });
     expect(options).toHaveBeenCalledTimes(2);
-    expect(query).toHaveBeenCalledTimes(8);
+    expect(query).toHaveBeenCalledTimes(10);
     expect(cache.get).toHaveBeenCalledTimes(4);
     expect(cache.set).toHaveBeenCalledTimes(2);
 

@@ -1015,6 +1015,260 @@
           }
         }
       }
+    },
+    "/api/admin/users/{id}/programme": {
+      "get": {
+        "operationId": "getStudentProgramme",
+        "summary": "The student programme of an account",
+        "description": "Returns the saved programme (curriculum option = programme + version) of the account's student profile, or null when the account has no student profile. S2-P004-026.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Student programme or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProgrammeEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator (the reason is required, 1-500 characters)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stable code: ACCOUNT_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "changeStudentProgramme",
+        "summary": "Change a student programme (admin only)",
+        "description": "Students choose their programme once, when they create their profile; afterwards PUT /api/profile rejects a different curriculumId with 409 PROFILE_PROGRAMME_LOCKED. This is the only way to change it. In ONE transaction the profile row is locked, the target curriculum must be active, the student's saved semester picks for semesters after the current one whose selection has not closed are deleted (they belong to the old curriculum), the programme is updated and an append-only row is written to academic_setup_audit_log (entity_type student_programme, action CHANGE_PROGRAMME, actor, reason, before/after incl. removedPicks and removedSubjectIds). Academic records, matric number, learning centre and current semester are kept. reason is trimmed, 1-500 characters.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeProgrammeRequest"
+              },
+              "example": {
+                "curriculumId": 2,
+                "reason": "Registered on the wrong programme at setup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New programme and the number of removed subject picks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgrammeChangeEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator (the reason is required, 1-500 characters)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stable codes: NOT_FOUND, STUDENT_PROFILE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stable codes: CURRICULUM_UNAVAILABLE (not an active curriculum of an active programme), PROGRAMME_UNCHANGED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/curriculum-options": {
+      "get": {
+        "operationId": "listCurriculumOptions",
+        "summary": "Active curricula an administrator may assign to a student",
+        "description": "Active curricula of active programmes, ordered by programme code and version.",
+        "responses": {
+          "200": {
+            "description": "Curriculum options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CurriculumOption"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1440,8 +1694,151 @@
           "INVITATION_NOT_PENDING",
           "INVITATION_EXPIRED",
           "CONFLICT",
-          "MUTATION_FAILED"
+          "MUTATION_FAILED",
+          "STUDENT_PROFILE_NOT_FOUND",
+          "CURRICULUM_UNAVAILABLE",
+          "PROGRAMME_UNCHANGED",
+          "ACCOUNT_NOT_FOUND"
         ]
+      },
+      "CurriculumOption": {
+        "type": "object",
+        "required": [
+          "curriculumId",
+          "curriculumVersion",
+          "programmeId",
+          "programmeCode",
+          "programmeName"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "curriculumId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "programmeId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "programmeCode": {
+            "type": "string"
+          },
+          "programmeName": {
+            "type": "string"
+          }
+        }
+      },
+      "StudentProgramme": {
+        "type": "object",
+        "required": [
+          "studentId",
+          "studentName",
+          "matricNo",
+          "curriculumId",
+          "curriculumVersion",
+          "programmeId",
+          "programmeCode",
+          "programmeName"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "studentId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "studentName": {
+            "type": "string"
+          },
+          "matricNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "curriculumId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "programmeId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "programmeCode": {
+            "type": "string"
+          },
+          "programmeName": {
+            "type": "string"
+          }
+        }
+      },
+      "StudentProgrammeEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StudentProgramme"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ChangeProgrammeRequest": {
+        "type": "object",
+        "required": [
+          "curriculumId",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "curriculumId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Active curriculum (programme + version) from GET /api/admin/curriculum-options"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "ProgrammeChangeEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "programme",
+              "removedPicks"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "programme": {
+                "$ref": "#/components/schemas/StudentProgramme"
+              },
+              "removedPicks": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Saved semester picks deleted because they belonged to the old curriculum"
+              }
+            }
+          }
+        }
       }
     }
   }

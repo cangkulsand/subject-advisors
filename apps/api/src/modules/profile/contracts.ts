@@ -33,7 +33,8 @@ export interface SubjectOption { subjectId: number; subjectCode: string; subject
 export interface SubjectGroupOption { category: string; requiredSubjects: number | null; availableSubjects: number }
 export interface SemesterOption { semesterId: number; academicYear: string; semesterNo: number; semesterType?: 'NORMAL' | 'SHORT' }
 export interface LearningCentreOption { learningCentreId: number; centreCode: string; centreName: string }
-export interface ProfileOptions { curricula: CurriculumOption[]; subjects: SubjectOption[]; semesters: SemesterOption[]; subjectGroups?: SubjectGroupOption[]; learningCentres: LearningCentreOption[] }
+export interface CurrentSemesterOption extends SemesterOption { semesterType: 'NORMAL' | 'SHORT' }
+export interface ProfileOptions { curricula: CurriculumOption[]; subjects: SubjectOption[]; semesters: SemesterOption[]; currentSemester: CurrentSemesterOption | null; currentAcademicYear: string | null; subjectGroups?: SubjectGroupOption[]; learningCentres: LearningCentreOption[] }
 export type Parameter = string | number | boolean | null;
 export type Query = (text: string, parameters: Parameter[]) => Promise<Record<string, unknown>[]>;
 export interface ProfileRepository {

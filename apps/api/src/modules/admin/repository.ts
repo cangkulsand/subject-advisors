@@ -1,4 +1,4 @@
-import type { AdminAuditQuery, AdminAuditEvent, AdminInvitation, AdminMembership, AdminOverview, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditQuery, AdminAuditEvent, AdminInvitation, AdminMembership, AdminOverview, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import type { AccountDetailRow, AccountRow, AdminRepository } from './contracts';
 import { AdminMutationError, GUARD_MARKER, mapAdminDatabaseError, type AdminErrorCode } from './errors';
 export type AdminQuery = (sql: string, values: unknown[]) => Promise<Record<string, unknown>[]>;
@@ -28,6 +28,14 @@ const events = `SELECT 'role:' || l.user_role_audit_log_id AS "eventId", l.acces
   'ACCESS', l.change_type, NULL::varchar, l.old_value, l.new_value, l.reason, l.created_at
   FROM public.user_access_audit_log l JOIN public.user_access_assignment a USING(access_assignment_id)`;
 
+const programmeColumns = `p.student_id AS "studentId", p.student_name AS "studentName", p.matric_no AS "matricNo", p.curriculum_id AS "curriculumId",
+  c.curriculum_version AS "curriculumVersion", g.programme_id AS "programmeId", g.programme_code AS "programmeCode", g.programme_name AS "programmeName"`;
+const programmeFrom = `public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
+  JOIN public.curriculum c ON c.curriculum_id=p.curriculum_id JOIN public.programme g ON g.programme_id=c.programme_id`;
+function programmeRow(row: Record<string, unknown>): AdminStudentProgramme {
+  return { studentId: integer(row.studentId), studentName: String(row.studentName), matricNo: row.matricNo == null ? null : String(row.matricNo), curriculumId: integer(row.curriculumId),
+    curriculumVersion: String(row.curriculumVersion), programmeId: integer(row.programmeId), programmeCode: String(row.programmeCode), programmeName: String(row.programmeName) };
+}
 const membershipColumns = `app_role AS role, email_policy AS "emailPolicy", grant_source AS source,
   protected_owner AS "protectedOwner", grant_reason AS reason, created_at AS "grantedAt"`;
 const membershipRow = (row: Record<string, unknown>) => ({ ...row, grantedAt: timestamp(row.grantedAt) }) as unknown as AdminMembership;
@@ -246,6 +254,29 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       const results = await run(actor, 'Expire lapsed invitations', [{
         text: "UPDATE public.admin_user_invitation SET status='EXPIRED' WHERE status='PENDING' AND expires_at<=clock_timestamp() RETURNING invitation_id", values: [] }]);
       return results[0]?.length ?? 0;
+    },
+    async studentProgramme(accountId) {
+      const rows = await query(`SELECT ${programmeColumns} FROM ${programmeFrom} WHERE a.access_assignment_id=$1`, [accountId]);
+      return rows[0] ? programmeRow(rows[0]) : null;
+    },
+    async curriculumOptions() {
+      const rows = await query(`SELECT c.curriculum_id AS "curriculumId", c.curriculum_version AS "curriculumVersion", g.programme_id AS "programmeId",
+        g.programme_code AS "programmeCode", g.programme_name AS "programmeName" FROM public.curriculum c JOIN public.programme g USING(programme_id)
+        WHERE coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE' ORDER BY g.programme_code, c.curriculum_version`, []);
+      return rows.map(row => ({ curriculumId: integer(row.curriculumId), curriculumVersion: String(row.curriculumVersion), programmeId: integer(row.programmeId),
+        programmeCode: String(row.programmeCode), programmeName: String(row.programmeName) }) as AdminCurriculumOption);
+    },
+    async changeStudentProgramme(accountId, curriculumId, actor, reason): Promise<AdminProgrammeChange> {
+      // The database function locks the profile row, validates the curriculum, removes the stale picks, updates the profile and writes the audit row.
+      const results = await run(actor, reason, [
+        guard(noAccount('$1'), [accountId], 'NOT_FOUND'),
+        { text: `SELECT public.db_change_student_programme((SELECT p.student_id FROM public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
+          WHERE a.access_assignment_id=$1), $2::integer) AS "removedPicks"`, values: [accountId, curriculumId] },
+        { text: `SELECT ${programmeColumns} FROM ${programmeFrom} WHERE a.access_assignment_id=$1`, values: [accountId] },
+      ]);
+      const removed = results[1]?.[0], programme = results[2]?.[0];
+      if (!removed || !programme) throw new AdminMutationError('MUTATION_FAILED');
+      return { programme: programmeRow(programme), removedPicks: integer(removed.removedPicks) };
     },
     async acceptInvitation(invitationId, accountId, actor) {
       const results = await run(actor, 'Invitation accepted', [{

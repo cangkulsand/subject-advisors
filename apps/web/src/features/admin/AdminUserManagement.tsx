@@ -18,7 +18,7 @@ function ReasonField({ label, value, onChange, disabled, autoFocus, textareaRef 
  * In-page confirmation for every mutation. A native modal dialog gives focus containment, Escape and an
  * inert background without any window.confirm/alert/prompt. It stays open on failure so the server message is shown inline.
  */
-export function ReasonDialog({ title, description, confirmLabel, danger, onSubmit, onCancel }: { title: string; description: ReactNode; confirmLabel: string; danger?: boolean; onSubmit: (reason: string) => Promise<void>; onCancel: () => void }) {
+export function ReasonDialog({ title, description, confirmLabel, danger, disabled, onSubmit, onCancel }: { title: string; description: ReactNode; confirmLabel: string; danger?: boolean; disabled?: boolean; onSubmit: (reason: string) => Promise<void>; onCancel: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), field = useRef<HTMLTextAreaElement>(null), inFlight = useRef(false), mounted = useRef(true);
   const [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const titleId = useId();
@@ -51,7 +51,7 @@ export function ReasonDialog({ title, description, confirmLabel, danger, onSubmi
       {error && <p className="admin-form-error" role="alert">{error}</p>}
       <div className="admin-dialog-actions">
         <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
-        <button type="submit" className={danger ? 'admin-danger' : 'admin-primary'} disabled={busy || !valid} aria-busy={busy}>{busy ? 'Working…' : confirmLabel}</button>
+        <button type="submit" className={danger ? 'admin-danger' : 'admin-primary'} disabled={busy || !valid || disabled} aria-busy={busy}>{busy ? 'Working…' : confirmLabel}</button>
       </div>
     </form>
   </dialog>;

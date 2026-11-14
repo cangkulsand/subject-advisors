@@ -26,7 +26,7 @@ const server = createServer(async (req, res) => {
       res.statusCode = result?.status ?? 405; res.end(JSON.stringify(result?.payload ?? { error: { code: 'METHOD_NOT_ALLOWED', message: 'Not supported.' } }));
     } else {
       const data = fixtureResponse(url, serveState);
-      res.statusCode = data !== null || url.pathname === '/api/admin/academic-setup/current-semester' ? 200 : 404; res.end(JSON.stringify({ data }));
+      res.statusCode = data !== null || url.pathname === '/api/admin/academic-setup/current-semester' || /^\/api\/admin\/users\/\d+\/programme$/.test(url.pathname) ? 200 : 404; res.end(JSON.stringify({ data }));
     }
   } else {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -52,7 +52,7 @@ else {
         return;
       }
       const data = fixtureResponse(url, state);
-      await route.fulfill({ status: failed ? 503 : data !== null || url.pathname === '/api/admin/academic-setup/current-semester' ? 200 : 404, contentType: 'application/json', body: JSON.stringify(failed ? { error: { code: 'ADMIN_UNAVAILABLE', message: 'Fixture service unavailable. Please retry.' } } : { data }) });
+      await route.fulfill({ status: failed ? 503 : data !== null || url.pathname === '/api/admin/academic-setup/current-semester' || /^\/api\/admin\/users\/\d+\/programme$/.test(url.pathname) ? 200 : 404, contentType: 'application/json', body: JSON.stringify(failed ? { error: { code: 'ADMIN_UNAVAILABLE', message: 'Fixture service unavailable. Please retry.' } } : { data }) });
     });
     return state;
   }
@@ -76,7 +76,7 @@ else {
       assert.equal(await page.getByRole('link', { name: 'Academic Semesters', exact: true, includeHidden: true }).count(), 2); // Desktop and mobile dialog.
       await page.getByRole('link', { name: 'Academic Semesters', exact: true }).click();
       await page.getByRole('heading', { name: 'Academic Semesters', exact: true }).waitFor();
-      await page.getByText('Not configured', { exact: true }).waitFor();
+      await page.getByRole('group', { name: 'Current semester', exact: true }).getByText('Not configured', { exact: true }).waitFor();
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/admin/academic-setup/semesters', '/api/admin/academic-setup/current-semester']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
       await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
@@ -463,6 +463,36 @@ else {
       await page.goto(base + '/admin/users/2?test-user=user_someone_else'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Remove role System Admin' }).count(), 1);
       assert.equal(await page.getByRole('button', { name: 'Suspend account', exact: true }).count(), 1);
+    });
+    await check('student programme: shown for student profiles, hidden otherwise, changed with a reason and the removed pick count', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/6'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.getByRole('heading', { name: 'Student programme' }).count(), 0); // account 6 has no student profile
+      await page.goto(base + '/admin/users/4'); const card = page.getByLabel('Student programme', { exact: true }); await card.waitFor();
+      await card.getByText('DEMO — DEMO Not official', { exact: true }).waitFor(); await card.getByText('Fictional Account 4 (A22EC0004)', { exact: true }).waitFor();
+      await page.screenshot({ path: '.wrangler/admin-review/student-programme-desktop.png', fullPage: true });
+      await card.getByRole('button', { name: 'Change programme', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Change programme' }); await dialog.waitFor();
+      const choose = dialog.getByLabel('New programme', { exact: true });
+      await choose.locator('option', { hasText: 'OTHER' }).waitFor({ state: 'attached' });
+      assert.deepEqual(await choose.locator('option').allInnerTexts(), ['Choose a programme', 'OTHER — DEMO Other programme (version DEMO_B)']); // the current programme is not offered
+      const confirm = dialog.getByRole('button', { name: 'Change programme', exact: true });
+      assert.equal(await confirm.isDisabled(), true);
+      await choose.selectOption('2'); assert.equal(await confirm.isDisabled(), true); // a reason is required too
+      await dialog.getByLabel(reasonLabel).fill('Fictional: registered on the wrong programme.'); assert.equal(await confirm.isDisabled(), false);
+      await page.screenshot({ path: '.wrangler/admin-review/student-programme-dialog-desktop.png', fullPage: true });
+      state.mutationError = { status: 409, code: 'CURRICULUM_UNAVAILABLE', message: 'The selected programme is not available. Choose an active programme.' };
+      await confirm.click(); await dialog.getByRole('alert').filter({ hasText: 'not available' }).waitFor(); assert.equal(await dialog.isVisible(), true);
+      delete state.mutationError; await confirm.click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Programme changed; 3 subject picks removed.' }).waitFor();
+      await card.getByText('OTHER — DEMO Other programme', { exact: true }).waitFor();
+      assert.deepEqual(state.bodies.filter(item => item.method === 'PATCH').at(-1).body, { curriculumId: 2, reason: 'Fictional: registered on the wrong programme.' });
+      // A second student with no saved picks.
+      await page.goto(base + '/admin/users/5'); await card.waitFor();
+      await card.getByRole('button', { name: 'Change programme', exact: true }).click();
+      await dialog.getByLabel('New programme', { exact: true }).locator('option', { hasText: 'DEMO_A' }).waitFor({ state: 'attached' });
+      await dialog.getByLabel('New programme', { exact: true }).selectOption('1'); await dialog.getByLabel(reasonLabel).fill('Fictional: correction.');
+      await dialog.getByRole('button', { name: 'Change programme', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Programme changed; 0 subject picks removed.' }).waitFor();
     });
     for (const width of [320, 375, 768]) await check('user management has no horizontal overflow and keeps dialog on screen at ' + width, async page => {
       const state = await mock(page); await page.setViewportSize({ width, height: 844 });

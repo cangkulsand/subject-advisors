@@ -93,4 +93,19 @@ export async function runAcademicRaces(observer,connect){
  const history=await observer.query('SELECT count(*)::int AS total,count(*) FILTER(WHERE ended_at IS NOT NULL)::int AS ended FROM public.coordinator_assignment WHERE programme_id=-8001');
  assert.equal(history.rows[0].total,history.rows[0].ended);assert.ok(history.rows[0].ended>=7);
  console.log('PASS ended assignment histories retained across all races');
+ // Department level (0010): a programme link and a department move/deactivation serialize on the department row.
+ await write('UPDATE public.faculty SET is_active=true WHERE faculty_id=-8001');
+ await write(`INSERT INTO public.department(department_id,department_code,department_name,faculty_id) VALUES(-8001,'__RACE_D__','Synthetic department',-8001)`);
+ const link='UPDATE public.programme SET department_id=-8001,faculty_id=-8001 WHERE programme_id=-8001';
+ const unlink='UPDATE public.programme SET department_id=NULL,faculty_id=NULL WHERE programme_id=-8001';
+ await write(unlink);
+ await race('programme department link blocks department move',link,'UPDATE public.department SET faculty_id=-8002 WHERE department_id=-8001','23514');
+ await write(unlink);
+ await race('department move blocks stale programme link','UPDATE public.department SET faculty_id=-8002 WHERE department_id=-8001',link,'23514');
+ await write('UPDATE public.department SET faculty_id=-8001 WHERE department_id=-8001');
+ await race('department deactivation rejects waiting programme link','UPDATE public.department SET is_active=false WHERE department_id=-8001',link,'23514');
+ await write('UPDATE public.department SET is_active=true WHERE department_id=-8001');
+ await write(link);
+ await reject('UPDATE public.programme SET faculty_id=-8002 WHERE programme_id=-8001','23514','PROGRAMME_FACULTY_MISMATCH');
+ console.log('PASS department level races and faculty consistency');
 }

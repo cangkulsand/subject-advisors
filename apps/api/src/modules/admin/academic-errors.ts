@@ -10,6 +10,7 @@ const catalogue: Record<AcademicSetupErrorCode, { status: number; message: strin
   PROGRAMME_FACULTY_MISMATCH: { status: 409, message: 'The programme must belong to the selected faculty.' },
   ASSIGNMENT_ACTIVE: { status: 409, message: 'An active assignment already exists.' },
   ASSIGNMENT_ENDED: { status: 409, message: 'The assignment has already ended.' },
+  DEPARTMENT_HAS_PROGRAMMES: { status: 409, message: 'A department with programmes cannot move to another faculty. Reassign its programmes first.' },
 };
 /** Repository domain boundary: fixed messages only, never driver messages or SQL. */
 export class AcademicSetupDomainError extends Error {

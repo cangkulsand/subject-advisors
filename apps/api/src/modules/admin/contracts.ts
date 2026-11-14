@@ -1,5 +1,5 @@
 import type { AuthDependencies } from '../auth/contracts';
-import type { AdminAccount, AdminAuditEvent, AdminAuditQuery, AdminMembership, AdminOverview, AdminPage, AdminUsersQuery, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminRole, AdminStatus } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAccount, AdminAuditEvent, AdminAuditQuery, AdminMembership, AdminOverview, AdminPage, AdminUsersQuery, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminRole, AdminStatus } from '../../../../../packages/shared/src/admin/admin';
 export type AccountRow = Omit<AdminAccount, 'identity'>;
 export type AccountDetailRow = AccountRow & { memberships: AdminMembership[] };
 export interface AdminInvitationQuery { page: number; status?: AdminInvitationStatus | '' }
@@ -28,6 +28,15 @@ export interface AdminRepository {
   /** Marks every lapsed PENDING invitation EXPIRED; returns how many rows changed. */
   expireInvitations(actor: string): Promise<number>;
   acceptInvitation(invitationId: string, accountId: number, actor: string): Promise<AdminInvitation>;
+  /** The account's student programme, or null when the account has no student profile. */
+  studentProgramme(accountId: number): Promise<AdminStudentProgramme | null>;
+  /** Active curricula (programme + version) an administrator may assign, ordered by programme code and version. */
+  curriculumOptions(): Promise<AdminCurriculumOption[]>;
+  /**
+   * Moves the student to another active curriculum in one transaction (db_change_student_programme): removes the saved
+   * semester picks of not-yet-closed future semesters, keeps academic records, and writes the append-only audit row.
+   */
+  changeStudentProgramme(accountId: number, curriculumId: number, actor: string, reason: string): Promise<AdminProgrammeChange>;
 }
 export interface AdminIdentities {
   search(query: string): Promise<{ ids: string[]; total: number }>;

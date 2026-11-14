@@ -22,6 +22,15 @@ alongside this baseline. The old P004 file is historical evidence only.
 8. 0008_admin_academic_setup.sql: faculty/programme links, centre activation, explicit
    system current semester, coordinator assignment history and immutable academic audit.
    This branch's manifest intentionally skips absent 0007 for isolated local testing only.
+9. 0010_department.sql (applies after 0009): additive `department` table (faculty -> department -> programme),
+   nullable `programme.department_id`, faculty-consistency and department-move guards, and audit coverage of
+   department rows; static check `db/checks/015_department.sql`. No department rows are seeded.
+10. 0011_student_programme_change.sql (applies after 0010): admin-controlled student programme change. Adds only
+   `migration_meta.programme_change_context`, `public.db_change_student_programme(student_id, curriculum_id)` and a
+   replaced `db_preserve_membership()` whose student-curriculum guard stands aside inside that function (same
+   transaction-context pattern as `db_set_current_semester`); no public table or column. The change is audited in
+   `academic_setup_audit_log` (`entity_type='student_programme'`). Static check
+   `db/checks/016_student_programme_change.sql`.
 
 ### Academic setup integration gate (0008)
 

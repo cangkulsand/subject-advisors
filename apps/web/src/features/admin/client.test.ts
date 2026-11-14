@@ -59,3 +59,26 @@ it('rejects a malformed mutation response and parses API errors into AdminApiErr
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' } }, { status: 422 })));
   await expect(createAdminClient(async () => 'TEST_ONLY').grantRole(5, { role: 'SYSTEM_ADMIN', reason: 'Why' })).rejects.toMatchObject({ name: 'Error', status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' });
 });
+const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' };
+it('reads the student programme and curriculum options and validates the rows', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: programmeRow })); vi.stubGlobal('fetch', fetcher);
+  expect(await createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).toEqual(programmeRow);
+  expect(fetcher).toHaveBeenCalledWith('/api/admin/users/5/programme', expect.objectContaining({ method: 'GET', headers: { Authorization: 'Bearer TEST_ONLY' } }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: null })));
+  expect(await createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).toBeNull();
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }] })));
+  expect(await createAdminClient(async () => 'TEST_ONLY').curriculumOptions()).toHaveLength(1);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ curriculumId: 'x' }] })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').curriculumOptions()).rejects.toThrow('Invalid administration response');
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { ...programmeRow, studentId: 0 } })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).rejects.toThrow('Invalid administration response');
+});
+it('changeProgramme PATCHes the curriculum with a reason and decodes the removed pick count', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: { programme: programmeRow, removedPicks: 3 } })); vi.stubGlobal('fetch', fetcher);
+  expect(await createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).toEqual({ programme: programmeRow, removedPicks: 3 });
+  expect(fetcher).toHaveBeenCalledWith('/api/admin/users/5/programme', expect.objectContaining({ method: 'PATCH', headers: { Authorization: 'Bearer TEST_ONLY', 'Content-Type': 'application/json' }, body: JSON.stringify({ curriculumId: 2, reason: 'Why' }) }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { programme: programmeRow, removedPicks: -1 } })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).rejects.toThrow('Invalid administration response');
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'PROGRAMME_UNCHANGED', message: 'The student is already on this programme.' } }, { status: 409 })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).rejects.toMatchObject({ status: 409, code: 'PROGRAMME_UNCHANGED' });
+});

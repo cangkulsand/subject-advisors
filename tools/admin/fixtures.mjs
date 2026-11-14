@@ -21,9 +21,16 @@ const invitations = [
   { id: '00000000-0000-4000-8000-000000000003', email: 'accepted@utm.my', roles: ['COORDINATOR'], status: 'ACCEPTED', invitedBy: 'user_fictional_operator', reason: 'Fictional invitation.', createdAt: generatedAt, expiresAt: '2026-11-04T10:00:00.000Z', acceptedAt: generatedAt },
   { id: '00000000-0000-4000-8000-000000000004', email: 'revoked@utm.my', roles: ['SYSTEM_ADMIN'], status: 'REVOKED', invitedBy: 'user_fictional_operator', reason: 'Fictional invitation.', createdAt: generatedAt, expiresAt: '2026-11-04T10:00:00.000Z', acceptedAt: null },
 ];
+// Student programme change (S2-P004-026): only accounts 4 and 5 have a student profile.
+const curricula = [
+  { curriculumId: 1, curriculumVersion: 'DEMO_A', programmeId: 1, programmeCode: 'DEMO', programmeName: 'DEMO Not official' },
+  { curriculumId: 2, curriculumVersion: 'DEMO_B', programmeId: 2, programmeCode: 'OTHER', programmeName: 'DEMO Other programme' },
+];
+const studentProfiles = { 4: { studentId: 14, studentName: 'Fictional Account 4', matricNo: 'A22EC0004', curriculumId: 1, picks: 3 }, 5: { studentId: 15, studentName: 'Fictional Account 5', matricNo: null, curriculumId: 2, picks: 0 } };
+const programmeOf = profile => { const option = curricula.find(item => item.curriculumId === profile.curriculumId); return { studentId: profile.studentId, studentName: profile.studentName, matricNo: profile.matricNo, ...option }; };
 /** Per-session mutable copy so one browser check never leaks edits into another. */
 function store(state) {
-  return state.store ??= { accounts: structuredClone(accounts), invitations: structuredClone(invitations), events: structuredClone(events), nextId: accounts.length + 1 };
+  return state.store ??= { accounts: structuredClone(accounts), invitations: structuredClone(invitations), events: structuredClone(events), nextId: accounts.length + 1, profiles: structuredClone(studentProfiles) };
 }
 function membershipsOf(account) {
   return account.memberships ?? account.roles.map(role => ({ role, emailPolicy: 'ROLE_DOMAIN', source: 'OPERATOR', protectedOwner: role === 'SYSTEM_ADMIN' && account.protectedOwner, reason: 'Explicit fictional fixture assignment.', grantedAt: generatedAt }));
@@ -61,6 +68,13 @@ export function fixtureResponse(url, state = {}) {
     const account = store(state).accounts.find(item => item.accountId === Number(url.pathname.split('/').pop()));
     return account ? detailOf(account) : null;
   }
+  if (/^\/api\/admin\/users\/\d+\/programme$/.test(url.pathname)) {
+    const accountId = Number(url.pathname.split('/')[4]);
+    if (!store(state).accounts.some(item => item.accountId === accountId)) return null;
+    const profile = store(state).profiles[accountId];
+    return profile ? programmeOf(profile) : null;
+  }
+  if (url.pathname === '/api/admin/curriculum-options') return curricula;
   if (url.pathname === '/api/admin/invitations') {
     const status = url.searchParams.get('status');
     return paged(state.empty ? [] : store(state).invitations.filter(item => !status || item.status === status), url);
@@ -102,6 +116,15 @@ export function fixtureMutation(method, url, body, state = {}) {
     if (row.status !== 'PENDING') return failure(409, 'INVITATION_NOT_PENDING', 'The invitation is no longer pending.');
     row.status = 'REVOKED';
     return { status: 200, payload: { data: row } };
+  }
+  const programmeRoute = /^\/api\/admin\/users\/(\d+)\/programme$/.exec(url.pathname);
+  if (method === 'PATCH' && programmeRoute) {
+    const profile = data.profiles[Number(programmeRoute[1])];
+    if (!profile) return failure(404, 'STUDENT_PROFILE_NOT_FOUND', 'This account has no student profile yet.');
+    if (!curricula.some(item => item.curriculumId === body.curriculumId)) return failure(409, 'CURRICULUM_UNAVAILABLE', 'The selected programme is not available. Choose an active programme.');
+    if (profile.curriculumId === body.curriculumId) return failure(409, 'PROGRAMME_UNCHANGED', 'The student is already on this programme.');
+    const removedPicks = profile.picks; profile.curriculumId = body.curriculumId; profile.picks = 0;
+    return { status: 200, payload: { data: { programme: programmeOf(profile), removedPicks } } };
   }
   const route = /^\/api\/admin\/users\/(\d+)\/(roles|access)(?:\/([A-Z_]+))?$/.exec(url.pathname);
   if (!route) return null;
