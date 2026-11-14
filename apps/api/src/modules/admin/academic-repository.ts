@@ -21,6 +21,15 @@ const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_cod
   d.faculty_id AS "departmentFacultyId", d.is_active AS "departmentIsActive"
   FROM public.programme p LEFT JOIN public.faculty f ON f.faculty_id=p.faculty_id
   LEFT JOIN public.department d ON d.department_id=p.department_id`;
+const curriculumColumns = `c.curriculum_id AS "curriculumId", c.programme_id AS "programmeId", c.curriculum_version AS "curriculumVersion",
+  c.total_credit_required AS "totalCreditRequired", c.effective_year AS "effectiveYear", coalesce(upper(c.status),'ACTIVE')='ACTIVE' AS "isActive",
+  (SELECT count(*) FROM public.curriculum_subject cs WHERE cs.curriculum_id=c.curriculum_id)::int AS "subjectCount"`;
+const programmeFields = { programmeCode: 'programme_code', programmeName: 'programme_name', level: 'level', status: 'status' };
+const curriculumFields = { curriculumVersion: 'curriculum_version', totalCreditRequired: 'total_credit_required', effectiveYear: 'effective_year', status: 'status' };
+const withStatus = <T extends { isActive?: boolean }>(input: T): object => {
+  const { isActive, ...rest } = input;
+  return isActive === undefined ? rest : { ...rest, status: isActive ? 'ACTIVE' : 'INACTIVE' };
+};
 const assignmentColumns = `assignment_id AS "assignmentId", access_assignment_id AS "accountId", faculty_id AS "facultyId",
   programme_id AS "programmeId", learning_centre_id AS "learningCentreId", started_at AS "startedAt", ended_at AS "endedAt"`;
 const scopeSelect = `SELECT DISTINCT c.faculty_id AS "facultyId", c.programme_id AS "programmeId", c.learning_centre_id AS "learningCentreId"
@@ -40,6 +49,8 @@ const department = (r: Row): C.Department => ({ departmentId: Number(r.departmen
 const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), level: r.level == null ? null : String(r.level), isActive: r.programmeIsActive === true, facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r),
   departmentId: r.departmentId == null ? null : Number(r.departmentId),
   department: r.departmentId == null ? null : department({ departmentId: r.departmentId, departmentCode: r.departmentCode, departmentName: r.departmentName, facultyId: r.departmentFacultyId, isActive: r.departmentIsActive }) });
+const curriculum = (r: Row): C.Curriculum => ({ curriculumId: Number(r.curriculumId), programmeId: Number(r.programmeId), curriculumVersion: String(r.curriculumVersion), totalCreditRequired: Number(r.totalCreditRequired),
+  effectiveYear: r.effectiveYear == null ? null : Number(r.effectiveYear), isActive: r.isActive === true, subjectCount: Number(r.subjectCount) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
 const timestamp = (v: unknown) => (v instanceof Date ? v : new Date(String(v))).toISOString();
 const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });
@@ -84,6 +95,17 @@ export function createAcademicSetupRepository(query: AdminQuery, transaction: Ad
     // The faculty is derived from the department in the same statement; the programme department guard re-verifies it under a row lock.
     setProgrammeDepartment: (id, input, actor) => write(actor, input.reason, [statement(`UPDATE public.programme SET department_id=$2::integer, faculty_id=CASE WHEN $2::integer IS NULL THEN CASE WHEN department_id IS NULL THEN faculty_id END ELSE (SELECT d.faculty_id FROM public.department d WHERE d.department_id=$2::integer) END WHERE programme_id=$1 RETURNING programme_id`, [id, input.departmentId]),
       statement(programmeSelect + ' WHERE p.programme_id=$1', [id])], programme),
+    // Faculty comes from the department row in the INSERT itself; unknown department yields no row (NOT_FOUND), an inactive one trips the 0010 guard.
+    createProgramme: (input, actor) => write(actor, input.reason, [statement(`WITH created AS (INSERT INTO public.programme(programme_code,programme_name,level,status,department_id,faculty_id)
+      SELECT $1,$2,$3,'ACTIVE',d.department_id,d.faculty_id FROM public.department d WHERE d.department_id=$4 RETURNING *)
+      ` + programmeSelect.replace('FROM public.programme p', 'FROM created p'), [input.programmeCode, input.programmeName, input.level, input.departmentId])], programme),
+    updateProgramme: (id, input, actor) => write(actor, input.reason, [patch('programme', 'programme_id', id, withStatus(input), programmeFields, 'programme_id'),
+      statement(programmeSelect + ' WHERE p.programme_id=$1', [id])], programme),
+    listCurricula: () => read(`SELECT ${curriculumColumns} FROM public.curriculum c JOIN public.programme p ON p.programme_id=c.programme_id ORDER BY p.programme_code, c.curriculum_version, c.curriculum_id`, [], curriculum),
+    createCurriculum: (input, actor) => write(actor, input.reason, [statement(`WITH c AS (INSERT INTO public.curriculum(programme_id,curriculum_version,total_credit_required,status,effective_year)
+      VALUES ($1,$2,$3,'ACTIVE',$4) RETURNING *) SELECT ${curriculumColumns} FROM c`, [input.programmeId, input.curriculumVersion, input.totalCreditRequired, input.effectiveYear])], curriculum),
+    updateCurriculum: (id, input, actor) => write(actor, input.reason, [patch('curriculum', 'curriculum_id', id, withStatus(input), curriculumFields, 'curriculum_id'),
+      statement(`SELECT ${curriculumColumns} FROM public.curriculum c WHERE c.curriculum_id=$1`, [id])], curriculum),
     listAcademicSemesters: () => read(`SELECT ${semesterColumns} FROM public.academic_semester ORDER BY academic_year, semester_no, semester_id`, [], semester),
     createAcademicSemester: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.academic_semester(academic_year,semester_no,semester_type,max_subjects,max_credits,start_date,end_date,selection_opens_at,selection_closes_at)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${semesterColumns}`, [input.academicYear, input.semesterNo, input.semesterType, input.maxSubjects, input.maxCredits, input.startDate, input.endDate, input.selectionOpensAt ?? null, input.selectionClosesAt ?? null])], semester),
