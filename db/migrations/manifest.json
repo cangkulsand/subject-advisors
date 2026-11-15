@@ -67,6 +67,11 @@
       "version": "0012",
       "file": "0012_programme_curriculum_admin.sql",
       "description": "UC25 admin programmes and curricula: NULL curriculum status set ACTIVE, audited programme/curriculum changes and active-programme guard"
+    },
+    {
+      "version": "0013",
+      "file": "0013_graduation_confirmations.sql",
+      "description": "UC13 graduation check: student-confirmed fees-cleared and MUET timestamps on student_profile"
     }
   ],
   "historicalExcluded": [
