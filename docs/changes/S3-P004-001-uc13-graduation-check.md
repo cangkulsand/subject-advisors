@@ -18,7 +18,7 @@ Decisions:
 - The credit requirement is the curriculum Total credits set on the admin Programmes page (UC25).
 - The admin Graduation Requirements placeholder (UC07) was removed by owner decision on 2026-11-15; the credit requirement is the curriculum Total credits on the admin Programmes page (UC25). `/admin/requirements` now behaves like any unknown admin path ("Page not found").
 - The SRS/SDD in `docs/System Documents/` was deliberately NOT updated.
-- Migration 0013 is NOT yet applied to Neon. Rollback: revert the branch commits and drop the two columns (`ALTER TABLE student_profile DROP COLUMN fees_cleared_confirmed_at, DROP COLUMN muet_confirmed_at`).
+- Migration 0013 was applied to Neon development (shared by dev and prod) on 2026-11-15 by the controller; `npm run db:verify` 46 PASS. Rollback: revert the branch commits and drop the two columns (`ALTER TABLE student_profile DROP COLUMN fees_cleared_confirmed_at, DROP COLUMN muet_confirmed_at`).
 
 ## 2. Implementation
 
@@ -42,9 +42,10 @@ Decisions:
 - `PLAYWRIGHT_CHANNEL=chrome npm run test:ui:offerings`: 57 browser checks passed
 - `PLAYWRIGHT_CHANNEL=chrome npm run test:ui:admin`: 50 administration browser checks passed
 
-Not verified: no database was used (migration 0013 not applied; API behaviour covered by unit tests with fakes); the UI was checked with mocks only.
+Database: 0013 applied to Neon on 2026-11-15; `db:verify` 46 PASS, including the new `018` checks. `db/checks/001` and `004` were updated to register the two new `student_profile` columns, and `018` was added to the `db:verify` list in `tools/db/cli.mjs`. Not verified: the live API against the database (unit tests use fakes); the UI was checked with mocks only.
 
 ## 4. Changelog
 
 - 2026-11-15 - Type: Added. Graduation check (UC13): `/student/graduation`, `GET /api/graduation-check`, `PUT /api/graduation-check/confirmations`; migration 0013 adds `student_profile.fees_cleared_confirmed_at` and `muet_confirmed_at`. Compatibility: additive nullable columns; existing endpoints unchanged. Outstanding: apply 0013 to Neon; human peer review; SRS/SDD not updated.
 - 2026-11-15 - Removed: admin Graduation Requirements placeholder page and menu item (`/admin/requirements`), by owner decision; the credit requirement is the curriculum Total credits on the admin Programmes page (UC25).
+- 2026-11-15 - Database: migration 0013 applied to Neon; schema checks 001/004 register the new columns; 018 added to db:verify (46 PASS).
