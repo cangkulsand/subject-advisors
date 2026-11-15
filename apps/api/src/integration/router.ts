@@ -23,6 +23,11 @@ export async function dispatchIntegratedRequest(request: Request, services: Inte
     await authorize(request, services.auth, { roles: ['SYSTEM_ADMIN'] });
     return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
   }
+  if (path === '/api/p001-sprint2/progress') {
+    if (services.curriculum) return await services.curriculum(request) ?? authJson({ error: { code: 'FEATURE_ROUTE_UNAVAILABLE', message: 'This academic service is temporarily unavailable.' } }, 503);
+    await authorize(request, services.auth, { roles: ['STUDENT'] });
+    return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
+  }
   const profileRoute = path === '/api/profile' || path === '/api/profile/options' || path === '/api/academic-records' || /^\/api\/academic-records\/[^/]+$/.test(path);
   const offeringRoute = path === '/api/semester-offerings';
   const pathwayRoute = path === '/api/pathway/graph';
