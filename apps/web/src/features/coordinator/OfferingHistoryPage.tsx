@@ -33,16 +33,15 @@ function History({ client, scope }: { client: CoordinatorClient; scope: Forecast
             <th scope="row"><strong>{row.name}</strong><span className="coordinator-subject-code">{row.code}</span></th>
             <td>{row.credits}</td>
             <td><span className={'admin-pill ' + (row.decision === 'Approved' ? 'coordinator-pill-success' : 'coordinator-pill-muted')}>{row.decision}</span></td>
-            <td><strong className="coordinator-number">{row.picks ?? '—'}</strong>
-              {row.picks ? <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View students for ${row.code}`} onClick={() => setViewing({ subjectId: row.subjectId, code: row.code })}>View students</button> : null}</td>
+            <td><div className="coordinator-pick-cell"><strong className="coordinator-number">{row.picks ?? '—'}</strong>
+              {row.picks ? <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View students for ${row.code}`} onClick={() => setViewing({ subjectId: row.subjectId, code: row.code })}>View students</button> : null}</div></td>
           </tr>)}</tbody></table></div>}
     {viewing && <SubjectPickersDialog client={client} scope={scope} subjectId={viewing.subjectId} subjectCode={viewing.code} cache={pickerCache.current} onClose={() => setViewing(null)}/>}
   </section>;
 }
 
 interface Pair { programmeId: number; learningCentreId: number }
-const assignedPairs = (context: ForecastContext): Pair[] => context.assignedScopes
-  ?? context.programmes.flatMap(programme => context.learningCentres.map(centre => ({ programmeId: programme.programmeId, learningCentreId: centre.learningCentreId })));
+const assignedPairs = (context: ForecastContext): Pair[] => context.assignedScopes ?? [];
 
 function Chooser({ client, context }: { client: CoordinatorClient; context: ForecastContext }) {
   const programmeField = useId(), centreField = useId(), semesterField = useId();

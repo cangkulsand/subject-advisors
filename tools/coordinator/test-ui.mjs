@@ -897,6 +897,13 @@ else {
       assert.ok(!state.requests.some(request => request.path.includes('offering-decisions')), 'no decisions request');
     });
 
+    await check('history: a coordinator without assignments sees the not-assigned message and no decisions request', async page => {
+      const state = await mock(page, { noAssignments: true, history: true }); await page.goto(base + '/coordinator/history');
+      await page.getByRole('heading', { name: 'Offering History', exact: true }).first().waitFor();
+      await page.getByRole('status').filter({ hasText: 'You are not assigned to any programme and learning centre yet.' }).waitFor();
+      assert.ok(!state.requests.some(request => request.path.includes('offering-decisions')), 'no decisions request');
+    });
+
     await check('history: a failed decisions request shows an alert and Try again recovers', async page => {
       const state = await mock(page, { history: true }); await page.goto(base + '/coordinator/history'); await historyReady(page);
       state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
