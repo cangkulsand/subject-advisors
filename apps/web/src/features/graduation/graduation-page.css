@@ -9,7 +9,7 @@
   --gp-action: var(--color-action, #6b1d2f);
   --gp-focus: var(--color-focus, #6b1d2f);
   color: var(--gp-body); font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
-  font-size: var(--font-size-control); line-height: 1.6; max-width: 880px; margin: auto; padding: 40px 32px 64px; overflow-wrap: anywhere;
+  font-size: var(--font-size-control); line-height: 1.6; max-width: 1184px; margin: auto; padding: 40px 32px 64px; overflow-wrap: anywhere;
 }
 .graduation-page *, .graduation-page *::before, .graduation-page *::after { box-sizing: border-box; }
 .graduation-page h1, .graduation-page h2, .graduation-page p { margin: 0; }
@@ -28,15 +28,15 @@
 .graduation-bar { margin-top: 20px; }
 .graduation-bar label { display: block; margin-bottom: 8px; font-weight: 650; color: var(--gp-heading); }
 .graduation-bar progress { width: 100%; height: 16px; accent-color: var(--gp-action); }
-.graduation-bar p { margin-top: 8px; color: var(--gp-muted); }
+.graduation-page .graduation-bar p { margin-top: 8px; color: var(--gp-muted); }
 .graduation-missing { margin: 8px 0 0; padding-left: 22px; }
 .graduation-check { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: var(--control-min-height, 44px); padding: 8px 0; border-top: 1px solid var(--gp-outline); }
 .graduation-card > h2 + .graduation-check { margin-top: 12px; }
 .graduation-check label { display: flex; align-items: center; gap: 12px; min-height: var(--control-min-height, 44px); color: var(--gp-heading); font-weight: 650; cursor: pointer; }
 .graduation-check input { width: 22px; height: 22px; flex: none; accent-color: var(--gp-action); }
 .graduation-check span { color: var(--gp-muted); }
-.graduation-notice { margin: 24px 0 0; border: 1px solid var(--color-warning-text, #92400e); border-radius: 10px; background: var(--color-warning-bg, #fffbeb); padding: 14px 18px; color: var(--color-warning-text, #92400e); }
-.graduation-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; border: 1px solid var(--color-danger-text, #b91c1c); border-radius: 10px; background: var(--color-danger-bg, #fef2f2); padding: 14px 18px; color: var(--color-danger-text, #b91c1c); }
+.graduation-page .graduation-notice { margin: 32px 0 0; border: 1px solid var(--color-warning-text, #92400e); border-radius: 10px; background: var(--color-warning-bg, #fffbeb); padding: 14px 18px; color: var(--color-warning-text, #92400e); }
+.graduation-page .graduation-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; border: 1px solid var(--color-danger-text, #b91c1c); border-radius: 10px; background: var(--color-danger-bg, #fef2f2); padding: 14px 18px; color: var(--color-danger-text, #b91c1c); }
 .graduation-button { min-height: var(--control-min-height, 44px); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 10px 16px; border: 1.5px solid var(--gp-accent); border-radius: 8px; background: transparent; color: var(--gp-accent); font: inherit; font-weight: 600; }
 .graduation-button:hover { background: var(--gp-subtle); }
 @media (max-width: 640px) { .graduation-page { padding: 24px 16px 48px; } .graduation-card { padding: 16px; } }
