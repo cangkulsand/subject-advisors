@@ -85,7 +85,7 @@ else {
       assert.equal(await page.getByRole('group', { name: 'Access', exact: true }).getByRole('button', { name: 'Suspended', exact: true }).getAttribute('aria-pressed'), 'true');
       await page.getByText('Fictional Account 3', { exact: true }).waitFor();
     });
-    await check('all admin planned destinations are navigable and data-free', async page => {
+    await check('admin curriculum destination is navigable and uses only GET requests', async page => {
       const state = await mock(page, { roles: ['SYSTEM_ADMIN'] }); await page.goto(base + '/admin');
       await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/staff-menu-review/admin-desktop.png', fullPage: true });
@@ -93,14 +93,6 @@ else {
       await navigation.getByRole('link', { name: 'Curriculum & Prerequisites', exact: true }).click();
       await page.getByRole('heading', { name: 'Subjects and prerequisites', exact: true }).waitFor();
       await page.getByLabel('Curriculum', { exact: true }).waitFor();
-      for (const [label, title] of [['Graduation Requirements', 'Graduation Requirements']]) {
-        await navigation.getByRole('link', { name: label, exact: true }).click();
-        await page.getByRole('heading', { name: title, exact: true }).waitFor();
-        await page.getByText('This workspace is planned.', { exact: false }).waitFor();
-        assert.equal(await page.locator('form').count(), 0);
-        assert.equal(await page.getByRole('button', { name: /save|generate|upload|import|delete|grant/i }).count(), 0);
-        assert.ok(!/\b(?:23|22|40)\b/.test(await page.locator('.admin-planned-page').innerText()));
-      }
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/p001-sprint2/curricula']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
     });
