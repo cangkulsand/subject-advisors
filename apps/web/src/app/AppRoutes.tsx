@@ -16,6 +16,7 @@ export function AppRoutes() {
   if (path === '/student' || path === '/student/records') return <StudentRoutes area="records" />;
   if (path === '/student/offerings') return <StudentRoutes area="offerings" />;
   if (path === '/student/pathway') return <StudentRoutes area="pathway" />;
+  if (path === '/student/progress') return <StudentRoutes area="progress" />;
   if (path === '/coordinator' || path.startsWith('/coordinator/')) return <CoordinatorRoutes/>;
   if (path === '/admin' || path.startsWith('/admin/')) return <AdminRoutes/>;
   if (path !== '/') return <main className="local-card"><h1>Page not found</h1><a href="/">Return home</a></main>;

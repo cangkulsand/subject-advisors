@@ -16,18 +16,22 @@ const script=output.outputFiles.find(file=>file.path.endsWith('.js')).text,css=o
 const server=createServer((req,res)=>{if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(script);}else{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;let browser,passed=0;
 const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:'A22EC0001',learningCentreId:1,learningCentreLocked:false,curriculumId:1,currentSemesterId:1,weeklyWorkingHours:0,availableStudyHours:8,programmeCode:'DEMO',programmeName:'DEMO',curriculumVersion:'DEMO',createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z'};
+const progressSubjects=[1,2,3].map(id=>({mappingId:id,subjectId:100+id,code:'DEMO'+id,name:'Fictional subject '+id,credits:3,category:'CORE',compulsory:true,semesterTypes:id===3?['SHORT']:['NORMAL','SHORT'],outcome:['COMPLETED','REMAINING','REMAINING'][id-1],earnedCredits:id===1?3:0}));
+const progressFixture={programme:'DEMO programme - NOT OFFICIAL',version:'DEMO_A',totalCredits:9,earnedCredits:3,completedCredits:3,exemptionCredits:0,remainingCredits:6,percent:33,completedSubjects:1,exemptedSubjects:0,zeroCreditExemptions:0,outstandingCompulsory:2,noHistory:false,warnings:[],links:[{id:1,from:2,required:1,kind:'MANDATORY'},{id:2,from:3,required:2,kind:'MANDATORY'},{id:3,from:3,required:1,kind:'RECOMMENDED'}],subjects:progressSubjects,requirements:[{type:'COMPULSORY',credits:9,subjects:3,earnedCredits:3,satisfiedSubjects:1,status:'OUTSTANDING'}]};
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
   (state.requests??=[]).push({path,method:route.request().method()});
+  if(path==='/api/p001-sprint2/progress'){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:progressFixture})});return;}
+  if(path==='/api/semester-offerings'&&state.offeringsFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'UNAVAILABLE',message:'Please retry later.'}})});return;}
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
   if(path==='/api/profile'&&route.request().method()==='PUT')state.setup=false;
   const role=state.role??'STUDENT',roles=state.roles??[role],availableRoles=state.availableRoles??roles;
   const studentProfileState=availableRoles.includes('STUDENT')?(state.setup?'SETUP_REQUIRED':'COMPLETE'):'NOT_APPLICABLE';
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:role,roles,availableRoles,studentProfileState,accessStatus:'ACTIVE',profileState:role==='STUDENT'?studentProfileState:'NOT_APPLICABLE',landingPath:role==='SYSTEM_ADMIN'?'/admin':role==='COORDINATOR'?'/coordinator':state.setup?'/student/setup':'/student'}
    :path==='/api/profile'?(state.setup?null:profile):path==='/api/profile/options'?{learningCentres:[{learningCentreId:1,centreCode:'KL',centreName:'DEMO Kuala Lumpur'},{learningCentreId:2,centreCode:'JB',centreName:'DEMO Johor Bahru'}],curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],currentSemester:{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'},currentAcademicYear:'1001/1002',semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
-   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',window:{status:'OPEN',targetSemesterId:'1',selectionOpensAt:null,selectionClosesAt:null,learningCentreName:'KL'},curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}
+   :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',window:{status:'OPEN',targetSemesterId:'1',selectionOpensAt:null,selectionClosesAt:null,learningCentreName:'KL'},curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{subjectId:'102',curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}
    :path==='/api/pathway/graph'?{curriculumId:1,curriculumVersion:'DEMO',programmeName:'Fictional demo programme',demo:true,nodes:[
     {id:'10',subjectCode:'DEMO101',subjectName:'Foundations',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'COMPLETED',grade:'A',recognizedCredits:3},
     {id:'11',subjectCode:'DEMO201',subjectName:'Applied study',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'REMAINING',grade:null,recognizedCredits:null},
@@ -43,7 +47,7 @@ async function clickStudentLink(page,name){
 }
 async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);await assertReadable(page,name);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 try{
- browser=await chromium.launch({headless:true});
+ browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||undefined});
  await check('a student-only account has no staff view selector',async page=>{
   await mock(page);await page.goto(base+'/student/profile');await page.getByLabel('Student name',{exact:true}).waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
@@ -94,12 +98,41 @@ try{
   await mock(page);await page.goto(base+'/admin');await page.getByRole('alert').filter({hasText:'does not have access'}).waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
- for(const path of ['/student/profile','/student/records','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
+ for(const path of ['/student/profile','/student/records','/student/progress','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
   await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
-  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
+  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
+
+ const shots=process.env.PROGRESS_SHOTS;
+ async function progressPage(page,state){await mock(page,state);await page.goto(base+'/student/records');await clickStudentLink(page,'Academic progress');await page.waitForURL('**/student/progress');await page.getByText('Credit completion: 33%',{exact:true}).waitFor();}
+ async function shot(page,name){if(!shots)return;const {mkdirSync}=await import('node:fs');mkdirSync(shots,{recursive:true});await page.screenshot({path:shots+'/'+name+'.png',fullPage:true});}
+ for(const width of [1440,375])await check('Academic progress is in the menu, details show prerequisites, unlocks and approval at '+width,async page=>{
+  await progressPage(page,{});
+  const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});assert.equal(await nav.getByRole('link',{name:'Academic progress',exact:true,includeHidden:true}).getAttribute('aria-current'),'page');
+  await page.getByText('DEMO1 — Fictional subject 1',{exact:true}).first().waitFor();await shot(page,'progress-'+width);
+  const opener=page.getByRole('button',{name:'Details for DEMO2',exact:true});await opener.click();
+  const dialog=page.getByRole('dialog',{name:'Fictional subject 2'});await dialog.waitFor();
+  await dialog.getByRole('heading',{name:'Prerequisites',exact:true}).waitFor();await dialog.getByRole('heading',{name:'Unlocks',exact:true}).waitFor();await dialog.getByRole('heading',{name:'Next semester',exact:true}).waitFor();
+  await dialog.getByText('Met',{exact:true}).waitFor();await dialog.getByText('DEMO3 — Fictional subject 3').waitFor();await dialog.getByText('Approved for next semester',{exact:true}).waitFor();
+  assert.equal(await dialog.getByText('Availability not confirmed').count(),0);assert.equal(await dialog.locator('input,textarea,select').count(),0);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await shot(page,'details-'+width);
+  await assertReadable(page,'progress details '+width);
+  await page.keyboard.press('Escape');await dialog.waitFor({state:'detached'});await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Details for DEMO2');
+ },width);
+ await check('a subject with an unmet mandatory prerequisite, advice only and a Short-only note',async page=>{
+  await progressPage(page,{});await page.getByRole('button',{name:'Details for DEMO3',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Fictional subject 3'});
+  await dialog.getByText('Not met',{exact:true}).waitFor();await dialog.getByText('Recommended (advice only)').waitFor();await dialog.getByText('Offered in Short semester (Semester 3) only',{exact:true}).waitFor();
+  await dialog.getByText('Availability not confirmed',{exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Details for DEMO1',exact:true}).click();await page.getByRole('dialog',{name:'Fictional subject 1'}).getByText('No mandatory prerequisite is configured',{exact:true}).waitFor();
+ });
+ await check('failed offerings request shows Availability not confirmed and the page still works',async page=>{
+  await progressPage(page,{offeringsFail:true});await page.getByRole('button',{name:'Details for DEMO2',exact:true}).click();
+  await page.getByRole('dialog',{name:'Fictional subject 2'}).getByText('Availability not confirmed',{exact:true}).waitFor();
+ });
+ await check('Academic progress needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/progress');await page.waitForURL('**/student/setup');});
  await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway');
   const node=page.getByRole('button',{name:'DEMO101 Foundations, 3 credits, Completed'});await node.waitFor();
@@ -109,7 +142,7 @@ try{
   await page.getByRole('list',{name:'Curriculum subjects'}).getByText('Applied study').waitFor();
  });
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
- for(const path of ['/student/records','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
+ for(const path of ['/student/records','/student/progress','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
  await check('P001 actions use burgundy and explicit Cancel uses red in the shared shell',async page=>{
   await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');

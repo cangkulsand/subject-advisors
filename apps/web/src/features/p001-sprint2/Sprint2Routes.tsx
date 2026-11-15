@@ -19,7 +19,7 @@ function Content({area}:{area:Sprint2Area}) {
       <a href="/student/records" aria-current={area==='records'?'page':undefined}>Subject records</a>
       <a href="/student/progress" aria-current={area==='progress'?'page':undefined}>Academic progress</a>
     </>}<LogoutButton/></nav><main>
-      {area==='progress'?<ProgressPage api={api}/>:area==='curriculum'?<CurriculumPage api={api}/>:area==='records'?<RecordsPage api={academic}/>:<ProfilePage api={academic} setup={area==='setup'}/>}
+      {area==='progress'?<ProgressPage api={api} offerings={academic}/>:area==='curriculum'?<CurriculumPage api={api}/>:area==='records'?<RecordsPage api={academic}/>:<ProfilePage api={academic} setup={area==='setup'}/>}
     </main></div>;
 }
 export function Sprint2Routes({area}:{area:Sprint2Area}) {
