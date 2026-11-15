@@ -10,7 +10,7 @@ BEGIN
     RAISE EXCEPTION '0003 extension current_semester_id must be nullable integer without identity/default';
   END IF;
   IF (SELECT count(*) FROM information_schema.columns
-      WHERE table_schema='public' AND table_name='student_profile') <> 11 THEN -- baseline plus 0003 current_semester_id and 0009 learning_centre_id
+      WHERE table_schema='public' AND table_name='student_profile') <> 13 THEN -- baseline plus 0003 current_semester_id, 0009 learning_centre_id and 0013 fees_cleared_confirmed_at, muet_confirmed_at
     RAISE EXCEPTION 'student_profile contains an unregistered column extension';
   END IF;
   IF (SELECT count(*) FROM pg_constraint

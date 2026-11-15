@@ -94,6 +94,13 @@ against `main`; keep each PR within its selected owner scope.
 
 Subject names are English; see `db/reference-data/subject-english-names.csv`.
 
+## Sprint 3 (in progress)
+
+| Owner | Feature | Record |
+| --- | --- | --- |
+| P003 (UC13); built by P004 | Graduation check in the student app: `/student/graduation` (menu item after Academic progress) compares earned credits with the curriculum Total credits and lets the student confirm two items the system cannot check (no outstanding fees, MUET); `GET /api/graduation-check`, `PUT /api/graduation-check/confirmations`; migration 0013 (not yet applied to Neon) | S3-P004-001 |
+
+
 ## Current integration boundaries
 
 - Shared auth identity and role checks: apps/api/src/modules/auth and middleware/auth.ts.
