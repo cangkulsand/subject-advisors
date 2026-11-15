@@ -146,7 +146,8 @@ else {
       }
     });
     await check('signed-out staff routes redirect to sign in', async page => {
-      await page.goto(base + '/coordinator/imports?scenario=signed-out'); await page.waitForURL(base + '/sign-in');
+      // The redirect is a full navigation; let the sign-in page settle so the readability scan does not run mid-navigation.
+      await page.goto(base + '/coordinator/imports?scenario=signed-out'); await page.waitForURL(base + '/sign-in'); await page.waitForLoadState('networkidle');
       assert.equal(await page.getByRole('heading', { name: 'Data Imports', exact: true }).count(), 0);
     });
     await check('expanded groups preserve collapse choice and reopen the active group through history', async page => {
@@ -270,8 +271,12 @@ else {
         const toggle = page.getByRole('button', { name: 'Open navigation' }); await toggle.click(); await page.getByRole('dialog', { name: 'Administration menu' }).waitFor();
         await page.keyboard.press('Shift+Tab'); assert.ok(await page.evaluate(() => !!document.activeElement?.closest('dialog')));
         await page.keyboard.press('Escape'); assert.equal(await page.getByRole('dialog').isVisible(), false); assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
-        const table = page.getByRole('region', { name: 'Users and invitations table' }); await table.focus(); await page.keyboard.press('ArrowRight');
-        await page.waitForFunction(() => document.querySelector('[aria-label="Users and invitations table"]').scrollLeft > 0);
+        const table = page.getByRole('region', { name: 'Users and invitations table' });
+        // Closing the menu returns focus to its toggle, sometimes a moment after Escape; that can take focus back from the
+        // table. Refocus the table on each attempt so the arrow key reaches it.
+        let scrolled = false;
+        for (let attempt = 0; attempt < 5 && !scrolled; attempt++) { await table.focus(); await page.keyboard.press('ArrowRight'); scrolled = await page.waitForFunction(() => document.querySelector('[aria-label="Users and invitations table"]').scrollLeft > 0, null, { timeout: 2000 }).then(() => true, () => false); }
+        assert.ok(scrolled, 'keyboard ArrowRight scrolls the focused users table');
       }
       if (width === 375 || width === 1280) await page.screenshot({ path: '.wrangler/admin-review/users-' + width + '.png', fullPage: true });
     }, width);

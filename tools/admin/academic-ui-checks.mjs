@@ -150,6 +150,9 @@ export async function academicUiChecks({ check, mock, base }) {
     await page.getByRole('button', { name: 'Set current 2027/2028 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
     assert.equal(academicStore(state).semesters.find(s => s.isCurrent).semesterId, 4);
     await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
+    // Saving refreshes the list, which briefly unmounts the table; wait for the reloaded state before counting.
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).waitFor({ state: 'detached' });
     const add = page.getByRole('button', { name: 'Add semester', exact: true });
     const advance = page.getByRole('button', { name: 'Advance to next semester', exact: true });
     assert.equal(await add.locator('svg[aria-hidden="true"]').count(), 1);
