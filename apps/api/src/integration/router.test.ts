@@ -80,3 +80,12 @@ it('leaves unknown routes unimplemented and preserves auth body rejection',async
   const deps=services();expect((await dispatchIntegratedRequest(new Request('https://example.test/api/unknown'),deps)).status).toBe(404);
   const response=await dispatchIntegratedRequest(new Request('https://example.test/api/me/initialize',{method:'POST',body:'{}'}),deps);expect(response.status).toBe(400);
 });
+it.each(['/api/graduation-check','/api/graduation-check/confirmations'])('dispatches graduation route %s',async path=>{
+  const deps=services();deps.graduation=vi.fn(async req=>Response.json({path:new URL(req.url).pathname}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test'+path),deps);
+  expect(await response.json()).toEqual({path});expect(deps.graduation).toHaveBeenCalled();
+});
+it('graduation fails closed with student authorization when the feature is absent',async()=>{
+  const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',appRole:'SYSTEM_ADMIN' as const,roles:['SYSTEM_ADMIN' as const],accessStatus:'ACTIVE' as const}));
+  await expect(dispatchIntegratedRequest(new Request('https://example.test/api/graduation-check'),deps)).rejects.toMatchObject({status:403});
+});
