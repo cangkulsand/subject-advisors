@@ -18,7 +18,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.
 const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:'A22EC0001',learningCentreId:1,learningCentreLocked:false,curriculumId:1,currentSemesterId:1,weeklyWorkingHours:0,availableStudyHours:8,programmeCode:'DEMO',programmeName:'DEMO',curriculumVersion:'DEMO',createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z'};
 const progressSubjects=[1,2,3].map(id=>({mappingId:id,subjectId:100+id,code:'DEMO'+id,name:'Fictional subject '+id,credits:3,category:'CORE',compulsory:true,semesterTypes:id===3?['SHORT']:['NORMAL','SHORT'],outcome:['COMPLETED','REMAINING','REMAINING'][id-1],earnedCredits:id===1?3:0}));
 const progressFixture={programme:'DEMO programme - NOT OFFICIAL',version:'DEMO_A',totalCredits:9,earnedCredits:3,completedCredits:3,exemptionCredits:0,remainingCredits:6,percent:33,completedSubjects:1,exemptedSubjects:0,zeroCreditExemptions:0,outstandingCompulsory:2,noHistory:false,warnings:[],links:[{id:1,from:2,required:1,kind:'MANDATORY'},{id:2,from:3,required:2,kind:'MANDATORY'},{id:3,from:3,required:1,kind:'RECOMMENDED'}],subjects:progressSubjects,requirements:[{type:'COMPULSORY',credits:9,subjects:3,earnedCredits:3,satisfiedSubjects:1,status:'OUTSTANDING'}]};
-const gradFixture={requiredCredits:120,earnedCredits:90,remainingCredits:30,creditsMet:false,status:'NOT_YET_ELIGIBLE',missing:['30 more credits needed','Fees clearance not confirmed','MUET certificate not confirmed'],feesClearedConfirmedAt:null,muetConfirmedAt:null};
+const gradFixture={requiredCredits:120,earnedCredits:90,remainingCredits:30,creditsMet:false,status:'NOT_YET_ELIGIBLE',missing:['30 more credits needed.','Confirm you have no outstanding fees.','Confirm you have your MUET certificate.'],feesClearedConfirmedAt:null,muetConfirmedAt:null};
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
@@ -26,7 +26,7 @@ async function mock(page,state={}){
   (state.requests??=[]).push({path,method:route.request().method()});
   if(path==='/api/p001-sprint2/progress'){if(state.progressFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.progress??progressFixture})});return;}
   if(path==='/api/graduation-check'||path==='/api/graduation-check/confirmations'){
-   if(route.request().method()==='PUT'){const body=route.request().postDataJSON();(state.graduationPuts??=[]).push(body);if(state.graduationSaveFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'GRADUATION_UNAVAILABLE',message:'Could not save your confirmations.'}})});return;}const at='2026-11-15T02:00:00.000Z';state.graduation={...(state.graduation??gradFixture),feesClearedConfirmedAt:body.feesCleared?at:null,muetConfirmedAt:body.muet?at:null};}
+   if(route.request().method()==='PUT'){const body=route.request().postDataJSON();(state.graduationPuts??=[]).push(body);if(state.graduationSaveFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'GRADUATION_UNAVAILABLE',message:'Could not save your confirmations.'}})});return;}const at='2026-11-15T02:00:00.000Z',prev=state.graduation??gradFixture,fc=body.feesCleared?(prev.feesClearedConfirmedAt??at):null,mc=body.muet?(prev.muetConfirmedAt??at):null,missing=[];if(prev.requiredCredits===null)missing.push('The programme credit requirement is not configured.');else if(!prev.creditsMet)missing.push((prev.requiredCredits-prev.earnedCredits)+' more credits needed.');if(!fc)missing.push('Confirm you have no outstanding fees.');if(!mc)missing.push('Confirm you have your MUET certificate.');state.graduation={...prev,feesClearedConfirmedAt:fc,muetConfirmedAt:mc,missing,status:prev.requiredCredits===null?'CANNOT_ASSESS':missing.length===0?'ELIGIBLE':'NOT_YET_ELIGIBLE'};}
    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.graduation??gradFixture})});return;}
   if(path==='/api/semester-offerings'&&state.offeringsFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'UNAVAILABLE',message:'Please retry later.'}})});return;}
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
@@ -145,7 +145,7 @@ try{
   state.progressFail=false;await page.getByRole('button',{name:'Refresh progress'}).click();await page.getByText('Credit completion: 33%',{exact:true}).waitFor();
  });
  await check('Academic progress with incomplete credit configuration shows no percentage',async page=>{
-  await mock(page,{progress:{...progressFixture,percent:null,totalCredits:null,remainingCredits:null,warnings:['Programme credit requirement is not configured.']}});await page.goto(base+'/student/progress');
+  await mock(page,{progress:{...progressFixture,percent:null,totalCredits:null,remainingCredits:null,warnings:['The programme credit requirement is not configured.']}});await page.goto(base+'/student/progress');
   await page.getByText('Not configured',{exact:true}).first().waitFor();assert.equal(await page.locator('progress').count(),0);
  });
  await check('Academic progress needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/progress');await page.waitForURL('**/student/setup');});
@@ -153,12 +153,12 @@ try{
  for(const width of [1440,375])await check('Graduation check lists what is missing, saves a confirmation and fails safely at '+width,async page=>{
   const state={};await graduationPage(page,state);
   const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});assert.equal(await nav.getByRole('link',{name:'Graduation check',exact:true,includeHidden:true}).getAttribute('aria-current'),'page');
-  for(const line of ['30 more credits needed','Fees clearance not confirmed','MUET certificate not confirmed'])await page.getByText(line,{exact:true}).waitFor();
+  for(const line of ['30 more credits needed.','Confirm you have no outstanding fees.','Confirm you have your MUET certificate.'])await page.getByText(line,{exact:true}).waitFor();
   await page.getByText('90 of 120 credits earned',{exact:true}).waitFor();await page.getByText('30 remaining',{exact:true}).waitFor();assert.equal(await page.locator('progress').count(),1);
   await page.getByText('Based on your recorded subjects and your own confirmations. Not an official UTMSPACE graduation decision.',{exact:true}).waitFor();
   assert.equal(await page.getByText('not confirmed',{exact:true}).count(),2);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  const muet=page.getByLabel('I have my MUET certificate',{exact:true});await muet.check();await page.getByText('confirmed 15 Nov 2026',{exact:true}).waitFor();
+  const muet=page.getByLabel('I have my MUET certificate',{exact:true});await muet.check();await page.getByText('confirmed 15 Nov 2026',{exact:true}).waitFor();await page.getByText('Confirm you have your MUET certificate.',{exact:true}).waitFor({state:'detached'});await page.getByText('Confirm you have no outstanding fees.',{exact:true}).waitFor();
   assert.deepEqual(state.graduationPuts.at(-1),{feesCleared:false,muet:true});assert.equal(await muet.isChecked(),true);
   await shot(page,'graduation-'+width);await assertReadable(page,'graduation '+width);
   state.graduationSaveFail=true;const fees=page.getByLabel('I have no outstanding fees (no debt)',{exact:true});await fees.check();
@@ -170,7 +170,7 @@ try{
   await page.getByText('Eligible to graduate',{exact:true}).waitFor();assert.equal(await page.getByLabel('I have my MUET certificate',{exact:true}).isChecked(),true);
  });
  await check('Graduation check with no configured requirement shows no progress bar',async page=>{
-  await mock(page,{graduation:{...gradFixture,status:'CANNOT_ASSESS',requiredCredits:null,remainingCredits:null,creditsMet:null,missing:['Programme credit requirement is not configured.']}});await page.goto(base+'/student/graduation');
+  await mock(page,{graduation:{...gradFixture,status:'CANNOT_ASSESS',requiredCredits:null,remainingCredits:null,creditsMet:null,missing:['The programme credit requirement is not configured.']}});await page.goto(base+'/student/graduation');
   await page.getByText('Cannot assess',{exact:true}).waitFor();assert.equal(await page.locator('progress').count(),0);
  });
  await check('Graduation check load failure offers retry',async page=>{
