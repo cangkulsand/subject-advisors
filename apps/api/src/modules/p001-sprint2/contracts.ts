@@ -22,7 +22,7 @@ export interface Progress {
   completedCredits: number; exemptionCredits: number; remainingCredits: number | null; percent: number | null;
   completedSubjects: number; exemptedSubjects: number; zeroCreditExemptions: number;
   outstandingCompulsory: number; noHistory: boolean; warnings: string[];
-  subjects: ProgressSubject[]; requirements: (Requirement & { earnedCredits: number | null; satisfiedSubjects: number | null; status: 'MET' | 'OUTSTANDING' | 'UNASSESSED' })[];
+  links: Dependency[]; subjects: ProgressSubject[]; requirements: (Requirement & { earnedCredits: number | null; satisfiedSubjects: number | null; status: 'MET' | 'OUTSTANDING' | 'UNASSESSED' })[];
 }
 export interface PrerequisiteSelection { mappingId: number; code: string }
 export interface SubjectInput {
