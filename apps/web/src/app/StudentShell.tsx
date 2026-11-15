@@ -9,6 +9,7 @@ const links = [
   { area: 'profile', href: '/student/profile', label: 'Academic profile', icon: 'user' },
   { area: 'records', href: '/student/records', label: 'Subject records', icon: 'records' },
   { area: 'progress', href: '/student/progress', label: 'Academic progress', icon: 'progress' },
+  { area: 'graduation', href: '/student/graduation', label: 'Graduation check', icon: 'records' },
   { area: 'offerings', href: '/student/offerings', label: 'Semester offerings', icon: 'calendar' },
   { area: 'pathway', href: '/student/pathway', label: 'Academic pathway', icon: 'pathway' },
 ] as const;
