@@ -53,9 +53,18 @@ it.each(['/api/p001-sprint2/curricula','/api/p001-sprint2/curricula/1','/api/p00
   const response=await dispatchIntegratedRequest(new Request('https://example.test'+path),deps);
   expect(await response.json()).toEqual({owner:'P003',path});expect(deps.curriculum).toHaveBeenCalled();
 });
-it('does not dispatch the student progress route to the curriculum handler',async()=>{
+it('dispatches the student progress route to the P001 Sprint 2 handler (S2-P001-006)',async()=>{
+  const deps=services();deps.curriculum=vi.fn(async req=>Response.json({path:new URL(req.url).pathname}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/progress'),deps);
+  expect(await response.json()).toEqual({path:'/api/p001-sprint2/progress'});expect(deps.curriculum).toHaveBeenCalled();
+});
+it('progress fails closed with student authorization when the P001 Sprint 2 feature is absent',async()=>{
+  const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',appRole:'SYSTEM_ADMIN' as const,roles:['SYSTEM_ADMIN' as const],accessStatus:'ACTIVE' as const}));
+  await expect(dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/progress'),deps)).rejects.toMatchObject({status:403});
+});
+it('does not dispatch unknown P001 Sprint 2 paths',async()=>{
   const deps=services();deps.curriculum=vi.fn();
-  expect((await dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/progress'),deps)).status).toBe(404);
+  expect((await dispatchIntegratedRequest(new Request('https://example.test/api/p001-sprint2/other'),deps)).status).toBe(404);
   expect(deps.curriculum).not.toHaveBeenCalled();
 });
 it('fails closed with admin authorization when the curriculum feature is absent',async()=>{
