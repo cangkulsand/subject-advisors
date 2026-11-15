@@ -100,14 +100,14 @@ else {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const destinations = [
-        ['Data Imports', 'Data Imports'], ['Data Quality', 'Data Quality'], ['Class Offering Forecast', 'Class Offering Forecast'], ['Decision Audit', 'Decision Audit'],
+        ['Data Imports', 'Data Imports'], ['Data Quality', 'Data Quality'], ['Class Offering Forecast', 'Class Offering Forecast'], ['Offering History', 'Offering History'], ['Decision Audit', 'Decision Audit'],
       ];
       const quicklinks = page.locator('.coordinator-quicklinks');
       assert.equal(await quicklinks.getByRole('link').count(), destinations.length);
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Coordinator navigation' });
-      for (const [label, title] of destinations.filter((_, index) => ![0, 2].includes(index))) {
+      for (const [label, title] of destinations.filter((_, index) => ![0, 2, 3].includes(index))) {
         await navigation.getByRole('link', { name: label, exact: true }).click();
         await page.getByRole('heading', { name: title, exact: true }).waitFor();
         await page.getByText('This workspace is planned.', { exact: false }).waitFor();
