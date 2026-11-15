@@ -5,7 +5,7 @@
 - **Sprint:** Sprint 2
 - **Owner:** P001 (UC05) / P003 (UC18); built by P004
 - **Related UC / FR:** UC05 academic progress; UC18 subject details; UC24 prerequisite links (P003)
-- **Branch / PR:** `feature/s2-progress-subject-details`; merged into `main` on 2026-11-15 (merge commit 0f72f82); no PR
+- **Branch / PR:** `feature/s2-progress-subject-details`; merged into `main` on 2026-11-15 (merge commit c8a7fcd); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -46,5 +46,5 @@ Not verified: no database was used; the offerings availability was checked with 
 ## 4. Changelog
 
 - 2026-11-14 - Type: Added. Academic progress in the student app (`/student/progress`) with a read-only subject Details panel (UC05 / UC18). `GET /api/p001-sprint2/progress` additively returns `links`. Compatibility: no migration; existing response fields unchanged. Outstanding: human peer review; SRS/SDD not updated.
-- 2026-11-15 - Merged: `feature/s2-progress-subject-details` into `main` (merge commit 0f72f82). Checks on merged main: typecheck, lint, unit tests (1625 passed, 65 skipped), integration 11/11, build, check:cloudflare, student app UI (37), offerings UI (57), UC24 UI (14). Status: MERGED; human peer review pending.
+- 2026-11-15 - Merged: `feature/s2-progress-subject-details` into `main` (merge commit c8a7fcd). Checks on merged main: typecheck, lint, unit tests (1625 passed, 65 skipped), integration 11/11, build, check:cloudflare, student app UI (37), offerings UI (57), UC24 UI (14). Status: MERGED; human peer review pending.
 - 2026-11-15 - Fixed: the shared router (`apps/api/src/integration/router.ts`) did not dispatch `GET /api/p001-sprint2/progress`, so the deployed Academic progress page received 404 (browser checks mock the API and missed it). The route now goes to the P001 Sprint 2 handler (student + completed profile); without that feature it fails closed with student authorization. Router tests updated (22 passed); unit tests 1627 passed, integration 11/11, check:cloudflare.

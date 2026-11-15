@@ -80,4 +80,4 @@ Improve the visual hierarchy and accessibility of the `/admin/semesters` page's 
 - **Verification summary:** Admin UI 44 checks, typecheck, lint, full unit suite (1,374 passed / 59 skipped), build and build:local passed. Read-only UI fixtures only; no database writes.
 - **Outstanding blockers / follow-up:** Human peer review pending. No commit or push.
 - **Final status:** READY_FOR_REVIEW.
-- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 4d7c0b8) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.
+- 2026-11-14 - Merged: `feature/s2-continue` into `main` (merge commit 43fd88a) together with S2-P004-025/026 and S2-P001-003/004. Checks before merge: typecheck, lint, unit tests (1480 passed, 63 skipped). Status: MERGED; human peer review pending.

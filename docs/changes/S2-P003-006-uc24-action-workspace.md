@@ -3,7 +3,7 @@
 - Status: MERGED to `main` (2026-11-14); human peer review pending. Before merge: READY_FOR_REVIEW (PASS SELF-REVIEW; latest state is the 2026-11-12 horizontal tab reversal incl. mobile tab-fit fix — earlier vertical layout superseded; lead review complete, human approval pending)
 - Date: 2026-11-12
 - Owner: Harraz / P003, Sprint 2 (UC24/UC06 presentation)
-- Branch: feature/uc24-create-subject; merged into `main` on 2026-11-14 (merge commit 3fcc9fe), no PR
+- Branch: feature/uc24-create-subject; merged into `main` on 2026-11-14 (merge commit a474622), no PR
 - Human peer review: Pending
 - Follow-up to: S2-P003-005 (create subject with initial prerequisites)
 
@@ -378,4 +378,4 @@ Evidence (`.wrangler/uc24-horizontal-review/`):
   narrow screens. The four independent panes, draft guards and
   keyboard navigation are unchanged.
 
-- 2026-11-14 - Merged into `main` by P004 (merge commit 3fcc9fe). One conflict in `apps/web/src/features/admin/AdminRoutes.tsx` resolved by keeping the Departments page (S2-P004-025) and adding `/admin/curriculum`. Checks after merge: typecheck, lint, unit tests (1519 passed, 63 skipped), integration (11 passed), build, admin browser checks (48 passed, system Chrome via `PLAYWRIGHT_CHANNEL=chrome`). Status: MERGED; human peer review pending.
+- 2026-11-14 - Merged into `main` by P004 (merge commit a474622). One conflict in `apps/web/src/features/admin/AdminRoutes.tsx` resolved by keeping the Departments page (S2-P004-025) and adding `/admin/curriculum`. Checks after merge: typecheck, lint, unit tests (1519 passed, 63 skipped), integration (11 passed), build, admin browser checks (48 passed, system Chrome via `PLAYWRIGHT_CHANNEL=chrome`). Status: MERGED; human peer review pending.

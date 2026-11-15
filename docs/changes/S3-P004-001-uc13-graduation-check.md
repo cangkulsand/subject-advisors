@@ -1,11 +1,11 @@
 # S3-P004-001 — Graduation check in the student app (UC13)
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-15); human peer review pending
 - **Date:** 2026-11-15
 - **Sprint:** Sprint 3
 - **Owner:** P003 (UC13); built by P004
 - **Related UC / FR:** UC13 graduation check (M5); UC05 earned-credit calculation; UC25 curriculum Total credits
-- **Branch / PR:** `feature/s3-uc13-graduation-check`; not merged, no PR
+- **Branch / PR:** `feature/s3-uc13-graduation-check`; merged into `main` on 2026-11-15 (merge commit 3ec045f); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -49,3 +49,4 @@ Database: 0013 applied to Neon on 2026-11-15; `db:verify` 46 PASS, including the
 - 2026-11-15 - Type: Added. Graduation check (UC13): `/student/graduation`, `GET /api/graduation-check`, `PUT /api/graduation-check/confirmations`; migration 0013 adds `student_profile.fees_cleared_confirmed_at` and `muet_confirmed_at`. Compatibility: additive nullable columns; existing endpoints unchanged. Outstanding: apply 0013 to Neon; human peer review; SRS/SDD not updated.
 - 2026-11-15 - Removed: admin Graduation Requirements placeholder page and menu item (`/admin/requirements`), by owner decision; the credit requirement is the curriculum Total credits on the admin Programmes page (UC25).
 - 2026-11-15 - Database: migration 0013 applied to Neon; schema checks 001/004 register the new columns; 018 added to db:verify (46 PASS).
+- 2026-11-15 - Merged: `feature/s3-uc13-graduation-check` into `main` (merge commit 3ec045f) and deployed to prod. Status: MERGED; human peer review pending.

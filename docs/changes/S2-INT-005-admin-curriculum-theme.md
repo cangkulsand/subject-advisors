@@ -4,7 +4,7 @@
 - **Date:** 2026-11-14
 - **Sprint:** Sprint 2
 - **Owner:** Integration (FOUNDATION)
-- **Branch / PR:** `feature/s2-admin-curriculum-theme`; merged into `main` on 2026-11-14 (merge commit e80f1cd); no PR
+- **Branch / PR:** `feature/s2-admin-curriculum-theme`; merged into `main` on 2026-11-14 (merge commit d01b0fa); no PR
 - **Reviewer:** P003 (owner of UC24) and Coordinator review
 
 ## 1. Plan
@@ -24,5 +24,5 @@ Before/after screenshots at 1440 and 375 (Subject List, Create Subject, Manage P
 
 ## 4. Changelog
 
-- 2026-11-14 - Merged: `feature/s2-admin-curriculum-theme` into `main` (merge commit e80f1cd). Checks on merged main: typecheck, lint, unit tests (1616 passed, 65 skipped), integration 11/11, db-tooling 26/26, build, check:cloudflare, offerings UI (57), UC24 UI (14), admin UI (50). Status: MERGED; human peer review pending.
+- 2026-11-14 - Merged: `feature/s2-admin-curriculum-theme` into `main` (merge commit d01b0fa). Checks on merged main: typecheck, lint, unit tests (1616 passed, 65 skipped), integration 11/11, db-tooling 26/26, build, check:cloudflare, offerings UI (57), UC24 UI (14), admin UI (50). Status: MERGED; human peer review pending.
 - 2026-11-14 — Type: UI. Curriculum & Prerequisites page restyled to the admin template theme; behaviour unchanged. Status: READY_FOR_REVIEW.
