@@ -23,7 +23,7 @@ async function mock(page,state={}){
   const path=new URL(route.request().url()).pathname;
   if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
   (state.requests??=[]).push({path,method:route.request().method()});
-  if(path==='/api/p001-sprint2/progress'){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:progressFixture})});return;}
+  if(path==='/api/p001-sprint2/progress'){if(state.progressFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.progress??progressFixture})});return;}
   if(path==='/api/semester-offerings'&&state.offeringsFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'UNAVAILABLE',message:'Please retry later.'}})});return;}
   if(path==='/api/me')state.accountReads=(state.accountReads??0)+1;
   if(path==='/api/profile'&&route.request().method()==='PUT')state.setup=false;
@@ -131,6 +131,18 @@ try{
  await check('failed offerings request shows Availability not confirmed and the page still works',async page=>{
   await progressPage(page,{offeringsFail:true});await page.getByRole('button',{name:'Details for DEMO2',exact:true}).click();
   await page.getByRole('dialog',{name:'Fictional subject 2'}).getByText('Availability not confirmed',{exact:true}).waitFor();
+ });
+ await check('Academic progress filter shows only remaining subjects',async page=>{
+  await progressPage(page,{});await page.getByLabel('Show subjects').selectOption('REMAINING');
+  await page.getByText('DEMO2 — Fictional subject 2',{exact:true}).first().waitFor();assert.equal(await page.getByText('DEMO1 — Fictional subject 1',{exact:true}).count(),0);
+ });
+ await check('Academic progress failure offers retry without fabricated totals',async page=>{
+  const state={progressFail:true};await mock(page,state);await page.goto(base+'/student/progress');await page.getByRole('alert').first().waitFor();assert.equal(await page.locator('progress').count(),0);
+  state.progressFail=false;await page.getByRole('button',{name:'Refresh progress'}).click();await page.getByText('Credit completion: 33%',{exact:true}).waitFor();
+ });
+ await check('Academic progress with incomplete credit configuration shows no percentage',async page=>{
+  await mock(page,{progress:{...progressFixture,percent:null,totalCredits:null,remainingCredits:null,warnings:['Programme credit requirement is not configured.']}});await page.goto(base+'/student/progress');
+  await page.getByText('Not configured',{exact:true}).first().waitFor();assert.equal(await page.locator('progress').count(),0);
  });
  await check('Academic progress needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/progress');await page.waitForURL('**/student/setup');});
  await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{

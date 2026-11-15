@@ -182,14 +182,6 @@
       "path": "tools/p001-sprint2/test-db.mjs"
     },
     {
-      "sha256": "aae3b5ac3935eba5f3f9cb08ae3ad70d7421926e8a4f970ddb11a0d91f1f4cd0",
-      "path": "tools/p001-sprint2/test-ui.mjs"
-    },
-    {
-      "sha256": "bd7fe4fc0461dfaf22729348e03db266f7c048e99f05b7affa6946342824e973",
-      "path": "tools/p001-sprint2/testing/main.tsx"
-    },
-    {
       "sha256": "bbe8921ed6837a64f0c234f0c5b9f0d14af50451fcf3ebd4197568846112dc78",
       "path": "tools/p001-sprint2/verify-handoff.mjs"
     },
