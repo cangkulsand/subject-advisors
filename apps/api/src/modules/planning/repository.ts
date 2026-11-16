@@ -29,13 +29,15 @@ export function startSemester(semesters: PlanningRows['semesters']): (SemesterRe
   return { ...next, semesterId: row?.semesterId ?? null };
 }
 
-/** Same validity rules as UC05 progress (calculateProgress): a COMPLETED record must carry the subject's full credits,
- * an EXEMPTED record needs remarks; anything else does not count as passed. */
+/**
+ * A record counts as passed when it is COMPLETED with the subject's full credits, or EXEMPTED with credits between 0
+ * and the subject's credits. Remarks are not required: the Subject records page saves "Exempted" immediately and lets
+ * the student add remarks later (S3-P004-007). FAILED / WITHDRAWN never count.
+ */
 function countsAsPassed(record: PlanningRows['records'][number], creditHours: number): boolean {
   if (!Number.isInteger(record.recognizedCredits) || record.recognizedCredits < 0 || record.recognizedCredits > creditHours) return false;
   if (record.status === 'COMPLETED') return record.recognizedCredits === creditHours;
-  if (record.status === 'EXEMPTED') return Boolean(record.remarks?.trim());
-  return false;
+  return record.status === 'EXEMPTED';
 }
 
 /** Pure: raw rows -> engine input. */
