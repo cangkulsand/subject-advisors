@@ -1,11 +1,11 @@
 # S3-P004-002 — Coordinator Offering History page
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-15
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6)
 - **Related UC / FR:** UC23 / FR-H13–H14 ("past semesters' decisions and picks are kept for a future Offering History page"); SDD Sprint 3 "Add an Offering History page for past semesters"
-- **Branch / PR:** `feature/s3-offering-history`; not merged, no PR
+- **Branch / PR:** `feature/s3-offering-history`; merged into `main` on 2026-11-16 (merge commit eccb909); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -48,4 +48,4 @@ Audit placeholder, counts of picks withdrawn by removals.
 
 ## 4. Changelog
 
-- 2026-11-15 - Type: Added. Coordinator Offering History page (`/coordinator/history`), read-only, frontend only. Outstanding: human peer review.
+- 2026-11-15 - Type: Added. Coordinator Offering History page (`/coordinator/history`), read-only, frontend only. Code review fixes 2026-11-16. Merged to `main` 2026-11-16 (eccb909). Outstanding: human peer review.
