@@ -1,11 +1,11 @@
 # S3-P004-006 — Academic progress matches requirement groups like the planner
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P001 (M1, UC05 progress); built by P004, to be handed to P001 as files
 - **Related UC / FR:** UC05 academic progress; UC13 graduation check (uses the same calculation)
-- **Branch / PR:** `feature/s3-progress-requirement-match`; not merged, no PR
+- **Branch / PR:** `feature/s3-progress-requirement-match`; merged into `main` on 2026-11-16 (merge commit a32824c); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -36,4 +36,4 @@ planning engine (upper case, spaces and underscores alike).
 ## 4. Changelog
 
 - 2026-11-16 - Type: Fixed. Academic progress (and the Graduation check) match requirement types such as
-  `ELECTIVE_E1` to categories such as `Elective E1`. Outstanding: human peer review; P001 confirmation.
+  `ELECTIVE_E1` to categories such as `Elective E1`. Merged to `main` 2026-11-16 (a32824c). Outstanding: human peer review; P001 confirmation.
