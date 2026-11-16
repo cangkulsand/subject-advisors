@@ -70,3 +70,4 @@ persistence (`simulation_scenario` tables) and "outdated scenario" marking are n
 - 2026-11-16 - Type: Added. Student Graduation plan (`/student/plan`) with what-if scenarios and comparison;
   `GET /api/planning/input`; shared planning engine. Read-only, no migration. Merged to `main` 2026-11-16 (84de073). Outstanding: human peer review; P003
   confirmation of the design calls.
+- 2026-11-16 - Type: Changed. Semester labels drop the "AY" prefix ("2027/2028 – Semester 1"), owner decision; affects the Graduation plan and Recommendations.

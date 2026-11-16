@@ -32,7 +32,7 @@ describe('recommend', () => {
   it('ranks full loads that start the longest chain first, with reasons', () => {
     const result = recommend(input());
     expect(result.status).toBe('READY');
-    expect(result.semester).toEqual({ label: 'AY 2026/2027 – Semester 2', semesterType: 'NORMAL', maxSubjects: 3, maxCredits: 10 });
+    expect(result.semester).toEqual({ label: '2026/2027 – Semester 2', semesterType: 'NORMAL', maxSubjects: 3, maxCredits: 10 });
     expect(codes(result.best)).toEqual(['SECA1013', 'SECB1013', 'SECE1013']);
     expect(result.best!.differenceFromBest).toBe(0);
     expect(result.best!.subjects[0]!.reasons).toEqual(['Unlocks 2 later subjects', 'Compulsory']);
@@ -43,14 +43,14 @@ describe('recommend', () => {
   it('warns about a Short-only chain head and names the next Short semester', () => {
     const result = recommend(input({ start: { academicYear: '2026/2027', semesterNo: 3 } }));
     expect(codes(result.best)).toEqual(['UHLB1112']);
-    expect(result.best!.subjects[0]!.reasons).toContain('Short semester only: the next chance is AY 2027/2028 – Semester 3 (Short Semester)');
+    expect(result.best!.subjects[0]!.reasons).toContain('Short semester only: the next chance is 2027/2028 – Semester 3 (Short Semester)');
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]!.message).toBe('If you do not take UHLB1112 in AY 2026/2027 – Semester 3 (Short Semester), your earliest completion moves from AY 2028/2029 – Semester 3 (Short Semester) to AY 2029/2030 – Semester 3 (Short Semester). This assumes later semesters offer every subject.');
+    expect(result.warnings[0]!.message).toBe('If you do not take UHLB1112 in 2026/2027 – Semester 3 (Short Semester), your earliest completion moves from 2028/2029 – Semester 3 (Short Semester) to 2029/2030 – Semester 3 (Short Semester). This assumes later semesters offer every subject.');
   });
   it('recommends only coordinator-approved subjects when the semester is decided', () => {
     const result = recommend(input({ approvedFirst: [4, 5] }));
     expect(codes(result.best)).toEqual(['SECB1013', 'SECE1013']);
-    expect(result.assumptions[0]).toBe('Only subjects your coordinator approved for AY 2026/2027 – Semester 2 are recommended.');
+    expect(result.assumptions[0]).toBe('Only subjects your coordinator approved for 2026/2027 – Semester 2 are recommended.');
   });
   it('says when nothing can be recommended and when nothing is left', () => {
     expect(recommend(input({ approvedFirst: [] }))).toMatchObject({ status: 'NO_CANDIDATES', best: null, alternatives: [] });

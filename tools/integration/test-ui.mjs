@@ -188,8 +188,8 @@ try{
  await check('Graduation check needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/graduation');await page.waitForURL('**/student/setup');});
  for(const width of [1440,375])await check('Graduation plan shows completion, semesters, bottlenecks and assumptions at '+width,async page=>{
   const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Graduation plan');await page.waitForURL('**/student/plan');
-  const summary=page.getByRole('region',{name:'Plan summary'});await summary.getByText('AY 2028/2029 – Semester 3 (Short Semester)',{exact:true}).waitFor();
-  await summary.getByText('8 semesters from now',{exact:true}).waitFor();await summary.getByText('AY 2027/2028 – Semester 1',{exact:true}).waitFor();await summary.getByText('8 subjects',{exact:true}).waitFor();
+  const summary=page.getByRole('region',{name:'Plan summary'});await summary.getByText('2028/2029 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await summary.getByText('8 semesters from now',{exact:true}).waitFor();await summary.getByText('2027/2028 – Semester 1',{exact:true}).waitFor();await summary.getByText('8 subjects',{exact:true}).waitFor();
   assert.ok(state.requests.some(r=>r.path==='/api/planning/input'&&r.method==='GET'));
   const semesters=page.locator('.planning-semester');assert.equal(await semesters.count(),8);
   assert.deepEqual(await semesters.first().locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
@@ -207,7 +207,7 @@ try{
   assert.deepEqual(await whatIf.getByLabel('Change',{exact:true}).locator('option').allInnerTexts(),['Postpone one semester','Fail it','Withdraw']);
   await whatIf.getByRole('button',{name:'Add change',exact:true}).click();
   const compare=page.getByRole('region',{name:'Compare with your plan'});await compare.getByText('3 semesters later',{exact:true}).waitFor();
-  await compare.getByRole('definition').getByText('AY 2029/2030 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await compare.getByRole('definition').getByText('2029/2030 – Semester 3 (Short Semester)',{exact:true}).waitFor();
   await compare.locator('tbody tr[data-subject="DEML1112"]').waitFor();
   await page.getByRole('heading',{name:'Plan with your changes',exact:true}).waitFor();
   await page.getByRole('button',{name:'Your plan',exact:true}).click();await page.getByRole('heading',{name:'Your plan',exact:true}).waitFor();
@@ -240,7 +240,7 @@ try{
  });
  for(const width of [1440,375])await check('Recommendations rank the next semester, explain why and list alternatives at '+width,async page=>{
   const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Recommendations');await page.waitForURL('**/student/recommendations');
-  await page.getByRole('heading',{name:'Recommended for AY 2026/2027 – Semester 2',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Recommended for 2026/2027 – Semester 2',exact:true}).waitFor();
   const best=page.getByRole('region',{name:'Recommended subjects'});
   assert.deepEqual(await best.locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
   await best.getByText('Unlocks 2 later subjects',{exact:true}).waitFor();await best.getByText('Counts toward Elective E1',{exact:true}).waitFor();
@@ -256,15 +256,15 @@ try{
  },width);
  await check('Recommendations warn about a Short-only chain and handle no candidates and failures',async page=>{
   await mock(page,{plan:{...planFixture,start:{academicYear:'2026/2027',semesterNo:3}}});await page.goto(base+'/student/recommendations');
-  await page.getByText('Short semester only: the next chance is AY 2027/2028 – Semester 3 (Short Semester)',{exact:true}).waitFor();
-  await page.getByText('If you do not take DEML1112 in AY 2026/2027 – Semester 3 (Short Semester), your earliest completion moves from',{exact:false}).waitFor();
+  await page.getByText('Short semester only: the next chance is 2027/2028 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await page.getByText('If you do not take DEML1112 in 2026/2027 – Semester 3 (Short Semester), your earliest completion moves from',{exact:false}).waitFor();
   await page.unrouteAll({behavior:'ignoreErrors'});
   await mock(page,{plan:{...planFixture,approvedFirst:[]}});await page.goto(base+'/student/recommendations');
-  await page.getByRole('heading',{name:'No recommendation for AY 2026/2027 – Semester 2',exact:true}).waitFor();
-  await page.getByText('Only subjects your coordinator approved for AY 2026/2027 – Semester 2 are recommended.',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'No recommendation for 2026/2027 – Semester 2',exact:true}).waitFor();
+  await page.getByText('Only subjects your coordinator approved for 2026/2027 – Semester 2 are recommended.',{exact:true}).waitFor();
   await page.unrouteAll({behavior:'ignoreErrors'});
   const state={planFail:true};await mock(page,state);await page.goto(base+'/student/recommendations');await page.getByRole('alert').getByText('Please retry later.').waitFor();
-  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Recommended for AY 2026/2027 – Semester 2',exact:true}).waitFor();
+  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Recommended for 2026/2027 – Semester 2',exact:true}).waitFor();
  });
  await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway');
