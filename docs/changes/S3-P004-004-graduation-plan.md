@@ -46,6 +46,21 @@ browser only, and the earliest-completion bound.
 - Screenshots checked at 1440 and 375; semester tables use fixed column widths on wide screens only, so phones keep
   readable subject names.
 
+Review round 2 (2026-11-16, code review of `main...feature/s3-graduation-plan`), fixed:
+- Compulsory subjects are always planned; a requirement group's threshold only limits optional members, and compulsory
+  members count toward it first (before, a compulsory subject inside a group could be dropped).
+- Records count as passed with the UC05 progress rules (COMPLETED with full credits, EXEMPTED with remarks).
+- The first planned semester is the one after the current semester even if the admin has not created it yet
+  (coordinator decisions then do not apply); before, the plan fell back to numbered semesters.
+- What-if changes apply in order, each to the plan as it stands: repeated postpones keep moving the subject, each
+  failed attempt stays where it happened, and a fail after a postponed prerequisite follows it.
+- Sign-in is checked before the method on `/api/planning/input`; the category matching rule is exported once
+  (`normaliseRequirementType`) and reused by the page.
+- Not changed: baseline recomputed inside `planScenario` (cheap). Noted for P001: UC05 progress matches requirement
+  types to categories without treating spaces and underscores alike (`ELECTIVE_E1` vs `Elective E1`), so
+  Academic progress can show such groups as unassessed while this plan matches them.
+- After round 2: typecheck, lint, check:cloudflare pass; `npm test` 1690 passed (65 skipped); integration UI 54 passed.
+
 Not verified: against live Neon data (mocks and fakes only). Open for P003 / product owner: the **(call)** items in the
 design; corequisites are not enforced; Industrial Training and final-year projects get no special placement; scenario
 persistence (`simulation_scenario` tables) and "outdated scenario" marking are not built.

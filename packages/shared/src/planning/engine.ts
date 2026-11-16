@@ -15,13 +15,20 @@ const BOTTLENECK_COUNT = 5;
 
 interface Constraints {
   notBefore: Map<number, number>;
-  failedIn: Map<number, number>;
+  /** Semester indexes holding a failed attempt, per subject. */
+  failedIn: Map<number, number[]>;
   replaced: Map<number, number>;
   changeOf: Map<number, ScenarioChangeKind>;
 }
 const none = (): Constraints => ({ notBefore: new Map(), failedIn: new Map(), replaced: new Map(), changeOf: new Map() });
+const copy = (c: Constraints): Constraints => ({
+  notBefore: new Map(c.notBefore), failedIn: new Map([...c.failedIn].map(([id, list]) => [id, [...list]])),
+  replaced: new Map(c.replaced), changeOf: new Map(c.changeOf),
+});
 
-const normalise = (value: string) => value.trim().toUpperCase().replace(/[\s_]+/g, '_');
+/** Requirement type / category key: upper case, spaces and underscores alike ("Elective E1" = "ELECTIVE_E1"). */
+export const normaliseRequirementType = (value: string) => value.trim().toUpperCase().replace(/[\s_]+/g, '_');
+const normalise = normaliseRequirementType;
 
 interface Needed { ids: Set<number>; electives: Map<number, NonNullable<PlannedSubject['electiveChoice']>>; noGroups: boolean }
 
@@ -32,20 +39,22 @@ function neededSubjects(input: PlanningInput, byId: Map<number, PlanningSubject>
   const unlocks = (id: number) => input.subjects.filter(s => !passed.has(s.curriculumSubjectId) && s.prerequisites.includes(id)).length;
   const unmetPrereqs = (s: PlanningSubject) => s.prerequisites.filter(id => !passed.has(id)).length;
   const forcedIn = new Set(constraints.replaced.values());
+  // Compulsory subjects are always needed, whatever a group's threshold says (UC11 BR5; matches UC05 outstanding compulsory).
+  for (const s of input.subjects) if (s.compulsory && !passed.has(s.curriculumSubjectId)) ids.add(s.curriculumSubjectId);
   let matchedAny = false;
-  const inGroup = new Set<number>();
   for (const requirement of input.requirements) {
     const type = normalise(requirement.requirementType);
     const members = input.subjects.filter(s => type === 'COMPULSORY' ? s.compulsory : normalise(s.category) === type);
     if (members.length === 0) continue;
     matchedAny = true;
-    for (const member of members) inGroup.add(member.curriculumSubjectId);
-    const done = members.filter(s => passed.has(s.curriculumSubjectId));
-    const needCount = requirement.requiredSubjects === null ? null : Math.max(0, requirement.requiredSubjects - done.length);
-    const needCredits = requirement.requiredCredits === null ? null : Math.max(0, requirement.requiredCredits - done.reduce((n, s) => n + s.creditHours, 0));
+    // Passed and compulsory members already count toward the group; only optional members are chosen.
+    const counted = members.filter(s => passed.has(s.curriculumSubjectId) || s.compulsory);
+    const needCount = requirement.requiredSubjects === null ? null : Math.max(0, requirement.requiredSubjects - counted.length);
+    const needCredits = requirement.requiredCredits === null ? null : Math.max(0, requirement.requiredCredits - counted.reduce((n, s) => n + s.creditHours, 0));
     if (needCount === null && needCredits === null) continue;
-    const pool = members
-      .filter(s => !passed.has(s.curriculumSubjectId) && !constraints.replaced.has(s.curriculumSubjectId))
+    const optional = members.filter(s => !s.compulsory && !passed.has(s.curriculumSubjectId));
+    const pool = optional
+      .filter(s => !constraints.replaced.has(s.curriculumSubjectId))
       .sort((left, right) => Number(forcedIn.has(right.curriculumSubjectId)) - Number(forcedIn.has(left.curriculumSubjectId))
         || unlocks(right.curriculumSubjectId) - unlocks(left.curriculumSubjectId)
         || unmetPrereqs(left) - unmetPrereqs(right)
@@ -56,16 +65,12 @@ function neededSubjects(input: PlanningInput, byId: Map<number, PlanningSubject>
       if ((needCount === null || chosen.length >= needCount) && (needCredits === null || credits >= needCredits)) break;
       chosen.push(candidate); credits += candidate.creditHours;
     }
-    const options = pool.length + [...constraints.replaced.keys()].filter(id => members.some(m => m.curriculumSubjectId === id)).length;
     for (const pick of chosen) {
       ids.add(pick.curriculumSubjectId);
-      if (chosen.length < options && !pick.compulsory) electives.set(pick.curriculumSubjectId, { requirementType: type, needed: needCount ?? chosen.length, options });
+      if (chosen.length < optional.length) electives.set(pick.curriculumSubjectId, { requirementType: type, needed: needCount ?? chosen.length, options: optional.length });
     }
   }
-  for (const s of input.subjects) {
-    if (passed.has(s.curriculumSubjectId)) continue;
-    if (!matchedAny || (s.compulsory && !inGroup.has(s.curriculumSubjectId))) ids.add(s.curriculumSubjectId);
-  }
+  if (!matchedAny) for (const s of input.subjects) if (!passed.has(s.curriculumSubjectId)) ids.add(s.curriculumSubjectId);
   // Pull in unpassed MANDATORY prerequisites of anything included.
   const queue = [...ids];
   while (queue.length) {
@@ -137,9 +142,9 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
     if (!limits.configured) usedDefaults = true;
     const subjects: PlannedSubject[] = [];
     let credits = 0;
-    for (const [id, failedIndex] of constraints.failedIn) {
+    for (const [id, failedIndexes] of constraints.failedIn) {
       const s = byId.get(id);
-      if (failedIndex === index && s) { subjects.push(toPlanned(s, true)); credits += s.creditHours; }
+      if (s && failedIndexes.includes(index)) { subjects.push(toPlanned(s, true)); credits += s.creditHours; }
     }
     const placedBefore = subjects.filter(s => !s.failedAttempt).length;
     for (const s of order) {
@@ -241,40 +246,38 @@ export function planBaseline(input: PlanningInput): GraduationPlan {
 }
 
 /**
- * UC15 scenario: the same engine with the student's what-if changes. Postpone, fail and withdraw keep the subject out
- * of the semester the baseline put it in (fail also keeps the failed attempt there). Replace swaps an elective choice
- * for another option of the same group. Changes to subjects the baseline does not plan are ignored.
+ * UC15 scenario: the same engine with the student's what-if changes, applied one after another. Each change acts on
+ * the plan as it stands after the earlier changes: postpone, fail and withdraw keep the subject out of the semester it
+ * is currently in (fail also keeps the failed attempt there, using its slot and credits); replace swaps an elective
+ * choice for another option of the same group. A change to a subject the current plan does not place is ignored.
  */
 export function planScenario(input: PlanningInput, changes: ScenarioChange[]): GraduationPlan {
-  const baseline = planBaseline(input);
-  const position = new Map<number, number>();
-  const groupOf = new Map<number, string>();
-  baseline.semesters.forEach((semester, index) => semester.subjects.forEach(s => {
-    position.set(s.curriculumSubjectId, index);
-    if (s.electiveChoice) groupOf.set(s.curriculumSubjectId, s.electiveChoice.requirementType);
-  }));
   const byId = new Map(input.subjects.map(s => [s.curriculumSubjectId, s]));
   const passed = new Set(input.passed);
-  const constraints = none();
-  const delays = new Map<number, number>();
+  let constraints = none();
+  let current = plan(input, constraints);
   for (const change of changes) {
-    const at = position.get(change.curriculumSubjectId);
+    let at: number | undefined, group: string | undefined;
+    current.semesters.forEach((semester, index) => semester.subjects.forEach(s => {
+      if (s.curriculumSubjectId !== change.curriculumSubjectId || s.failedAttempt) return;
+      at = index; group = s.electiveChoice?.requirementType;
+    }));
     if (at === undefined) continue;
+    const next = copy(constraints);
     if (change.kind === 'REPLACE') {
-      const group = groupOf.get(change.curriculumSubjectId);
       const replacement = change.replacementId === undefined ? undefined : byId.get(change.replacementId);
-      if (!group || !replacement || passed.has(replacement.curriculumSubjectId) || normalise(replacement.category) !== group) continue;
-      constraints.replaced.set(change.curriculumSubjectId, replacement.curriculumSubjectId);
-      constraints.changeOf.set(replacement.curriculumSubjectId, 'REPLACE');
-      continue;
+      if (!group || !replacement || replacement.compulsory || passed.has(replacement.curriculumSubjectId) || normalise(replacement.category) !== group) continue;
+      next.replaced.set(change.curriculumSubjectId, replacement.curriculumSubjectId);
+      next.changeOf.set(replacement.curriculumSubjectId, 'REPLACE');
+    } else {
+      next.notBefore.set(change.curriculumSubjectId, at + 1);
+      next.changeOf.set(change.curriculumSubjectId, change.kind);
+      if (change.kind === 'FAIL') next.failedIn.set(change.curriculumSubjectId, [...(next.failedIn.get(change.curriculumSubjectId) ?? []), at]);
     }
-    const steps = (delays.get(change.curriculumSubjectId) ?? 0) + 1;
-    delays.set(change.curriculumSubjectId, steps);
-    constraints.notBefore.set(change.curriculumSubjectId, at + steps);
-    constraints.changeOf.set(change.curriculumSubjectId, change.kind);
-    if (change.kind === 'FAIL') constraints.failedIn.set(change.curriculumSubjectId, at);
+    constraints = next;
+    current = plan(input, constraints);
   }
-  return plan(input, constraints);
+  return current;
 }
 
 /** UC16 comparison, computed only from the two engine results. */

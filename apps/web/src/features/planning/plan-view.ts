@@ -1,4 +1,5 @@
 import type { GraduationPlan, PlannedSubject, PlanningInput, ScenarioChange, ScenarioChangeKind } from '../../../../../packages/shared/src/planning/contracts';
+import { normaliseRequirementType as normalise } from '../../../../../packages/shared/src/planning/engine';
 
 export const CHANGE_LABEL: Record<ScenarioChangeKind, string> = {
   POSTPONE: 'Postpone one semester', FAIL: 'Fail it', WITHDRAW: 'Withdraw', REPLACE: 'Replace with another elective',
@@ -30,15 +31,13 @@ export function changeableSubjects(plan: GraduationPlan): PlannedSubject[] {
   return [...seen.values()].sort((left, right) => left.subjectCode.localeCompare(right.subjectCode));
 }
 
-const normalise = (value: string) => value.trim().toUpperCase().replace(/[\s_]+/g, '_');
-
 /** Other options of the same elective group that are not passed and not already in the plan. */
 export function replacementOptions(input: PlanningInput, plan: GraduationPlan, subject: PlannedSubject) {
   if (!subject.electiveChoice) return [];
   const planned = new Set(changeableSubjects(plan).map(s => s.curriculumSubjectId));
   const passed = new Set(input.passed);
   return input.subjects
-    .filter(s => normalise(s.category) === subject.electiveChoice!.requirementType && !passed.has(s.curriculumSubjectId) && !planned.has(s.curriculumSubjectId))
+    .filter(s => !s.compulsory && normalise(s.category) === subject.electiveChoice!.requirementType && !passed.has(s.curriculumSubjectId) && !planned.has(s.curriculumSubjectId))
     .sort((left, right) => left.subjectCode.localeCompare(right.subjectCode));
 }
 

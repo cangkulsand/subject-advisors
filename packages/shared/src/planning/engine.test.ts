@@ -152,3 +152,35 @@ describe('planScenario and comparePlans', () => {
     expect(comparison).toMatchObject({ semesterDifference: 0, moved: [] });
   });
 });
+
+describe('review fixes (S3-P004-004 round 2)', () => {
+  it('keeps every compulsory subject even when a group threshold is already met or not set', () => {
+    const plan = planBaseline(input({ requirements: [{ requirementType: 'CORE', requiredSubjects: 1, requiredCredits: null }, { requirementType: 'COMPULSORY', requiredSubjects: null, requiredCredits: null }] }));
+    const codes = codesBySemester(plan).flat();
+    for (const code of ['SECA1013', 'SECA2013', 'SECA3013', 'SECB1013', 'UHLB1112', 'UHLB2122', 'UHLB3132']) expect(codes).toContain(code);
+    expect(codes.filter(code => code.startsWith('SECE'))).toEqual([]);
+  });
+  it('counts compulsory members toward a group before choosing optional ones', () => {
+    const mixed = subjects.map(s => s.subjectCode === 'SECE2013' ? { ...s, compulsory: true } : s);
+    const plan = planBaseline(input({ subjects: mixed }));
+    const codes = codesBySemester(plan).flat();
+    expect(codes).toContain('SECE2013');
+    expect(codes.filter(code => code.startsWith('SECE'))).toEqual(['SECE2013']);
+  });
+  it('applies changes in order: a second postpone moves the subject again, from where it is now', () => {
+    const once = planScenario(input(), [{ kind: 'POSTPONE', curriculumSubjectId: 8 }]);
+    const twice = planScenario(input(), [{ kind: 'POSTPONE', curriculumSubjectId: 8 }, { kind: 'POSTPONE', curriculumSubjectId: 8 }]);
+    const where = (p: typeof once) => p.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === 'UHLB1112' && !x.failedAttempt));
+    expect(where(once)).toBe(4);
+    expect(where(twice)).toBe(7);
+  });
+  it('records each failed attempt where it happened and puts a later fail after a postponed prerequisite', () => {
+    const twice = planScenario(input(), [{ kind: 'FAIL', curriculumSubjectId: 4 }, { kind: 'FAIL', curriculumSubjectId: 4 }]);
+    expect(codesBySemester(twice)[0]).toContain('SECB1013*');
+    expect(codesBySemester(twice)[2]).toContain('SECB1013*');
+    const chained = planScenario(input(), [{ kind: 'POSTPONE', curriculumSubjectId: 1 }, { kind: 'FAIL', curriculumSubjectId: 2 }]);
+    const a1 = chained.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === 'SECA1013'));
+    const failed = chained.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === 'SECA2013' && x.failedAttempt));
+    expect(failed).toBeGreaterThan(a1);
+  });
+});

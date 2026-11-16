@@ -11,12 +11,12 @@ export const PLANNING_INPUT_PATH = '/api/planning/input';
 export async function handlePlanningRequest(request: Request, deps: PlanningDependencies): Promise<Response | null> {
   if (new URL(request.url).pathname !== PLANNING_INPUT_PATH) return null;
   try {
+    const me = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
     if (request.method !== 'GET') {
       const response = authJson({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this endpoint.' } }, 405);
       response.headers.set('Allow', 'GET');
       return response;
     }
-    const me = await authorize(request, deps.auth, { roles: ['STUDENT'], requireProfile: true });
     const input = await deps.repository.load(me.clerkUserId);
     if (!input) throw new P001Error(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile first.');
     return authJson({ data: input });

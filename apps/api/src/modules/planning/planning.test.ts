@@ -17,7 +17,7 @@ const rows = (extra: Partial<PlanningRows> = {}): PlanningRows => ({
   ],
   rules: [{ curriculumSubjectId: 11, semesterType: 'NORMAL' }, { curriculumSubjectId: 13, semesterType: 'SHORT' }, { curriculumSubjectId: 13, semesterType: 'SHORT' }],
   prerequisites: [{ curriculumSubjectId: 12, requiredCurriculumSubjectId: 11 }],
-  records: [{ subjectId: 101, status: 'FAILED', recognizedCredits: 0 }, { subjectId: 101, status: 'COMPLETED', recognizedCredits: 3 }, { subjectId: 999, status: 'COMPLETED', recognizedCredits: 3 }],
+  records: [{ subjectId: 101, status: 'FAILED', recognizedCredits: 0, remarks: null }, { subjectId: 101, status: 'COMPLETED', recognizedCredits: 3, remarks: null }, { subjectId: 999, status: 'COMPLETED', recognizedCredits: 3, remarks: null }],
   requirements: [{ requirementType: 'CORE', requiredSubjects: 2, requiredCredits: 6 }],
   semesters,
   decisions: [{ subjectId: 102, status: 'APPROVED' }, { subjectId: 103, status: 'REMOVED' }],
@@ -25,10 +25,11 @@ const rows = (extra: Partial<PlanningRows> = {}): PlanningRows => ({
 });
 
 describe('startSemester', () => {
-  it('is the configured semester after the current one, in academic order', () => {
-    expect(startSemester(semesters)?.semesterId).toBe(4);
+  it('is the semester after the current one, with its row when configured', () => {
+    expect(startSemester(semesters)).toEqual({ academicYear: '2026/2027', semesterNo: 2, semesterId: 4 });
     expect(startSemester(semesters.map(s => ({ ...s, isCurrent: false })))).toBeNull();
-    expect(startSemester([{ ...semesters[0]! }])).toBeNull();
+    expect(startSemester([{ ...semesters[0]! }])).toEqual({ academicYear: '2026/2027', semesterNo: 2, semesterId: null });
+    expect(startSemester([{ ...semesters[0]!, semesterNo: 3 }])).toEqual({ academicYear: '2027/2028', semesterNo: 1, semesterId: null });
   });
 });
 
@@ -44,6 +45,20 @@ describe('toPlanningInput', () => {
     expect(input.approvedFirst).toEqual([12]);
     expect(input.limits).toHaveLength(3);
     expect(input).toMatchObject({ programmeName: 'Software Engineering', totalCredits: 120, requirements: [{ requirementType: 'CORE' }] });
+  });
+  it('counts records as passed with the same rules as Academic progress', () => {
+    const records = [
+      { subjectId: 101, status: 'COMPLETED', recognizedCredits: 0, remarks: null },
+      { subjectId: 102, status: 'EXEMPTED', recognizedCredits: 3, remarks: '  ' },
+      { subjectId: 103, status: 'EXEMPTED', recognizedCredits: 2, remarks: 'MUET band 4' },
+    ];
+    const input = toPlanningInput(rows({ records }));
+    expect(input.passed).toEqual([13]);
+    expect(input.earnedCredits).toBe(2);
+  });
+  it('plans from the computed next semester when the admin has not created it yet, without coordinator decisions', () => {
+    const input = toPlanningInput(rows({ semesters: [semesters[0]!] }));
+    expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: null });
   });
   it('has no approved list when the coordinator decided nothing, or there is no start semester', () => {
     expect(toPlanningInput(rows({ decisions: [] })).approvedFirst).toBeNull();
@@ -91,6 +106,11 @@ describe('planning route', () => {
     expect(res.status).toBe(200);
     expect(repository.load).toHaveBeenCalledWith('student_a');
     expect(await res.json()).toEqual({ data: toPlanningInput(rows()) });
+  });
+  it('checks sign-in before the method', async () => {
+    const { d } = deps(); (d.auth.verify as ReturnType<typeof vi.fn>).mockRejectedValue(Object.assign(new Error('no session'), { status: 401 }));
+    const res = (await handlePlanningRequest(req('/api/planning/input', 'POST'), d))!;
+    expect(res.status).not.toBe(405);
   });
   it('rejects non-students and other methods', async () => {
     expect((await handlePlanningRequest(req('/api/planning/input'), deps('COORDINATOR').d))!.status).toBe(403);
