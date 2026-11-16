@@ -240,6 +240,17 @@ function assumptions(input: PlanningInput, needed: Needed, usedDefaults: boolean
   return list;
 }
 
+/**
+ * What the baseline still needs, with each needed subject's critical-chain length (1 = nothing needed depends on it)
+ * and how many needed subjects it unlocks. Used by UC11/UC12 recommendations to explain priorities.
+ */
+export function planningAnalysis(input: PlanningInput): { needed: number[]; depth: Map<number, number>; unlocks: Map<number, number> } {
+  const byId = new Map(input.subjects.map(s => [s.curriculumSubjectId, s]));
+  const needed = neededSubjects(input, byId, new Set(input.passed), none());
+  const { depth, unlocks } = chains(needed.ids, input.subjects);
+  return { needed: [...needed.ids].sort((a, b) => a - b), depth, unlocks };
+}
+
 /** UC14 baseline: the plan with no what-if changes. */
 export function planBaseline(input: PlanningInput): GraduationPlan {
   return plan(input, none());

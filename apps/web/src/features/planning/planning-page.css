@@ -24,8 +24,9 @@
 .planning-status { display: inline-block; border-radius: 8px; padding: 8px 14px; font-size: var(--font-size-body); font-weight: 650; }
 .planning-status--met { background: var(--color-success-bg, #f0fdf4); color: var(--color-success-text, #166534); }
 
-.planning-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
-.planning-card > .planning-summary:first-child { margin-top: 0; }
+.planning-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.planning-page .planning-summary { margin-top: 16px; }
+.planning-page .planning-card > .planning-summary:first-child { margin-top: 0; }
 .planning-summary > div { border-radius: 10px; background: var(--pl-subtle); padding: 14px 16px; }
 .planning-summary dt { font-size: var(--font-size-label); font-weight: 600; color: var(--pl-muted); }
 .planning-summary dd { margin-top: 4px; font-size: var(--font-size-body); font-weight: 650; color: var(--pl-heading); }
