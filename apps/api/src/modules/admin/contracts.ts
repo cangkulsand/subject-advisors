@@ -45,5 +45,7 @@ export interface AdminIdentities {
   findByEmail(email: string): Promise<{ clerkUserId: string; verifiedEmail: string; emailVerified: boolean } | null>;
   createInvitation(email: string, redirectUrl?: string, expiresInDays?: number): Promise<{ clerkInvitationId: string }>;
   revokeInvitation(clerkInvitationId: string): Promise<void>;
+  /** Blocks (Clerk ban: no sign-in, sessions revoked) or unblocks sign-in for a suspended / reactivated account. */
+  setSignInBlocked(clerkUserId: string, blocked: boolean): Promise<void>;
 }
 export interface AdminDependencies { auth: AuthDependencies; repository: AdminRepository; identities: AdminIdentities; academicRepository?: import('./academic-contracts').AcademicSetupRepository }

@@ -491,7 +491,7 @@
       "patch": {
         "operationId": "changeAdminAccess",
         "summary": "Suspend or reactivate an account",
-        "description": "Suspension is the only way to remove an account access. An administrator cannot suspend themselves, the protected owner cannot be suspended, and the last active SYSTEM_ADMIN cannot be suspended. reason is trimmed, 1-500 characters, and is stored in the audit log.",
+        "description": "Suspension is the only way to remove an account access. An administrator cannot suspend themselves, the protected owner cannot be suspended, and the last active SYSTEM_ADMIN cannot be suspended. reason is trimmed, 1-500 characters, and is stored in the audit log. Order: app status change (with its guards), then Clerk ban on SUSPENDED / unban on ACTIVE; if Clerk fails the app status is reverted (S3-P004-009).",
         "parameters": [
           {
             "name": "id",
@@ -609,6 +609,16 @@
                     "code": "UNSUPPORTED_MEDIA_TYPE",
                     "message": "See the error code catalogue."
                   }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Sign-in could not be blocked or unblocked in Clerk; the app status was put back. Stable codes: SIGN_IN_BLOCK_FAILED (suspend), SIGN_IN_UNBLOCK_FAILED (reactivate). Retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
