@@ -25,10 +25,10 @@ export function semesterAt(start: SemesterRef | null, offset: number): SemesterR
   return { academicYear, semesterNo };
 }
 
-/** UC14 BR12 label, e.g. "AY 2026/2027 – Semester 3 (Short Semester)"; numbered when there is no calendar. */
+/** UC14 BR12 label without the "AY" prefix (owner decision 2026-11-16), e.g. "2026/2027 – Semester 3 (Short Semester)"; numbered when there is no calendar. */
 export function semesterLabel(semester: SemesterRef, index: number, calendar: boolean): string {
   const short = semester.semesterNo === 3 ? ' (Short Semester)' : '';
-  return calendar ? `AY ${semester.academicYear} – Semester ${semester.semesterNo}${short}` : `Plan semester ${index}${short}`;
+  return calendar ? `${semester.academicYear} – Semester ${semester.semesterNo}${short}` : `Plan semester ${index}${short}`;
 }
 
 const order = (left: SemesterRef, right: SemesterRef) =>

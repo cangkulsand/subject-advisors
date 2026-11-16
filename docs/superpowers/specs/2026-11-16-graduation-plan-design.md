@@ -54,7 +54,7 @@ approved for the first planned semester.
    assumption says so. Unpassed MANDATORY prerequisites of anything included are pulled in.
 3. **Semesters:** start at the semester after the system current semester (`academic_semester.is_current`, the same
    rule as the offerings page) **(call)**; without a current semester, plan in numbered semesters ("Semester 1 of your
-   plan") (SRS UC14 BR10). Order 1, 2, 3 per academic year; 3 is Short. Labels: `AY 2026/2027 – Semester 3 (Short
+   plan") (SRS UC14 BR10). Order 1, 2, 3 per academic year; 3 is Short. Labels: `2026/2027 – Semester 3 (Short
    Semester)` (BR12); years past the configured calendar roll forward (2027/2028, …).
 4. **Limits:** the configured `max_subjects` / `max_credits` of that semester; otherwise the latest configured semester
    of the same type; otherwise Normal 3 subjects / 10 credits and Short 3 subjects / 6 credits (BR4).

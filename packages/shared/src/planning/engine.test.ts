@@ -40,7 +40,7 @@ describe('semester helpers', () => {
     expect(semesterAt(null, 4)).toEqual({ academicYear: '', semesterNo: 2 });
   });
   it('labels calendar and numbered semesters', () => {
-    expect(semesterLabel({ academicYear: '2026/2027', semesterNo: 3 }, 2, true)).toBe('AY 2026/2027 – Semester 3 (Short Semester)');
+    expect(semesterLabel({ academicYear: '2026/2027', semesterNo: 3 }, 2, true)).toBe('2026/2027 – Semester 3 (Short Semester)');
     expect(semesterLabel({ academicYear: '', semesterNo: 1 }, 4, false)).toBe('Plan semester 4');
   });
   it('uses exact, then latest same-type, then default limits', () => {
@@ -66,8 +66,8 @@ describe('planBaseline', () => {
       [],
       ['UHLB3132'],
     ]);
-    expect(plan.semesters[1]!.label).toBe('AY 2026/2027 – Semester 3 (Short Semester)');
-    expect(plan.completion).toMatchObject({ index: 8, academicYear: '2028/2029', semesterNo: 3, label: 'AY 2028/2029 – Semester 3 (Short Semester)' });
+    expect(plan.semesters[1]!.label).toBe('2026/2027 – Semester 3 (Short Semester)');
+    expect(plan.completion).toMatchObject({ index: 8, academicYear: '2028/2029', semesterNo: 3, label: '2028/2029 – Semester 3 (Short Semester)' });
     const elective = plan.semesters[0]!.subjects.find(s => s.subjectCode === 'SECE1013')!;
     expect(elective.electiveChoice).toEqual({ requirementType: 'ELECTIVE_E1', needed: 1, options: 3 });
     expect(plan.remainingSubjects).toBe(8);
@@ -124,12 +124,12 @@ describe('planScenario and comparePlans', () => {
     expect(scenario.semesters[a1]!.subjects.find(x => x.subjectCode === 'SECA1013')!.change).toBe('POSTPONE');
     const comparison = comparePlans(baseline, scenario);
     expect(comparison.semesterDifference).toBe(0);
-    expect(comparison.moved.find(m => m.subjectCode === 'SECA1013')).toMatchObject({ from: 'AY 2026/2027 – Semester 2', to: 'AY 2027/2028 – Semester 1' });
+    expect(comparison.moved.find(m => m.subjectCode === 'SECA1013')).toMatchObject({ from: '2026/2027 – Semester 2', to: '2027/2028 – Semester 1' });
   });
   it('postponing a bottleneck delays completion', () => {
     const comparison = comparePlans(planBaseline(input()), planScenario(input(), [{ kind: 'POSTPONE', curriculumSubjectId: 8 }]));
     expect(comparison.semesterDifference).toBe(3);
-    expect(comparison.scenario!.label).toBe('AY 2029/2030 – Semester 3 (Short Semester)');
+    expect(comparison.scenario!.label).toBe('2029/2030 – Semester 3 (Short Semester)');
   });
   it('keeps a failed attempt in its semester, using the slot, and retakes it later', () => {
     const scenario = planScenario(input(), [{ kind: 'FAIL', curriculumSubjectId: 4 }]);
