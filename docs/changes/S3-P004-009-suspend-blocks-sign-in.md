@@ -1,11 +1,11 @@
 # S3-P004-009 — Suspending an account also blocks sign-in
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M0 authentication, M7 system administration)
 - **Related UC / FR:** UC02 / FR (suspend or reactivate application access); SRS L585, L589
-- **Branch / PR:** `feature/s3-suspend-blocks-signin`; not merged, no PR
+- **Branch / PR:** `feature/s3-suspend-blocks-signin`; merged into `main` on 2026-11-16 (merge commit d05f82c); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -40,4 +40,4 @@ signs out when its session token next refreshes, about a minute with Clerk's def
 ## 4. Changelog
 
 - 2026-11-16 - Type: Fixed. Suspending an account bans it in Clerk (signed out, cannot sign in); reactivating
-  unbans it. Clerk failure reverts the change. Outstanding: human peer review; live Clerk check.
+  unbans it. Clerk failure reverts the change. Merged to `main` 2026-11-16 (d05f82c). Outstanding: human peer review; live Clerk check.
