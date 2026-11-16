@@ -1,11 +1,11 @@
 # S3-P004-007 — Graduation plan counts exemptions saved without remarks
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P003 (M5); built by P004 (fix to S3-P004-004)
 - **Related UC / FR:** UC14 projected pathway
-- **Branch / PR:** `fix/s3-plan-exemptions`; not merged, no PR
+- **Branch / PR:** `fix/s3-plan-exemptions`; merged into `main` on 2026-11-16 (merge commit 91fc24a); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -35,4 +35,4 @@ prod bundle has the plan page).
 ## 4. Changelog
 
 - 2026-11-16 - Type: Fixed. Graduation plan and Recommendations count exemptions saved without remarks as passed.
-  Outstanding: human peer review.
+  Merged to `main` 2026-11-16 (91fc24a). Outstanding: human peer review.
