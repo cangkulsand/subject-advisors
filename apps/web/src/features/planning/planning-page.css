@@ -1,0 +1,92 @@
+.planning-page {
+  --pl-surface: var(--color-surface, #fff);
+  --pl-subtle: var(--color-surface-subtle, #f0e9da);
+  --pl-heading: var(--color-heading, #1a1a1a);
+  --pl-body: var(--color-body, #555555);
+  --pl-muted: var(--color-muted-text, #555555);
+  --pl-outline: var(--color-outline, #ddd3c3);
+  --pl-accent: var(--color-accent, #6b1d2f);
+  --pl-focus: var(--color-focus, #6b1d2f);
+  color: var(--pl-body); font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--font-size-control); line-height: var(--line-height-body, 1.55); max-width: 1184px; margin: auto; padding: 40px 32px 64px; overflow-wrap: anywhere;
+}
+.planning-page *, .planning-page *::before, .planning-page *::after { box-sizing: border-box; }
+.planning-page :is(h1, h2, h3, p, dl, dd) { margin: 0; }
+.planning-page :is(h1, h2, h3) { color: var(--pl-heading); }
+.planning-page h1 { font-size: clamp(26px, 3vw, 36px); line-height: 1.25; letter-spacing: -.035em; font-weight: 650; margin: 12px 0; }
+.planning-page h2 { font-size: 19px; line-height: 1.4; letter-spacing: -.02em; font-weight: 650; }
+.planning-page h3 { font-size: var(--font-size-body); line-height: 1.4; font-weight: 650; }
+.planning-page :is(button, select, [tabindex]):focus-visible { outline: 3px solid var(--pl-focus); outline-offset: 3px; }
+.planning-eyebrow { font-size: var(--font-size-small); line-height: 1.5; font-weight: 700; letter-spacing: .1em; color: var(--pl-muted); text-transform: uppercase; }
+.planning-page .planning-lead { max-width: 720px; font-size: var(--font-size-body); color: var(--pl-muted); margin-top: 4px; }
+.planning-card { border: 1px solid var(--pl-outline); border-radius: 12px; background: var(--pl-surface); padding: 24px; margin-top: 24px; }
+.planning-card > h3 { margin-top: 20px; }
+.planning-status { display: inline-block; border-radius: 8px; padding: 8px 14px; font-size: var(--font-size-body); font-weight: 650; }
+.planning-status--met { background: var(--color-success-bg, #f0fdf4); color: var(--color-success-text, #166534); }
+
+.planning-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+.planning-card > .planning-summary:first-child { margin-top: 0; }
+.planning-summary > div { border-radius: 10px; background: var(--pl-subtle); padding: 14px 16px; }
+.planning-summary dt { font-size: var(--font-size-label); font-weight: 600; color: var(--pl-muted); }
+.planning-summary dd { margin-top: 4px; font-size: var(--font-size-body); font-weight: 650; color: var(--pl-heading); }
+.planning-summary p { margin-top: 2px; color: var(--pl-muted); }
+.planning-page .planning-later { color: var(--color-danger-text, #b91c1c); }
+
+.planning-warning { margin-top: 20px; border: 1px solid var(--color-warning-text, #92400e); border-radius: 10px; background: var(--color-warning-bg, #fffbeb); padding: 14px 18px; color: var(--color-warning-text, #92400e); }
+.planning-warning h3 { color: inherit; }
+.planning-warning ul, .planning-notice ul { margin: 8px 0 0; padding-left: 22px; }
+
+.planning-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-top: 16px; }
+.planning-field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 220px; min-width: 0; }
+.planning-field label { font-size: var(--font-size-label); font-weight: 600; color: var(--pl-heading); }
+.planning-field select { width: 100%; min-height: var(--control-min-height, 44px); font: inherit; font-size: var(--font-size-control); border: 1px solid var(--pl-outline); border-radius: 8px; padding: 8px 12px; background: var(--pl-surface); color: var(--pl-heading); }
+.planning-button { min-height: var(--control-min-height, 44px); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 10px 16px; border: 1.5px solid var(--pl-accent); border-radius: 8px; background: transparent; color: var(--pl-accent); font: inherit; font-size: var(--font-size-control); font-weight: 600; }
+.planning-button:hover { background: var(--pl-subtle); }
+.planning-button--primary { background: var(--pl-accent); color: #fff; }
+.planning-button--primary:hover { background: var(--pl-accent); filter: brightness(1.1); }
+.planning-changes { list-style: none; margin: 8px 0 16px; padding: 0; }
+.planning-changes li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 8px 0; border-top: 1px solid var(--pl-outline); color: var(--pl-heading); }
+
+.planning-toggle { display: inline-flex; gap: 2px; margin-top: 24px; padding: 2px; border-radius: 8px; background: #f3f4f6; }
+.planning-toggle button { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 6px; background: transparent; color: var(--pl-muted); font: inherit; font-size: var(--font-size-control); font-weight: 500; cursor: pointer; }
+.planning-toggle button[aria-pressed="true"] { background: #fff; color: var(--pl-heading); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+
+.planning-semesters { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 16px; }
+.planning-semester { border: 1px solid var(--pl-outline); border-radius: 10px; padding: 16px; }
+.planning-semester-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.planning-semester-head span { color: var(--pl-muted); font-variant-numeric: tabular-nums; }
+.planning-page .planning-empty { margin-top: 10px; color: var(--pl-muted); }
+.planning-table-scroll { overflow-x: auto; margin-top: 12px; }
+.planning-table { width: 100%; border-collapse: collapse; line-height: var(--line-height-table, 1.5); }
+.planning-table thead th { font-size: var(--font-size-table-head); font-weight: 600; color: var(--pl-muted); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--pl-outline); }
+.planning-table :is(td, tbody th) { font-size: var(--font-size-table); padding: 14px 12px; border-bottom: 1px solid var(--pl-outline); text-align: left; vertical-align: top; font-weight: 400; }
+.planning-table tbody tr:last-child :is(td, th) { border-bottom: 0; }
+@media (min-width: 641px) {
+  /* Same column widths in every semester table on wide screens; phones keep automatic widths. */
+  .planning-table--semester { table-layout: fixed; }
+  .planning-table--semester th:nth-child(2) { width: 88px; }
+  .planning-table--semester th:nth-child(3) { width: 40%; }
+}
+@media (max-width: 640px) {
+  .planning-table thead th { padding: 10px 6px; }
+  .planning-table :is(td, tbody th) { padding: 14px 6px; }
+  .planning-table :is(th, td):first-child { padding-left: 0; }
+  .planning-table :is(th, td):last-child { padding-right: 0; }
+}
+.planning-table .planning-number { text-align: right; font-variant-numeric: tabular-nums; }
+.planning-table thead .planning-number { white-space: nowrap; }
+.planning-subject-name { display: block; font-size: var(--font-size-subject-name); font-weight: 600; color: var(--pl-heading); }
+.planning-subject-code { font-size: var(--font-size-subject-code); color: var(--pl-muted); }
+.planning-muted { color: var(--pl-muted); }
+.planning-failed .planning-subject-name { text-decoration: line-through; }
+
+.planning-bottlenecks { list-style: none; margin: 12px 0 0; padding: 0; }
+.planning-bottlenecks li { padding: 10px 0; border-top: 1px solid var(--pl-outline); }
+.planning-bottlenecks li:first-child { border-top: 0; }
+.planning-bottlenecks strong { color: var(--pl-heading); }
+.planning-bottlenecks p { margin-top: 2px; }
+
+.planning-page .planning-notice { margin-top: 32px; border: 1px solid var(--color-warning-text, #92400e); border-radius: 10px; background: var(--color-warning-bg, #fffbeb); padding: 14px 18px; color: var(--color-warning-text, #92400e); }
+.planning-notice h2 { font-size: var(--font-size-body); color: inherit; }
+.planning-page .planning-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; border: 1px solid var(--color-danger-text, #b91c1c); border-radius: 10px; background: var(--color-danger-bg, #fef2f2); padding: 14px 18px; color: var(--color-danger-text, #b91c1c); }
+@media (max-width: 640px) { .planning-page { padding: 24px 16px 48px; } .planning-card { padding: 16px; } .planning-semester { padding: 12px; } }

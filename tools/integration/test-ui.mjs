@@ -19,12 +19,20 @@ const profile={studentId:1,studentName:'DEMO NOT OFFICIAL',matricNo:'A22EC0001',
 const progressSubjects=[1,2,3].map(id=>({mappingId:id,subjectId:100+id,code:'DEMO'+id,name:'Fictional subject '+id,credits:3,category:'CORE',compulsory:true,semesterTypes:id===3?['SHORT']:['NORMAL','SHORT'],outcome:['COMPLETED','REMAINING','REMAINING'][id-1],earnedCredits:id===1?3:0}));
 const progressFixture={programme:'DEMO programme - NOT OFFICIAL',version:'DEMO_A',totalCredits:9,earnedCredits:3,completedCredits:3,exemptionCredits:0,remainingCredits:6,percent:33,completedSubjects:1,exemptedSubjects:0,zeroCreditExemptions:0,outstandingCompulsory:2,noHistory:false,warnings:[],links:[{id:1,from:2,required:1,kind:'MANDATORY'},{id:2,from:3,required:2,kind:'MANDATORY'},{id:3,from:3,required:1,kind:'RECOMMENDED'}],subjects:progressSubjects,requirements:[{type:'COMPULSORY',credits:9,subjects:3,earnedCredits:3,satisfiedSubjects:1,status:'OUTSTANDING'}]};
 const gradFixture={requiredCredits:120,earnedCredits:90,remainingCredits:30,creditsMet:false,status:'NOT_YET_ELIGIBLE',missing:['30 more credits needed.','Confirm you have no outstanding fees.','Confirm you have your MUET certificate.'],feesClearedConfirmedAt:null,muetConfirmedAt:null};
+const planSubject=(id,code,credits,extra={})=>({curriculumSubjectId:id,subjectCode:code,subjectName:'Fictional '+code,creditHours:credits,category:'Core',compulsory:true,semesterTypes:['NORMAL'],prerequisites:[],...extra});
+const planFixture={programmeName:'DEMO programme - NOT OFFICIAL',curriculumVersion:'DEMO_A',totalCredits:27,earnedCredits:0,passed:[],approvedFirst:null,start:{academicYear:'2026/2027',semesterNo:2},
+ limits:[{academicYear:'2026/2027',semesterNo:2,maxSubjects:3,maxCredits:10},{academicYear:'2026/2027',semesterNo:3,maxSubjects:3,maxCredits:6}],
+ requirements:[{requirementType:'CORE',requiredSubjects:4,requiredCredits:12},{requirementType:'ELECTIVE_E1',requiredSubjects:1,requiredCredits:null},{requirementType:'UNIVERSITY_COMPULSORY',requiredSubjects:3,requiredCredits:6}],
+ subjects:[planSubject(1,'DEMA1013',3),planSubject(2,'DEMA2013',3,{prerequisites:[1]}),planSubject(3,'DEMA3013',3,{prerequisites:[2]}),planSubject(4,'DEMB1013',3),
+  planSubject(5,'DEME1013',3,{category:'Elective E1',compulsory:false}),planSubject(6,'DEME2013',3,{category:'Elective E1',compulsory:false}),planSubject(7,'DEME3013',3,{category:'Elective E1',compulsory:false,prerequisites:[5]}),
+  planSubject(8,'DEML1112',2,{category:'University Compulsory',semesterTypes:['SHORT']}),planSubject(9,'DEML2122',2,{category:'University Compulsory',semesterTypes:['SHORT'],prerequisites:[8]}),planSubject(10,'DEML3132',2,{category:'University Compulsory',semesterTypes:['SHORT'],prerequisites:[9]})]};
 async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
   (state.requests??=[]).push({path,method:route.request().method()});
   if(path==='/api/p001-sprint2/progress'){if(state.progressFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.progress??progressFixture})});return;}
+  if(path==='/api/planning/input'){if(state.planFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.plan??planFixture})});return;}
   if(path==='/api/graduation-check'||path==='/api/graduation-check/confirmations'){
    if(route.request().method()==='PUT'){const body=route.request().postDataJSON();(state.graduationPuts??=[]).push(body);if(state.graduationSaveFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'GRADUATION_UNAVAILABLE',message:'Could not save your confirmations.'}})});return;}const at='2026-11-15T02:00:00.000Z',prev=state.graduation??gradFixture,fc=body.feesCleared?(prev.feesClearedConfirmedAt??at):null,mc=body.muet?(prev.muetConfirmedAt??at):null,missing=[];if(prev.requiredCredits===null)missing.push('The programme credit requirement is not configured.');else if(!prev.creditsMet)missing.push((prev.requiredCredits-prev.earnedCredits)+' more credits needed.');if(!fc)missing.push('Confirm you have no outstanding fees.');if(!mc)missing.push('Confirm you have your MUET certificate.');state.graduation={...prev,feesClearedConfirmedAt:fc,muetConfirmedAt:mc,missing,status:prev.requiredCredits===null?'CANNOT_ASSESS':missing.length===0?'ELIGIBLE':'NOT_YET_ELIGIBLE'};}
    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.graduation??gradFixture})});return;}
@@ -102,9 +110,9 @@ try{
   await mock(page);await page.goto(base+'/admin');await page.getByRole('alert').filter({hasText:'does not have access'}).waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
- for(const path of ['/student/profile','/student/records','/student/progress','/student/graduation','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
+ for(const path of ['/student/profile','/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
   await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
-  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Graduation check','/student/graduation'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
+  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Graduation check','/student/graduation'],['Graduation plan','/student/plan'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
@@ -178,6 +186,58 @@ try{
   await page.goto(base+'/student/graduation');await page.getByRole('alert').getByText('Please retry later.').waitFor();assert.equal(await page.locator('progress').count(),0);
  });
  await check('Graduation check needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/graduation');await page.waitForURL('**/student/setup');});
+ for(const width of [1440,375])await check('Graduation plan shows completion, semesters, bottlenecks and assumptions at '+width,async page=>{
+  const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Graduation plan');await page.waitForURL('**/student/plan');
+  const summary=page.getByRole('region',{name:'Plan summary'});await summary.getByText('AY 2028/2029 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await summary.getByText('8 semesters from now',{exact:true}).waitFor();await summary.getByText('AY 2027/2028 – Semester 1',{exact:true}).waitFor();await summary.getByText('8 subjects',{exact:true}).waitFor();
+  assert.ok(state.requests.some(r=>r.path==='/api/planning/input'&&r.method==='GET'));
+  const semesters=page.locator('.planning-semester');assert.equal(await semesters.count(),8);
+  assert.deepEqual(await semesters.first().locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
+  await semesters.first().getByText('Elective choice: any 1 of 3 options',{exact:true}).waitFor();
+  await page.getByText('Nothing can be taken this semester',{exact:false}).first().waitFor();
+  await page.getByText('Delaying DEMA1013 delays 2 later subjects (DEMA1013 → DEMA2013 → DEMA3013).',{exact:true}).waitFor();
+  await page.getByRole('region',{name:'How this plan is made'}).getByText('This plan is advice only.',{exact:false}).waitFor();
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await shot(page,'plan-'+width);await assertReadable(page,'plan '+width);
+ },width);
+ await check('Graduation plan what-if: postpone, fail, replace, compare, toggle and reset',async page=>{
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const whatIf=page.getByRole('region',{name:'What if…'});
+  await whatIf.getByLabel('Subject',{exact:true}).selectOption({label:'Fictional DEML1112 (DEML1112)'});
+  assert.deepEqual(await whatIf.getByLabel('Change',{exact:true}).locator('option').allInnerTexts(),['Postpone one semester','Fail it','Withdraw']);
+  await whatIf.getByRole('button',{name:'Add change',exact:true}).click();
+  const compare=page.getByRole('region',{name:'Compare with your plan'});await compare.getByText('3 semesters later',{exact:true}).waitFor();
+  await compare.getByRole('definition').getByText('AY 2029/2030 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await compare.locator('tbody tr[data-subject="DEML1112"]').waitFor();
+  await page.getByRole('heading',{name:'Plan with your changes',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Your plan',exact:true}).click();await page.getByRole('heading',{name:'Your plan',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Your plan',exact:true}).getAttribute('aria-pressed'),'true');
+  await page.getByRole('button',{name:'With your changes',exact:true}).click();
+  await whatIf.getByLabel('Subject',{exact:true}).selectOption({label:'Fictional DEMB1013 (DEMB1013)'});await whatIf.getByLabel('Change',{exact:true}).selectOption('FAIL');
+  await whatIf.getByRole('button',{name:'Add change',exact:true}).click();
+  await page.locator('.planning-semester').first().locator('tr.planning-failed[data-subject="DEMB1013"]').waitFor();
+  await page.getByText('Failed in this what-if: retaken later',{exact:true}).waitFor();
+  await whatIf.getByLabel('Subject',{exact:true}).selectOption({label:'Fictional DEME1013 (DEME1013)'});await whatIf.getByLabel('Change',{exact:true}).selectOption('REPLACE');
+  assert.deepEqual(await whatIf.getByLabel('Take instead',{exact:true}).locator('option').allInnerTexts(),['Fictional DEME2013 (DEME2013)','Fictional DEME3013 (DEME3013)']);
+  await whatIf.getByRole('button',{name:'Add change',exact:true}).click();
+  await page.locator('.planning-semester tr[data-subject="DEME2013"]').first().waitFor();
+  assert.equal(await whatIf.getByRole('listitem').count(),3);
+  await whatIf.getByRole('button',{name:'Remove: Postpone DEML1112 one semester',exact:true}).click();assert.equal(await whatIf.getByRole('listitem').count(),2);
+  await assertReadable(page,'plan what-if');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await whatIf.getByRole('button',{name:'Reset to my plan',exact:true}).click();
+  await compare.waitFor({state:'detached'});assert.equal(await page.getByRole('button',{name:'With your changes',exact:true}).count(),0);
+  assert.ok(state.requests.every(r=>r.method==='GET'));
+ });
+ await check('Graduation plan shows done, unplanned and load-failure states',async page=>{
+  await mock(page,{plan:{...planFixture,passed:[1,2,3,4,5,8,9,10]}});await page.goto(base+'/student/plan');
+  await page.getByText('No subjects left to plan',{exact:true}).waitFor();assert.equal(await page.getByRole('region',{name:'What if…'}).count(),0);
+  await page.unrouteAll({behavior:'ignoreErrors'});
+  await mock(page,{plan:{...planFixture,requirements:[],subjects:[...planFixture.subjects,planSubject(11,'DEMX4118',12)]}});await page.goto(base+'/student/plan');
+  await page.getByRole('heading',{name:'Some subjects cannot be planned',exact:true}).waitFor();await page.getByText('Worth 12 credits, more than any semester allows.',{exact:false}).waitFor();
+  await page.unrouteAll({behavior:'ignoreErrors'});
+  const state={planFail:true};await mock(page,state);await page.goto(base+'/student/plan');await page.getByRole('alert').getByText('Please retry later.').waitFor();
+  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('region',{name:'Plan summary'}).waitFor();
+ });
  await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway');
   const node=page.getByRole('button',{name:'DEMO101 Foundations, 3 credits, Completed'});await node.waitFor();
@@ -187,7 +247,7 @@ try{
   await page.getByRole('list',{name:'Curriculum subjects'}).getByText('Applied study').waitFor();
  });
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
- for(const path of ['/student/records','/student/progress','/student/graduation','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
+ for(const path of ['/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
  await check('P001 actions use burgundy and explicit Cancel uses red in the shared shell',async page=>{
   await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');

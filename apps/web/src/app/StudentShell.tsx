@@ -10,6 +10,7 @@ const links = [
   { area: 'records', href: '/student/records', label: 'Subject records', icon: 'records' },
   { area: 'progress', href: '/student/progress', label: 'Academic progress', icon: 'progress' },
   { area: 'graduation', href: '/student/graduation', label: 'Graduation check', icon: 'records' },
+  { area: 'plan', href: '/student/plan', label: 'Graduation plan', icon: 'plan' },
   { area: 'offerings', href: '/student/offerings', label: 'Semester offerings', icon: 'calendar' },
   { area: 'pathway', href: '/student/pathway', label: 'Academic pathway', icon: 'pathway' },
 ] as const;
@@ -19,6 +20,7 @@ function Icon({ name }: { name: string }) {
     records: <><path d="M6 3.75h9l3 3V20H6z"/><path d="M14.5 4v4h4M9 12h6M9 16h6"/></>,
     progress: <><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4m4 4V8m4 8v-6"/></>,
     calendar: <><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16M8 14h3m2 3h3"/></>,
+    plan: <><path d="M4 6h10M4 12h7M4 18h12"/><path d="m16 9 4 3-4 3"/></>,
     pathway: <><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></>,
     menu: <path d="M4 6h16M4 12h9M4 18h16"/>, close: <path d="m6 6 12 12M6 18 18 6"/>,
     search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></>,
