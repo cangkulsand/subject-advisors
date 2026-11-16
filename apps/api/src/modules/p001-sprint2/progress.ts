@@ -15,8 +15,9 @@ export function calculateProgress(source: ProgressSource): Progress {
   const subjects: ProgressSubject[] = curriculum.subjects.map(subject => {
     const valid = attempts.filter(a => a.subjectId === subject.subjectId).filter(a => {
       const credits = a.recognizedCredits;
+      // EXEMPTED needs no remarks: the Subject records page saves it immediately and remarks are optional (S3-P004-008).
       const okay = Number.isInteger(credits) && credits! >= 0 && credits! <= subject.credits &&
-        (a.status === 'COMPLETED' ? credits === subject.credits : a.status === 'EXEMPTED' ? Boolean(a.remarks?.trim()) :
+        (a.status === 'COMPLETED' ? credits === subject.credits : a.status === 'EXEMPTED' ? true :
           (a.status === 'FAILED' || a.status === 'WITHDRAWN') && credits === 0);
       if (!okay) warn('Some academic records have incomplete or inconsistent credit/exemption information and were excluded. Review your subject records.');
       return okay;
