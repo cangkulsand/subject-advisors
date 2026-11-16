@@ -918,14 +918,14 @@ else {
       await page.screenshot({ path: shots + `history-${width}.png`, fullPage: true });
     }, width);
 
-    await check('the removed review, versions, comparison and offering decisions pages no longer exist', async page => {
+    await check('the removed review, versions, comparison, offering decisions, Data Quality and Decision Audit pages no longer exist', async page => {
       await mock(page, { seed: 'run' });
-      for (const path of ['/coordinator/decisions', '/coordinator/versions', '/coordinator/comparison']) {
+      for (const path of ['/coordinator/decisions', '/coordinator/versions', '/coordinator/comparison', '/coordinator/data-quality', '/coordinator/audit']) {
         await page.goto(base + path + scoped);
         await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
       }
       const links = await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link').allInnerTexts();
-      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Data Quality', 'Class Offering Forecast', 'Offering History', 'Decision Audit']);
+      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Class Offering Forecast', 'Offering History']);
     });
 
     console.log('PASS ' + passed + ' coordinator browser checks');
