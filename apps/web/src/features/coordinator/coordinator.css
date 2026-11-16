@@ -182,3 +182,4 @@
 .admin-shell .coordinator-phase { margin: 16px 0 0; font-size: var(--font-size-body); font-weight: 600; color: var(--color-heading); }
 .admin-shell .coordinator-phase + .coordinator-warning { margin: 10px 0 0 !important; }
 .admin-shell .coordinator-decisions td > .coordinator-number { display: block; }
+.coordinator-pick-cell { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }

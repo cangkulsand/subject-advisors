@@ -170,7 +170,7 @@ export function handle(state, request) {
     // `noAssignments` / `noCurrentSemester` mirror the live DB-backed context (S2-P004-011): no scopes, and no semesters when none is marked current.
     if (state.noAssignments) return ok({ programmes: [], learningCentres: [], targetSemesters: state.noCurrentSemester ? [] : [target], assignedScopes: [], currentSemesterId: state.noCurrentSemester ? null : 1, targetSemesterId: state.noCurrentSemester ? null : 2, curricula: [], subjects: [] });
     if (state.noCurrentSemester) return ok({ programmes, learningCentres, targetSemesters: [], assignedScopes, currentSemesterId: null, targetSemesterId: null, curricula: [], subjects: [] });
-    return ok({ programmes, learningCentres, targetSemesters: [target], semesters: [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1 }, { ...target, ...selectionWindow(state) }, { semesterId: 3, academicYear: '2026/2027', semesterNumber: 3 }], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
+    return ok({ programmes, learningCentres, targetSemesters: [target], semesters: [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1, ...(state.history ? { selectionOpensAt: daysFromNow(-100), selectionClosesAt: daysFromNow(-60) } : {}) }, ...(state.history ? [{ semesterId: 4, academicYear: '2025/2026', semesterNumber: 3, selectionOpensAt: daysFromNow(-260), selectionClosesAt: daysFromNow(-220) }] : []), { ...target, ...selectionWindow(state) }, { semesterId: 3, academicYear: '2026/2027', semesterNumber: 3 }], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
   }
   if (route === 'forecast-import-template' && url.searchParams.get('format') === 'coordinator') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template-coordinator.csv"' }, text: ['courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A', ''].join('\n') };
   if (route === 'forecast-import-template') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template.csv"' }, text: 'external_reference,curriculum_version,cohort_status,history_completeness,subject_code,subject_status,record_semester_id,recognized_credits,is_synthetic,student_name\n' };
@@ -265,6 +265,7 @@ function generate(state, body) {
   return receipt(addRun(state, body.importBatchId), 201);
 }
 const dayMs = 24 * 60 * 60 * 1000;
+const daysFromNow = (days) => new Date(Date.now() + days * dayMs).toISOString();
 
 // ---- Offering decisions (simplified flow): mirrors apps/api/src/modules/forecasting/decisions-routes.ts ----
 const decisionCatalogue = new Map([
@@ -301,6 +302,7 @@ function handleDecisions(state, route, method, url, headers, text) {
   if (method === 'GET') {
     const scope = scopeFromQuery(url);
     if (!inScope(scope)) return failure(403, 'SCOPE_NOT_ASSIGNED', 'You are not assigned to this programme and learning centre.');
+    if (state.history && scope.targetSemesterId !== 2) return historyDecisions(state, scope, match[2] ? Number(match[2]) : null);
     if (match[1]) return ok(paginate(state.decisionAudit, url));
     if (match[2]) {
       const subjectId = Number(match[2]);
@@ -329,4 +331,27 @@ function handleDecisions(state, route, method, url, headers, text) {
   if (current !== body.expectedStatus) return failure(409, 'DECISION_STALE', 'This subject was changed by someone else. Reload to see the current decision.');
   const result = decideSubject(state, body.subjectId, body.status, body.importBatchId ?? null);
   return ok({ subjectId: body.subjectId, beforeStatus: result.before, afterStatus: result.after, affectedPicks: result.affectedPicks, phase });
+}
+
+// ---- Offering History (past semesters, read only): `history: true` closes semesters 1 and 4. Decisions are fictional and differ per scope; semester 4 has none. ----
+const historyData = {
+  '5|1|1': { decisions: [[107, 'APPROVED'], [101, 'APPROVED'], [102, 'REMOVED']], picks: { 101: [31, 32, 33] } },
+  '5|2|1': { decisions: [[103, 'APPROVED']], picks: { 103: [31] } },
+};
+const historyStudents = [
+  { studentId: 31, studentName: 'Aisyah binti Ahmad', matricNo: 'A22EC0051', email: 'aisyah@graduate.utm.my' },
+  { studentId: 32, studentName: 'Bakri bin Hassan', matricNo: 'A22EC0052', email: 'bakri@graduate.utm.my' },
+  { studentId: 33, studentName: 'Chong Wei', matricNo: 'A22EC0053', email: 'chong@graduate.utm.my' },
+];
+function historyDecisions(state, scope, pickersFor) {
+  const entry = historyData[[scope.programmeId, scope.learningCentreId, scope.targetSemesterId].join('|')] ?? { decisions: [], picks: {} };
+  const row = ([subjectId, status]) => { const [subjectCode, subjectName, creditHours, classType] = decisionCatalogue.get(subjectId); return { subjectId, subjectCode, subjectName, creditHours, classType, status, decidedBy: 'user_test', decidedAt: generatedAt }; };
+  if (pickersFor !== null) {
+    const found = entry.decisions.find(([id]) => id === pickersFor);
+    if (!found) return failure(404, 'OFFERING_DECISION_NOT_FOUND', 'This subject has no decision in the scope.');
+    const pickers = (entry.picks[pickersFor] ?? []).map(id => historyStudents.find(item => item.studentId === id));
+    return ok({ scope, subjectId: pickersFor, subjectCode: row(found).subjectCode, subjectName: row(found).subjectName, pickCount: pickers.length, emailsAvailable: true, pickers });
+  }
+  const semester = [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1, selectionOpensAt: daysFromNow(-100), selectionClosesAt: daysFromNow(-60) }, { semesterId: 4, academicYear: '2025/2026', semesterNumber: 3, selectionOpensAt: daysFromNow(-260), selectionClosesAt: daysFromNow(-220) }].find(item => item.semesterId === scope.targetSemesterId);
+  return ok({ scope, semester, phase: 'CLOSED', asOf: new Date().toISOString(), editable: false, decisions: entry.decisions.map(row), pickCounts: Object.entries(entry.picks).map(([subjectId, list]) => ({ subjectId: Number(subjectId), pickCount: list.length })) });
 }

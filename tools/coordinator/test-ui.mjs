@@ -92,7 +92,7 @@ else {
   const forecastUrl = '/coordinator/forecasts' + scoped;
   const scopeBody = { programmeId: 5, learningCentreId: 1, targetSemesterId: 2 };
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
 
     await check('imports: scope pickers follow assignments, target semester is read-only, template downloads', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports?source=csv');
@@ -849,6 +849,75 @@ else {
       });
     }
 
+
+    const historyReady = page => page.getByRole('region', { name: 'Offering history table', exact: true }).waitFor();
+    const historyCodes = page => page.locator('[aria-label="Offering history table"] tbody tr').evaluateAll(rows => rows.map(row => row.dataset.subject));
+    await check('history: the menu link opens the page; approved shows its count, removed shows a dash; View students lists names and matric numbers', async page => {
+      const state = await mock(page, { history: true }); await page.goto(base + '/coordinator');
+      await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link', { name: 'Offering History', exact: true }).click();
+      await page.getByRole('heading', { name: 'Offering History', exact: true }).first().waitFor();
+      await page.getByText("Look back at past semesters' offering decisions and how many students picked each subject.", { exact: true }).waitFor();
+      assert.ok(page.url().endsWith('/coordinator/history'));
+      await historyReady(page);
+      assert.deepEqual(await page.getByLabel('Semester', { exact: true }).locator('option').allInnerTexts(), ['2026/2027 · Semester 1', '2025/2026 · Semester 3']);
+      assert.deepEqual(await historyCodes(page), ['SECJ1013', 'SECJ1023', 'SECJ2203']);
+      const rows = page.locator('[aria-label="Offering history table"] tbody tr');
+      assert.match(await rows.nth(0).innerText(), /Approved\s+3\s*View students/);
+      assert.match(await rows.nth(1).innerText(), /Removed\s+—/);
+      assert.equal(await rows.nth(1).getByRole('button').count(), 0, 'no View students for a removed subject');
+      assert.match(await rows.nth(2).innerText(), /Approved\s+0/);
+      assert.equal(await rows.nth(2).getByRole('button').count(), 0);
+      assert.equal(await page.getByRole('button', { name: /^Action for / }).count(), 0, 'read only');
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog'); await dialog.waitFor();
+      await dialog.getByText('Aisyah binti Ahmad').waitFor(); await dialog.getByText('A22EC0051').waitFor(); await dialog.getByText('Chong Wei').waitFor();
+      const asked = state.requests.find(request => request.path.endsWith('/offering-decisions/101/pickers'));
+      assert.ok(asked && asked.search.includes('targetSemesterId=1'), 'pickers are requested for the chosen semester');
+      await page.keyboard.press('Escape');
+    });
+
+    await check('history: switching the learning centre or semester reloads for the new scope', async page => {
+      const state = await mock(page, { history: true }); await page.goto(base + '/coordinator/history'); await historyReady(page);
+      assert.deepEqual(await historyCodes(page), ['SECJ1013', 'SECJ1023', 'SECJ2203']);
+      await page.getByLabel('Learning centre', { exact: true }).selectOption('2');
+      await page.locator('[aria-label="Offering history table"] tbody tr[data-subject="SCSJ1013"]').waitFor();
+      assert.deepEqual(await historyCodes(page), ['SCSJ1013']);
+      assert.ok(state.requests.some(request => request.path.endsWith('/offering-decisions') && request.search.includes('learningCentreId=2') && request.search.includes('targetSemesterId=1')));
+      await page.getByLabel('Semester', { exact: true }).selectOption('4');
+      await page.getByText('No offering decisions were recorded for this programme, learning centre and semester.', { exact: true }).waitFor();
+      assert.equal(await page.getByRole('region', { name: 'Offering history table' }).count(), 0);
+    });
+
+    await check('history: no closed semester shows the empty state and sends no decisions request', async page => {
+      const state = await mock(page); await page.goto(base + '/coordinator/history');
+      await page.getByRole('heading', { name: 'Offering History', exact: true }).first().waitFor();
+      await page.getByText('No semester has closed subject selection yet.', { exact: true }).waitFor();
+      assert.ok(!state.requests.some(request => request.path.includes('offering-decisions')), 'no decisions request');
+    });
+
+    await check('history: a coordinator without assignments sees the not-assigned message and no decisions request', async page => {
+      const state = await mock(page, { noAssignments: true, history: true }); await page.goto(base + '/coordinator/history');
+      await page.getByRole('heading', { name: 'Offering History', exact: true }).first().waitFor();
+      await page.getByRole('status').filter({ hasText: 'You are not assigned to any programme and learning centre yet.' }).waitFor();
+      assert.ok(!state.requests.some(request => request.path.includes('offering-decisions')), 'no decisions request');
+    });
+
+    await check('history: a failed decisions request shows an alert and Try again recovers', async page => {
+      const state = await mock(page, { history: true }); await page.goto(base + '/coordinator/history'); await historyReady(page);
+      state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
+      await page.getByLabel('Learning centre', { exact: true }).selectOption('2');
+      await page.getByRole('alert').filter({ hasText: 'Forecasting data is unavailable. Please retry.' }).waitFor();
+      await page.getByRole('button', { name: 'Try again', exact: true }).click();
+      await page.locator('[aria-label="Offering history table"] tbody tr[data-subject="SCSJ1013"]').waitFor();
+    });
+
+    for (const width of [1440, 375]) await check('history: no horizontal overflow at ' + width, async page => {
+      await mock(page, { history: true });
+      await page.goto(base + '/coordinator/history'); await historyReady(page);
+      assert.ok(await noOverflow(page));
+      await page.screenshot({ path: shots + `history-${width}.png`, fullPage: true });
+    }, width);
+
     await check('the removed review, versions, comparison and offering decisions pages no longer exist', async page => {
       await mock(page, { seed: 'run' });
       for (const path of ['/coordinator/decisions', '/coordinator/versions', '/coordinator/comparison']) {
@@ -856,7 +925,7 @@ else {
         await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
       }
       const links = await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link').allInnerTexts();
-      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Data Quality', 'Class Offering Forecast', 'Decision Audit']);
+      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Data Quality', 'Class Offering Forecast', 'Offering History', 'Decision Audit']);
     });
 
     console.log('PASS ' + passed + ' coordinator browser checks');
