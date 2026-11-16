@@ -1,4 +1,7 @@
 import type { Progress, ProgressSource, ProgressSubject } from './contracts';
+/** Requirement type / category key: upper case, spaces and underscores alike, so requirement 'ELECTIVE_E1' matches
+ * category 'Elective E1'. Same rule as the planning engine (packages/shared/src/planning, normaliseRequirementType). */
+const requirementKey = (value: string) => value.trim().toUpperCase().replace(/[\s_]+/g, '_');
 export function calculateProgress(source: ProgressSource): Progress {
   const { curriculum, attempts } = source;
   const warnings: string[] = [];
@@ -26,8 +29,8 @@ export function calculateProgress(source: ProgressSource): Progress {
   const sum = (rows: ProgressSubject[]) => rows.reduce((n,s) => n + s.earnedCredits, 0);
   const earnedCredits = sum(subjects), completedCredits = sum(subjects.filter(s => s.outcome === 'COMPLETED'));
   const requirements = source.requirements.map(r => {
-    const type = r.type.trim().toUpperCase();
-    const matches = type === 'COMPULSORY' ? subjects.filter(s => s.compulsory) : subjects.filter(s => s.category.trim().toUpperCase() === type);
+    const type = requirementKey(r.type);
+    const matches = type === 'COMPULSORY' ? subjects.filter(s => s.compulsory) : subjects.filter(s => requirementKey(s.category) === type);
     const configured = matches.length > 0 && (r.credits !== null || r.subjects !== null);
     const earned = sum(matches), satisfied = matches.filter(s => s.outcome !== 'REMAINING').length;
     return { ...r, earnedCredits: configured ? earned : null, satisfiedSubjects: configured ? satisfied : null,
