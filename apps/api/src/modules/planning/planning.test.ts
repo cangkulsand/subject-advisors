@@ -46,15 +46,19 @@ describe('toPlanningInput', () => {
     expect(input.limits).toHaveLength(3);
     expect(input).toMatchObject({ programmeName: 'Software Engineering', totalCredits: 120, requirements: [{ requirementType: 'CORE' }] });
   });
-  it('counts records as passed with the same rules as Academic progress', () => {
+  it('counts COMPLETED with full credits and EXEMPTED as the Subject records page saves them (remarks optional)', () => {
     const records = [
       { subjectId: 101, status: 'COMPLETED', recognizedCredits: 0, remarks: null },
-      { subjectId: 102, status: 'EXEMPTED', recognizedCredits: 3, remarks: '  ' },
+      { subjectId: 102, status: 'EXEMPTED', recognizedCredits: 3, remarks: null },
       { subjectId: 103, status: 'EXEMPTED', recognizedCredits: 2, remarks: 'MUET band 4' },
     ];
     const input = toPlanningInput(rows({ records }));
-    expect(input.passed).toEqual([13]);
-    expect(input.earnedCredits).toBe(2);
+    expect(input.passed).toEqual([12, 13]);
+    expect(input.earnedCredits).toBe(5);
+  });
+  it('still ignores exemptions with impossible credits', () => {
+    const input = toPlanningInput(rows({ records: [{ subjectId: 102, status: 'EXEMPTED', recognizedCredits: 9, remarks: null }] }));
+    expect(input.passed).toEqual([]);
   });
   it('plans from the computed next semester when the admin has not created it yet, without coordinator decisions', () => {
     const input = toPlanningInput(rows({ semesters: [semesters[0]!] }));
