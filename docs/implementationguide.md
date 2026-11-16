@@ -32,7 +32,7 @@ When a scope or architecture conflict is discovered, record it as a blocker/deci
 | P001 / Programmer 1 | Student academic profile (now including the learning centre, chosen by the student and locked from the moment selection opens until the admin moves the semester forward, S2-P004-023) and subject records | UC03, UC04 |
 | P002 / Programmer 2 | Semester offerings page: the subjects the coordinator approved for the next semester and student picks while the admin-set selection window is open (Sprint 1 delivered student-reported offerings; replaced by S2-P004-022, 2026-11-10) | UC08 |
 | P003 / Programmer 3 | Interactive Academic Pathway talent-tree prototype | UC17 |
-| P004 / Programmer 4 | Clerk registration, login/logout and backend role/access checks (Sprint 2: UC20 forecasting, one-click coordinator approval of offered subjects with pick counts and pickers, admin semester selection window; planned follow-up: Offering History replacing the Decision Audit placeholder) | UC01, UC02 |
+| P004 / Programmer 4 | Clerk registration, login/logout and backend role/access checks (Sprint 2: UC20 forecasting, one-click coordinator approval of offered subjects with pick counts and pickers, admin semester selection window; Sprint 3: coordinator Offering History; Data Quality and Decision Audit placeholders removed) | UC01, UC02 |
 
 - Work in **one designated owner scope at a time**. Reading another section for context does not authorize implementing it.
 - Recommended branches: `feature/p001-s1-profile`, `feature/p002-s1-offerings`, `feature/p003-s1-pathway`, `feature/p004-s1-auth`, and `chore/foundation-s1` (adapt to repository conventions).

@@ -96,26 +96,21 @@ else {
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/p001-sprint2/curricula']);
       assert.ok(state.requests.every(request => request.method === 'GET'));
     });
-    await check('coordinator quick links: the planned routes (Data Quality, Decision Audit) use only account access', async page => {
+    await check('coordinator quick links: every link opens a built workspace; Data Quality and Decision Audit are gone', async page => {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
-      const destinations = [
-        ['Data Imports', 'Data Imports'], ['Data Quality', 'Data Quality'], ['Class Offering Forecast', 'Class Offering Forecast'], ['Offering History', 'Offering History'], ['Decision Audit', 'Decision Audit'],
-      ];
       const quicklinks = page.locator('.coordinator-quicklinks');
-      assert.equal(await quicklinks.getByRole('link').count(), destinations.length);
+      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Data Imports', 'Class Offering Forecast', 'Offering History']);
+      assert.equal(await quicklinks.getByText('Planned workspace').count(), 0);
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Coordinator navigation' });
-      for (const [label, title] of destinations.filter((_, index) => ![0, 2, 3].includes(index))) {
-        await navigation.getByRole('link', { name: label, exact: true }).click();
-        await page.getByRole('heading', { name: title, exact: true }).waitFor();
-        await page.getByText('This workspace is planned.', { exact: false }).waitFor();
-        assert.equal(await page.locator('form').count(), 0);
-        assert.equal(await page.getByRole('button', { name: /save|generate|upload|import|delete|grant/i }).count(), 0);
+      for (const label of ['Data Quality', 'Decision Audit']) assert.equal(await navigation.getByRole('link', { name: label, exact: true }).count(), 0);
+      for (const path of ['/coordinator/data-quality', '/coordinator/audit']) {
+        await page.goto(base + path); await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
+        assert.equal(await page.getByText('This workspace is planned.', { exact: false }).count(), 0);
       }
-      assert.deepEqual(state.requests.map(request => request.path), ['/api/me']);
-      assert.ok(state.requests.every(request => request.method === 'GET'));
+      assert.ok(state.requests.every(request => request.path === '/api/me' && request.method === 'GET'));
     });
     await check('nested admin route keeps Users active and RoleSwitcher matches staff workspace', async page => {
       await mock(page); await page.goto(base + '/admin/users/1'); await page.getByRole('heading', { name: 'Account details', exact: true }).waitFor();
@@ -124,7 +119,7 @@ else {
       assert.equal(await navigation.getByRole('link', { name: 'Overview', exact: true }).getAttribute('aria-current'), null);
       const workspace = page.getByRole('combobox', { name: 'Workspace view' });
       assert.equal(await workspace.inputValue(), 'SYSTEM_ADMIN');
-      await page.goto(base + '/coordinator/audit'); await page.getByRole('heading', { name: 'Decision Audit', exact: true }).waitFor();
+      await page.goto(base + '/coordinator'); await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       assert.equal(await page.getByRole('combobox', { name: 'Workspace view' }).inputValue(), 'COORDINATOR');
       assert.equal(await page.getByRole('heading', { name: 'Academic profile setup' }).count(), 0);
     });

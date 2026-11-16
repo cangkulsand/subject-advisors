@@ -100,6 +100,7 @@ Subject names are English; see `db/reference-data/subject-english-names.csv`.
 | --- | --- | --- |
 | P003 (UC13); built by P004 | Graduation check in the student app: `/student/graduation` (menu item after Academic progress) compares earned credits with the curriculum Total credits and lets the student confirm two items the system cannot check (no outstanding fees, MUET); `GET /api/graduation-check`, `PUT /api/graduation-check/confirmations`; migration 0013 (applied to Neon development 2026-11-15) | S3-P004-001 |
 | P004 (M6) | Coordinator Offering History: `/coordinator/history` shows past semesters' Approved / Removed subjects and pick counts with "View students", within assigned scopes; read-only, frontend only | S3-P004-002 |
+| P004 (M6) | Coordinator menu: removed the planned Data Quality and Decision Audit pages; `/coordinator/data-quality` and `/coordinator/audit` now show "Page not found"; every Overview quick link opens a built page | S3-P004-003 |
 | Integration | Removed AI co-author trailers from `main` history (messages only; anyone with an older clone must reset `main` to `origin/main`) | S3-INT-001 |
 | Integration | Fixed three timing races in the admin browser checks (`npm run test:ui:admin`); test tooling only | S3-INT-002 |
 
