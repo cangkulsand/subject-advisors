@@ -110,9 +110,9 @@ try{
   await mock(page);await page.goto(base+'/admin');await page.getByRole('alert').filter({hasText:'does not have access'}).waitFor();
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
- for(const path of ['/student/profile','/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/pathway'])await check('shared route and navigation '+path,async page=>{
+ for(const path of ['/student/profile','/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/recommendations','/student/pathway'])await check('shared route and navigation '+path,async page=>{
   await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
-  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Graduation check','/student/graduation'],['Graduation plan','/student/plan'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
+  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Graduation check','/student/graduation'],['Graduation plan','/student/plan'],['Semester offerings','/student/offerings'],['Recommendations','/student/recommendations'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
@@ -238,6 +238,34 @@ try{
   const state={planFail:true};await mock(page,state);await page.goto(base+'/student/plan');await page.getByRole('alert').getByText('Please retry later.').waitFor();
   state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('region',{name:'Plan summary'}).waitFor();
  });
+ for(const width of [1440,375])await check('Recommendations rank the next semester, explain why and list alternatives at '+width,async page=>{
+  const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Recommendations');await page.waitForURL('**/student/recommendations');
+  await page.getByRole('heading',{name:'Recommended for AY 2026/2027 – Semester 2',exact:true}).waitFor();
+  const best=page.getByRole('region',{name:'Recommended subjects'});
+  assert.deepEqual(await best.locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
+  await best.getByText('Unlocks 2 later subjects',{exact:true}).waitFor();await best.getByText('Counts toward Elective E1',{exact:true}).waitFor();
+  await page.getByText('No specific prerequisite warning was found from the available data.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.recommend-alternatives > li').count(),3);
+  await page.getByRole('heading',{name:'Option 2',exact:true}).waitFor();
+  assert.equal(await page.getByText('Same completion as the recommendation',{exact:false}).count(),3);
+  assert.equal(await page.getByRole('link',{name:'Save your picks on Semester offerings',exact:true}).getAttribute('href'),'/student/offerings');
+  assert.equal(await page.getByRole('link',{name:'Try what-ifs in your Graduation plan',exact:true}).getAttribute('href'),'/student/plan');
+  assert.ok(state.requests.every(r=>r.method==='GET'));
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await shot(page,'recommend-'+width);await assertReadable(page,'recommendations '+width);
+ },width);
+ await check('Recommendations warn about a Short-only chain and handle no candidates and failures',async page=>{
+  await mock(page,{plan:{...planFixture,start:{academicYear:'2026/2027',semesterNo:3}}});await page.goto(base+'/student/recommendations');
+  await page.getByText('Short semester only: the next chance is AY 2027/2028 – Semester 3 (Short Semester)',{exact:true}).waitFor();
+  await page.getByText('If you do not take DEML1112 in AY 2026/2027 – Semester 3 (Short Semester), your earliest completion moves from',{exact:false}).waitFor();
+  await page.unrouteAll({behavior:'ignoreErrors'});
+  await mock(page,{plan:{...planFixture,approvedFirst:[]}});await page.goto(base+'/student/recommendations');
+  await page.getByRole('heading',{name:'No recommendation for AY 2026/2027 – Semester 2',exact:true}).waitFor();
+  await page.getByText('Only subjects your coordinator approved for AY 2026/2027 – Semester 2 are recommended.',{exact:true}).waitFor();
+  await page.unrouteAll({behavior:'ignoreErrors'});
+  const state={planFail:true};await mock(page,state);await page.goto(base+'/student/recommendations');await page.getByRole('alert').getByText('Please retry later.').waitFor();
+  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Recommended for AY 2026/2027 – Semester 2',exact:true}).waitFor();
+ });
  await check('P003 pathway loads a graph, inspects a node and switches to the accessible list',async page=>{
   const state=await mock(page);await page.goto(base+'/student/pathway');
   const node=page.getByRole('button',{name:'DEMO101 Foundations, 3 credits, Completed'});await node.waitFor();
@@ -247,7 +275,7 @@ try{
   await page.getByRole('list',{name:'Curriculum subjects'}).getByText('Applied study').waitFor();
  });
  await check('profile-to-offerings navigation uses shared route',async page=>{await mock(page);await page.goto(base+'/student/profile');await clickStudentLink(page,'Semester offerings');await page.waitForURL('**/student/offerings');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
- for(const path of ['/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
+ for(const path of ['/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/recommendations','/student/pathway'])await check('setup guard covers '+path,async page=>{await mock(page,{setup:true});await page.goto(base+path);await page.waitForURL('**/student/setup');await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).waitFor({state:'attached'});});
  await check('coordinator cannot open student offerings',async page=>{await mock(page,{role:'COORDINATOR'});await page.goto(base+'/student/offerings');await page.getByRole('alert').waitFor();assert.equal(await page.getByRole('navigation',{name:'Student navigation',includeHidden:true}).count(),0);});
  await check('P001 actions use burgundy and explicit Cancel uses red in the shared shell',async page=>{
   await mock(page);await page.goto(base+'/student/profile');const name=page.getByLabel('Student name',{exact:true});await name.waitFor();await name.fill('DEMO updated');
