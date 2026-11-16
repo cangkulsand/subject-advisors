@@ -1,11 +1,11 @@
 # S3-P004-008 — Academic progress counts exemptions saved without remarks
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P001 (M1, UC05 progress); built by P004, to be handed to P001 as files
 - **Related UC / FR:** UC05 academic progress; UC13 graduation check (uses the same calculation)
-- **Branch / PR:** `feature/s3-progress-exemptions`; not merged, no PR
+- **Branch / PR:** `feature/s3-progress-exemptions`; merged into `main` on 2026-11-16 (merge commit 92acbb5); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -33,4 +33,4 @@ credits, the subject stayed "remaining", and a "records excluded" warning showed
 ## 4. Changelog
 
 - 2026-11-16 - Type: Fixed. Academic progress and the Graduation check count exemptions saved without remarks.
-  Outstanding: human peer review; P001 confirmation.
+  Merged to `main` 2026-11-16 (92acbb5). Outstanding: human peer review; P001 confirmation.
