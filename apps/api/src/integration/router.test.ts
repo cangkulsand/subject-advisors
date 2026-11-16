@@ -89,3 +89,12 @@ it('graduation fails closed with student authorization when the feature is absen
   const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',appRole:'SYSTEM_ADMIN' as const,roles:['SYSTEM_ADMIN' as const],accessStatus:'ACTIVE' as const}));
   await expect(dispatchIntegratedRequest(new Request('https://example.test/api/graduation-check'),deps)).rejects.toMatchObject({status:403});
 });
+it('dispatches the planning route',async()=>{
+  const deps=services();deps.planning=vi.fn(async req=>Response.json({path:new URL(req.url).pathname}));
+  const response=await dispatchIntegratedRequest(new Request('https://example.test/api/planning/input'),deps);
+  expect(await response.json()).toEqual({path:'/api/planning/input'});expect(deps.planning).toHaveBeenCalled();
+});
+it('planning fails closed with student authorization when the feature is absent',async()=>{
+  const deps=services();deps.auth.access.find=vi.fn(async()=>({clerkUserId:'test_student',appRole:'SYSTEM_ADMIN' as const,roles:['SYSTEM_ADMIN' as const],accessStatus:'ACTIVE' as const}));
+  await expect(dispatchIntegratedRequest(new Request('https://example.test/api/planning/input'),deps)).rejects.toMatchObject({status:403});
+});
