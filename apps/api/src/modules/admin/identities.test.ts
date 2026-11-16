@@ -1,8 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const { getUserList, createInvitation, revokeInvitation } = vi.hoisted(() => ({ getUserList: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn() }));
-vi.mock('@clerk/backend', () => ({ createClerkClient: () => ({ users: { getUserList }, invitations: { createInvitation, revokeInvitation } }) }));
+const { getUserList, createInvitation, revokeInvitation, banUser, unbanUser } = vi.hoisted(() => ({ getUserList: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn() }));
+vi.mock('@clerk/backend', () => ({ createClerkClient: () => ({ users: { getUserList, banUser, unbanUser }, invitations: { createInvitation, revokeInvitation } }) }));
 import { createAdminIdentities } from './identities';
-beforeEach(() => { getUserList.mockReset(); createInvitation.mockReset(); revokeInvitation.mockReset(); });
+beforeEach(() => { getUserList.mockReset(); createInvitation.mockReset(); revokeInvitation.mockReset(); banUser.mockReset(); unbanUser.mockReset(); });
+it('bans on block and unbans on unblock (S3-P004-009), only for Clerk user IDs', async () => {
+  const identities = createAdminIdentities('TEST_ONLY');
+  await identities.setSignInBlocked('user_a', true);
+  expect(banUser).toHaveBeenCalledExactlyOnceWith('user_a'); expect(unbanUser).not.toHaveBeenCalled();
+  await identities.setSignInBlocked('user_a', false);
+  expect(unbanUser).toHaveBeenCalledExactlyOnceWith('user_a');
+  await expect(identities.setSignInBlocked('not-a-clerk-id', true)).rejects.toThrow();
+  expect(banUser).toHaveBeenCalledTimes(1);
+});
 it('never performs an instance-wide provider lookup for an empty identity page', async () => {
   const identities = createAdminIdentities('TEST_ONLY');
   expect(await identities.lookup([])).toEqual(new Map());

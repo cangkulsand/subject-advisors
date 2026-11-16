@@ -29,6 +29,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       search: vi.fn(), lookup: vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'Target', email: 'target@utm.my', emailVerified: true }]])),
       findByEmail: vi.fn(async () => ({ clerkUserId: 'user_target', verifiedEmail: 'target@utm.my', emailVerified: true })),
       createInvitation: vi.fn(async () => ({ clerkInvitationId: 'inv_clerk' })), revokeInvitation: vi.fn(async () => undefined),
+      setSignInBlocked: vi.fn(async () => undefined),
     },
   };
   return deps;
@@ -187,6 +188,34 @@ describe('role grants and revokes', () => {
     expect(deps.repository.revokeRole).toHaveBeenCalledWith(5, 'COORDINATOR', ADMIN, 'Left');
     await send(deps, '/api/admin/users/5/access', 'PATCH', { status: 'ACTIVE', reason: 'Resolved' });
     expect(deps.repository.setAccessStatus).toHaveBeenCalledWith(5, 'ACTIVE', ADMIN, 'Resolved');
+  });
+  it('suspend blocks sign-in in Clerk after the app change; reactivate unblocks it (S3-P004-009)', async () => {
+    const deps = fixture(); const order: string[] = [];
+    mocked(deps, 'setAccessStatus').mockImplementation(async (_id: number, status: string) => { order.push('app:' + status); return account; });
+    (deps.identities.setSignInBlocked as ReturnType<typeof vi.fn>).mockImplementation(async (_id: string, blocked: boolean) => { order.push('clerk:' + blocked); });
+    expect((await send(deps, '/api/admin/users/5/access', 'PATCH', { status: 'SUSPENDED', reason })).status).toBe(200);
+    expect(deps.identities.setSignInBlocked).toHaveBeenLastCalledWith('user_target', true);
+    expect((await send(deps, '/api/admin/users/5/access', 'PATCH', { status: 'ACTIVE', reason })).status).toBe(200);
+    expect(deps.identities.setSignInBlocked).toHaveBeenLastCalledWith('user_target', false);
+    expect(order).toEqual(['app:SUSPENDED', 'clerk:true', 'app:ACTIVE', 'clerk:false']);
+  });
+  it('a refused app change never touches Clerk', async () => {
+    const deps = fixture(); mocked(deps, 'setAccessStatus').mockRejectedValue(new AdminMutationError('SELF_LOCKOUT'));
+    expect((await send(deps, '/api/admin/users/5/access', 'PATCH', { status: 'SUSPENDED', reason })).status).toBe(409);
+    expect(deps.identities.setSignInBlocked).not.toHaveBeenCalled();
+  });
+  it('when Clerk fails, the app status is put back and the admin is told to retry', async () => {
+    const deps = fixture();
+    (deps.identities.setSignInBlocked as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('clerk sk_live_secret down'));
+    const response = await send(deps, '/api/admin/users/5/access', 'PATCH', { status: 'SUSPENDED', reason });
+    expect(response.status).toBe(502);
+    const body = await response.json(); expect(body.error.code).toBe('SIGN_IN_BLOCK_FAILED'); expect(JSON.stringify(body)).not.toContain('sk_live');
+    expect(mocked(deps, 'setAccessStatus').mock.calls).toEqual([[5, 'SUSPENDED', ADMIN, reason], [5, 'ACTIVE', ADMIN, 'Reverted: sign-in could not be blocked in Clerk']]);
+    const back = fixture(); mocked(back, 'account').mockResolvedValue({ ...account, accessStatus: 'SUSPENDED' });
+    (back.identities.setSignInBlocked as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('down'));
+    const reactivate = await send(back, '/api/admin/users/5/access', 'PATCH', { status: 'ACTIVE', reason });
+    expect((await reactivate.json()).error.code).toBe('SIGN_IN_UNBLOCK_FAILED');
+    expect(mocked(back, 'setAccessStatus').mock.calls.at(-1)).toEqual([5, 'SUSPENDED', ADMIN, 'Reverted: sign-in could not be unblocked in Clerk']);
   });
   it('surfaces LAST_ROLE as 409 telling admins to suspend', async () => {
     const deps = fixture(); deps.repository.revokeRole = vi.fn(async () => { throw new AdminMutationError('LAST_ROLE'); });

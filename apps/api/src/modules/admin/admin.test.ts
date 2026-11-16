@@ -17,7 +17,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       createAccount: vi.fn(), grantRole: vi.fn(), revokeRole: vi.fn(), setAccessStatus: vi.fn(), createInvitation: vi.fn(), attachClerkInvitation: vi.fn(),
       listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn(), studentProgramme: vi.fn(), curriculumOptions: vi.fn(), changeStudentProgramme: vi.fn() },
     identities: { search: vi.fn(async () => ({ ids: ['user_fixture'], total: 1 })), lookup: vi.fn(async () => new Map([['user_fixture', { state: 'available' as const, name: 'Fictional Account', email: 'fixture@graduate.utm.my', emailVerified: true }]])),
-      findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn() },
+      findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), setSignInBlocked: vi.fn() },
   };
   return deps;
 }

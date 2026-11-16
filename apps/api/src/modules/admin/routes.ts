@@ -142,7 +142,21 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       const denied = allow('PATCH'); if (denied) return denied;
       parameters(url, []);
       const input = validated(validateChangeAccessRequest(await readJson(request)));
-      return authJson({ data: await detail(await deps.repository.setAccessStatus(positive(usersMutation[1]!, 'account ID'), input.status, actor, input.reason), deps) });
+      const accountId = positive(usersMutation[1]!, 'account ID');
+      const before = await deps.repository.account(accountId);
+      if (!before) throw new AdminMutationError('NOT_FOUND');
+      // App first (its guards: self-lockout, protected owner, last admin), then Clerk. If Clerk fails, put the app
+      // status back so the app and Clerk never disagree (S3-P004-009).
+      const changed = await deps.repository.setAccessStatus(accountId, input.status, actor, input.reason);
+      const blocking = input.status === 'SUSPENDED';
+      try {
+        await deps.identities.setSignInBlocked(before.clerkUserId, blocking);
+      } catch {
+        await deps.repository.setAccessStatus(accountId, before.accessStatus, actor,
+          blocking ? 'Reverted: sign-in could not be blocked in Clerk' : 'Reverted: sign-in could not be unblocked in Clerk').catch(() => undefined);
+        throw new AdminMutationError(blocking ? 'SIGN_IN_BLOCK_FAILED' : 'SIGN_IN_UNBLOCK_FAILED');
+      }
+      return authJson({ data: await detail(changed, deps) });
     }
     if (roleDelete) {
       const denied = allow('DELETE'); if (denied) return denied;

@@ -17,6 +17,8 @@ const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   INVITATION_EXISTS: { status: 409, message: 'A pending invitation already exists for this email address.' },
   LAST_ROLE: { status: 409, message: 'An account must keep at least one role. Suspend the account instead of removing its last role.' },
   INVITATION_DELIVERY_FAILED: { status: 503, message: 'The invitation email could not be sent. Please retry.' },
+  SIGN_IN_BLOCK_FAILED: { status: 502, message: 'Sign-in could not be blocked, so the account was not suspended. Please retry.' },
+  SIGN_IN_UNBLOCK_FAILED: { status: 502, message: 'Sign-in could not be unblocked, so the account is still suspended. Please retry.' },
   INVALID_REQUEST: { status: 400, message: 'The request is not valid.' },
   NOT_FOUND: { status: 404, message: 'The requested account or invitation was not found.' },
   ROLE_NOT_ASSIGNED: { status: 404, message: 'The account does not hold this role.' },

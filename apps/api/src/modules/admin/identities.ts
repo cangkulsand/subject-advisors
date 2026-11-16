@@ -45,5 +45,11 @@ export function createAdminIdentities(secretKey: string): AdminIdentities {
     async revokeInvitation(clerkInvitationId) {
       await clerk.invitations.revokeInvitation(clerkInvitationId);
     },
+    async setSignInBlocked(clerkUserId, blocked) {
+      // A Clerk ban stops new sign-ins and revokes the user's sessions; unban restores sign-in (S3-P004-009).
+      if (!clerkUserId.startsWith('user_')) throw new Error('Not a Clerk user ID');
+      if (blocked) await clerk.users.banUser(clerkUserId);
+      else await clerk.users.unbanUser(clerkUserId);
+    },
   };
 }

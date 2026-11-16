@@ -137,8 +137,8 @@ function dialogCopy(pending: PendingAction) {
   if (pending.kind === 'revoke') return { title: `Remove ${labels[pending.role]} role`, confirm: 'Remove role', danger: true, text: `This account loses the ${labels[pending.role]} role immediately. An account must keep at least one role.` };
   if (pending.kind === 'grant') return { title: `Add ${labels[pending.role]} role`, confirm: 'Add role', danger: false, text: pending.role === 'SYSTEM_ADMIN' ? 'The role is added only if the verified email address of the account is eligible for it. ' + SYSTEM_ADMIN_EMAIL_RULE + '.' : 'The role is added only if the verified email address of the account is eligible for it.' };
   return pending.status === 'SUSPENDED'
-    ? { title: 'Suspend account', confirm: 'Suspend account', danger: true, text: 'The account holder is blocked from using the application until access is reactivated. Roles are kept.' }
-    : { title: 'Reactivate account', confirm: 'Reactivate account', danger: false, text: 'The account holder can use the application again with their existing roles.' };
+    ? { title: 'Suspend account', confirm: 'Suspend account', danger: true, text: 'The account holder is signed out and cannot sign in until access is reactivated. Roles are kept.' }
+    : { title: 'Reactivate account', confirm: 'Reactivate account', danger: false, text: 'The account holder can sign in and use the application again with their existing roles.' };
 }
 export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { client: AdminClient; accountId: number; viewerClerkUserId?: string | null }) {
   const result = useRead(signal => client.account(accountId, signal), 'account:' + accountId);
