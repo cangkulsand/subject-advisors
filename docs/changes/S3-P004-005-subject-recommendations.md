@@ -1,12 +1,12 @@
 # S3-P004-005 — Subject recommendations, bottlenecks and alternatives (UC11–UC12)
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P002 (M4, UC11–UC12); built by P004, to be handed to P002 as files
 - **Related UC / FR:** UC11 (FR-D1, D2, D6), UC12 (FR-D3, D4); SDD Sprint 3 "Implement intelligent subject
   recommendations, ranking, bottleneck warnings and alternatives"
-- **Branch / PR:** `feature/s3-recommendations` (on top of `feature/s3-graduation-plan`, S3-P004-004); not merged, no PR
+- **Branch / PR:** `feature/s3-recommendations`; merged into `main` on 2026-11-16 (merge commit 4279c04); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -45,4 +45,4 @@ change" beyond reloading.
 
 - 2026-11-16 - Type: Added. Student Recommendations page (`/student/recommendations`) with ranked combinations,
   alternatives and bottleneck warnings; shared recommendation engine. Read-only, no API or migration change.
-  Outstanding: human peer review; P002 confirmation of the design calls.
+  Merged to `main` 2026-11-16 (4279c04). Outstanding: human peer review; P002 confirmation of the design calls.

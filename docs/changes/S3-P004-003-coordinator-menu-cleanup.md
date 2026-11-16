@@ -1,11 +1,11 @@
 # S3-P004-003 — Remove the Data Quality and Decision Audit coordinator pages
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6)
 - **Related UC / FR:** M6 coordinator dashboard; SDD Sprint 3 "Continue the coordinator and admin dashboards"
-- **Branch / PR:** `feature/s3-coordinator-menu-cleanup`; not merged, no PR
+- **Branch / PR:** `feature/s3-coordinator-menu-cleanup`; merged into `main` on 2026-11-16 (merge commit b9b3c7f); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -33,4 +33,4 @@ Data Quality and Decision Audit. Offering History (S3-P004-002) now covers looki
 
 ## 4. Changelog
 
-- 2026-11-16 - Type: Removed. Coordinator Data Quality and Decision Audit placeholder pages and menu items. Outstanding: human peer review.
+- 2026-11-16 - Type: Removed. Coordinator Data Quality and Decision Audit placeholder pages and menu items. Merged to `main` 2026-11-16 (b9b3c7f). Outstanding: human peer review.

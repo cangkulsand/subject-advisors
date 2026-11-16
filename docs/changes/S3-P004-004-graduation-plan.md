@@ -1,12 +1,12 @@
 # S3-P004-004 — Graduation plan and what-if scenarios (UC14–UC16)
 
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED to `main` (2026-11-16); human peer review pending
 - **Date:** 2026-11-16
 - **Sprint:** Sprint 3
 - **Owner:** P003 (M5, UC14–UC16); built by P004, to be handed to P003 as files
 - **Related UC / FR:** UC14 projected pathway (FR-E2–E6), UC15 simulate subject choices (FR-F1, F2, F5), UC16 compare and
   reset (FR-F3, F4); SDD Sprint 3 "Combine baseline completion forecasting and scenario comparison"
-- **Branch / PR:** `feature/s3-graduation-plan`; not merged, no PR
+- **Branch / PR:** `feature/s3-graduation-plan`; merged into `main` on 2026-11-16 (merge commit 84de073); no PR
 - **Reviewer:** Pending
 
 ## 1. Plan
@@ -68,5 +68,5 @@ persistence (`simulation_scenario` tables) and "outdated scenario" marking are n
 ## 4. Changelog
 
 - 2026-11-16 - Type: Added. Student Graduation plan (`/student/plan`) with what-if scenarios and comparison;
-  `GET /api/planning/input`; shared planning engine. Read-only, no migration. Outstanding: human peer review; P003
+  `GET /api/planning/input`; shared planning engine. Read-only, no migration. Merged to `main` 2026-11-16 (84de073). Outstanding: human peer review; P003
   confirmation of the design calls.
