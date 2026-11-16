@@ -1,7 +1,7 @@
 import { authorize, authJson, handleAuthRequest } from '../modules/auth';
 import type { AuthDependencies } from '../modules/auth/contracts';
 export type FeatureHandler = (request: Request) => Promise<Response | null>;
-export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler; forecasting?: FeatureHandler; curriculum?: FeatureHandler; graduation?: FeatureHandler }
+export interface IntegratedServices { auth: AuthDependencies; profile?: FeatureHandler; offerings?: FeatureHandler; pathway?: FeatureHandler; admin?: FeatureHandler; forecasting?: FeatureHandler; curriculum?: FeatureHandler; graduation?: FeatureHandler; planning?: FeatureHandler }
 /** Owners retain validation/authorization inside their handlers. No business logic here. */
 export async function dispatchIntegratedRequest(request: Request, services: IntegratedServices): Promise<Response> {
   const path = new URL(request.url).pathname;
@@ -30,6 +30,11 @@ export async function dispatchIntegratedRequest(request: Request, services: Inte
   }
   if (path === '/api/graduation-check' || path === '/api/graduation-check/confirmations') {
     if (services.graduation) return await services.graduation(request) ?? authJson({ error: { code: 'FEATURE_ROUTE_UNAVAILABLE', message: 'This academic service is temporarily unavailable.' } }, 503);
+    await authorize(request, services.auth, { roles: ['STUDENT'] });
+    return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
+  }
+  if (path === '/api/planning/input') {
+    if (services.planning) return await services.planning(request) ?? authJson({ error: { code: 'FEATURE_ROUTE_UNAVAILABLE', message: 'This academic service is temporarily unavailable.' } }, 503);
     await authorize(request, services.auth, { roles: ['STUDENT'] });
     return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
   }
