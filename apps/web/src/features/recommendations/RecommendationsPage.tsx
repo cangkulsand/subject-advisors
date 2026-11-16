@@ -63,7 +63,7 @@ export function RecommendationsPage({ api }: { api: PlanningClient }) {
           <h2 id="recommend-alt-heading">Other combinations</h2>
           {result.alternatives.length === 0 ? <p className="planning-empty">No other valid combination is available, so only the recommendation is shown.</p>
             : <ol className="recommend-alternatives">{result.alternatives.map((option, index) => <li key={index} className="planning-semester">
-              <div className="planning-semester-head"><h3>Option {index + 2}</h3><span>{option.subjects.length} subjects · {option.credits} credits</span></div>
+              <div className="planning-semester-head"><h3>Option {index + 2}</h3><span>{option.subjects.length} subject{option.subjects.length === 1 ? '' : 's'} · {option.credits} credits</span></div>
               <p className={'recommend-versus' + (option.differenceFromBest ? ' planning-later' : '')}>{versusBest(option.differenceFromBest)}{option.completion ? ` (${option.completion.label})` : ''}</p>
               <OptionTable option={option} label={`Option ${index + 2} subjects`}/>
             </li>)}</ol>}
