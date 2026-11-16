@@ -19,10 +19,11 @@ comparison). Spec `docs/superpowers/specs/2026-11-15-offering-history-design.md`
 - `/coordinator/history` "Offering History", coordinator menu under Forecast planning after Class Offering Forecast;
   overview quick link added.
 - `OfferingHistoryPage.tsx`: programme / learning centre / semester selectors limited to the coordinator's
-  `assignedScopes` (none → the existing "not assigned" message); semesters = those whose `selectionClosesAt` is set
-  and past, newest first (`closedSemesters`). Table: subject, credits, Approved / Removed, picked-by count (`—` for
+  `assignedScopes` (none → the existing "not assigned" message); semesters = those the shared `selectionPhase` rule reports as
+  CLOSED (opening and closing time set, closing time reached), newest first (`closedSemesters`). Table: subject, credits, Approved / Removed, picked-by count (`—` for
   removed, `0` when nobody picked) and "View students" (existing `SubjectPickersDialog`; picker lists kept in memory
-  only and cleared on scope change). Loading, error with Try again, and both empty states.
+  only; `History` is remounted per scope so each scope gets a fresh cache and a late response from an old scope
+  cannot repopulate it). Loading, error with Try again, and both empty states.
 - `offering-history.ts` helpers `closedSemesters`, `historyRows` (+ tests).
 - Frontend only: reuses `context()`, `GET /api/coordinator/offering-decisions` (already accepts any semester, returns
   `editable:false` for past ones, enforces scope) and the pickers endpoint. No API, contract or database change.
@@ -33,7 +34,14 @@ comparison). Spec `docs/superpowers/specs/2026-11-15-offering-history-design.md`
 
 - typecheck, lint, build, check:cloudflare pass; `npm test` 1652 passed (65 skipped).
 - `PLAYWRIGHT_CHANNEL=chrome`: coordinator UI 54, integration UI 48, admin UI 50 — all passed.
-- Review round: assigned-scope fallback removed (no unassigned combinations offered); count / "View students" spacing.
+- Review round 1: assigned-scope fallback removed (no unassigned combinations offered); count / "View students" spacing.
+- Review round 2 (2026-11-16, code review of `main...feature/s3-offering-history`): history screenshots moved from a
+  hard-coded local temp path to the suite's `.wrangler/coordinator-review/`; `closedSemesters` now uses the shared
+  `selectionPhase` (boundary and no-opening-time cases agree with the server, new unit test); picker cache made
+  per-scope by remounting `History`; new `history` sidebar icon so Offering History no longer shares Decision Audit's.
+  Not taken: memoising the semester list, de-duplicating fixture semesters, a data-driven coordinator route table
+  (refactor outside scope). After round 2: typecheck, lint, build, check:cloudflare pass; `npm test` 1653 passed
+  (65 skipped); `PLAYWRIGHT_CHANNEL=chrome` coordinator UI 54, admin UI 50, integration UI 48 all passed.
 
 Not verified: against live data (mocks only). Non-goals: comparison across semesters, admin access, the Decision
 Audit placeholder, counts of picks withdrawn by removals.

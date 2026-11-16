@@ -4,11 +4,15 @@ import type { OfferingDecisionSet } from '../../../../../packages/shared/src/for
 import { closedSemesters, historyRows } from './offering-history';
 
 const now = new Date('2026-11-15T00:00:00.000Z');
-const semester = (semesterId: number, selectionClosesAt?: string | null): SemesterOption => ({ semesterId, academicYear: '2025/2026', semesterNumber: 1, selectionClosesAt });
+const semester = (semesterId: number, selectionClosesAt?: string | null, selectionOpensAt: string | null = '2024-01-01T00:00:00.000Z'): SemesterOption => ({ semesterId, academicYear: '2025/2026', semesterNumber: 1, selectionOpensAt, selectionClosesAt });
 
 describe('closedSemesters', () => {
   it('lists only semesters whose selection closed before now', () => {
     const list = closedSemesters([semester(1, '2026-01-01T00:00:00.000Z'), semester(2, '2026-12-01T00:00:00.000Z'), semester(3, null), semester(4), semester(5, 'not a date')], now);
+    expect(list.map(item => item.semesterId)).toEqual([1]);
+  });
+  it('follows selectionPhase: closed at exactly the closing time, never closed without an opening time', () => {
+    const list = closedSemesters([semester(1, now.toISOString()), semester(2, '2026-01-01T00:00:00.000Z', null)], now);
     expect(list.map(item => item.semesterId)).toEqual([1]);
   });
   it('sorts newest first by the closing time and keeps the input untouched', () => {

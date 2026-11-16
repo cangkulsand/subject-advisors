@@ -19,8 +19,9 @@ function History({ client, scope }: { client: CoordinatorClient; scope: Forecast
   const decisions = useRead(signal => client.getDecisions(scope, signal), 'history|' + key);
   const pickerCache = useRef<PickerListCache>(new Map());
   const [viewing, setViewing] = useState<{ subjectId: number; code: string } | null>(null);
-  // Picker lists hold personal data: memory only, dropped when the scope or semester changes or the page is left.
-  useEffect(() => { const cache = pickerCache.current; cache.clear(); setViewing(null); return () => cache.clear(); }, [key]);
+  // Picker lists hold personal data: memory only. Chooser remounts History per scope (key), so each scope or
+  // semester gets a fresh cache and dialog state; a late response from an old scope lands in a discarded cache.
+  useEffect(() => { const cache = pickerCache.current; return () => cache.clear(); }, []);
   if (decisions.error) return <ErrorBox message={decisions.error} retry={decisions.retry}/>;
   if (!decisions.data) return <section className="admin-card admin-loading" role="status">Loading offering history…</section>;
   const rows = historyRows(decisions.data);
@@ -73,7 +74,7 @@ function Chooser({ client, context }: { client: CoordinatorClient; context: Fore
           </select></div>
       </div>
     </section>
-    {scope && <History client={client} scope={scope}/>}
+    {scope && <History key={[scope.programmeId, scope.learningCentreId, scope.targetSemesterId].join('|')} client={client} scope={scope}/>}
   </>;
 }
 

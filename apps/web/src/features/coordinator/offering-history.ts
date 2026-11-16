@@ -1,12 +1,15 @@
 import type { SemesterOption } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { OfferingDecisionSet } from '../../../../../packages/shared/src/forecasting/offering-decisions';
+import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 
 export interface HistoryRow { subjectId: number; code: string; name: string; credits: number; decision: 'Approved' | 'Removed'; picks: number | null }
 
-/** Semesters whose selection has closed (closing time set and in the past), newest closing first. */
+/** Semesters whose selection window is CLOSED by the shared selectionPhase rule, newest closing first. */
 export function closedSemesters(semesters: SemesterOption[], now: Date): SemesterOption[] {
-  const closedAt = (semester: SemesterOption) => semester.selectionClosesAt ? Date.parse(semester.selectionClosesAt) : NaN;
-  return semesters.filter(semester => closedAt(semester) < now.getTime()).sort((left, right) => closedAt(right) - closedAt(left));
+  const closedAt = (semester: SemesterOption) => Date.parse(semester.selectionClosesAt ?? '');
+  return semesters
+    .filter(semester => !Number.isNaN(closedAt(semester)) && selectionPhase({ selectionOpensAt: semester.selectionOpensAt ?? null, selectionClosesAt: semester.selectionClosesAt ?? null }, now) === 'CLOSED')
+    .sort((left, right) => closedAt(right) - closedAt(left));
 }
 
 /** One row per decided subject, by subject code: approved subjects carry their pick count (0 when nobody picked), removed subjects none. */

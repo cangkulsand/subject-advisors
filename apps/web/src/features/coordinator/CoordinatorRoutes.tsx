@@ -13,7 +13,7 @@ import { OfferingHistoryPage } from './OfferingHistoryPage';
 const groups: StaffNavigationGroup[] = [
   { label: 'Workspace', links: [{ href: '/coordinator', label: 'Overview', icon: 'overview' }] },
   { label: 'Academic data', links: [{ href: '/coordinator/imports', label: 'Data Imports', icon: 'data' }, { href: '/coordinator/data-quality', label: 'Data Quality', icon: 'quality' }] },
-  { label: 'Forecast planning', links: [{ href: '/coordinator/forecasts', label: 'Class Offering Forecast', icon: 'forecast' }, { href: '/coordinator/history', label: 'Offering History', icon: 'audit' }] },
+  { label: 'Forecast planning', links: [{ href: '/coordinator/forecasts', label: 'Class Offering Forecast', icon: 'forecast' }, { href: '/coordinator/history', label: 'Offering History', icon: 'history' }] },
   { label: 'Audit', links: [{ href: '/coordinator/audit', label: 'Decision Audit', icon: 'audit' }] },
 ];
 const pages: Record<string, { title: string; description: string }> = {

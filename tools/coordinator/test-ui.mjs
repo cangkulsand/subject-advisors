@@ -850,8 +850,6 @@ else {
     }
 
 
-    const historyShots = 'C:/Users/Asus/AppData/Local/Temp/claude/4795dd4a0714ec36/2f868daa-f74f-4c8a-8ab8-0db2a4082255/scratchpad/history/';
-    await mkdir(historyShots, { recursive: true });
     const historyReady = page => page.getByRole('region', { name: 'Offering history table', exact: true }).waitFor();
     const historyCodes = page => page.locator('[aria-label="Offering history table"] tbody tr').evaluateAll(rows => rows.map(row => row.dataset.subject));
     await check('history: the menu link opens the page; approved shows its count, removed shows a dash; View students lists names and matric numbers', async page => {
@@ -917,7 +915,7 @@ else {
       await mock(page, { history: true });
       await page.goto(base + '/coordinator/history'); await historyReady(page);
       assert.ok(await noOverflow(page));
-      await page.screenshot({ path: historyShots + `history-${width}.png`, fullPage: true });
+      await page.screenshot({ path: shots + `history-${width}.png`, fullPage: true });
     }, width);
 
     await check('the removed review, versions, comparison and offering decisions pages no longer exist', async page => {
