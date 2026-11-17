@@ -1,6 +1,6 @@
 # S3-P004-011 — Sign-up tells students to use their @graduate.utm.my email
 
-- **Status:** Implemented on branch, awaiting owner merge
+- **Status:** MERGED to main (fast-forward, 384b26a) and deployed to dev and prod on 2026-11-17
 - **Date:** 2026-11-17
 - **Sprint:** Sprint 3 (hotfix)
 - **Owner:** P004 (M0 authentication)
