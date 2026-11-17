@@ -23,7 +23,7 @@ const input = (extra: Partial<PlanningInput> = {}): PlanningInput => ({
     { requirementType: 'UNIVERSITY_COMPULSORY', requiredSubjects: 3, requiredCredits: null },
   ],
   passed: [], start: { academicYear: '2026/2027', semesterNo: 2 },
-  limits: [{ academicYear: '2026/2027', semesterNo: 2, maxSubjects: 3, maxCredits: 10 }, { academicYear: '2026/2027', semesterNo: 3, maxSubjects: 3, maxCredits: 6 }],
+  limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 3, maxCredits: 10 }, { semesterId: 22, academicYear: '2026/2027', semesterNo: 3, maxSubjects: 3, maxCredits: 6 }],
   approvedFirst: null, ...extra,
 });
 const codes = (option: { subjects: { subjectCode: string }[] } | null) => option?.subjects.map(s => s.subjectCode);
@@ -57,7 +57,7 @@ describe('recommend', () => {
     expect(recommend(input({ passed: [1, 2, 3, 4, 5, 8, 9, 10] }))).toMatchObject({ status: 'DONE', best: null });
   });
   it('keeps every option within the subject and credit limits', () => {
-    const result = recommend(input({ limits: [{ academicYear: '2026/2027', semesterNo: 2, maxSubjects: 2, maxCredits: 6 }] }));
+    const result = recommend(input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 2, maxCredits: 6 }] }));
     for (const option of [result.best!, ...result.alternatives]) {
       expect(option.subjects.length).toBeLessThanOrEqual(2);
       expect(option.credits).toBeLessThanOrEqual(6);

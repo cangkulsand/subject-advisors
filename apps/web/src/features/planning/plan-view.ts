@@ -2,7 +2,7 @@ import type { GraduationPlan, PlannedSubject, PlanningInput, ScenarioChange, Sce
 import { normaliseRequirementType as normalise } from '../../../../../packages/shared/src/planning/engine';
 
 export const CHANGE_LABEL: Record<ScenarioChangeKind, string> = {
-  POSTPONE: 'Postpone one semester', FAIL: 'Fail it', WITHDRAW: 'Withdraw', REPLACE: 'Replace with another elective',
+  POSTPONE: 'Postpone one semester', FAIL: 'Fail it', WITHDRAW: 'Withdraw', REPLACE: 'Replace with another elective', PLACE: 'Move to another semester',
 };
 
 /** The note shown next to a subject in the plan. */

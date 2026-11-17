@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanningInput, PlanningSubject } from './contracts';
 import { comparePlans, planBaseline, planScenario } from './engine';
-import { limitsFor, nextAcademicYear, semesterAt, semesterLabel } from './semesters';
+import { limitsFor, nextAcademicYear, semesterAt, semesterIndex, semesterLabel } from './semesters';
 
 const subject = (id: number, code: string, credits: number, extra: Partial<PlanningSubject> = {}): PlanningSubject => ({
   curriculumSubjectId: id, subjectCode: code, subjectName: 'Name ' + code, creditHours: credits, category: 'Core',
@@ -28,7 +28,7 @@ const input = (extra: Partial<PlanningInput> = {}): PlanningInput => ({
     { requirementType: 'UNIVERSITY_COMPULSORY', requiredSubjects: 3, requiredCredits: 6 },
   ],
   passed: [], start: { academicYear: '2026/2027', semesterNo: 2 },
-  limits: [{ academicYear: '2026/2027', semesterNo: 2, maxSubjects: 3, maxCredits: 10 }, { academicYear: '2026/2027', semesterNo: 3, maxSubjects: 3, maxCredits: 6 }],
+  limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 3, maxCredits: 10 }, { semesterId: 22, academicYear: '2026/2027', semesterNo: 3, maxSubjects: 3, maxCredits: 6 }],
   approvedFirst: null, ...extra,
 });
 const codesBySemester = (plan: ReturnType<typeof planBaseline>) => plan.semesters.map(s => s.subjects.map(x => x.subjectCode + (x.failedAttempt ? '*' : '')));
@@ -44,7 +44,7 @@ describe('semester helpers', () => {
     expect(semesterLabel({ academicYear: '', semesterNo: 1 }, 4, false)).toBe('Plan semester 4');
   });
   it('uses exact, then latest same-type, then default limits', () => {
-    const limits = [{ academicYear: '2026/2027', semesterNo: 1, maxSubjects: 4, maxCredits: 12 }, { academicYear: '2025/2026', semesterNo: 2, maxSubjects: 2, maxCredits: 8 }];
+    const limits = [{ semesterId: 1, academicYear: '2026/2027', semesterNo: 1, maxSubjects: 4, maxCredits: 12 }, { semesterId: 2, academicYear: '2025/2026', semesterNo: 2, maxSubjects: 2, maxCredits: 8 }];
     expect(limitsFor({ academicYear: '2026/2027', semesterNo: 1 }, limits)).toMatchObject({ maxSubjects: 4, maxCredits: 12 });
     expect(limitsFor({ academicYear: '2030/2031', semesterNo: 2 }, limits)).toMatchObject({ maxSubjects: 4, maxCredits: 12 });
     expect(limitsFor({ academicYear: '2030/2031', semesterNo: 3 }, limits)).toEqual({ maxSubjects: 3, maxCredits: 6, configured: false });
@@ -93,7 +93,7 @@ describe('planBaseline', () => {
     expect(plan.assumptions.join(' ')).toContain('approved');
   });
   it('respects subject and credit limits', () => {
-    const plan = planBaseline(input({ limits: [{ academicYear: '2026/2027', semesterNo: 2, maxSubjects: 1, maxCredits: 10 }] }));
+    const plan = planBaseline(input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 1, maxCredits: 10 }] }));
     expect(plan.semesters[0]!.subjects).toHaveLength(1);
     expect(plan.semesters[0]!.maxSubjects).toBe(1);
   });
@@ -182,5 +182,59 @@ describe('review fixes (S3-P004-004 round 2)', () => {
     const a1 = chained.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === 'SECA1013'));
     const failed = chained.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === 'SECA2013' && x.failedAttempt));
     expect(failed).toBeGreaterThan(a1);
+  });
+});
+
+describe('PLACE (S3-P004-010)', () => {
+  const at = (plan: ReturnType<typeof planBaseline>, code: string) => plan.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === code && !x.failedAttempt));
+  const card = (plan: ReturnType<typeof planBaseline>, code: string) => plan.semesters.flatMap(s => s.subjects).find(x => x.subjectCode === code && !x.failedAttempt)!;
+  it('semesterIndex is the offset from the first planned semester, null before it or without a calendar', () => {
+    const start = { academicYear: '2026/2027', semesterNo: 2 };
+    expect(semesterIndex(start, { academicYear: '2027/2028', semesterNo: 1 })).toBe(2);
+    expect(semesterIndex(start, start)).toBe(0);
+    expect(semesterIndex(start, { academicYear: '2026/2027', semesterNo: 1 })).toBeNull();
+    expect(semesterIndex(null, start)).toBeNull();
+  });
+  it('pins a subject to a later semester and re-plans the rest', () => {
+    const plan = planScenario(input(), [{ kind: 'PLACE', curriculumSubjectId: 4, semester: { academicYear: '2027/2028', semesterNo: 2 } }]);
+    expect(at(plan, 'SECB1013')).toBe(3);
+    expect(plan.semesters[3]!.label).toBe('2027/2028 – Semester 2');
+    expect(card(plan, 'SECB1013')).toMatchObject({ pinned: true, change: 'PLACE' });
+    expect(codesBySemester(plan).flat().filter(c => c === 'SECB1013')).toHaveLength(1);
+  });
+  it('pins a subject to an earlier semester', () => {
+    const tight = input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 2, maxCredits: 10 }] });
+    expect(at(planBaseline(tight), 'SECE1013')).toBeGreaterThan(0);
+    const plan = planScenario(tight, [{ kind: 'PLACE', curriculumSubjectId: 5, semester: { academicYear: '2026/2027', semesterNo: 2 } }]);
+    expect(at(plan, 'SECE1013')).toBe(0);
+    expect(card(plan, 'SECE1013').pinned).toBe(true);
+    expect(plan.status).toBe('PLANNED');
+  });
+  it('counts pinned subjects toward the semester limits', () => {
+    const tight = input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 2, maxCredits: 10 }] });
+    const first = { academicYear: '2026/2027', semesterNo: 2 };
+    const plan = planScenario(tight, [{ kind: 'PLACE', curriculumSubjectId: 4, semester: first }, { kind: 'PLACE', curriculumSubjectId: 5, semester: first }]);
+    expect(codesBySemester(plan)[0]).toEqual(['SECB1013', 'SECE1013']);
+  });
+  it('places a pinned subject\'s prerequisites in time, ahead of deeper chains', () => {
+    const own = [subject(1, 'SECA1013', 3), subject(2, 'SECA2013', 3, { prerequisites: [1] }), subject(3, 'SECA3013', 3, { prerequisites: [2] }),
+      subject(4, 'SECB1013', 3), subject(5, 'SECB2013', 3, { prerequisites: [4] })];
+    const tight = input({ subjects: own, requirements: [], limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 1, maxCredits: 10 }] });
+    expect(at(planBaseline(tight), 'SECA1013')).toBe(0);
+    const plan = planScenario(tight, [{ kind: 'PLACE', curriculumSubjectId: 5, semester: { academicYear: '2027/2028', semesterNo: 1 } }]);
+    expect(at(plan, 'SECB1013')).toBe(0);
+    expect(at(plan, 'SECB2013')).toBe(2);
+    expect(card(plan, 'SECB2013').pinned).toBe(true);
+  });
+  it('keeps a failed attempt and pins the retake', () => {
+    const plan = planScenario(input(), [{ kind: 'FAIL', curriculumSubjectId: 4, semester: { academicYear: '2027/2028', semesterNo: 2 } }]);
+    expect(codesBySemester(plan)[0]).toContain('SECB1013*');
+    expect(at(plan, 'SECB1013')).toBe(3);
+    expect(card(plan, 'SECB1013')).toMatchObject({ pinned: true, change: 'FAIL' });
+  });
+  it('without changes equals the baseline and pins nothing', () => {
+    const plan = planScenario(input(), []);
+    expect(plan).toEqual(planBaseline(input()));
+    expect(plan.semesters.flatMap(s => s.subjects).every(s => !s.pinned)).toBe(true);
   });
 });

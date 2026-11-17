@@ -25,7 +25,8 @@ export interface PlanningRequirement {
 
 export interface SemesterRef { academicYear: string; semesterNo: number }
 
-export interface SemesterLimit extends SemesterRef { maxSubjects: number; maxCredits: number }
+/** A configured `academic_semester` row; `semesterId` is what a saved what-if stores (S3-P004-010). */
+export interface SemesterLimit extends SemesterRef { semesterId: number; maxSubjects: number; maxCredits: number }
 
 export interface PlanningInput {
   programmeName: string;
@@ -44,13 +45,15 @@ export interface PlanningInput {
   approvedFirst: number[] | null;
 }
 
-export type ScenarioChangeKind = 'POSTPONE' | 'FAIL' | 'WITHDRAW' | 'REPLACE';
+export type ScenarioChangeKind = 'POSTPONE' | 'FAIL' | 'WITHDRAW' | 'REPLACE' | 'PLACE';
 
 export interface ScenarioChange {
   kind: ScenarioChangeKind;
   curriculumSubjectId: number;
   /** For REPLACE: the elective option taken instead. */
   replacementId?: number;
+  /** PLACE: the semester the subject is pinned to. FAIL / WITHDRAW: where the retake is pinned, when the student moved it. */
+  semester?: SemesterRef;
 }
 
 export interface PlannedSubject {
@@ -66,6 +69,8 @@ export interface PlannedSubject {
   change: ScenarioChangeKind | null;
   /** True for the attempt a FAIL change says was failed: it uses the slot and credits but is taken again later. */
   failedAttempt: boolean;
+  /** True when the student placed this subject in this semester (a PLACE, or a moved retake). */
+  pinned: boolean;
 }
 
 export interface PlannedSemester extends SemesterRef {

@@ -2,7 +2,7 @@ import type {
   Bottleneck, GraduationPlan, MovedSubject, PlanComparison, PlanCompletion, PlannedSemester, PlannedSubject,
   PlanningInput, PlanningSubject, ScenarioChange, ScenarioChangeKind, UnplannedSubject,
 } from './contracts';
-import { limitsFor, semesterAt, semesterLabel, semesterTypeOf } from './semesters';
+import { limitsFor, semesterAt, semesterIndex, semesterLabel, semesterTypeOf } from './semesters';
 
 /**
  * UC14–UC16 planning engine (M5). Pure and deterministic: the same input and changes always give the same plan,
@@ -19,11 +19,13 @@ interface Constraints {
   failedIn: Map<number, number[]>;
   replaced: Map<number, number>;
   changeOf: Map<number, ScenarioChangeKind>;
+  /** Semester index each subject is pinned to (PLACE, or a moved retake). */
+  pinned: Map<number, number>;
 }
-const none = (): Constraints => ({ notBefore: new Map(), failedIn: new Map(), replaced: new Map(), changeOf: new Map() });
+const none = (): Constraints => ({ notBefore: new Map(), failedIn: new Map(), replaced: new Map(), changeOf: new Map(), pinned: new Map() });
 const copy = (c: Constraints): Constraints => ({
   notBefore: new Map(c.notBefore), failedIn: new Map([...c.failedIn].map(([id, list]) => [id, [...list]])),
-  replaced: new Map(c.replaced), changeOf: new Map(c.changeOf),
+  replaced: new Map(c.replaced), changeOf: new Map(c.changeOf), pinned: new Map(c.pinned),
 });
 
 /** Requirement type / category key: upper case, spaces and underscores alike ("Elective E1" = "ELECTIVE_E1"). */
@@ -118,20 +120,31 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
   const needed = neededSubjects(input, byId, passed, constraints);
   const { depth, next, unlocks } = chains(needed.ids, input.subjects);
   const calendar = input.start !== null;
+  // Prerequisites of a pinned subject must be placed before the pin: give them a deadline and place them first.
+  const deadline = new Map<number, number>();
+  const setDeadline = (id: number, latest: number, guard: number) => {
+    if (guard > 40 || (deadline.get(id) ?? Infinity) <= latest) return;
+    deadline.set(id, latest);
+    for (const required of byId.get(id)?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, latest - 1, guard + 1);
+  };
+  for (const [id, index] of constraints.pinned) for (const required of byId.get(id)?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, index - 1, 0);
   const order = [...needed.ids].map(id => byId.get(id)!).sort((left, right) =>
-    depth.get(right.curriculumSubjectId)! - depth.get(left.curriculumSubjectId)!
+    (deadline.get(left.curriculumSubjectId) ?? Infinity) - (deadline.get(right.curriculumSubjectId) ?? Infinity)
+    || depth.get(right.curriculumSubjectId)! - depth.get(left.curriculumSubjectId)!
     || unlocks.get(right.curriculumSubjectId)! - unlocks.get(left.curriculumSubjectId)!
     || Number(right.compulsory) - Number(left.compulsory)
     || left.subjectCode.localeCompare(right.subjectCode));
   const remainingCredits = order.reduce((n, s) => n + s.creditHours, 0);
 
-  const toPlanned = (s: PlanningSubject, failedAttempt = false): PlannedSubject => ({
+  const toPlanned = (s: PlanningSubject, failedAttempt = false, pinned = false): PlannedSubject => ({
     curriculumSubjectId: s.curriculumSubjectId, subjectCode: s.subjectCode, subjectName: s.subjectName, creditHours: s.creditHours,
     category: s.category, compulsory: s.compulsory, electiveChoice: needed.electives.get(s.curriculumSubjectId) ?? null,
-    change: constraints.changeOf.get(s.curriculumSubjectId) ?? null, failedAttempt,
+    change: constraints.changeOf.get(s.curriculumSubjectId) ?? null, failedAttempt, pinned,
   });
 
   const placedAt = new Map<number, number>();
+  const prerequisitesMet = (s: PlanningSubject, index: number) =>
+    s.prerequisites.every(required => passed.has(required) || (placedAt.get(required) ?? Infinity) < index);
   const semesters: PlannedSemester[] = [];
   let emptyStreak = 0;
   let usedDefaults = false;
@@ -147,10 +160,21 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
       if (s && failedIndexes.includes(index)) { subjects.push(toPlanned(s, true)); credits += s.creditHours; }
     }
     const placedBefore = subjects.filter(s => !s.failedAttempt).length;
+    // Subjects the student placed in this semester go first. One whose rules are not met here falls back to normal placement.
+    for (const s of order) {
+      const id = s.curriculumSubjectId;
+      if (constraints.pinned.get(id) !== index || placedAt.has(id)) continue;
+      if (subjects.length >= limits.maxSubjects || credits + s.creditHours > limits.maxCredits) continue;
+      if (s.semesterTypes.length > 0 && !s.semesterTypes.includes(type)) continue;
+      if (!prerequisitesMet(s, index)) continue;
+      placedAt.set(id, index); subjects.push(toPlanned(s, false, true)); credits += s.creditHours;
+    }
     for (const s of order) {
       if (subjects.length >= limits.maxSubjects) break;
       const id = s.curriculumSubjectId;
       if (placedAt.has(id) || credits + s.creditHours > limits.maxCredits) continue;
+      const pin = constraints.pinned.get(id);
+      if (pin !== undefined && index <= pin) continue;
       if (s.semesterTypes.length > 0 && !s.semesterTypes.includes(type)) continue;
       if ((constraints.notBefore.get(id) ?? 0) > index) continue;
       if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(id)) continue;
@@ -280,8 +304,17 @@ export function planScenario(input: PlanningInput, changes: ScenarioChange[]): G
       if (!group || !replacement || replacement.compulsory || passed.has(replacement.curriculumSubjectId) || normalise(replacement.category) !== group) continue;
       next.replaced.set(change.curriculumSubjectId, replacement.curriculumSubjectId);
       next.changeOf.set(replacement.curriculumSubjectId, 'REPLACE');
+    } else if (change.kind === 'PLACE') {
+      const index = change.semester ? semesterIndex(input.start, change.semester) : null;
+      if (index === null) continue;
+      next.pinned.set(change.curriculumSubjectId, index);
+      next.notBefore.delete(change.curriculumSubjectId);
+      next.changeOf.set(change.curriculumSubjectId, 'PLACE');
     } else {
       next.notBefore.set(change.curriculumSubjectId, at + 1);
+      const retake = change.semester && change.kind !== 'POSTPONE' ? semesterIndex(input.start, change.semester) : null;
+      if (retake !== null && retake > at) next.pinned.set(change.curriculumSubjectId, retake);
+      else next.pinned.delete(change.curriculumSubjectId);
       next.changeOf.set(change.curriculumSubjectId, change.kind);
       if (change.kind === 'FAIL') next.failedIn.set(change.curriculumSubjectId, [...(next.failedIn.get(change.curriculumSubjectId) ?? []), at]);
     }

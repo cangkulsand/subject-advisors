@@ -47,7 +47,7 @@ function WhatIf({ input, baseline, changes, setChanges }: { input: PlanningInput
   const options = subject ? replacementOptions(input, baseline, subject) : [];
   const [replacementId, setReplacementId] = useState<number | null>(null);
   const replacement = options.find(o => o.curriculumSubjectId === replacementId) ?? options[0];
-  const kinds = (Object.keys(CHANGE_LABEL) as ScenarioChangeKind[]).filter(k => k !== 'REPLACE' || options.length > 0);
+  const kinds = (Object.keys(CHANGE_LABEL) as ScenarioChangeKind[]).filter(k => k !== 'PLACE' && (k !== 'REPLACE' || options.length > 0));
   const action = kinds.includes(kind) ? kind : 'POSTPONE';
   if (!subject) return null;
   const add = () => setChanges([...changes, action === 'REPLACE' ? { kind: action, curriculumSubjectId: subject.curriculumSubjectId, replacementId: replacement?.curriculumSubjectId } : { kind: action, curriculumSubjectId: subject.curriculumSubjectId }]);

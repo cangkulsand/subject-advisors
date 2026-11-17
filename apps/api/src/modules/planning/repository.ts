@@ -73,7 +73,7 @@ export function toPlanningInput(rows: PlanningRows): PlanningInput {
     requirements: rows.requirements,
     passed: [...passed].sort((a, b) => a - b),
     start: start ? { academicYear: start.academicYear, semesterNo: start.semesterNo } : null,
-    limits: rows.semesters.map(s => ({ academicYear: s.academicYear, semesterNo: s.semesterNo, maxSubjects: s.maxSubjects, maxCredits: s.maxCredits })),
+    limits: rows.semesters.map(s => ({ semesterId: s.semesterId, academicYear: s.academicYear, semesterNo: s.semesterNo, maxSubjects: s.maxSubjects, maxCredits: s.maxCredits })),
     approvedFirst,
   };
 }
