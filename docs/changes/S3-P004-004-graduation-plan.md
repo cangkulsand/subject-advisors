@@ -71,3 +71,4 @@ persistence (`simulation_scenario` tables) and "outdated scenario" marking are n
   `GET /api/planning/input`; shared planning engine. Read-only, no migration. Merged to `main` 2026-11-16 (84de073). Outstanding: human peer review; P003
   confirmation of the design calls.
 - 2026-11-16 - Type: Changed. Semester labels drop the "AY" prefix ("2027/2028 – Semester 1"), owner decision; affects the Graduation plan and Recommendations. Merged to `main` 2026-11-16 (0943c6b).
+- 2026-11-17 - Type: Changed. The what-if is now saved per student, with drag and drop and coloured semesters: see S3-P004-010.
