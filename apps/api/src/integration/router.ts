@@ -33,7 +33,7 @@ export async function dispatchIntegratedRequest(request: Request, services: Inte
     await authorize(request, services.auth, { roles: ['STUDENT'] });
     return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);
   }
-  if (path === '/api/planning/input') {
+  if (path === '/api/planning/input' || path === '/api/planning/scenario') {
     if (services.planning) return await services.planning(request) ?? authJson({ error: { code: 'FEATURE_ROUTE_UNAVAILABLE', message: 'This academic service is temporarily unavailable.' } }, 503);
     await authorize(request, services.auth, { roles: ['STUDENT'] });
     return authJson({ error: { code: 'FEATURE_NOT_INSTALLED', message: 'This academic service is not available yet.' } }, 503);

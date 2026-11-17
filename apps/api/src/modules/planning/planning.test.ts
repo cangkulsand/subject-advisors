@@ -97,6 +97,7 @@ function deps(role: 'STUDENT' | 'COORDINATOR' = 'STUDENT') {
       profiles: { stateFor: vi.fn(async () => 'COMPLETE' as const) },
     },
     repository,
+    scenarios: { read: vi.fn(), replace: vi.fn(), remove: vi.fn() },
   };
   return { d, repository };
 }
