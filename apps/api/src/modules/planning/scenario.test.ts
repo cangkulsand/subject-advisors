@@ -87,7 +87,7 @@ describe('DELETE and other methods', () => {
   it('DELETE removes the saved scenario', async () => {
     const { d, scenarios } = deps();
     const res = await call(d, 'DELETE');
-    expect(res.status).toBe(204); expect(scenarios.remove).toHaveBeenCalledWith('student_a');
+    expect(res.status).toBe(200); expect(await res.json()).toEqual({ data: null }); expect(scenarios.remove).toHaveBeenCalledWith('student_a');
   });
   it('PATCH is not allowed', async () => {
     const res = await call(deps().d, 'PATCH');

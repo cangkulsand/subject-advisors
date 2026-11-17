@@ -1,5 +1,8 @@
 import type { GraduationPlan, PlannedSubject, PlanningInput, ScenarioChange, ScenarioChangeKind } from '../../../../../packages/shared/src/planning/contracts';
 import { normaliseRequirementType as normalise } from '../../../../../packages/shared/src/planning/engine';
+import { cleanChanges } from '../../../../../packages/shared/src/planning/placement';
+import { fromSaved, type SavedScenario } from '../../../../../packages/shared/src/planning/saved';
+import { semesterIndex, semesterLabel } from '../../../../../packages/shared/src/planning/semesters';
 
 export const CHANGE_LABEL: Record<ScenarioChangeKind, string> = {
   POSTPONE: 'Postpone one semester', FAIL: 'Fail it', WITHDRAW: 'Withdraw', REPLACE: 'Replace with another elective', PLACE: 'Move to another semester',
@@ -8,6 +11,7 @@ export const CHANGE_LABEL: Record<ScenarioChangeKind, string> = {
 /** The note shown next to a subject in the plan. */
 export function subjectNote(subject: PlannedSubject): string | null {
   if (subject.failedAttempt) return 'Failed in this what-if: retaken later';
+  if (subject.pinned && (subject.change === 'PLACE' || subject.change === 'REPLACE' || subject.change === null)) return 'Placed here by you';
   if (subject.change === 'FAIL') return 'Retake';
   if (subject.change === 'POSTPONE') return 'Postponed';
   if (subject.change === 'WITHDRAW') return 'Taken again after withdrawing';
@@ -44,8 +48,18 @@ export function replacementOptions(input: PlanningInput, plan: GraduationPlan, s
 /** Plain description of one change, for the list of changes. */
 export function describeChange(change: ScenarioChange, input: PlanningInput): string {
   const code = (id: number | undefined) => input.subjects.find(s => s.curriculumSubjectId === id)?.subjectCode ?? 'subject';
+  const where = change.semester ? semesterLabel(change.semester, (semesterIndex(input.start, change.semester) ?? 0) + 1, input.start !== null) : null;
+  if (change.kind === 'PLACE') return `Move ${code(change.curriculumSubjectId)} to ${where ?? 'another semester'}`;
+  if (change.kind === 'FAIL' && where) return `Fail ${code(change.curriculumSubjectId)}, retaken in ${where}`;
+  if (change.kind === 'WITHDRAW' && where) return `Withdraw from ${code(change.curriculumSubjectId)}, taken again in ${where}`;
   if (change.kind === 'REPLACE') return `Replace ${code(change.curriculumSubjectId)} with ${code(change.replacementId)}`;
   if (change.kind === 'POSTPONE') return `Postpone ${code(change.curriculumSubjectId)} one semester`;
   if (change.kind === 'FAIL') return `Fail ${code(change.curriculumSubjectId)}`;
   return `Withdraw from ${code(change.curriculumSubjectId)}`;
+}
+
+/** The saved what-if as engine changes, without the ones that no longer apply (S3-P004-010). */
+export function restoreChanges(input: PlanningInput, saved: SavedScenario | null): { changes: ScenarioChange[]; dropped: number } {
+  if (!saved) return { changes: [], dropped: 0 };
+  return cleanChanges(input, fromSaved(input, saved.changes));
 }

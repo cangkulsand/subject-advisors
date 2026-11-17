@@ -34,7 +34,8 @@ export async function handlePlanningRequest(request: Request, deps: PlanningDepe
       return authJson({ data: input });
     }
     if (request.method === 'GET') return authJson({ data: await deps.scenarios.read(me.clerkUserId) });
-    if (request.method === 'DELETE') { await deps.scenarios.remove(me.clerkUserId); return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } }); }
+    // 200 with { data: null } rather than 204: the shared browser client reads a JSON body on every response.
+    if (request.method === 'DELETE') { await deps.scenarios.remove(me.clerkUserId); return authJson({ data: null }); }
     if (request.method !== 'PUT') return notAllowed('GET, PUT, DELETE');
     let body: unknown;
     try { body = await request.json(); } catch { return invalid('The request is not valid JSON.'); }
