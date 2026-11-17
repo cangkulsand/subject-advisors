@@ -1,29 +1,16 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { GraduationPlan, PlanningInput, ScenarioChange, ScenarioChangeKind } from '../../../../../packages/shared/src/planning/contracts';
 import { comparePlans, planBaseline, planScenario } from '../../../../../packages/shared/src/planning/engine';
+import { checkChange, validateChanges } from '../../../../../packages/shared/src/planning/placement';
+import { toSaved } from '../../../../../packages/shared/src/planning/saved';
 import { errorMessage } from '../profile/client';
 import type { PlanningClient } from './client';
-import { CHANGE_LABEL, changeableSubjects, describeChange, differenceText, replacementOptions, subjectNote } from './plan-view';
+import { CheckIcon, SpinnerIcon, WarningIcon } from './icons';
+import { PlanBoard } from './PlanBoard';
+import { CHANGE_LABEL, changeableSubjects, describeChange, differenceText, replacementOptions, restoreChanges } from './plan-view';
+import { SaveQueue, type SaveStatus } from './save-queue';
 import '../../app/typography.css';
 import './planning-page.css';
-
-function Timeline({ plan, heading }: { plan: GraduationPlan; heading: string }) {
-  return <section className="planning-card" aria-labelledby="planning-timeline-heading">
-    <h2 id="planning-timeline-heading">{heading}</h2>
-    <ol className="planning-semesters">{plan.semesters.map(semester => <li key={semester.index} className="planning-semester">
-      <div className="planning-semester-head"><h3>{semester.label}</h3>
-        <span>{semester.subjects.length} of {semester.maxSubjects} subjects · {semester.credits} of {semester.maxCredits} credits</span></div>
-      {semester.subjects.length === 0 ? <p className="planning-empty">Nothing can be taken this semester: the subjects left are waiting for a prerequisite or run in the other semester type.</p>
-        : <div className="planning-table-scroll" role="region" aria-label={semester.label + ' subjects'} tabIndex={0}><table className="planning-table planning-table--semester">
-          <thead><tr><th scope="col">Subject</th><th scope="col" className="planning-number">Credits</th><th scope="col">Note</th></tr></thead>
-          <tbody>{semester.subjects.map(s => <tr key={s.curriculumSubjectId + (s.failedAttempt ? '-failed' : '')} data-subject={s.subjectCode} className={s.failedAttempt ? 'planning-failed' : undefined}>
-            <th scope="row"><span className="planning-subject-name">{s.subjectName}</span><span className="planning-subject-code">{s.subjectCode}</span></th>
-            <td className="planning-number">{s.creditHours}</td>
-            <td>{subjectNote(s) ?? <span className="planning-muted">—</span>}</td>
-          </tr>)}</tbody></table></div>}
-    </li>)}</ol>
-  </section>;
-}
 
 function Summary({ plan }: { plan: GraduationPlan }) {
   if (plan.status === 'DONE') return <section className="planning-card" aria-label="Plan summary"><p className="planning-status planning-status--met">No subjects left to plan</p><p className="planning-lead">Your records already cover every subject your programme needs. Check the Graduation check page for the rest.</p></section>;
@@ -38,11 +25,12 @@ function Summary({ plan }: { plan: GraduationPlan }) {
   </section>;
 }
 
-function WhatIf({ input, baseline, changes, setChanges }: { input: PlanningInput; baseline: GraduationPlan; changes: ScenarioChange[]; setChanges: (next: ScenarioChange[]) => void }) {
+function WhatIf({ input, baseline, changes, apply }: { input: PlanningInput; baseline: GraduationPlan; changes: ScenarioChange[]; apply: (next: ScenarioChange[] | null) => string | null }) {
   const subjectField = useId(), actionField = useId(), replacementField = useId();
   const subjects = changeableSubjects(baseline);
   const [subjectId, setSubjectId] = useState<number | null>(subjects[0]?.curriculumSubjectId ?? null);
   const [kind, setKind] = useState<ScenarioChangeKind>('POSTPONE');
+  const [refusal, setRefusal] = useState('');
   const subject = subjects.find(s => s.curriculumSubjectId === subjectId) ?? subjects[0];
   const options = subject ? replacementOptions(input, baseline, subject) : [];
   const [replacementId, setReplacementId] = useState<number | null>(null);
@@ -50,10 +38,16 @@ function WhatIf({ input, baseline, changes, setChanges }: { input: PlanningInput
   const kinds = (Object.keys(CHANGE_LABEL) as ScenarioChangeKind[]).filter(k => k !== 'PLACE' && (k !== 'REPLACE' || options.length > 0));
   const action = kinds.includes(kind) ? kind : 'POSTPONE';
   if (!subject) return null;
-  const add = () => setChanges([...changes, action === 'REPLACE' ? { kind: action, curriculumSubjectId: subject.curriculumSubjectId, replacementId: replacement?.curriculumSubjectId } : { kind: action, curriculumSubjectId: subject.curriculumSubjectId }]);
+  const add = () => {
+    const change: ScenarioChange = action === 'REPLACE' ? { kind: action, curriculumSubjectId: subject.curriculumSubjectId, replacementId: replacement?.curriculumSubjectId } : { kind: action, curriculumSubjectId: subject.curriculumSubjectId };
+    const check = checkChange(input, changes, change);
+    if (!check.ok) { setRefusal(check.reason); return; }
+    setRefusal(apply(check.changes) ?? '');
+  };
+  const remove = (index: number) => setRefusal(apply(changes.filter((_, i) => i !== index)) ?? '');
   return <section className="planning-card" aria-labelledby="planning-whatif-heading">
     <h2 id="planning-whatif-heading">What if…</h2>
-    <p className="planning-lead">Try a change and compare it with your plan. Nothing is saved and your records do not change.</p>
+    <p className="planning-lead">Try a change, or move subjects in the plan below, and compare with your plan. Your changes are saved for next time; your records do not change.</p>
     <div className="planning-form">
       <div className="planning-field"><label htmlFor={subjectField}>Subject</label>
         <select id={subjectField} value={subject.curriculumSubjectId} onChange={e => { setSubjectId(Number(e.target.value)); setReplacementId(null); }}>
@@ -69,11 +63,12 @@ function WhatIf({ input, baseline, changes, setChanges }: { input: PlanningInput
         </select></div>}
       <button type="button" className="planning-button planning-button--primary" onClick={add}>Add change</button>
     </div>
+    <p className="planning-move-message" role="status">{refusal && <><WarningIcon />{refusal}</>}</p>
     {changes.length > 0 && <>
       <h3>Your changes</h3>
       <ul className="planning-changes">{changes.map((change, index) => <li key={index}><span>{describeChange(change, input)}</span>
-        <button type="button" className="planning-button" aria-label={'Remove: ' + describeChange(change, input)} onClick={() => setChanges(changes.filter((_, i) => i !== index))}>Remove</button></li>)}</ul>
-      <button type="button" className="planning-button" onClick={() => setChanges([])}>Reset to my plan</button>
+        <button type="button" className="planning-button" aria-label={'Remove: ' + describeChange(change, input)} onClick={() => remove(index)}>Remove</button></li>)}</ul>
+      <button type="button" className="planning-button" onClick={() => { setRefusal(''); apply(null); }}>Reset to my plan</button>
     </>}
   </section>;
 }
@@ -96,19 +91,50 @@ function Comparison({ baseline, scenario }: { baseline: GraduationPlan; scenario
   </section>;
 }
 
+function SaveState({ status, retry }: { status: SaveStatus; retry: () => void }) {
+  return <div className="planning-save" role="status">
+    {status === 'saving' && <><SpinnerIcon /><span>Saving…</span></>}
+    {status === 'saved' && <><CheckIcon /><span>Saved</span></>}
+    {status === 'failed' && <><WarningIcon /><span>Not saved</span><button type="button" className="planning-button" onClick={retry}>Try again</button></>}
+  </div>;
+}
+
 export function PlanningPage({ api }: { api: PlanningClient }) {
   const [input, setInput] = useState<PlanningInput>(), [error, setError] = useState(''), [refresh, setRefresh] = useState(0);
   const [changes, setChanges] = useState<ScenarioChange[]>([]);
+  const [stale, setStale] = useState(false);
+  const [status, setStatus] = useState<SaveStatus>('idle');
   const [view, setView] = useState<'baseline' | 'scenario'>('scenario');
+  const queue = useMemo(() => new SaveQueue(async value => {
+    if (value === null || value.length === 0) await api.clearScenario(); else await api.saveScenario(value);
+  }, setStatus), [api]);
   useEffect(() => {
-    const controller = new AbortController(); setInput(undefined); setError(''); setChanges([]);
-    api.load(controller.signal).then(value => { if (!controller.signal.aborted) setInput(value); })
-      .catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); });
+    const controller = new AbortController(); setInput(undefined); setError(''); setChanges([]); setStale(false);
+    Promise.all([api.load(controller.signal), api.loadScenario(controller.signal)]).then(([value, saved]) => {
+      if (controller.signal.aborted) return;
+      const restored = restoreChanges(value, saved);
+      setInput(value); setChanges(restored.changes);
+      if (restored.dropped > 0) { setStale(true); queue.push(toSaved(value, restored.changes)); }
+    }).catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); });
     return () => controller.abort();
-  }, [api, refresh]);
+  }, [api, refresh, queue]);
   const baseline = useMemo(() => input ? planBaseline(input) : null, [input]);
   const scenario = useMemo(() => input && changes.length ? planScenario(input, changes) : null, [input, changes]);
-  const shown = scenario && view === 'scenario' ? scenario : baseline;
+  /** Shows and saves a list already checked by the engine; null resets. Returns a refusal when the list no longer holds. */
+  const apply = (next: ScenarioChange[] | null): string | null => {
+    if (!input) return null;
+    if (next !== null && next.length) {
+      const check = validateChanges(input, next);
+      if (!check.ok) return check.reason;
+    }
+    const list = next ?? [];
+    setChanges(list); setStale(false);
+    if (list.length === 0) setView('scenario');
+    queue.push(list.length ? toSaved(input, list) : null);
+    return null;
+  };
+  const showBaseline = scenario !== null && view === 'baseline';
+  const shown = showBaseline ? baseline : scenario ?? baseline;
   return <section className="planning-page" aria-label="Graduation plan">
     <header><p className="planning-eyebrow">Graduation plan</p><h1>When could you finish?</h1>
       <p className="planning-lead">A semester-by-semester plan for the subjects you still need, using your records, your programme's rules and the semester limits.</p></header>
@@ -116,13 +142,16 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
     {!input && !error && <p role="status">Loading your graduation plan…</p>}
     {input && baseline && <>
       <Summary plan={baseline}/>
-      {baseline.status !== 'DONE' && <WhatIf input={input} baseline={baseline} changes={changes} setChanges={setChanges}/>}
+      {stale && <p className="planning-stale" role="status"><WarningIcon />Some saved changes no longer apply and were removed.</p>}
+      {baseline.status !== 'DONE' && <WhatIf input={input} baseline={baseline} changes={changes} apply={apply}/>}
       {scenario && <Comparison baseline={baseline} scenario={scenario}/>}
       {scenario && <div className="planning-toggle" role="group" aria-label="Plan shown">
         <button type="button" aria-pressed={view === 'baseline'} onClick={() => setView('baseline')}>Your plan</button>
         <button type="button" aria-pressed={view === 'scenario'} onClick={() => setView('scenario')}>With your changes</button>
       </div>}
-      {shown && shown.semesters.length > 0 && <Timeline plan={shown} heading={shown === scenario ? 'Plan with your changes' : 'Your plan'}/>}
+      {shown && shown.semesters.length > 0 && <PlanBoard input={input} plan={shown} changes={changes} editable={!showBaseline}
+        heading={shown === scenario ? 'Plan with your changes' : 'Your plan'} status={<SaveState status={status} retry={() => queue.retry()}/>}
+        onChange={next => { apply(next); }}/>}
       {baseline.bottlenecks.length > 0 && <section className="planning-card" aria-labelledby="planning-bottleneck-heading">
         <h2 id="planning-bottleneck-heading">Subjects not to delay</h2>
         <ul className="planning-bottlenecks">{baseline.bottlenecks.map(b => <li key={b.curriculumSubjectId}><strong>{b.subjectName}</strong> <span className="planning-subject-code">{b.subjectCode}</span><p>{b.explanation}</p></li>)}</ul>
