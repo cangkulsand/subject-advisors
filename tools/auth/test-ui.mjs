@@ -26,7 +26,7 @@ const base = 'http://127.0.0.1:' + server.address().port;
 let browser;
 let passed = 0;
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
   async function check(name, body) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     try { await body(page); passed++; console.log('PASS ' + name); }

@@ -26,6 +26,7 @@ export function LandingPage() {
             <a className="landing-button landing-button-primary" href="/sign-up">Create your account <span aria-hidden="true">→</span></a>
             <a className="landing-button landing-button-secondary" href="/sign-in">Sign in to continue</a>
           </div>
+          <p className="landing-email-hint">Students: sign up with your @graduate.utm.my email.</p>
           <a className="landing-continue" href="/auth/complete">Already signed in? Continue to your account <span aria-hidden="true">↗</span></a>
         </div>
         <div className="landing-visual"><span className="landing-visual-halo" aria-hidden="true" /><span className="landing-visual-spark landing-visual-spark-one" aria-hidden="true">✳</span><span className="landing-visual-spark landing-visual-spark-two" aria-hidden="true">✳</span><img src={frontpageImage} width="1452" height="1083" alt="Two friendly student characters holding books and study materials" /></div>

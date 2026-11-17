@@ -29,7 +29,12 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   if (isSignedIn) return <AuthRedirect to="/auth/complete" />;
   return <main className="auth-panel">
     <h1>{mode === 'sign-up' ? 'Create your student account' : 'Sign in'}</h1>
-    <p>Students use a verified @graduate.utm.my email. Approved staff sign in with their assigned account.</p>
+    {mode === 'sign-up'
+      ? <aside className="auth-email-notice" role="note" aria-labelledby="auth-email-notice-title">
+          <p id="auth-email-notice-title" className="auth-email-notice-title">Student email required</p>
+          <p>Sign up with your UTM student email ending in <strong>@graduate.utm.my</strong> (for example, name@graduate.utm.my). Other email addresses cannot be used for a student account.</p>
+        </aside>
+      : <p>Students use a verified @graduate.utm.my email. Approved staff sign in with their assigned account.</p>}
     {mode === 'sign-up'
       ? <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" forceRedirectUrl="/auth/complete" />
       : <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" forceRedirectUrl="/auth/complete" />}

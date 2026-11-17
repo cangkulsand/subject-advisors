@@ -8,3 +8,7 @@
 .auth-role-switcher select { max-width:100%; min-height:44px; padding:6px 10px; border:1px solid var(--color-outline,#ccc); border-radius:8px; background:var(--color-surface,#fff); color:var(--color-body,#333); font:inherit; }
 .auth-role-switcher p { margin:0; }
 @media(max-width:767px) { .student-header-actions { flex-wrap:wrap; min-width:0; max-width:100%; } }
+.auth-email-notice { margin: 0 0 1rem; padding: .75rem 1rem; border: 1px solid #e3c9cf; border-left: 4px solid var(--color-focus, #6b1d2f); border-radius: 8px; background: #fbf4f5; color: var(--color-heading, #1a1a1a); font-size: var(--font-size-body); }
+.auth-email-notice p { margin: 0; }
+.auth-email-notice .auth-email-notice-title { margin-bottom: .25rem; font-weight: 600; }
+.auth-email-notice strong { color: var(--color-focus, #6b1d2f); }

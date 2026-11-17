@@ -58,6 +58,7 @@
 .landing-page a.landing-button-secondary { color: var(--color-action); background: transparent; border-width: 1.5px; }
 .landing-page a.landing-button-secondary:hover { color: var(--color-action-hover); background: var(--color-surface-subtle); }
 .landing-page a.landing-continue { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; margin-top: 12px; color: var(--color-muted-text); font-size: var(--font-size-small); }
+.landing-email-hint { margin: 12px 0 0; color: var(--color-muted-text); font-size: var(--font-size-label); }
 .landing-continue span { color: var(--landing-brand); }
 .landing-page a.landing-continue:hover { color: var(--color-action-hover); text-decoration: underline; text-underline-offset: 3px; }
 .landing-visual { position: relative; z-index: 1; display: grid; min-width: 0; min-height: 490px; place-items: center; isolation: isolate; }

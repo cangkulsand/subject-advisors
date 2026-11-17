@@ -33,7 +33,7 @@ await new Promise(done => server.listen(0, '127.0.0.1', done));
 const base = 'http://127.0.0.1:' + server.address().port;
 let browser;
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
   for (const width of [300, 320, 375, 768, 1024, 1440]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors = [];
@@ -88,7 +88,20 @@ try {
   assert.equal(await authPage.evaluate(() => getComputedStyle(document.body).paddingLeft), '16px');
   await authPage.getByText('Test sign-in widget', { exact: true }).waitFor();
   console.log('PASS landing CSS remains scoped on sign-in route');
+  await authPage.goto(base + '/sign-up?scenario=signed-out');
+  await authPage.getByRole('heading', { name: 'Create your student account', exact: true }).waitFor();
+  const notice = authPage.getByRole('note', { name: 'Student email required' });
+  assert.match(await notice.innerText(), /@graduate\.utm\.my/);
+  assert.match(await notice.innerText(), /cannot be used/);
+  assert.ok(await notice.evaluate(element => element.getBoundingClientRect().bottom) <= await authPage.getByText('Test sign-up widget', { exact: true }).evaluate(element => element.getBoundingClientRect().top), 'email notice must sit above the sign-up form');
+  await authPage.screenshot({ path: '.wrangler/landing-review/sign-up-1024.png', fullPage: true });
+  console.log('PASS sign-up page tells students to use @graduate.utm.my');
   await authPage.close();
+  const hintPage = await browser.newPage({ viewport: { width: 375, height: 800 } });
+  await hintPage.goto(base + '/');
+  assert.match(await hintPage.locator('.landing-email-hint').innerText(), /Students: sign up with your @graduate\.utm\.my email/);
+  console.log('PASS landing shows the student email hint');
+  await hintPage.close();
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));
