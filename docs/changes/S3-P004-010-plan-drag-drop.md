@@ -1,6 +1,6 @@
 # S3-P004-010 — Graduation plan: drag and drop with a saved what-if
 
-- **Status:** Implemented on branch, awaiting owner review and merge
+- **Status:** MERGED to main (fast-forward, 53400ef) and deployed to dev and prod on 2026-11-17
 - **Date:** 2026-11-17
 - **Sprint:** Sprint 3
 - **Owner:** M5 / P003 (Harraz); built by P004, to be handed over as files
