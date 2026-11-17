@@ -100,6 +100,13 @@ export function PlanBoard({ input, plan, changes, editable, heading, status, onC
   const [message, setMessage] = useState('');
   const [moving, setMoving] = useState<PlannedSubject | null>(null);
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  // After the Move dialog closes, focus goes back to that subject's Move button (in its new semester when it moved).
+  const [returnFocus, setReturnFocus] = useState<{ code: string } | null>(null);
+  useEffect(() => {
+    if (!returnFocus || moving) return;
+    container.current?.querySelector<HTMLElement>('[data-subject="' + returnFocus.code + '"]:not(.planning-failed) .planning-move')?.focus();
+    setReturnFocus(null);
+  }, [returnFocus, moving, plan]);
   const canEdit = editable && input.start !== null;
   const years = useMemo(() => panelsByYear(input, plan, canEdit), [input, plan, canEdit]);
   const refByKey = useMemo(() => new Map(years.flatMap(y => y.panels).map(p => [keyOf(p.semester), { academicYear: p.semester.academicYear, semesterNo: p.semester.semesterNo }])), [years]);
@@ -127,7 +134,8 @@ export function PlanBoard({ input, plan, changes, editable, heading, status, onC
           blocked={blocked.has(keyOf(panel.semester))} onMove={setMoving} />)}</ol>
       </section>)}
     </div>
-    {moving && <MoveDialog subject={moving} targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)} onClose={() => setMoving(null)}
-      onConfirm={target => { setMoving(null); move(moving.curriculumSubjectId, target); }} />}
+    {moving && <MoveDialog subject={moving} targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)}
+      onClose={() => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); }}
+      onConfirm={target => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); move(moving.curriculumSubjectId, target); }} />}
   </section>;
 }

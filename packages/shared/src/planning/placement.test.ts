@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GraduationPlan, PlanningInput, PlanningSubject, ScenarioChange, SemesterLimit } from './contracts';
 import { planBaseline } from './engine';
-import { checkChange, checkPlacement, cleanChanges, placementTargets, validateChanges, withChange } from './placement';
+import { checkChange, checkPlacement, cleanChanges, placementTargets, removeChange, validateChanges, withChange } from './placement';
 
 const subject = (id: number, code: string, credits: number, extra: Partial<PlanningSubject> = {}): PlanningSubject => ({
   curriculumSubjectId: id, subjectCode: code, subjectName: 'Name ' + code, creditHours: credits, category: 'Core',
@@ -127,5 +127,38 @@ describe('placementTargets', () => {
     expect(targets[0]).toMatchObject({ label: '2026/2027 – Semester 2', ok: true, reason: null });
     expect(targets[1]).toMatchObject({ label: '2026/2027 – Semester 3 (Short Semester)', ok: false, reason: 'Runs only in Normal semesters.' });
     expect(targets.length).toBe(planBaseline(input()).semesters.length + 1);
+  });
+});
+
+describe('review fixes', () => {
+  it('a first-semester pin the coordinator did not approve is invalid and cleaned up', () => {
+    const unapproved = input({ approvedFirst: [1] });
+    const changes = [place(4, '2026/2027', 2)];
+    const check = validateChanges(unapproved, changes);
+    expect(check.ok ? 'accepted' : check.reason).toBe('Not approved by your coordinator for 2026/2027 – Semester 2.');
+    expect(cleanChanges(unapproved, changes)).toEqual({ changes: [], dropped: 1 });
+  });
+  it('replacing or removing a swap also drops the move of its replacement', () => {
+    const swapped: ScenarioChange[] = [{ kind: 'REPLACE', curriculumSubjectId: 5, replacementId: 6 }, place(6, '2027/2028', 2)];
+    expect(validateChanges(input(), swapped).ok).toBe(true);
+    expect(withChange(swapped, { kind: 'POSTPONE', curriculumSubjectId: 5 })).toEqual([{ kind: 'POSTPONE', curriculumSubjectId: 5 }]);
+    expect(removeChange(swapped, 0)).toEqual([]);
+    expect(removeChange(swapped, 1)).toEqual([swapped[0]]);
+  });
+  it('a placed subject that left the plan says so', () => {
+    const check = validateChanges(input(), [place(6, '2027/2028', 2)]);
+    expect(check.ok ? 'accepted' : check.reason).toBe('SECE2013 is placed in 2027/2028 – Semester 2 but is no longer in your plan. Remove that move first.');
+  });
+  it('a retake must come after the failed attempt', () => {
+    const failed: ScenarioChange[] = [{ kind: 'FAIL', curriculumSubjectId: 4 }];
+    expect(refused(checkPlacement(input(), failed, 4, sem('2026/2027', 2)))).toBe('A retake must come after the semester you failed it in.');
+    const withdrawn: ScenarioChange[] = [{ kind: 'WITHDRAW', curriculumSubjectId: 4 }];
+    expect(refused(checkPlacement(input(), withdrawn, 4, sem('2026/2027', 2)))).toBe('Taking it again must come after the semester you withdrew from it.');
+    expect(checkPlacement(input(), failed, 4, sem('2027/2028', 2)).ok).toBe(true);
+  });
+  it('a stale retake semester keeps the fail and drops only the pin', () => {
+    const later = input({ start: sem('2027/2028', 2) });
+    expect(cleanChanges(later, [{ kind: 'FAIL', curriculumSubjectId: 4, semester: sem('2027/2028', 1) }]))
+      .toEqual({ changes: [{ kind: 'FAIL', curriculumSubjectId: 4 }], dropped: 0 });
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import type { GraduationPlan, PlanningInput, ScenarioChange, ScenarioChangeKind } from '../../../../../packages/shared/src/planning/contracts';
 import { comparePlans, planBaseline, planScenario } from '../../../../../packages/shared/src/planning/engine';
-import { checkChange, validateChanges } from '../../../../../packages/shared/src/planning/placement';
+import { checkChange, removeChange, validateChanges } from '../../../../../packages/shared/src/planning/placement';
 import { toSaved } from '../../../../../packages/shared/src/planning/saved';
 import { errorMessage } from '../profile/client';
 import type { PlanningClient } from './client';
@@ -44,7 +44,7 @@ function WhatIf({ input, baseline, changes, apply }: { input: PlanningInput; bas
     if (!check.ok) { setRefusal(check.reason); return; }
     setRefusal(apply(check.changes) ?? '');
   };
-  const remove = (index: number) => setRefusal(apply(changes.filter((_, i) => i !== index)) ?? '');
+  const remove = (index: number) => setRefusal(apply(removeChange(changes, index)) ?? '');
   return <section className="planning-card" aria-labelledby="planning-whatif-heading">
     <h2 id="planning-whatif-heading">What if…</h2>
     <p className="planning-lead">Try a change, or move subjects in the plan below, and compare with your plan. Your changes are saved for next time; your records do not change.</p>

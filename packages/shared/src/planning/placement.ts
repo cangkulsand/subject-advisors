@@ -42,7 +42,20 @@ export function withChange(changes: ScenarioChange[], change: ScenarioChange): S
     if (retake) return changes.map(c => c === retake ? { ...c, semester: change.semester } : c);
     return [...changes.filter(c => !(c.curriculumSubjectId === id && (c.kind === 'PLACE' || c.kind === 'POSTPONE'))), change];
   }
-  return [...changes.filter(c => c.curriculumSubjectId !== id), change];
+  return [...withoutSwapMoves(changes, changes.filter(c => c.curriculumSubjectId === id)).filter(c => c.curriculumSubjectId !== id), change];
+}
+
+/** Dropping a swap also drops the student's move of the subject it brought in, which is no longer in the plan. */
+function withoutSwapMoves(changes: ScenarioChange[], dropped: ScenarioChange[]): ScenarioChange[] {
+  const replacements = new Set(dropped.filter(c => c.kind === 'REPLACE' && c.replacementId !== undefined).map(c => c.replacementId!));
+  return changes.filter(c => !(c.kind === 'PLACE' && replacements.has(c.curriculumSubjectId)));
+}
+
+/** Removes one change from "Your changes" (and the move of a swap's replacement with its swap). */
+export function removeChange(changes: ScenarioChange[], index: number): ScenarioChange[] {
+  const removed = changes[index];
+  if (!removed) return changes;
+  return withoutSwapMoves(changes.filter((_, i) => i !== index), [removed]);
 }
 
 /** The same list without the student's placement of this subject (a retake keeps its fail / withdraw). */
@@ -60,14 +73,14 @@ function brokenPins(input: PlanningInput, changes: ScenarioChange[], plan: Gradu
   const at = positions(plan);
   const passed = new Set(input.passed);
   const byId = new Map(input.subjects.map(s => [s.curriculumSubjectId, s]));
-  const broken: { id: number; index: number | null; semester: SemesterRef }[] = [];
+  const broken: { id: number; index: number | null; semester: SemesterRef; where: number | undefined }[] = [];
   for (const change of changes) {
     if (!change.semester) continue;
     const index = semesterIndex(input.start, change.semester);
     const where = at.get(change.curriculumSubjectId);
     const prerequisitesEarlier = (byId.get(change.curriculumSubjectId)?.prerequisites ?? [])
       .every(required => passed.has(required) || (at.get(required) ?? Infinity) < (where ?? -1));
-    if (index === null || where !== index || !prerequisitesEarlier) broken.push({ id: change.curriculumSubjectId, index, semester: change.semester });
+    if (index === null || where !== index || !prerequisitesEarlier) broken.push({ id: change.curriculumSubjectId, index, semester: change.semester, where });
   }
   return broken;
 }
@@ -94,6 +107,10 @@ export function validateChanges(input: PlanningInput, changes: ScenarioChange[])
   const broken = brokenPins(input, changes, plan)[0];
   if (broken) {
     if (broken.index === null) return { ok: false, reason: 'This semester is not set up yet.' };
+    const label = labelOf(broken.semester, broken.index);
+    const code = input.subjects.find(s => s.curriculumSubjectId === broken.id)?.subjectCode ?? 'A subject';
+    if (broken.where === undefined) return { ok: false, reason: `${code} is placed in ${label} but is no longer in your plan. Remove that move first.` };
+    if (broken.index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(broken.id)) return { ok: false, reason: `Not approved by your coordinator for ${label}.` };
     return { ok: false, reason: placementReason(input, plan, broken.id, broken.index, broken.semester) };
   }
   const at = positions(plan);
@@ -119,6 +136,14 @@ export function checkPlacement(input: PlanningInput, changes: ScenarioChange[], 
   const type = semesterTypeOf(target.semesterNo);
   if (subject.semesterTypes.length > 0 && !subject.semesterTypes.includes(type)) {
     return { ok: false, reason: subject.semesterTypes.includes('NORMAL') ? 'Runs only in Normal semesters.' : 'Runs only in Short semesters.' };
+  }
+  // A retake (after a fail or withdraw) has to come after the semester of that attempt.
+  const retakeAt = changes.findIndex(c => c.curriculumSubjectId === curriculumSubjectId && retakeKinds.has(c.kind));
+  if (retakeAt >= 0) {
+    const attempt = positions(planScenario(input, changes.slice(0, retakeAt))).get(curriculumSubjectId);
+    if (attempt !== undefined && index <= attempt) {
+      return { ok: false, reason: changes[retakeAt]!.kind === 'FAIL' ? 'A retake must come after the semester you failed it in.' : 'Taking it again must come after the semester you withdrew from it.' };
+    }
   }
   const label = labelOf(target, index);
   if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(curriculumSubjectId)) {
@@ -180,8 +205,10 @@ export function cleanChanges(input: PlanningInput, changes: ScenarioChange[]): {
   const known = new Set(input.subjects.map(s => s.curriculumSubjectId));
   const passed = new Set(input.passed);
   const usable = (id: number | undefined) => id === undefined || (known.has(id) && !passed.has(id));
-  const kept = changes.filter(c => usable(c.curriculumSubjectId) && usable(c.replacementId)
-    && (!c.semester || (!!configuredRow(input, c.semester) && semesterIndex(input.start, c.semester) !== null)));
+  const semesterUsable = (c: ScenarioChange) => !c.semester || (!!configuredRow(input, c.semester) && semesterIndex(input.start, c.semester) !== null);
+  const kept = changes.filter(c => usable(c.curriculumSubjectId) && usable(c.replacementId))
+    // A fail / withdraw whose retake semester no longer applies keeps the change and loses only the retake's place.
+    .flatMap(c => semesterUsable(c) ? [c] : retakeKinds.has(c.kind) ? withoutPin([c], c.curriculumSubjectId) : []);
   while (kept.length && !validateChanges(input, kept).ok) kept.pop();
   return { changes: kept, dropped: changes.length - kept.length };
 }

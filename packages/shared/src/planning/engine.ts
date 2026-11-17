@@ -166,6 +166,7 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
       if (constraints.pinned.get(id) !== index || placedAt.has(id)) continue;
       if (subjects.length >= limits.maxSubjects || credits + s.creditHours > limits.maxCredits) continue;
       if (s.semesterTypes.length > 0 && !s.semesterTypes.includes(type)) continue;
+      if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(id)) continue;
       if (!prerequisitesMet(s, index)) continue;
       placedAt.set(id, index); subjects.push(toPlanned(s, false, true)); credits += s.creditHours;
     }

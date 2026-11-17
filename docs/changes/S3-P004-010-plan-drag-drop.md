@@ -80,9 +80,9 @@ Owner decisions:
 ## 3. Review
 
 - typecheck, lint and check:cloudflare pass.
-- `npm test`: 1760 passed (65 skipped). New tests:
+- `npm test`: 1765 passed (65 skipped). New tests:
   - engine PLACE: 7;
-  - placement: 19;
+  - placement: 24 (5 from the final review);
   - saved mapping: 11;
   - scenario API and repository: 16;
   - save queue and view: 5.
@@ -96,6 +96,18 @@ Owner decisions:
     - stale-change notice;
     - read-only views;
   - admin UI 50 and coordinator UI 54 passed.
+- Final whole-branch review by a fresh reviewer (verdict: merge with fixes). Fixed, each with a failing test first:
+  - a first-semester pin the coordinator did not approve was accepted by the API and kept on load;
+  - removing or replacing a swap left a move of its replacement behind, with a misleading "already full" reason;
+  - a retake moved on or before its failed / withdrawn attempt got the wrong reason;
+  - a stale retake semester dropped the whole fail / withdraw instead of only the move;
+  - focus now returns to the subject's Move… button after the dialog closes.
+- Deferred (minor):
+  - a 422 after an admin programme change while the page is open keeps showing "Not saved" until a reload;
+  - refusal reasons on disabled options in the Move dialog;
+  - semesters that aren't set up are only dimmed while dragging;
+  - the target list is not memoised;
+  - a pin far past nine empty semesters.
 - Not verified: against live Neon data with a real student session (SQL `EXPLAIN` only), or on a real touch device.
 
 ## 4. Changelog

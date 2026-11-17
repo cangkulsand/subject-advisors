@@ -259,6 +259,7 @@ try{
   await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
   const card=panel(page,'2027/2028-2').locator('[data-subject="DEMB1013"]');await card.waitFor();await card.getByText('Placed here by you',{exact:true}).waitFor();
   await page.locator('.planning-save').getByText('Saved',{exact:true}).waitFor();
+  await page.waitForFunction(()=>document.activeElement?.closest('[data-subject]')?.closest('.planning-semester')?.dataset.semester==='2027/2028-2',null,{timeout:3000});
   assert.deepEqual(state.scenarioWrites.at(-1),{method:'PUT',body:{changes:[{kind:'PLACE',curriculumSubjectId:4,semesterId:24}]}});
   await page.getByRole('region',{name:'What if…'}).getByText('Move DEMB1013 to 2027/2028 – Semester 2',{exact:true}).waitFor();
   await page.reload();await panel(page,'2027/2028-2').locator('[data-subject="DEMB1013"]').waitFor();
@@ -272,6 +273,7 @@ try{
   assert.ok(await dialog.getByRole('radio',{name:'2026/2027 – Semester 3 (Short Semester)',exact:false}).isDisabled());
   await dialog.getByText('Runs only in Normal semesters.',{exact:true}).first().waitFor();
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await dialog.waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Move DEMB1013',null,{timeout:3000});
   await dragCard(page,'DEMB1013','2026/2027-3');
   await page.locator('.planning-move-message').getByText('Runs only in Normal semesters.',{exact:true}).waitFor();
   assert.equal(await page.locator('[data-subject="DEMB1013"]').count(),1);assert.equal((state.scenarioWrites??[]).length,0);
