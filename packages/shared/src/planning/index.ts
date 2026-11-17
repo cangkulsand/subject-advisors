@@ -3,3 +3,4 @@ export { planBaseline, planScenario, comparePlans, planningAnalysis, normaliseRe
 export { semesterAt, semesterLabel, semesterTypeOf, limitsFor, nextAcademicYear, DEFAULT_LIMITS } from './semesters';
 export { semesterIndex } from './semesters';
 export * from './placement';
+export * from './saved';
