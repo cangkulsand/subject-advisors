@@ -1,6 +1,6 @@
 # S3-P004-012 — Forecast versions and comparison dropped from scope (docs only)
 
-- **Status:** Docs updated on main (not pushed)
+- **Status:** On main and pushed to dev and prod on 2026-11-18 (docs only)
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6, UC20 and UC23)

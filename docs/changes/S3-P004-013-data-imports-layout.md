@@ -1,6 +1,6 @@
 # S3-P004-013 — Data Imports screen: clearer layout, latest-snapshot line and drop zone
 
-- **Status:** On branch `feature/coordinator-imports-layout` (not merged)
+- **Status:** MERGED to main (fast-forward, e150697) and deployed to dev and prod on 2026-11-18
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6, UC20)
