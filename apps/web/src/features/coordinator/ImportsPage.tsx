@@ -93,10 +93,13 @@ function SystemCard({ client, scope, onCreated }: { client: CoordinatorClient; s
     finally { setBusy(false); }
   }
   return <section className="coordinator-setup-section" aria-labelledby="coordinator-system-heading">
-    <h3 id="coordinator-system-heading" tabIndex={-1}>Students in the system</h3>
-    <p className="admin-muted">Uses the academic records that current students have entered in the system.</p>
+    <div className="coordinator-source-box">
+      <h3 id="coordinator-system-heading" tabIndex={-1}>Students in the system</h3>
+      <p className="admin-muted">Uses the academic records that current students have entered in the system for {scope.programmeLabel} at {scope.centreLabel}. No file is needed.</p>
+    </div>
     {failure && <p className="admin-form-error" role="alert">{failure}</p>}
-    <div className="coordinator-upload-submit"><button type="button" className="admin-primary" disabled={busy} aria-busy={busy} onClick={() => void create()}>{busy ? 'Creating snapshot…' : 'Create snapshot'}</button></div>
+    <div className="coordinator-action-bar"><p>The snapshot is frozen: later changes to student records do not change it.</p>
+      <button type="button" className="admin-primary" disabled={busy} aria-busy={busy} onClick={() => void create()}>{busy ? 'Creating snapshot…' : 'Create snapshot'}</button></div>
   </section>;
 }
 
@@ -152,9 +155,15 @@ function ReportCard({ outcome, onAccept, onDismiss }: { outcome: Exclude<UploadO
   </section>;
 }
 
+const downloadIcon = <ActionIcon><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></ActionIcon>;
+const uploadIcon = <ActionIcon><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.24"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></ActionIcon>;
+const fileIcon = <ActionIcon><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/></ActionIcon>;
+const fileSize = (bytes: number) => bytes < 1024 ? bytes + ' B' : bytes < 1024 * 1024 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+
+/** CSV form: narrow source date + wide label, a drop zone around a real (visually hidden, still focusable) file input, and an action bar. */
 function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { client: CoordinatorClient; scope: ChosenScope; combined: boolean; onOutcome: (outcome: UploadOutcome) => void; onTemplateError: (text: string) => void }) {
   const [date, setDate] = useState(today), [label, setLabel] = useState(''), [file, setFile] = useState<File | null>(null), [fileKey, setFileKey] = useState(0);
-  const [errors, setErrors] = useState<Record<string, string>>({}), [busy, setBusy] = useState(false), [failure, setFailure] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({}), [busy, setBusy] = useState(false), [failure, setFailure] = useState(''), [dragging, setDragging] = useState(false);
   const ids = { date: useId(), label: useId(), file: useId(), help: useId() };
   const first = useRef<Record<string, HTMLElement | null>>({});
   function pick(candidate: File | undefined) {
@@ -164,6 +173,7 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
     else if (candidate.size > IMPORT_LIMITS.maxBytes) { setFile(null); setFileKey(key => key + 1); setErrors(current => ({ ...current, file: 'Choose a CSV file no larger than 5 MiB.' })); }
     else setFile(candidate);
   }
+  function remove() { setFile(null); setFileKey(key => key + 1); setErrors(current => ({ ...current, file: '' })); setTimeout(() => first.current.file?.focus(), 0); }
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -191,22 +201,42 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
     } catch (error) { onTemplateError(errorText(error, 'The template could not be downloaded.')); }
   }
   const message = (key: string) => errors[key] ? <small id={ids[key as 'date'] + '-error'} className="coordinator-field-error">{errors[key]}</small> : null;
+  const browse = () => first.current.file?.click();
   return <section className="coordinator-setup-section" aria-labelledby="coordinator-upload-heading">
-    <div className="admin-card-title"><div><h3 id="coordinator-upload-heading" tabIndex={-1}>{combined ? 'Students in the system + CSV import' : 'CSV import'}</h3>
+    <div className="admin-card-title coordinator-upload-head"><div>
+      <div className="coordinator-heading-row"><h3 id="coordinator-upload-heading" tabIndex={-1}>{combined ? 'Students in the system + CSV import' : 'CSV import'}</h3>
+        {combined && <span className="admin-pill coordinator-pill-neutral">Merged with system records</span>}</div>
       {combined
         ? <p className="admin-muted">Combines system students with non-duplicate CSV records. Matches on matric number, keeps system data, and flags name conflicts for review.</p>
         : <p className="admin-muted">Upload one CSV of your students' academic history for {scope.programmeLabel} at {scope.centreLabel}.</p>}</div>
-      <div className="coordinator-row-actions"><button type="button" onClick={() => void template()}>Download template</button></div></div>
-    <form className="coordinator-upload-grid" onSubmit={submit} noValidate>
-      <div className="admin-field"><label htmlFor={ids.date}>Source date</label>
-        <input id={ids.date} ref={element => { first.current.date = element; }} type="date" value={date} max={today()} aria-invalid={!!errors.date || undefined} aria-describedby={errors.date ? ids.date + '-error' : undefined} onChange={event => setDate(event.target.value)}/>{message('date')}</div>
-      <div className="admin-field"><label htmlFor={ids.label}>Source label</label>
-        <input id={ids.label} ref={element => { first.current.label = element; }} type="text" value={label} maxLength={IMPORT_LIMITS.maxSourceLabelLength} placeholder="Example: September cohort export" aria-invalid={!!errors.label || undefined} aria-describedby={errors.label ? ids.label + '-error' : undefined} onChange={event => setLabel(event.target.value)}/>{message('label')}</div>
+      <button type="button" className="coordinator-outline-button" onClick={() => void template()}>{downloadIcon}Download template</button></div>
+    <form className="coordinator-upload-form" onSubmit={submit} noValidate>
+      <div className="coordinator-upload-meta">
+        <div className="admin-field"><label htmlFor={ids.date}>Source date</label>
+          <input id={ids.date} ref={element => { first.current.date = element; }} type="date" value={date} max={today()} aria-invalid={!!errors.date || undefined} aria-describedby={errors.date ? ids.date + '-error' : undefined} onChange={event => setDate(event.target.value)}/>{message('date')}</div>
+        <div className="admin-field"><label htmlFor={ids.label}>Source label</label>
+          <input id={ids.label} ref={element => { first.current.label = element; }} type="text" value={label} maxLength={IMPORT_LIMITS.maxSourceLabelLength} placeholder="Example: September cohort export" aria-invalid={!!errors.label || undefined} aria-describedby={errors.label ? ids.label + '-error' : undefined} onChange={event => setLabel(event.target.value)}/>{message('label')}</div>
+      </div>
       <div className="admin-field coordinator-upload-file"><label htmlFor={ids.file}>CSV file</label>
-        <input key={fileKey} id={ids.file} ref={element => { first.current.file = element; }} type="file" accept=".csv,text/csv" aria-invalid={!!errors.file || undefined} aria-describedby={ids.help + (errors.file ? ' ' + ids.file + '-error' : '')} onChange={event => pick(event.currentTarget.files?.[0])}/>
-        <small id={ids.help} className="admin-counter">CSV up to 5 MiB (maximum {IMPORT_LIMITS.maxCoordinatorDataRows.toLocaleString()} rows).</small>{message('file')}</div>
+        <div className={'coordinator-dropzone' + (dragging ? ' is-dragging' : '') + (file ? ' has-file' : '') + (errors.file ? ' is-invalid' : '')}
+          onDragOver={event => { event.preventDefault(); if (!dragging) setDragging(true); }} onDragLeave={() => setDragging(false)}
+          onDrop={event => { event.preventDefault(); setDragging(false); pick(event.dataTransfer.files?.[0]); }}>
+          <input key={fileKey} id={ids.file} className="coordinator-file-input" ref={element => { first.current.file = element; }} type="file" accept=".csv,text/csv" aria-invalid={!!errors.file || undefined} aria-describedby={ids.help + (errors.file ? ' ' + ids.file + '-error' : '')} onChange={event => pick(event.currentTarget.files?.[0])}/>
+          {file
+            ? <div className="coordinator-file-chosen">
+                <span className="coordinator-file-icon" aria-hidden="true">{fileIcon}</span>
+                <span className="coordinator-file-text"><strong>{file.name}</strong><span>{fileSize(file.size)} · Ready to validate</span></span>
+                <span className="coordinator-file-actions"><button type="button" onClick={browse}>Replace</button><button type="button" onClick={remove}>Remove</button></span>
+              </div>
+            : <div className="coordinator-dropzone-empty" onClick={browse} aria-hidden="true">
+                <span className="coordinator-dropzone-icon">{uploadIcon}</span>
+                <span className="coordinator-dropzone-text">Drag and drop your CSV file here, or <span className="coordinator-dropzone-browse">choose a file</span></span>
+              </div>}
+          <small id={ids.help} className="admin-counter">CSV up to 5 MiB (maximum {IMPORT_LIMITS.maxCoordinatorDataRows.toLocaleString()} rows).</small>
+        </div>{message('file')}</div>
       {failure && <p className="admin-form-error coordinator-upload-error" role="alert">{failure}</p>}
-      <div className="coordinator-upload-submit"><button type="submit" className="admin-primary" disabled={busy} aria-busy={busy}>{busy ? 'Validating…' : combined ? 'Create combined snapshot' : 'Upload and validate'}</button></div>
+      <div className="coordinator-action-bar"><p>Validation checks for missing fields, duplicate rows and subject codes that are not in the curriculum before anything is saved.</p>
+        <button type="submit" className="admin-primary" disabled={busy} aria-busy={busy}>{busy ? 'Validating…' : combined ? 'Create combined snapshot' : 'Upload and validate'}</button></div>
     </form>
   </section>;
 }
@@ -293,6 +323,16 @@ function ImportDetail({ client, scope, mode, importId, onGenerate }: { client: C
   </section>;
 }
 
+/** What already exists for the chosen scope, so the coordinator knows a new snapshot is added next to it. */
+function ScopeSnapshotStatus({ client, scope, version }: { client: CoordinatorClient; scope: ChosenScope; version: number }) {
+  const latest = useRead(signal => client.listImports(scope, { limit: 1 }, signal), ['latest', scope.programmeId, scope.learningCentreId, version].join('|'));
+  if (!latest.data) return null;
+  const item = latest.data.items[0];
+  return item
+    ? <p className="coordinator-scope-status"><strong>Latest snapshot:</strong> "{item.sourceLabel}", source date {item.sourceDate}, {item.counts.uniqueStudents} {item.counts.uniqueStudents === 1 ? 'student' : 'students'}, accepted {when(item.acceptedAt)}. A new snapshot is added next to it; earlier snapshots are kept.</p>
+    : <p className="coordinator-scope-status is-empty">No snapshot for this scope yet. Create the first one below.</p>;
+}
+
 /** One setup card (scope, data source, action for the chosen source); results, accepted imports and detail stay as cards below. Not keyed by scope, so radio focus survives a scope change. */
 function ImportWorkspace({ client, context, scope, programmeId, learningCentreId, importId, mode }: { client: CoordinatorClient; context: ForecastContext; scope: ChosenScope | null; programmeId: number | null; learningCentreId: number | null; importId: number | null; mode: DataMode }) {
   const [notice, setNotice] = useState<Notice>(null), [outcome, setOutcome] = useState<Exclude<UploadOutcome, { kind: 'ACCEPTED' }> | null>(null);
@@ -325,6 +365,7 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
       <div className="admin-card-title"><div><h2 id="coordinator-setup-heading">Forecast data setup</h2><p className="admin-muted">Imports and forecasts are kept separately for each scope.</p></div></div>
       <div className="coordinator-setup-section"><ScopeFields context={context} path="/coordinator/imports" programmeId={programmeId} learningCentreId={learningCentreId} keep={mode === 'system' ? undefined : { source: mode }}/></div>
       {scope && importId === null && <>
+        <ScopeSnapshotStatus client={client} scope={scope} version={version}/>
         <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>
         {mode === 'system'
           ? <SystemCard key={resetKey} client={client} scope={scope} onCreated={result => { setSnapshot(result); setOutcome(null); setNotice(null); setVersion(value => value + 1); }}/>

@@ -183,3 +183,44 @@
 .admin-shell .coordinator-phase + .coordinator-warning { margin: 10px 0 0 !important; }
 .admin-shell .coordinator-decisions td > .coordinator-number { display: block; }
 .coordinator-pick-cell { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+/* Data Imports layout (S3-P004-013): wider programme field, latest-snapshot line, drop zone and action bar. */
+.admin-shell .coordinator-scope-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr); }
+.admin-shell output.coordinator-readonly-value { justify-content: space-between; gap: 8px; }
+.coordinator-lock-icon { flex: none; color: var(--color-muted-text); }
+.admin-shell .coordinator-scope-status { margin: 16px 0 0; padding: 12px 14px; border: 1px solid var(--color-outline); border-left: 4px solid var(--color-brand); border-radius: 9px; background: var(--color-surface-subtle); color: var(--color-body); font-size: var(--font-size-control); overflow-wrap: anywhere; }
+.admin-shell .coordinator-scope-status.is-empty { border-left-color: var(--color-outline); background: var(--color-app-bg); }
+.coordinator-source-box { padding: 16px 18px; border: 1px solid var(--color-outline); border-radius: 10px; background: var(--color-app-bg); }
+.coordinator-source-box > p { margin: 6px 0 0; }
+.coordinator-heading-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.admin-shell .coordinator-upload-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px 20px; }
+.admin-shell .coordinator-outline-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--control-min-height); padding: 8px 14px; border: 1.5px solid var(--color-brand); border-radius: 8px; background: #fff; color: var(--color-brand); font-size: var(--font-size-control); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.admin-shell .coordinator-outline-button:hover { background: var(--color-surface-subtle); }
+.coordinator-upload-form { display: grid; gap: 16px; margin-top: 18px; }
+.admin-shell .coordinator-upload-meta { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.coordinator-dropzone { position: relative; display: grid; gap: 8px; justify-items: center; padding: 22px 18px; border: 2px dashed var(--color-outline); border-radius: 12px; background: var(--color-app-bg); text-align: center; transition: border-color .15s, background-color .15s; }
+.coordinator-dropzone:hover, .coordinator-dropzone.is-dragging { border-color: var(--color-brand); background: var(--color-surface-subtle); }
+.coordinator-dropzone.has-file { justify-items: stretch; padding: 14px 16px; border-style: solid; text-align: left; }
+.coordinator-dropzone.is-invalid { border-color: #b91c1c; }
+.coordinator-dropzone:has(.coordinator-file-input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+/* Visually hidden but still focusable and labelled, so keyboard users and screen readers use the real file control. */
+.admin-shell input.coordinator-file-input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+.coordinator-dropzone-empty { display: grid; gap: 10px; justify-items: center; cursor: pointer; }
+.coordinator-dropzone-icon, .coordinator-file-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--color-brand) 12%, #fff); color: var(--color-brand); }
+.coordinator-file-icon { border-radius: 10px; background: var(--color-brand); color: #fff; flex: none; }
+.coordinator-dropzone-text { color: var(--color-heading); font-size: var(--font-size-control); font-weight: 600; }
+.coordinator-dropzone-browse { color: var(--color-brand); text-decoration: underline; text-underline-offset: 2px; }
+.coordinator-file-chosen { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; }
+.coordinator-file-text { display: grid; flex: 1 1 200px; min-width: 0; gap: 2px; }
+.coordinator-file-text strong { color: var(--color-heading); font-size: var(--font-size-control); overflow-wrap: anywhere; }
+.coordinator-file-text span { color: var(--color-muted-text); font-size: var(--font-size-small); }
+.coordinator-file-actions { display: flex; gap: 8px; }
+.admin-shell .coordinator-file-actions button { min-height: var(--control-min-height); padding: 4px 12px; font-size: var(--font-size-small); }
+.coordinator-action-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--color-outline); }
+.admin-shell .coordinator-action-bar > p { flex: 1 1 260px; margin: 0; color: var(--color-muted-text); font-size: var(--font-size-small); }
+.coordinator-setup-section > .coordinator-action-bar { margin-top: 16px; }
+@media (max-width: 1050px) { .admin-shell .coordinator-scope-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .admin-shell .coordinator-scope-grid > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-meta, .admin-shell .coordinator-upload-head { grid-template-columns: 1fr; }
+  .admin-shell .coordinator-outline-button, .coordinator-action-bar button { width: 100%; }
+}

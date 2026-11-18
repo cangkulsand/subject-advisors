@@ -142,6 +142,31 @@ else {
       await page.screenshot({ path: shots + 'imports-desktop.png', fullPage: true });
     });
 
+    await check('imports: latest snapshot line, dropped file shows in the drop zone, Remove clears it', async page => {
+      await mock(page); await page.goto(base + '/coordinator/imports' + csvScoped);
+      await page.getByText('No snapshot for this scope yet. Create the first one below.', { exact: true }).waitFor();
+      assert.equal(await page.locator('output.coordinator-readonly-value').getAttribute('title'), 'Set by the system administrator');
+      const dataTransfer = await page.evaluateHandle(() => { const transfer = new DataTransfer(); transfer.items.add(new File(['x\n'], 'dropped.csv', { type: 'text/csv' })); return transfer; });
+      await page.locator('.coordinator-dropzone').dispatchEvent('drop', { dataTransfer });
+      await page.getByText('dropped.csv', { exact: true }).waitFor();
+      await page.getByText(/Ready to validate/).waitFor();
+      const wrong = await page.evaluateHandle(() => { const transfer = new DataTransfer(); transfer.items.add(new File(['x'], 'notes.txt', { type: 'text/plain' })); return transfer; });
+      await page.locator('.coordinator-dropzone').dispatchEvent('drop', { dataTransfer: wrong });
+      await page.getByText('Choose a file with a .csv extension.').waitFor();
+      assert.equal(await page.getByText('dropped.csv', { exact: true }).count(), 0, 'a rejected drop clears the earlier file');
+      await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv('VALIDFILE'));
+      await page.getByText('cohort.csv', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Remove', exact: true }).click();
+      assert.equal(await page.getByText('cohort.csv', { exact: true }).count(), 0);
+      await page.waitForFunction(() => document.activeElement?.matches('input.coordinator-file-input'), null, { timeout: 2000 }); // focus returns to the file control
+      await upload(page, 'VALIDFILE');
+      await page.getByText(/^Latest snapshot: "September cohort", source date .*, 55 students, accepted .*earlier snapshots are kept\.$/).waitFor();
+      await page.setViewportSize({ width: 375, height: 900 });
+      assert.equal(await noOverflow(page), true, 'no horizontal scroll at 375px');
+      await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv('VALIDFILE'));
+      await page.screenshot({ path: shots + 'imports-file-mobile.png', fullPage: true });
+    });
+
     await check('imports: students in the system is the default, snapshot shows coverage, lists the source and feeds the forecast', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports' + scoped);
       const system = page.getByRole('heading', { name: 'Students in the system', exact: true }); await system.waitFor();
