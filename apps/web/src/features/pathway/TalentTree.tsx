@@ -51,7 +51,7 @@ export function Legend() {
   );
 }
 
-export function TalentTree({ graph }: { graph: PathwayGraph }) {
+export function TalentTree({ graph, annotations }: { graph: PathwayGraph; annotations?: Record<string, { semester: string; baselineSemester?: string; changed: boolean }> }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scale, setScale] = useState<number | null>(null);
   const [viewport, setViewport] = useState({ width: 1, height: 1 });
@@ -256,15 +256,17 @@ export function TalentTree({ graph }: { graph: PathwayGraph }) {
               const statusClass = `pathway-node pathway-status-${node.status.toLowerCase()}`;
               const selectedClass = node.id === selectedId ? ' is-selected' : '';
               const dimmedClass = focusSet && !focusSet.has(node.id) ? ' is-dimmed' : '';
+              const annotation = annotations?.[node.id];
+              const changedClass = annotation?.changed ? ' is-changed' : '';
               const nameLines = wrapText(node.subjectName, 24);
               return (
                 <g
                   key={node.id}
-                  className={statusClass + selectedClass + dimmedClass}
+                  className={statusClass + selectedClass + dimmedClass + changedClass}
                   transform={`translate(${x} ${y})`}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${node.subjectCode} ${node.subjectName}, ${node.creditHours} credits, ${STATUS_META[node.status].label}`}
+                  aria-label={`${node.subjectCode} ${node.subjectName}, ${node.creditHours} credits, ${STATUS_META[node.status].label}${annotation ? `, ${annotation.semester}` : ''}`}
                   aria-pressed={node.id === selectedId}
                   onClick={() => setSelectedId(node.id === selectedId ? null : node.id)}
                   onKeyDown={event => {
@@ -274,7 +276,7 @@ export function TalentTree({ graph }: { graph: PathwayGraph }) {
                     }
                   }}
                 >
-                  <title>{node.subjectCode} — {node.subjectName}: {STATUS_META[node.status].label}</title>
+                  <title>{node.subjectCode} — {node.subjectName}: {STATUS_META[node.status].label}{annotation ? `, ${annotation.semester}` : ''}</title>
                   <rect width={NODE_WIDTH} height={NODE_HEIGHT} rx={4} className="pathway-node-box" />
                   <circle cx={NODE_WIDTH - 14} cy={18} r={4} className="pathway-node-status-dot" />
                   <text x={14} y={22} className="pathway-node-code">{node.subjectCode}</text>
@@ -291,12 +293,12 @@ export function TalentTree({ graph }: { graph: PathwayGraph }) {
         </svg>
       </div>
       <p className="pathway-canvas-help" id={`${graphId}-help`}>Drag the background or swipe to pan. Use Tab and Enter to select subjects; Escape clears selection. Focus the map and use arrow keys to pan, +/− to zoom, or Home to fit.</p>
-      {selected && <NodeDetails node={selected} graph={graph} />}
+      {selected && <NodeDetails node={selected} graph={graph} annotation={annotations?.[selected.id]} />}
     </div>
   );
 }
 
-function NodeDetails({ node, graph }: { node: PathwaySubjectNode; graph: PathwayGraph }) {
+function NodeDetails({ node, graph, annotation }: { node: PathwaySubjectNode; graph: PathwayGraph; annotation?: { semester: string; baselineSemester?: string; changed: boolean } }) {
   const meta = STATUS_META[node.status];
   const incoming = graph.edges.filter(edge => edge.target === node.id);
   return (
@@ -306,6 +308,8 @@ function NodeDetails({ node, graph }: { node: PathwaySubjectNode; graph: Pathway
         <dt>Credits</dt><dd>{node.creditHours}</dd>
         <dt>Category</dt><dd>{node.subjectCategory ?? 'Not set'}</dd>
         <dt>Status</dt><dd>{meta.label}</dd>
+        {annotation && <><dt>In this plan</dt><dd>{annotation.semester}</dd></>}
+        {annotation?.baselineSemester !== undefined && annotation.changed && <><dt>Baseline plan</dt><dd>{annotation.baselineSemester}</dd></>}
         {node.grade && <><dt>Grade</dt><dd>{node.grade}</dd></>}
         {node.recognizedCredits !== null && <><dt>Recognized credits</dt><dd>{node.recognizedCredits}</dd></>}
       </dl>

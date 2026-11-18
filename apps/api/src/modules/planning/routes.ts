@@ -2,6 +2,7 @@ import { authorize, authJson, authErrorResponse, AuthError } from '../auth';
 import type { AuthDependencies } from '../auth/contracts';
 import { P001Error } from '../profile/validation';
 import { databaseError } from '../p001-sprint2/repository';
+import { planningBaselineVersion } from '../../../../../packages/shared/src/planning/baseline-version';
 import { validateChanges } from '../../../../../packages/shared/src/planning/placement';
 import { fromSaved, toRows, validateSavedBody } from '../../../../../packages/shared/src/planning/saved';
 import type { PlanningRepository } from './repository';
@@ -31,7 +32,7 @@ export async function handlePlanningRequest(request: Request, deps: PlanningDepe
       if (request.method !== 'GET') return notAllowed('GET');
       const input = await deps.repository.load(me.clerkUserId);
       if (!input) throw new P001Error(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile first.');
-      return authJson({ data: input });
+      return authJson({ data: { ...input, baselineVersion: await planningBaselineVersion(input) } });
     }
     if (request.method === 'GET') return authJson({ data: await deps.scenarios.read(me.clerkUserId) });
     // 200 with { data: null } rather than 204: the shared browser client reads a JSON body on every response.
@@ -43,6 +44,9 @@ export async function handlePlanningRequest(request: Request, deps: PlanningDepe
     if (!shape.ok) return invalid(shape.error);
     const input = await deps.repository.load(me.clerkUserId);
     if (!input) throw new P001Error(403, 'PROFILE_SETUP_REQUIRED', 'Complete your academic profile first.');
+    if (shape.baselineVersion !== undefined && shape.baselineVersion !== await planningBaselineVersion(input)) {
+      return authJson({ error: { code: 'PLANNING_BASELINE_CHANGED', message: 'Your programme, records or semester setup changed since this plan was loaded. Refresh the plan and try again.' } }, 409);
+    }
     const known = new Set(input.subjects.map(s => s.curriculumSubjectId));
     const passed = new Set(input.passed);
     const configured = new Set(input.limits.map(l => l.semesterId));

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { GraduationPlan, PlannedSemester, PlannedSubject, PlanningInput, ScenarioChange, SemesterRef } from '../../../../../packages/shared/src/planning/contracts';
 import { checkPlacement, placementTargets, type PlacementTarget } from '../../../../../packages/shared/src/planning/placement';
 import { semesterAt, semesterLabel, semesterTypeOf } from '../../../../../packages/shared/src/planning/semesters';
@@ -8,15 +8,16 @@ import { useSortableLists } from './useSortableList';
 
 const keyOf = (ref: SemesterRef) => ref.academicYear + '-' + ref.semesterNo;
 
-interface Panel { semester: PlannedSemester; trailing: boolean }
+interface Panel { semester: PlannedSemester; trailing: boolean; unconfigured: boolean }
 
 /** Semesters of the plan grouped by academic year, plus one empty configured semester after the last when editable. */
 function panelsByYear(input: PlanningInput, plan: GraduationPlan, editable: boolean): { year: string; panels: Panel[] }[] {
-  const panels: Panel[] = plan.semesters.map(semester => ({ semester, trailing: false }));
+  const configured = (s: PlannedSemester) => input.limits.some(l => l.academicYear === s.academicYear && l.semesterNo === s.semesterNo);
+  const panels: Panel[] = plan.semesters.map(semester => ({ semester, trailing: false, unconfigured: editable && !configured(semester) }));
   if (editable && input.start) {
     const ref = semesterAt(input.start, plan.semesters.length);
     const row = input.limits.find(l => l.academicYear === ref.academicYear && l.semesterNo === ref.semesterNo);
-    if (row) panels.push({ trailing: true, semester: { ...ref, index: plan.semesters.length + 1, semesterType: semesterTypeOf(ref.semesterNo),
+    if (row) panels.push({ trailing: true, unconfigured: false, semester: { ...ref, index: plan.semesters.length + 1, semesterType: semesterTypeOf(ref.semesterNo),
       label: semesterLabel(ref, plan.semesters.length + 1, true), maxSubjects: row.maxSubjects, maxCredits: row.maxCredits, subjects: [], credits: 0 } });
   }
   const years: { year: string; panels: Panel[] }[] = [];
@@ -61,12 +62,14 @@ function SemesterPanel({ panel, editable, blocked, onMove }: { panel: Panel; edi
     <ul className="planning-cards" data-key={keyOf(semester)} aria-label={semester.label + ' subjects'}>
       {semester.subjects.map(s => <SubjectCard key={s.curriculumSubjectId + (s.failedAttempt ? '-failed' : '')} subject={s} editable={editable} onMove={onMove} />)}
     </ul>
-    {semester.subjects.length === 0 && <p className="planning-empty">{panel.trailing ? 'Drop here to move a subject later'
+    {semester.subjects.length === 0 && <p className="planning-empty">{panel.unconfigured ? 'Not set up for moving subjects'
+      : panel.trailing ? 'Drop here to move a subject later'
       : 'Nothing can be taken this semester: the subjects left are waiting for a prerequisite or run in the other semester type.'}</p>}
+    {semester.subjects.length > 0 && panel.unconfigured && <p className="planning-empty">Not set up for moving subjects</p>}
   </li>;
 }
 
-function MoveDialog({ subject, targets, onClose, onConfirm }: { subject: PlannedSubject; targets: PlacementTarget[]; onClose: () => void; onConfirm: (target: SemesterRef) => void }) {
+function MoveDialog({ subject, current, targets, onClose, onConfirm }: { subject: PlannedSubject; current: string | null; targets: PlacementTarget[]; onClose: () => void; onConfirm: (target: SemesterRef) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [choice, setChoice] = useState<string | null>(null);
@@ -74,11 +77,12 @@ function MoveDialog({ subject, targets, onClose, onConfirm }: { subject: Planned
   const chosen = targets.find(t => keyOf(t.semester) === choice && t.ok);
   return <dialog ref={ref} className="planning-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}>
     <h3 id={titleId}>Move {subject.subjectCode}</h3>
-    <p className="planning-dialog-lead">{subject.subjectName}. Choose the semester to take it in; the rest of your plan is rearranged around it.</p>
+    <p className="planning-dialog-lead">{subject.subjectName}{current ? <> — now in <strong>{current}</strong></> : ''}. Choose the semester to take it in; the rest of your plan is rearranged around it.</p>
     <fieldset className="planning-targets"><legend>Semester</legend>
       {targets.map(target => <label key={keyOf(target.semester)} className={'planning-target' + (target.ok ? '' : ' planning-target--off')}>
-        <input type="radio" name="planning-target" value={keyOf(target.semester)} disabled={!target.ok} checked={choice === keyOf(target.semester)} onChange={() => setChoice(keyOf(target.semester))} />
-        <span className="planning-target-text"><span>{target.label}</span>{target.reason && <span className="planning-target-reason">{target.reason}</span>}</span>
+        <input type="radio" name="planning-target" value={keyOf(target.semester)} disabled={!target.ok} checked={choice === keyOf(target.semester)} onChange={() => setChoice(keyOf(target.semester))}
+          aria-describedby={target.reason ? `${titleId}-reason-${keyOf(target.semester)}` : undefined} />
+        <span className="planning-target-text"><span>{target.label}</span>{target.reason && <span className="planning-target-reason" id={`${titleId}-reason-${keyOf(target.semester)}`}>{target.reason}</span>}</span>
       </label>)}
     </fieldset>
     <div className="planning-dialog-actions">
@@ -92,8 +96,8 @@ function MoveDialog({ subject, targets, onClose, onConfirm }: { subject: Planned
  * The plan as coloured semester panels with subject cards (S3-P004-010). When editable, cards can be dragged to another
  * semester or moved with "Move…"; every move goes through `checkPlacement`, and only accepted lists reach `onChange`.
  */
-export function PlanBoard({ input, plan, changes, editable, heading, status, onChange }: {
-  input: PlanningInput; plan: GraduationPlan; changes: ScenarioChange[]; editable: boolean; heading: string; status?: ReactNode;
+export function PlanBoard({ input, plan, changes, editable, heading, onChange }: {
+  input: PlanningInput; plan: GraduationPlan; changes: ScenarioChange[]; editable: boolean; heading: string;
   onChange: (next: ScenarioChange[]) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -124,7 +128,7 @@ export function PlanBoard({ input, plan, changes, editable, heading, status, onC
   }, [years]);
 
   return <section className="planning-card planning-board" aria-labelledby="planning-timeline-heading">
-    <div className="planning-board-head"><h2 id="planning-timeline-heading">{heading}</h2>{status}</div>
+    <div className="planning-board-head"><h2 id="planning-timeline-heading">{heading}</h2></div>
     {canEdit && <p className="planning-lead">Drag a subject by its handle, or use Move…, to take it in another semester. The rest of the plan is rearranged around it.</p>}
     <p className="planning-move-message" role="status">{message && <><WarningIcon />{message}</>}</p>
     <div ref={container} className="planning-years">
@@ -134,7 +138,8 @@ export function PlanBoard({ input, plan, changes, editable, heading, status, onC
           blocked={blocked.has(keyOf(panel.semester))} onMove={setMoving} />)}</ol>
       </section>)}
     </div>
-    {moving && <MoveDialog subject={moving} targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)}
+    {moving && <MoveDialog subject={moving} current={plan.semesters.find(s => s.subjects.some(x => x.curriculumSubjectId === moving.curriculumSubjectId && !x.failedAttempt))?.label ?? null}
+      targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)}
       onClose={() => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); }}
       onConfirm={target => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); move(moving.curriculumSubjectId, target); }} />}
   </section>;

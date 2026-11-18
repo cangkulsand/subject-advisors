@@ -89,10 +89,12 @@ export function fromSaved(input: Pick<PlanningInput, 'limits'>, saved: SavedChan
 const isId = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 2147483647;
 
 /** Shape check for `PUT /api/planning/scenario`; the API then checks the list against the student's plan. */
-export function validateSavedBody(body: unknown): { ok: true; value: SavedChange[] } | { ok: false; error: string } {
+export function validateSavedBody(body: unknown): { ok: true; value: SavedChange[]; baselineVersion?: string } | { ok: false; error: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return { ok: false, error: 'Request body must be an object.' };
   const record = body as Record<string, unknown>;
-  if (Object.keys(record).some(key => key !== 'changes')) return { ok: false, error: 'Only "changes" may be sent.' };
+  if (Object.keys(record).some(key => key !== 'changes' && key !== 'baselineVersion')) return { ok: false, error: 'Only "changes" may be sent.' };
+  const baselineVersion = record.baselineVersion;
+  if (baselineVersion !== undefined && (typeof baselineVersion !== 'string' || !/^[0-9a-f]{64}$/.test(baselineVersion))) return { ok: false, error: 'Invalid baseline version.' };
   const list = record.changes;
   if (!Array.isArray(list) || list.length > MAX_SAVED_CHANGES) return { ok: false, error: `Send up to ${MAX_SAVED_CHANGES} changes.` };
   const value: SavedChange[] = [];
@@ -122,5 +124,5 @@ export function validateSavedBody(body: unknown): { ok: true; value: SavedChange
     value.push({ kind, curriculumSubjectId: id, ...(c.semesterId !== undefined ? { semesterId: c.semesterId as number } : {}),
       ...(c.replacementId !== undefined ? { replacementId: c.replacementId as number } : {}) });
   }
-  return { ok: true, value };
+  return { ok: true, value, ...(baselineVersion !== undefined ? { baselineVersion } : {}) };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { toRows, type SavedChange } from '../../../../../packages/shared/src/planning/saved';
+import { planningBaselineVersion } from '../../../../../packages/shared/src/planning/baseline-version';
 import type { PlanningInput } from '../../../../../packages/shared/src/planning/contracts';
 import { createScenarioRepository } from './scenario';
 import { handlePlanningRequest, type PlanningDependencies } from './routes';
@@ -80,6 +81,47 @@ describe('PUT /api/planning/scenario', () => {
     const { d, scenarios } = deps(); scenarios.replace.mockRejectedValue({ code: '23514', message: 'Student subject curriculum mismatch' });
     const res = await call(d, 'PUT', { changes: [{ kind: 'POSTPONE', curriculumSubjectId: 3 }] });
     expect(res.status).toBe(422); expect(JSON.stringify(await res.json())).not.toContain('mismatch');
+  });
+});
+
+describe('baseline version token', () => {
+  const token = () => planningBaselineVersion(input);
+  it('saves a valid list when the token matches the current input', async () => {
+    const { d, scenarios } = deps();
+    const changes: SavedChange[] = [{ kind: 'POSTPONE', curriculumSubjectId: 3 }];
+    scenarios.replace.mockResolvedValue(saved(changes));
+    const res = await call(d, 'PUT', { changes, baselineVersion: await token() });
+    expect(res.status).toBe(200);
+    expect(scenarios.replace).toHaveBeenCalledWith('student_a', toRows(changes));
+  });
+  it('returns 409 when the token was computed from an older baseline, writing nothing', async () => {
+    const { d, scenarios } = deps();
+    const stale = await planningBaselineVersion({ ...input, totalCredits: 130 });
+    const res = await call(d, 'PUT', { changes: [{ kind: 'POSTPONE', curriculumSubjectId: 3 }], baselineVersion: stale });
+    expect(res.status).toBe(409);
+    const json = await res.json() as { error: { code: string; message: string } };
+    expect(json.error.code).toBe('PLANNING_BASELINE_CHANGED');
+    expect(json.error.message).toContain('Refresh');
+    expect(scenarios.replace).not.toHaveBeenCalled();
+  });
+  it('checks the token before the change list: a stale token with an unknown subject still gives 409', async () => {
+    const { d, scenarios } = deps();
+    const res = await call(d, 'PUT', { changes: [{ kind: 'POSTPONE', curriculumSubjectId: 99 }], baselineVersion: 'f'.repeat(64) });
+    expect(res.status).toBe(409);
+    expect(scenarios.replace).not.toHaveBeenCalled();
+  });
+  it('refuses a malformed token without loading the baseline', async () => {
+    const { d, scenarios } = deps();
+    const res = await call(d, 'PUT', { changes: [], baselineVersion: 'not-a-hash' });
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: { code: string } }).error.code).toBe('SCENARIO_INVALID');
+    expect(scenarios.replace).not.toHaveBeenCalled();
+  });
+  it('still accepts a legacy client that sends no token', async () => {
+    const { d, scenarios } = deps();
+    const res = await call(d, 'PUT', { changes: [{ kind: 'POSTPONE', curriculumSubjectId: 3 }] });
+    expect(res.status).toBe(200);
+    expect(scenarios.replace).toHaveBeenCalled();
   });
 });
 

@@ -7,7 +7,7 @@ export interface PlanningRows {
   profile: { curriculumId: number; programmeId: number; learningCentreId: number; programmeName: string; curriculumVersion: string; totalCredits: number | null };
   subjects: { curriculumSubjectId: number; subjectId: number; subjectCode: string; subjectName: string; creditHours: number; category: string; compulsory: boolean }[];
   rules: { curriculumSubjectId: number; semesterType: string }[];
-  prerequisites: { curriculumSubjectId: number; requiredCurriculumSubjectId: number }[];
+  prerequisites: { curriculumSubjectId: number; requiredCurriculumSubjectId: number; requirementType?: string }[];
   records: { subjectId: number; status: string; recognizedCredits: number; remarks: string | null }[];
   requirements: { requirementType: string; requiredSubjects: number | null; requiredCredits: number | null }[];
   semesters: { semesterId: number; academicYear: string; semesterNo: number; maxSubjects: number; maxCredits: number; isCurrent: boolean }[];
@@ -52,13 +52,31 @@ export function toPlanningInput(rows: PlanningRows): PlanningInput {
     const credits = record.status === 'COMPLETED' ? subject.creditHours : record.recognizedCredits;
     earned.set(subject.curriculumSubjectId, Math.max(earned.get(subject.curriculumSubjectId) ?? 0, credits));
   }
-  const subjects: PlanningSubject[] = rows.subjects.map(s => ({
-    curriculumSubjectId: s.curriculumSubjectId, subjectCode: s.subjectCode, subjectName: s.subjectName, creditHours: s.creditHours,
-    category: s.category, compulsory: s.compulsory,
-    semesterTypes: [...new Set(rows.rules.filter(r => r.curriculumSubjectId === s.curriculumSubjectId).map(r => r.semesterType))]
-      .filter((t): t is SemesterType => t === 'NORMAL' || t === 'SHORT').sort(),
-    prerequisites: rows.prerequisites.filter(p => p.curriculumSubjectId === s.curriculumSubjectId).map(p => p.requiredCurriculumSubjectId),
-  }));
+  const recorded: NonNullable<PlanningInput['recorded']> = {};
+  for (const record of rows.records) {
+    const subject = bySubjectId.get(record.subjectId);
+    if (!subject || !countsAsPassed(record, subject.creditHours)) continue;
+    const status = record.status === 'COMPLETED' ? 'COMPLETED' : 'EXEMPTED';
+    const existing = recorded[subject.curriculumSubjectId];
+    if (!existing || record.recognizedCredits > existing.recognizedCredits || (record.recognizedCredits === existing.recognizedCredits && status === 'COMPLETED')) {
+      recorded[subject.curriculumSubjectId] = { status, recognizedCredits: record.recognizedCredits };
+    }
+  }
+  const subjects: PlanningSubject[] = rows.subjects.map(s => {
+    const corequisites = rows.prerequisites
+      .filter(p => p.curriculumSubjectId === s.curriculumSubjectId && p.requirementType === 'COREQUISITE')
+      .map(p => p.requiredCurriculumSubjectId);
+    return {
+      curriculumSubjectId: s.curriculumSubjectId, subjectCode: s.subjectCode, subjectName: s.subjectName, creditHours: s.creditHours,
+      category: s.category, compulsory: s.compulsory,
+      semesterTypes: [...new Set(rows.rules.filter(r => r.curriculumSubjectId === s.curriculumSubjectId).map(r => r.semesterType))]
+        .filter((t): t is SemesterType => t === 'NORMAL' || t === 'SHORT').sort(),
+      prerequisites: rows.prerequisites
+        .filter(p => p.curriculumSubjectId === s.curriculumSubjectId && (p.requirementType ?? 'MANDATORY') === 'MANDATORY')
+        .map(p => p.requiredCurriculumSubjectId),
+      ...(corequisites.length > 0 ? { corequisites } : {}),
+    };
+  });
   const start = startSemester(rows.semesters);
   const curriculumBySubject = new Map(rows.subjects.map(s => [s.subjectId, s.curriculumSubjectId]));
   const approvedFirst = start?.semesterId != null && rows.decisions.length
@@ -67,6 +85,8 @@ export function toPlanningInput(rows: PlanningRows): PlanningInput {
   return {
     programmeName: rows.profile.programmeName,
     curriculumVersion: rows.profile.curriculumVersion,
+    curriculumId: rows.profile.curriculumId,
+    recorded,
     totalCredits: rows.profile.totalCredits,
     earnedCredits: [...earned.values()].reduce((n, c) => n + c, 0),
     subjects,
@@ -102,9 +122,9 @@ export function createPlanningRepository(db: Database): PlanningRepository {
           `SELECT r.curriculum_subject_id, r.semester_type FROM public.subject_semester_rule r
            JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = r.curriculum_subject_id WHERE cs.curriculum_id = $1`, [curriculumId]),
         db.query(
-          `SELECT p.curriculum_subject_id, p.required_curriculum_subject_id FROM public.subject_prerequisite p
+          `SELECT p.curriculum_subject_id, p.required_curriculum_subject_id, p.requirement_type FROM public.subject_prerequisite p
            JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = p.curriculum_subject_id
-           WHERE cs.curriculum_id = $1 AND p.requirement_type = 'MANDATORY'`, [curriculumId]),
+           WHERE cs.curriculum_id = $1 AND p.requirement_type IN ('MANDATORY', 'COREQUISITE')`, [curriculumId]),
         db.query(
           `SELECT ar.subject_id, ar.status, ar.recognized_credits, ar.remarks FROM public.academic_record ar
            JOIN public.student_profile sp ON sp.student_id = ar.student_id WHERE sp.clerk_user_id = $1`, [clerkUserId]),
@@ -134,7 +154,7 @@ export function createPlanningRepository(db: Database): PlanningRepository {
           subjectName: String(r.subject_name), creditHours: Number(r.credit_hours), category: String(r.subject_category ?? ''), compulsory: Number(r.is_compulsory) === 1,
         })),
         rules: rules.map(r => ({ curriculumSubjectId: Number(r.curriculum_subject_id), semesterType: String(r.semester_type) })),
-        prerequisites: prerequisites.map(r => ({ curriculumSubjectId: Number(r.curriculum_subject_id), requiredCurriculumSubjectId: Number(r.required_curriculum_subject_id) })),
+        prerequisites: prerequisites.map(r => ({ curriculumSubjectId: Number(r.curriculum_subject_id), requiredCurriculumSubjectId: Number(r.required_curriculum_subject_id), requirementType: String(r.requirement_type) })),
         records: records.map(r => ({ subjectId: Number(r.subject_id), status: String(r.status), recognizedCredits: Number(r.recognized_credits ?? 0), remarks: typeof r.remarks === 'string' ? r.remarks : null })),
         requirements: requirements.map(r => ({ requirementType: String(r.requirement_type), requiredSubjects: num(r.required_subjects), requiredCredits: num(r.required_credits) })),
         semesters: semesterRows,

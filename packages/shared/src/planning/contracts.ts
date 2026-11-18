@@ -15,6 +15,7 @@ export interface PlanningSubject {
   semesterTypes: SemesterType[];
   /** MANDATORY prerequisites (curriculum subject IDs). */
   prerequisites: number[];
+  corequisites?: number[];
 }
 
 export interface PlanningRequirement {
@@ -43,6 +44,9 @@ export interface PlanningInput {
   limits: SemesterLimit[];
   /** Subjects the coordinator approved for the first planned semester; null when none were decided. */
   approvedFirst: number[] | null;
+  curriculumId?: number;
+  recorded?: Record<number, { status: 'COMPLETED' | 'EXEMPTED'; recognizedCredits: number }>;
+  baselineVersion?: string;
 }
 
 export type ScenarioChangeKind = 'POSTPONE' | 'FAIL' | 'WITHDRAW' | 'REPLACE' | 'PLACE';

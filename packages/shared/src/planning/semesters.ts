@@ -41,6 +41,9 @@ export function semesterLabel(semester: SemesterRef, index: number, calendar: bo
   return calendar ? `${semester.academicYear} – Semester ${semester.semesterNo}${short}` : `Plan semester ${index}${short}`;
 }
 
+export const allowedSemesterTypes = (subject: { creditHours: number; semesterTypes: SemesterType[] }): SemesterType[] =>
+  subject.semesterTypes.length > 0 ? subject.semesterTypes : subject.creditHours === 2 ? ['SHORT'] : ['NORMAL', 'SHORT'];
+
 const order = (left: SemesterRef, right: SemesterRef) =>
   left.academicYear === right.academicYear ? left.semesterNo - right.semesterNo : left.academicYear < right.academicYear ? -1 : 1;
 

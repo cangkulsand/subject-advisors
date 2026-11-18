@@ -6,7 +6,7 @@ export interface PlanningClient {
   load(signal?: AbortSignal): Promise<PlanningInput>;
   /** The student's saved what-if, or null (S3-P004-010). */
   loadScenario(signal?: AbortSignal): Promise<SavedScenario | null>;
-  saveScenario(changes: SavedChange[]): Promise<SavedScenario>;
+  saveScenario(changes: SavedChange[], baselineVersion?: string): Promise<SavedScenario>;
   clearScenario(): Promise<void>;
 }
 
@@ -16,7 +16,7 @@ export function createPlanningClient(getToken: () => Promise<string | null>, bas
   return {
     load: signal => academic<PlanningInput>('/api/planning/input', { signal }),
     loadScenario: signal => academic<SavedScenario | null>('/api/planning/scenario', { signal }),
-    saveScenario: changes => academic<SavedScenario>('/api/planning/scenario', { method: 'PUT', body: { changes } }),
+    saveScenario: (changes, baselineVersion) => academic<SavedScenario>('/api/planning/scenario', { method: 'PUT', body: { changes, ...(baselineVersion ? { baselineVersion } : {}) } }),
     clearScenario: async () => { await academic<null>('/api/planning/scenario', { method: 'DELETE' }); },
   };
 }
