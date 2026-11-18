@@ -37,3 +37,19 @@ The frontend publishable key is public and belongs in the build variable; secret
 - This preview uses the existing development services. It does not apply migrations. Confirm the development database is already at the schema expected by the integrated application.
 - `npm run check:cloudflare` runs a local Wrangler dry-run after preparing generated integration modules.
 - The Worker keeps API paths worker-first and the asset handler serves SPA deep links. The local-only `/api/auth/local-status` diagnostic is not part of the deployed adapter.
+
+## Runtime limit: subrequests per request (S3-P004-016)
+
+A Worker request may make only a limited number of outbound calls ("subrequests"): **50 on the Workers Free plan**
+(1,000 on Paid). Every Neon query sent with `neon(...)` / `sql.query(...)` over HTTP and every Clerk API call is one
+subrequest; a `sql.transaction([...])` batch counts once.
+
+- **Never query once per row** (per student, per record, per subject). Read the whole list in one query with
+  `WHERE id = ANY($1::int[])`, and call Clerk in pages (the identity lookup takes up to 100 users per call).
+- Keep the number of queries per endpoint fixed, independent of how much data the scope has; parallel queries in a
+  `Promise.all` still count one each.
+- Symptom when the limit is hit: the request stops part way; endpoints that map unknown errors to a generic message
+  (for example the coordinator API's "Forecasting data is unavailable. Please retry.") show only that.
+- Incident: on 2026-11-18, "Students in the system" snapshots for SECJ (148 students) failed because the learning
+  centre was read with one query per student. Fixed by a single `ANY(...)` query; an audit of every coordinator
+  action found no other per-row calls (Generate forecast ≈ 18 subrequests whatever the student count).

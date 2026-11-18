@@ -28,6 +28,8 @@ outside the repository's error mapping, so the client got the generic message in
 - `buildSystemSnapshot` filters ACTIVE students first, then looks up all their centres in that one call
   (`system-snapshot.ts`; used by both the system and the combined snapshot in `routes.ts`).
 - Behaviour unchanged: same students, same exclusions (inactive access, other or missing centre), same fingerprint.
+- `docs/cloudflare-deployment.md`: new "Runtime limit: subrequests per request" note (the 50-call Free-plan limit, the
+  one-query-per-list rule, the symptom and this incident with the audit of the other coordinator actions).
 
 ## 4. Tests
 
