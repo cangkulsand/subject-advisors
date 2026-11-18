@@ -178,3 +178,22 @@
 .planning-deps-legend { margin-top: 8px; display: flex; align-items: center; gap: 8px; color: var(--pl-muted); font-size: var(--font-size-label); }
 .planning-deps-sample { display: inline-block; width: 22px; height: 14px; border: 2px dashed var(--pl-accent); border-radius: 3px; }
 .planning-dependencies .pathway-node.is-changed .pathway-node-box { stroke-dasharray: 5 4; stroke-width: 2.5; }
+
+/* Compact plan page (S3-P004-015): title and actions on one line, tabs with the changes beside them, board first. */
+.planning-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.planning-head h1 { margin-bottom: 0; }
+.planning-head .planning-header-actions { margin-top: 0; }
+.planning-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 16px; }
+.planning-toolbar .planning-toggle { margin-top: 0; }
+.planning-changes-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.planning-changes-bar .planning-changes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.planning-changes-bar .planning-changes li { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 2px 4px 2px 12px; border: 1px solid var(--pl-outline); border-radius: 999px; background: var(--pl-subtle); color: var(--pl-heading); font-size: var(--font-size-label); overflow-wrap: anywhere; }
+.planning-chip-remove { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--pl-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.planning-chip-remove:hover { background: var(--pl-surface); color: var(--pl-accent); }
+.planning-chip-remove:focus-visible { outline: 3px solid var(--pl-accent); outline-offset: 1px; }
+.planning-changes-bar .planning-move-message { flex-basis: 100%; margin: 0; }
+.planning-board.planning-card { margin-top: 12px; }
+.planning-postpone { position: sticky; top: 8px; z-index: 2; margin-bottom: 12px; }
+.planning-cards.planning-postpone-zone { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; margin: 0; padding: 10px 14px; border: 2px dashed var(--pl-outline); border-radius: 10px; background: var(--pl-surface); color: var(--pl-muted); font-size: var(--font-size-control); font-weight: 600; list-style: none; }
+.planning-postpone-zone:has(.planning-subject-card) { border-color: var(--pl-accent); color: var(--pl-accent); background: var(--pl-subtle); }
+.planning-postpone-zone .planning-subject-card { display: none; }

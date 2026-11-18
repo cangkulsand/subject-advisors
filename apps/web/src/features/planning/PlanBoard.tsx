@@ -1,12 +1,14 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { GraduationPlan, PlannedSemester, PlannedSubject, PlanningInput, ScenarioChange, SemesterRef } from '../../../../../packages/shared/src/planning/contracts';
-import { checkPlacement, placementTargets, type PlacementTarget } from '../../../../../packages/shared/src/planning/placement';
+import type { GraduationPlan, PlannedSemester, PlannedSubject, PlanningInput, ScenarioChange, ScenarioChangeKind, SemesterRef } from '../../../../../packages/shared/src/planning/contracts';
+import { checkChange, checkPlacement, placementTargets, type PlacementTarget } from '../../../../../packages/shared/src/planning/placement';
 import { semesterAt, semesterLabel, semesterTypeOf } from '../../../../../packages/shared/src/planning/semesters';
 import { GripIcon, LockIcon, NormalIcon, PinIcon, ShortIcon, WarningIcon } from './icons';
-import { subjectNote } from './plan-view';
+import { CHANGE_LABEL, replacementOptions, subjectNote } from './plan-view';
 import { useSortableLists } from './useSortableList';
 
 const keyOf = (ref: SemesterRef) => ref.academicYear + '-' + ref.semesterNo;
+const POSTPONE_KEY = 'postpone';
+const ClockIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
 
 interface Panel { semester: PlannedSemester; trailing: boolean; unconfigured: boolean }
 
@@ -69,12 +71,23 @@ function SemesterPanel({ panel, editable, blocked, onMove }: { panel: Panel; edi
   </li>;
 }
 
-function MoveDialog({ subject, current, targets, onClose, onConfirm }: { subject: PlannedSubject; current: string | null; targets: PlacementTarget[]; onClose: () => void; onConfirm: (target: SemesterRef) => void }) {
+export interface OtherChange { key: string; label: string; change: ScenarioChange }
+/** The what-ifs besides moving: postpone, fail, withdraw and, for an elective, replace it with another option. */
+function otherChanges(input: PlanningInput, baseline: GraduationPlan, subject: PlannedSubject): OtherChange[] {
+  const id = subject.curriculumSubjectId;
+  const simple = (['POSTPONE', 'FAIL', 'WITHDRAW'] as ScenarioChangeKind[]).map(kind => ({ key: kind, label: CHANGE_LABEL[kind], change: { kind, curriculumSubjectId: id } }));
+  const replace = replacementOptions(input, baseline, subject).map(option => ({ key: 'REPLACE-' + option.curriculumSubjectId, label: `Replace with ${option.subjectName} (${option.subjectCode})`,
+    change: { kind: 'REPLACE' as const, curriculumSubjectId: id, replacementId: option.curriculumSubjectId } }));
+  return [...simple, ...replace];
+}
+
+function MoveDialog({ subject, current, targets, others, onClose, onConfirm, onOther }: { subject: PlannedSubject; current: string | null; targets: PlacementTarget[]; others: OtherChange[]; onClose: () => void; onConfirm: (target: SemesterRef) => void; onOther: (change: ScenarioChange) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [choice, setChoice] = useState<string | null>(null);
   useEffect(() => { const dialog = ref.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
   const chosen = targets.find(t => keyOf(t.semester) === choice && t.ok);
+  const other = others.find(o => 'other:' + o.key === choice);
   return <dialog ref={ref} className="planning-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}>
     <h3 id={titleId}>Move {subject.subjectCode}</h3>
     <p className="planning-dialog-lead">{subject.subjectName}{current ? <> — now in <strong>{current}</strong></> : ''}. Choose the semester to take it in; the rest of your plan is rearranged around it.</p>
@@ -85,9 +98,16 @@ function MoveDialog({ subject, current, targets, onClose, onConfirm }: { subject
         <span className="planning-target-text"><span>{target.label}</span>{target.reason && <span className="planning-target-reason" id={`${titleId}-reason-${keyOf(target.semester)}`}>{target.reason}</span>}</span>
       </label>)}
     </fieldset>
+    {others.length > 0 && <fieldset className="planning-targets"><legend>Or try</legend>
+      {others.map(o => <label key={o.key} className="planning-target">
+        <input type="radio" name="planning-target" value={'other:' + o.key} checked={choice === 'other:' + o.key} onChange={() => setChoice('other:' + o.key)} />
+        <span className="planning-target-text"><span>{o.label}</span></span>
+      </label>)}
+    </fieldset>}
     <div className="planning-dialog-actions">
       <button type="button" className="planning-button" onClick={onClose}>Cancel</button>
-      <button type="button" className="planning-button planning-button--primary" disabled={!chosen} onClick={() => chosen && onConfirm(chosen.semester)}>Move here</button>
+      <button type="button" className="planning-button planning-button--primary" disabled={!chosen && !other}
+        onClick={() => { if (chosen) onConfirm(chosen.semester); else if (other) onOther(other.change); }}>{other ? 'Apply' : 'Move here'}</button>
     </div>
   </dialog>;
 }
@@ -96,8 +116,8 @@ function MoveDialog({ subject, current, targets, onClose, onConfirm }: { subject
  * The plan as coloured semester panels with subject cards (S3-P004-010). When editable, cards can be dragged to another
  * semester or moved with "Move…"; every move goes through `checkPlacement`, and only accepted lists reach `onChange`.
  */
-export function PlanBoard({ input, plan, changes, editable, heading, onChange }: {
-  input: PlanningInput; plan: GraduationPlan; changes: ScenarioChange[]; editable: boolean; heading: string;
+export function PlanBoard({ input, plan, baseline, changes, editable, heading, onChange }: {
+  input: PlanningInput; plan: GraduationPlan; baseline: GraduationPlan; changes: ScenarioChange[]; editable: boolean; heading: string;
   onChange: (next: ScenarioChange[]) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -121,17 +141,28 @@ export function PlanBoard({ input, plan, changes, editable, heading, onChange }:
     setMessage('');
     onChange(check.changes);
   };
+  const tryChange = (change: ScenarioChange) => {
+    const check = checkChange(input, changes, change);
+    if (!check.ok) { setMessage(check.reason); return; }
+    setMessage('');
+    onChange(check.changes);
+  };
   useSortableLists(container, canEdit, {
     onStart: id => setBlocked(new Set(placementTargets(input, plan, changes, id).filter(t => !t.ok).map(t => keyOf(t.semester)))),
     onEnd: () => setBlocked(new Set()),
-    onMove: (id, key) => { const target = refByKey.get(key); if (target) move(id, target); },
+    onMove: (id, key) => {
+      if (key === POSTPONE_KEY) { tryChange({ kind: 'POSTPONE', curriculumSubjectId: id }); return; }
+      const target = refByKey.get(key); if (target) move(id, target);
+    },
   }, [years]);
 
   return <section className="planning-card planning-board" aria-labelledby="planning-timeline-heading">
     <div className="planning-board-head"><h2 id="planning-timeline-heading">{heading}</h2></div>
-    {canEdit && <p className="planning-lead">Drag a subject by its handle, or use Move…, to take it in another semester. The rest of the plan is rearranged around it.</p>}
     <p className="planning-move-message" role="status">{message && <><WarningIcon />{message}</>}</p>
     <div ref={container} className="planning-years">
+      {canEdit && <div className="planning-postpone">
+        <div className="planning-cards planning-postpone-zone" data-key={POSTPONE_KEY} aria-label="Postpone one semester"><ClockIcon />Drop here to postpone one semester</div>
+      </div>}
       {years.map(year => <section key={year.year || 'plan'} className="planning-year" aria-label={year.year || 'Planned semesters'}>
         {year.year && <h3 className="planning-year-head">{year.year}</h3>}
         <ol className="planning-year-grid">{year.panels.map(panel => <SemesterPanel key={keyOf(panel.semester) + panel.semester.index} panel={panel} editable={canEdit}
@@ -139,8 +170,9 @@ export function PlanBoard({ input, plan, changes, editable, heading, onChange }:
       </section>)}
     </div>
     {moving && <MoveDialog subject={moving} current={plan.semesters.find(s => s.subjects.some(x => x.curriculumSubjectId === moving.curriculumSubjectId && !x.failedAttempt))?.label ?? null}
-      targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)}
+      targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)} others={otherChanges(input, baseline, moving)}
       onClose={() => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); }}
-      onConfirm={target => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); move(moving.curriculumSubjectId, target); }} />}
+      onConfirm={target => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); move(moving.curriculumSubjectId, target); }}
+      onOther={change => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); tryChange(change); }} />}
   </section>;
 }
