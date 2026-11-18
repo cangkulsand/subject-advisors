@@ -31,6 +31,10 @@ complete static review and report BLOCKED rather than pretending DB tests passed
 Test schema inventory, column mappings, foreign keys, unique/check constraints,
 role enforcement boundaries, curriculum isolation, rejected invalid inserts,
 audit immutability, forecast versioning and finalized-run read-only behavior.
+
+> **Note (2026-11-18, S3-P004-012):** forecast versions and comparison are out of scope. The version, status
+> and finalization columns and their checks remain in the schema for compatibility, but the system keeps one
+> forecast per snapshot and does not use them. Verifying the existing constraints is still valid.
 Record real commands and results. Update the change record's PLAN,
 IMPLEMENTATION, REVIEW and CHANGELOG stages. Publish final schema/ERD,
 migration order, known decisions and handoff contracts for all four programmers.
