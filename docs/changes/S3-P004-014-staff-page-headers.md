@@ -1,6 +1,6 @@
 # S3-P004-014 — Staff page headers: no breadcrumb, no workspace eyebrow, role badge in the top bar
 
-- **Status:** On branch `feature/staff-page-headers` (not merged)
+- **Status:** MERGED to main (fast-forward, 6e281f6) and deployed to dev and prod on 2026-11-18
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3
 - **Owner:** P004 (staff shell for M6 coordinator and M7 admin)
