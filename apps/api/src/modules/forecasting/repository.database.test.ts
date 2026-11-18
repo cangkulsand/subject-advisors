@@ -65,7 +65,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
     ids = { programme, centre, current: semesters[0]!, target: semesters[1]!, later: semesters[2]!, curriculum, s101: a.subjectId, s102: b.subjectId };
     const scopes: ScopeProvider = {
       listScopes: async () => [], isScopeAssigned: async (_user, p, c) => p === programme && c === centre,
-      currentSemesterId: async () => ids.current, studentLearningCentreId: async () => null, importAliases: async () => ({ programmes: {}, centres: {} }),
+      currentSemesterId: async () => ids.current, studentLearningCentres: async (ids: number[]) => new Map(ids.map((id) => [id, null])), importAliases: async () => ({ programmes: {}, centres: {} }),
     };
     let savepoints = 0;
     const query = async (text: string, values: unknown[]) => (await client.query(text, values)).rows;
@@ -308,7 +308,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       const studentTables = () => scalar(`SELECT (SELECT md5(string_agg(p::text, ',' ORDER BY student_id)) FROM public.student_profile p) AS profiles,
         (SELECT md5(string_agg(r::text, ',' ORDER BY record_id)) FROM public.academic_record r) AS records`);
       const before = await studentTables();
-      const inCentre = { ...deps, scopes: { ...deps.scopes, studentLearningCentreId: async () => ids.centre } };
+      const inCentre = { ...deps, scopes: { ...deps.scopes, studentLearningCentres: async (list: number[]) => new Map(list.map((id) => [id, ids.centre])) } };
       const snapshot = (target: typeof inCentre = inCentre) => handleForecastingRequest(new Request(base + 'forecast-imports/system-snapshots', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...runScope(), sourceLabel: 'System test' }),
       }), target) as Promise<Response>;
@@ -345,7 +345,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       expect((await replay.json()).data.importBatchId).toBe(accepted.importBatchId);
       expect(Number((await scalar('SELECT count(*) AS n FROM public.academic_import_batch WHERE programme_id=$1', [ids.programme])).n)).toBe(1);
       // A centre nobody belongs to finds nobody.
-      expect((await snapshot({ ...inCentre, scopes: { ...inCentre.scopes, studentLearningCentreId: async () => ids.centre + 1000 } })).status).toBe(422);
+      expect((await snapshot({ ...inCentre, scopes: { ...inCentre.scopes, studentLearningCentres: async (list: number[]) => new Map(list.map((id) => [id, ids.centre + 1000])) } })).status).toBe(422);
       await record(bob, ids.s101, 'COMPLETED', ids.current, 3);
       const changed = await snapshot();
       expect(changed.status).toBe(201);
@@ -383,7 +383,7 @@ describe.skipIf(!databaseUrl)('UC20 import repository on PostgreSQL (disposable 
       const studentTables = () => scalar(`SELECT (SELECT md5(string_agg(p::text, ',' ORDER BY student_id)) FROM public.student_profile p) AS profiles,
         (SELECT md5(string_agg(r::text, ',' ORDER BY record_id)) FROM public.academic_record r) AS records`);
       const before = await studentTables();
-      const inCentre = { ...deps, scopes: { ...deps.scopes, studentLearningCentreId: async () => ids.centre } };
+      const inCentre = { ...deps, scopes: { ...deps.scopes, studentLearningCentres: async (list: number[]) => new Map(list.map((id) => [id, ids.centre])) } };
       // a1000001 (lower case) is Alya's matric: skipped. CSV-NEW is new. CSV-NAME has Bob's name but another reference: kept with a warning.
       const csv = [header,
         row('a1000001', '', 'ACTIVE', 'COMPLETE', codes.b, 'COMPLETED', String(ids.current), '3', 'false', 'Alya From Csv'),

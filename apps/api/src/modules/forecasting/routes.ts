@@ -201,7 +201,7 @@ async function systemSnapshot(request: Request, deps: ForecastingDependencies, a
   if (target.semesterId !== input.targetSemesterId) throw new ForecastingError('TARGET_SEMESTER_NOT_ALLOWED');
   const catalogue = await deps.repository.catalogue(input.programmeId);
   if (!catalogue) throw new ForecastingError('SCOPE_NOT_FOUND');
-  const built = await buildSystemSnapshot(await deps.repository.systemStudents(input.programmeId), catalogue, input.learningCentreId, (studentId) => deps.scopes.studentLearningCentreId(studentId));
+  const built = await buildSystemSnapshot(await deps.repository.systemStudents(input.programmeId), catalogue, input.learningCentreId, (studentIds) => deps.scopes.studentLearningCentres(studentIds));
   if (built.students.length === 0) throw new ForecastingError('SYSTEM_SNAPSHOT_EMPTY');
   const existing = await deps.repository.findAcceptedByFingerprint(input, built.fingerprint);
   if (existing) return authJson({ data: acceptedOf(existing) }, 200);
@@ -228,7 +228,7 @@ async function combinedSnapshot(request: Request, url: URL, deps: ForecastingDep
   if (target.semesterId !== input.targetSemesterId) throw new ForecastingError('TARGET_SEMESTER_NOT_ALLOWED');
   const catalogue = await deps.repository.catalogue(input.programmeId);
   if (!catalogue) throw new ForecastingError('SCOPE_NOT_FOUND');
-  const system = await buildSystemSnapshot(await deps.repository.systemStudents(input.programmeId), catalogue, input.learningCentreId, (studentId) => deps.scopes.studentLearningCentreId(studentId));
+  const system = await buildSystemSnapshot(await deps.repository.systemStudents(input.programmeId), catalogue, input.learningCentreId, (studentIds) => deps.scopes.studentLearningCentres(studentIds));
   const csvFingerprint = await sha256Hex(input.bytes);
   const fingerprint = await combinedFingerprint(csvFingerprint, system, input);
   const existing = await deps.repository.findAcceptedByFingerprint(input, fingerprint);

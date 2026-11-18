@@ -21,7 +21,7 @@ export const testScopeProvider: ScopeProvider = {
     return Boolean(clerkUserId) && TEST_PROGRAMMES.some((p) => p.programmeId === programmeId) && TEST_CENTRES.some((c) => c.learningCentreId === learningCentreId);
   },
   async currentSemesterId() { return 1; },
-  async studentLearningCentreId() { return 1; },
+  async studentLearningCentres(studentIds) { return new Map(studentIds.map((id) => [id, 1])); },
   async importAliases() { return IMPORT_ALIASES; },
 };
 

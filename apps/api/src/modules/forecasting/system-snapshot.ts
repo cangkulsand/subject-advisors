@@ -58,14 +58,16 @@ export const portalReference = (studentId: number) => 'PORTAL-' + studentId;
  * - Recognized credits above the subject's catalogue credits are not trusted and stored as unknown (null) so the engine treats credit evidence as missing.
  */
 export async function buildSystemSnapshot(
-  selection: PortalStudentSelection, catalogue: ProgrammeCatalogue, learningCentreId: number, centreOf: (studentId: number) => Promise<number | null>,
+  selection: PortalStudentSelection, catalogue: ProgrammeCatalogue, learningCentreId: number, centresOf: (studentIds: number[]) => Promise<Map<number, number | null>>,
 ): Promise<BuiltSystemSnapshot> {
   const subjectsByCurriculum = new Map(catalogue.curricula.map((curriculum) => [curriculum.curriculumId, new Map(curriculum.subjects.map((subject) => [subject.subjectId, subject.creditHours]))]));
   const excluded = { otherProgramme: selection.otherProgrammeStudents, otherCentre: 0, inactiveAccess: 0 };
   const picked = [];
-  for (const student of selection.students) {
-    if (!student.eligible) { excluded.inactiveAccess += 1; continue; }
-    if ((await centreOf(student.studentId)) !== learningCentreId) { excluded.otherCentre += 1; continue; }
+  const eligible = selection.students.filter((student) => student.eligible);
+  excluded.inactiveAccess = selection.students.length - eligible.length;
+  const centres = eligible.length ? await centresOf(eligible.map((student) => student.studentId)) : new Map<number, number | null>();
+  for (const student of eligible) {
+    if ((centres.get(student.studentId) ?? null) !== learningCentreId) { excluded.otherCentre += 1; continue; }
     picked.push(student);
   }
   const recordsByStudent = new Map<number, typeof selection.records>();

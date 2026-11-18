@@ -22,11 +22,15 @@ export function createForecastingHandler(env: Pick<AuthBindings, 'DATABASE_URL' 
   const decisions = createOfferingDecisionsRepository(query, transaction);
   // Live, uncached reads of the admin academic setup (migration 0008): assignments, current semester, active centres.
   // Student centre: the learning centre saved in the student's profile (S2-P004-023); null when none.
-  const studentCentre = async (studentId: number) => {
-    const rows = await query('SELECT learning_centre_id FROM public.student_profile WHERE student_id = $1', [studentId]);
-    return rows[0]?.learning_centre_id == null ? null : Number(rows[0].learning_centre_id);
+  // One query for the whole list: a request per student hit the Workers subrequest limit on large programmes (S3-P004-016).
+  const studentCentres = async (studentIds: number[]) => {
+    const centres = new Map<number, number | null>(studentIds.map(id => [id, null]));
+    if (!studentIds.length) return centres;
+    const rows = await query('SELECT student_id, learning_centre_id FROM public.student_profile WHERE student_id = ANY($1::int[])', [studentIds]);
+    for (const row of rows) centres.set(Number(row.student_id), row.learning_centre_id == null ? null : Number(row.learning_centre_id));
+    return centres;
   };
-  const scopes = createDbScopeProvider(createAcademicSetupRepository(query, transaction), studentCentre);
+  const scopes = createDbScopeProvider(createAcademicSetupRepository(query, transaction), studentCentres);
   const identities = createAdminIdentities(env.CLERK_SECRET_KEY);
   // Portal student -> live matric number and Clerk account (student_profile), then the primary email in pages of 100 (the identity lookup's bound).
   const portalContacts = async (studentIds: number[]) => {

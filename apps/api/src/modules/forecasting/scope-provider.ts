@@ -20,7 +20,8 @@ export interface ScopeProvider {
   /** `academic_semester.is_current`; null when none is marked. */
   currentSemesterId(): Promise<number | null>;
   /** Centre of a student. */
-  studentLearningCentreId(studentId: number): Promise<number | null>;
+  /** Each student's profile learning centre (null when unset), read in ONE query for the whole list (S3-P004-016). */
+  studentLearningCentres(studentIds: number[]): Promise<Map<number, number | null>>;
   /** Coordinator-export vocabulary (S2-P004-010): export programme code -> system programme_code, centre name -> system centre code. */
   importAliases(): Promise<ImportAliases>;
 }
@@ -28,10 +29,11 @@ export interface ScopeProvider {
 export type ScopeSource = AcademicScopeReader & Pick<AcademicSetupRepository, 'listProgrammeFaculties'>;
 
 /**
- * `studentCentre` reads `student_profile.learning_centre_id` live (S2-P004-023); null when the student has no centre,
- * and such a student is left out of "students in the system" snapshots.
+ * `studentCentres` reads `student_profile.learning_centre_id` live (S2-P004-023) for a list of students in one query
+ * (one request per student exceeded the Workers subrequest limit, S3-P004-016); a student without a centre maps to null
+ * and is left out of "students in the system" snapshots.
  */
-export function createDbScopeProvider(source: ScopeSource, studentCentre: (studentId: number) => Promise<number | null>): ScopeProvider {
+export function createDbScopeProvider(source: ScopeSource, studentCentres: (studentIds: number[]) => Promise<Map<number, number | null>>): ScopeProvider {
   return {
     async listScopes(clerkUserId) {
       const assigned = await source.listScopes(clerkUserId);
@@ -49,7 +51,7 @@ export function createDbScopeProvider(source: ScopeSource, studentCentre: (stude
     },
     isScopeAssigned: (clerkUserId, programmeId, learningCentreId) => source.isScopeAssigned(clerkUserId, programmeId, learningCentreId),
     currentSemesterId: () => source.currentSemesterId(),
-    studentLearningCentreId: (studentId) => studentCentre(studentId),
+    studentLearningCentres: (studentIds) => studentCentres(studentIds),
     async importAliases() { return IMPORT_ALIASES; },
   };
 }

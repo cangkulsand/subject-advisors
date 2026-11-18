@@ -108,7 +108,7 @@ describe('POST forecast-imports/system-snapshots', () => {
   });
 
   it('selects ACTIVE student-role students of the programme and centre, with a coverage report and the source marker', async () => {
-    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentreId: vi.fn(async (id: number) => id === 4 ? 2 : 1) };
+    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentres: vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, id === 4 ? 2 : 1] as const))) };
     const { deps, stored } = fixture({ scopes });
     const response = await post(deps);
     expect(response.status).toBe(201);
@@ -153,8 +153,22 @@ describe('POST forecast-imports/system-snapshots', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'SYSTEM_SNAPSHOT_EMPTY' } });
   });
 
+  it('looks up every student centre in ONE call, so a large programme stays within the Workers subrequest limit', async () => {
+    const many: PortalStudentSelection = {
+      students: Array.from({ length: 120 }, (_, i) => ({ studentId: i + 1, studentName: 'Student ' + (i + 1), curriculumId: 10, eligible: true })),
+      records: [], otherProgrammeStudents: 0,
+    };
+    const studentLearningCentres = vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, id % 2 === 0 ? 1 : 2] as const)));
+    const { deps } = fixture({ selection: many, scopes: { ...testScopeProvider, studentLearningCentres } });
+    const response = await post(deps);
+    expect(response.status).toBe(201);
+    expect(studentLearningCentres).toHaveBeenCalledTimes(1);
+    expect(studentLearningCentres.mock.calls[0]![0]).toHaveLength(120);
+    expect((await data(response)).validationReport.coverage).toMatchObject({ studentsFound: 60, excluded: { otherCentre: 60 } });
+  });
+
   it('students without a centre are excluded and counted under otherCentre', async () => {
-    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentreId: vi.fn(async (id: number) => id === 4 ? null : 1) };
+    const scopes: ScopeProvider = { ...testScopeProvider, studentLearningCentres: vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, id === 4 ? null : 1] as const))) };
     const { deps } = fixture({ scopes });
     const snapshot = await data(await post(deps));
     expect(snapshot.validationReport.coverage.excluded.otherCentre).toBe(1);
