@@ -26,10 +26,10 @@ export function RoleSwitcher() {
     finally { setPending(false); }
   }
   return <div className="auth-role-switcher">
-    <label>Workspace view <select aria-label="Workspace view" value={roleForPath(path, me.appRole)} disabled={pending}
+    <select aria-label="Workspace view" title="Workspace view" value={roleForPath(path, me.appRole)} disabled={pending}
       onChange={event => { void change(event.target.value as AppRole); }}>
       {me.availableRoles.map(role => <option key={role} value={role}>{roleLabels[role]}</option>)}
-    </select></label>
+    </select>
     {pending && <span role="status">Checking access…</span>}
     {error && <p role="alert">{error}</p>}
   </div>;

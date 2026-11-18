@@ -176,13 +176,11 @@
   .admin-shell-admin .admin-topbar-title { color: var(--staff-nav-foreground); }
   .admin-shell-admin .admin-menu-button { color: var(--staff-nav-indicator); border-color: var(--staff-nav-indicator); }
   .admin-shell-admin .admin-menu-button:hover:not(:disabled) { background: var(--staff-nav-hover); color: var(--staff-nav-indicator); }
-  .admin-shell-admin .admin-topbar-actions .auth-role-switcher label { color: var(--staff-nav-foreground); }
   .admin-shell-admin .admin-topbar-actions button { color: var(--staff-nav-indicator); border-color: var(--staff-nav-indicator); }
   .admin-shell-admin .admin-topbar-actions button:hover:not(:disabled) { background: var(--staff-nav-hover); color: var(--staff-nav-indicator); }
   .admin-shell-admin .admin-topbar :focus-visible { outline-color: var(--staff-nav-indicator); }
   .admin-shell-admin .admin-topbar select { color: var(--color-heading); background: #fff; }
   .admin-topbar-actions { flex-wrap: wrap; gap: 10px; margin-left: auto; }
-  .admin-topbar-actions .auth-role-switcher label { font-size: var(--font-size-label); }
   .admin-topbar-actions .auth-role-switcher select { max-width: 150px; }
   .admin-content { padding: 18px 16px 36px; }
   .admin-page-heading { align-items: flex-start; flex-wrap: wrap; gap: 15px; }

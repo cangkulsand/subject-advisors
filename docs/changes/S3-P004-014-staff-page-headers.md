@@ -39,3 +39,10 @@ Owner request: remove repeated text from admin and coordinator pages and give ev
 
 - 2026-11-18 - Type: Changed. Staff pages: no breadcrumb or workspace eyebrow; role badge in the top bar; repeated
   scope-card titles removed.
+
+## Later changes
+
+- 2026-11-18 (owner request): the visible "Workspace view" text above the role selector is removed
+  (`auth/RoleSwitcher.tsx`, shared by staff and student shells); the select keeps the accessible name and a tooltip
+  "Workspace view". The top bar now fits on one row. Tests: admin 51 (new check: no visible "Workspace view" text),
+  integration 76, coordinator 56, auth 12 PASS; typecheck and lint pass.

@@ -122,6 +122,7 @@ else {
       assert.equal(await navigation.getByRole('link', { name: 'Users & Access', exact: true }).getAttribute('aria-current'), 'page');
       assert.equal(await navigation.getByRole('link', { name: 'Overview', exact: true }).getAttribute('aria-current'), null);
       const workspace = page.getByRole('combobox', { name: 'Workspace view' });
+      assert.equal(await page.getByText('Workspace view', { exact: true }).count(), 0, 'no visible Workspace view text above the role selector');
       assert.equal(await workspace.inputValue(), 'SYSTEM_ADMIN');
       await page.goto(base + '/coordinator'); await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       assert.equal(await page.getByRole('combobox', { name: 'Workspace view' }).inputValue(), 'COORDINATOR');
