@@ -194,8 +194,7 @@ try{
  await check('Graduation check needs a completed profile',async page=>{await mock(page,{setup:true});await page.goto(base+'/student/graduation');await page.waitForURL('**/student/setup');});
  for(const width of [1440,375])await check('Graduation plan shows completion, semesters, bottlenecks and assumptions at '+width,async page=>{
   const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Graduation plan');await page.waitForURL('**/student/plan');
-  const summary=page.getByRole('region',{name:'Plan summary'});await summary.locator('dd').getByText('2028/2029 – Semester 3 (Short Semester)',{exact:true}).waitFor();
-  await summary.locator('dd').getByText('2027/2028 – Semester 1',{exact:true}).waitFor();await summary.getByText('8 semesters from now',{exact:true}).waitFor();await summary.getByText('8 subjects',{exact:true}).waitFor();
+  await page.getByRole('group',{name:'Plan view'}).waitFor();assert.equal(await page.getByRole('region',{name:'Plan summary'}).count(),0,'no summary card');
   assert.ok(state.requests.some(r=>r.path==='/api/planning/input'&&r.method==='GET'));
   const semesters=page.locator('.planning-semester');assert.equal(await semesters.count(),8);
   assert.deepEqual(await semesters.first().locator('[data-subject]').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
@@ -221,12 +220,12 @@ try{
  }
  await check('Graduation plan opens on the board; postpone by drop, fail and replace from Move…, compare and reset',async page=>{
   await page.setViewportSize({width:1440,height:2400});
-  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   assert.equal(await page.getByRole('region',{name:'What if…'}).count(),0,'no What if form');
   assert.equal(await page.getByText('A semester-by-semester plan',{exact:false}).count(),0,'no lead text');
   assert.deepEqual(await page.getByRole('group',{name:'Plan view'}).getByRole('button').allInnerTexts(),['Semester plan','Dependencies']);
   assert.equal(await page.getByRole('group',{name:'Plan shown'}).count(),0,'only two tabs');
-  assert.ok(await page.evaluate(()=>!!(document.querySelector('.planning-board').compareDocumentPosition(document.querySelector('[aria-label="Plan summary"]'))&Node.DOCUMENT_POSITION_FOLLOWING)),'the board comes before the summary');
+  assert.equal(await page.getByRole('region',{name:'Plan summary'}).count(),0,'no summary card');
   assert.ok(await page.evaluate(()=>document.querySelector('.planning-board').getBoundingClientRect().top<500),'the board starts near the top of the page');
   await dragToPostpone(page,'DEML1112');
   const changes=page.getByRole('region',{name:'Your changes',exact:true});await changes.getByText('Postpone DEML1112 one semester',{exact:true}).waitFor();
@@ -270,7 +269,7 @@ try{
   await page.mouse.move(t.x+t.width/2,t.y+Math.min(t.height/2,24),{steps:20});await page.waitForTimeout(120);await page.mouse.move(t.x+t.width/2+2,t.y+Math.min(t.height/2,24)+2,{steps:2});await page.waitForTimeout(120);await page.mouse.up();
  }
  for(const width of [1440,375])await check('Plan semesters are coloured by semester number and show their type at '+width,async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   const panels=await page.locator('.planning-semester').evaluateAll(list=>list.map(el=>({no:el.dataset.semesterNo,color:getComputedStyle(el).borderLeftColor,text:el.textContent})));
   assert.equal(panels.length,8);
   const byNo={};for(const p of panels){byNo[p.no]??=new Set();byNo[p.no].add(p.color);}
@@ -282,7 +281,7 @@ try{
   await shot(page,'plan-board-'+width);
  },width);
  await check('Move… pins a subject, re-plans, saves and survives a reload',async page=>{
-  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.waitFor();
   await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
@@ -296,7 +295,7 @@ try{
  });
  await check('A refused move explains why and saves nothing',async page=>{
   await page.setViewportSize({width:1440,height:2400});
-  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});
   await dialog.getByText('now in',{exact:false}).waitFor();
@@ -313,7 +312,7 @@ try{
  });
  await check('Dragging a card to another semester moves it; dropping it back on its own semester does nothing',async page=>{
   await page.setViewportSize({width:1440,height:2400});
-  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await dragCard(page,'DEMB1013','2026/2027-2');await page.waitForTimeout(300);assert.equal((state.scenarioWrites??[]).length,0);
   await dragCard(page,'DEMB1013','2027/2028-2');
   await panel(page,'2027/2028-2').locator('[data-subject="DEMB1013"]').getByText('Placed here by you',{exact:true}).waitFor();
@@ -322,7 +321,7 @@ try{
   assert.equal(await page.locator('.planning-board [data-subject="DEMB1013"]').count(),1);
  });
  await check('Reset clears the saved what-if; a failed save can be retried',async page=>{
-  const state=await mock(page,{scenarioFail:true});await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page,{scenarioFail:true});await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
   const save=page.locator('.planning-save');await save.getByText('Not saved',{exact:true}).waitFor();
@@ -348,7 +347,7 @@ try{
   await page.goto(base+'/student/plan');await panel(page,'2027/2028-2').locator('[data-subject="DEMB1013"]').waitFor();
   assert.ok(await page.locator('.planning-grip').count()>0);await page.locator('.planning-postpone-zone').waitFor();
   await page.unrouteAll({behavior:'ignoreErrors'});
-  await mock(page,{plan:{...planFixture,start:null,limits:[]}});await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page,{plan:{...planFixture,start:null,limits:[]}});await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.locator('.planning-semester-head').getByText('Plan semester 1',{exact:true}).first().waitFor();
   assert.equal(await page.locator('.planning-grip').count(),0);assert.equal(await page.getByRole('button',{name:/^Move /}).count(),0);assert.equal(await page.locator('.planning-postpone-zone').count(),0);
  });
@@ -360,7 +359,7 @@ try{
   await page.getByRole('heading',{name:'Some subjects cannot be planned',exact:true}).waitFor();await page.getByText('Worth 12 credits, more than any semester allows.',{exact:false}).waitFor();
   await page.unrouteAll({behavior:'ignoreErrors'});
   const state={planFail:true};await mock(page,state);await page.goto(base+'/student/plan');await page.getByRole('alert').getByText('Please retry later.').waitFor();
-  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('group',{name:'Plan view'}).waitFor();
  });
  for(const width of [1440,375])await check('Recommendations rank the next semester, explain why and list alternatives at '+width,async page=>{
   const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Recommendations');await page.waitForURL('**/student/recommendations');
@@ -502,7 +501,7 @@ try{
   assert.equal(reads['/api/academic-records'],2);assert.equal(reads['/api/profile/options'],4);
  },1440);
   await check('A stale baseline stops writes, keeps the draft and refreshes after confirmation',async page=>{
-  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   state.plan={...planFixture,baselineVersion:'b'.repeat(64)};
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
@@ -522,11 +521,8 @@ try{
   assert.equal(await page.getByText('This plan view is out of date',{exact:false}).count(),0);
   assert.equal(state.scenarioWrites.length,1);
  });
- await check('Requirements card and comparison report recorded vs projected, and never fabricate completion',async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
-  const summary=page.getByRole('region',{name:'Plan summary'});
-  await summary.getByText('Programme requirements',{exact:false}).click();
-  await summary.locator('tbody tr[data-requirement="total"]').getByText('Projected',{exact:true}).waitFor();
+ await check('Comparison reports projected requirements and never fabricates completion',async page=>{
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await whatIfOption(page,'DEML1112','Postpone one semester');
   const compare=page.getByRole('region',{name:'Compare with your plan'});
   await compare.getByText('Requirement changes',{exact:false}).click();
@@ -536,19 +532,14 @@ try{
   await assertReadable(page,'plan requirements');
   await page.unrouteAll({behavior:'ignoreErrors'});
   await mock(page,{plan:{...planFixture,totalCredits:null}});
-  await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
-  await page.getByText('Cannot confirm yet',{exact:true}).waitFor();
-  const summary2=page.getByRole('region',{name:'Plan summary'});
-  await summary2.getByText('Programme requirements',{exact:false}).click();
-  await summary2.getByText('The total programme credit requirement is not configured',{exact:false}).waitFor();
-  await summary2.locator('tbody tr[data-requirement="total"]').getByText('Cannot verify',{exact:true}).waitFor();
+  await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await whatIfOption(page,'DEML1112','Postpone one semester');
   const incomplete=page.getByRole('region',{name:'Compare with your plan'});
   await incomplete.getByText('Cannot compare reliably',{exact:true}).waitFor();
   assert.equal(await incomplete.locator('dd').getByText('Cannot confirm yet',{exact:true}).count(),2);
  });
  await check('Dependencies view reuses the same plan and flags moved subjects',async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Dependencies',exact:true}).click();
   const deps=page.getByRole('region',{name:'Subject dependencies'});
   await deps.locator('.pathway-node').first().waitFor();
@@ -566,7 +557,7 @@ try{
   await assertReadable(page,'plan dependencies');await shotTop(page,'plan-deps-1440');
  },1440);
  await check('Dependencies view stays usable at 375 and 320',async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Dependencies',exact:true}).click();
   await page.locator('.pathway-node').first().waitFor();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -577,7 +568,7 @@ try{
   await shotTop(page,'plan-deps-320');
  },375);
  await check('A queued save is discarded when the page unmounts',async page=>{
-  const state=await mock(page,{holdSave:true});await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  const state=await mock(page,{holdSave:true});await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
   await page.waitForTimeout(300);
@@ -588,7 +579,7 @@ try{
   assert.equal(state.scenarioWrites.length,1);
  });
  await check('Move dialog names the current semester and unconfigured panels say they are not set up',async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});
   await dialog.getByText('now in',{exact:false}).waitFor();
@@ -597,12 +588,12 @@ try{
   await page.unrouteAll({behavior:'ignoreErrors'});
   const shortLimits=planFixture.limits.slice(0,4);
   await mock(page,{plan:{...planFixture,limits:shortLimits}});
-  await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByText('Not set up for moving subjects',{exact:true}).first().waitFor();
  });
  await check('Plan controls keep touch targets at 768 and stay usable at 200% zoom',async page=>{
   await page.setViewportSize({width:768,height:1000});
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   const heights=await page.locator('.planning-move').evaluateAll(list=>list.map(el=>el.getBoundingClientRect().height));
   assert.ok(heights.length>0&&heights.every(h=>h>=44));
   await shot(page,'plan-768');
@@ -613,23 +604,10 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2));
   await shotTop(page,'plan-zoom200');
  },768);
- await check('Summary follows the simulation and never confirms unmet requirements when done',async page=>{
-  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
-  const summary=page.getByRole('region',{name:'Plan summary'});
-  await summary.getByText('Your plan (baseline)',{exact:true}).waitFor();
-  await whatIfOption(page,'DEML1112','Postpone one semester');
-  await summary.getByText('With your changes (simulation)',{exact:true}).waitFor();
-  await page.unrouteAll({behavior:'ignoreErrors'});
-  await mock(page,{plan:{...planFixture,totalCredits:60,passed:[1,2,3,4,5,8,9,10],recorded:{1:{status:'COMPLETED',recognizedCredits:3},2:{status:'COMPLETED',recognizedCredits:3},3:{status:'COMPLETED',recognizedCredits:3},4:{status:'COMPLETED',recognizedCredits:3},5:{status:'COMPLETED',recognizedCredits:3},8:{status:'COMPLETED',recognizedCredits:2},9:{status:'COMPLETED',recognizedCredits:2},10:{status:'COMPLETED',recognizedCredits:2}},earnedCredits:21}});
-  await page.goto(base+'/student/plan');await page.getByText('No subjects left to plan',{exact:true}).waitFor();
-  await summary.getByText('Cannot confirm yet',{exact:true}).waitFor();
-  await summary.getByText('Programme requirements',{exact:false}).click();
-  await summary.locator('tbody tr[data-requirement="total"]').getByText('Outstanding',{exact:true}).waitFor();
- });
  await check('Planning controls and dialogs stay readable in dark mode',async page=>{
   await page.setViewportSize({width:1440,height:900});
   await mock(page);await page.goto(base+'/student/profile');await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();
-  await page.goto(base+'/student/plan');await page.getByRole('region',{name:'Plan summary'}).waitFor();
+  await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Dependencies',exact:true}).click();await page.locator('.pathway-node').first().waitFor();
   const contrast=await page.locator('.planning-toggle').evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,color:getComputedStyle(el.querySelector('button')).color};});
   assert.notEqual(contrast.bg,'rgb(243, 244, 246)');

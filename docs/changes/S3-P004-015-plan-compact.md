@@ -43,3 +43,12 @@ board first, make postponing a drag target, keep only the Semester plan and Depe
 
 - 2026-11-18 - Type: Changed. Graduation plan opens on the board; postpone by dropping on a zone; other what-ifs in
   Move…; only Semester plan and Dependencies tabs.
+
+## Later changes
+
+- 2026-11-18 (owner request, branch `feature/plan-no-summary`): the plan summary card below the board is removed
+  (estimated completion, earliest possible, still to take, and the programme requirements table). Kept as short
+  notices above the board: "No subjects left to plan" and "Some subjects cannot be planned" with the reasons. The
+  "Compare with your plan" card (shown once there are changes) still gives both completion semesters and the
+  requirement comparison. Tests: the summary-only test is removed; other plan tests wait for the plan tabs instead of
+  the summary. Integration UI 75 PASS, `npm test` 1841 passed, typecheck and lint pass.

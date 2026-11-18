@@ -19,47 +19,13 @@ const STATUS_LABEL: Record<RequirementProgress['status'], string> = {
   MET: 'Met', PROJECTED: 'Projected', OUTSTANDING: 'Outstanding', UNVERIFIED: 'Cannot verify',
 };
 
-const credits = (value: number | null) => value === null ? '—' : `${value} credits`;
-const count = (value: number | null) => value === null ? '—' : `${value}`;
-
-function Summary({ plan, assessment, label }: { plan: GraduationPlan; assessment: PlanAssessment; label: string }) {
-  const done = plan.status === 'DONE';
-  const confirmed = !done && assessment.complete && plan.status === 'PLANNED';
-  return <section className="planning-card" aria-label="Plan summary">
-    <p className="planning-eyebrow">{label}</p>
-    {done && <p className="planning-status planning-status--met">No subjects left to plan</p>}
-    <dl className="planning-summary">
-      <div><dt>Estimated completion</dt>
-        <dd>{done ? (assessment.complete ? 'Configured requirements met' : 'Cannot confirm yet')
-          : confirmed ? (plan.completion?.label ?? 'Cannot be planned yet') : 'Cannot confirm yet'}</dd>
-        {confirmed && plan.completion && <p>{plan.completion.index} semester{plan.completion.index === 1 ? '' : 's'} from now</p>}
-        {done && !assessment.complete && <p>Every subject is scheduled or recorded, but some requirements are outstanding or cannot be verified.</p>}
-        {!done && !confirmed && <p>Some requirements are outstanding or cannot be verified; see the requirement rows below.</p>}</div>
-      <div><dt>Earliest possible</dt><dd>{plan.earliest?.label ?? '—'}</dd><p>Theoretical lower bound — not a guaranteed date</p></div>
-      <div><dt>Still to take</dt><dd>{plan.remainingSubjects} subjects</dd><p>{plan.remainingCredits} credits</p></div>
-    </dl>
+/** What the board alone cannot say: nothing left to plan, or subjects that cannot be placed at all. */
+function PlanNotices({ plan }: { plan: GraduationPlan }) {
+  return <>
+    {plan.status === 'DONE' && <p className="planning-status planning-status--met" role="status">No subjects left to plan</p>}
     {plan.unplanned.length > 0 && <div className="planning-warning" role="status"><h3>Some subjects cannot be planned</h3>
       <ul>{plan.unplanned.map(u => <li key={u.curriculumSubjectId}><strong>{u.subjectCode}</strong> {u.subjectName}: {u.reason}</li>)}</ul></div>}
-    <details className="planning-requirements">
-      <summary>Programme requirements{assessment.complete ? ' (all met or projected)' : ' (attention needed)'}</summary>
-      {assessment.warnings.length > 0 && <div className="planning-warning" role="status"><ul>{assessment.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}
-      <div className="planning-table-scroll" role="region" aria-label="Programme requirements" tabIndex={0}>
-        <table className="planning-table">
-          <thead><tr><th scope="col">Requirement</th><th scope="col">Target</th><th scope="col">Recorded</th><th scope="col">With this plan</th><th scope="col">Left</th><th scope="col">Status</th><th scope="col">Done by</th></tr></thead>
-          <tbody>{assessment.requirements.map(row => <tr key={row.key} data-requirement={row.key}>
-            <th scope="row">{row.name}</th>
-            <td>{count(row.requiredSubjects)} subjects · {credits(row.requiredCredits)}</td>
-            <td>{count(row.recordedSubjects)} subjects · {credits(row.recordedCredits)}</td>
-            <td>{count(row.projectedSubjects)} subjects · {credits(row.projectedCredits)}</td>
-            <td>{count(row.remainingSubjects)} subjects · {credits(row.remainingCredits)}</td>
-            <td><span className={'planning-req planning-req--' + row.status.toLowerCase()}>{STATUS_LABEL[row.status]}</span></td>
-            <td>{row.status === 'PROJECTED' ? (row.completion?.label ?? 'Cannot be placed') : '—'}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-      <p className="planning-muted">Recorded means an actual record on file; the plan column adds this view&apos;s hypothetical semesters.</p>
-    </details>
-  </section>;
+  </>;
 }
 
 /** The what-if changes as a compact list with Remove, and Reset (the changes themselves are made on the board). */
@@ -180,8 +146,6 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
   }, [api, refresh]);
   const baseline = useMemo(() => input ? planBaseline(input) : null, [input]);
   const scenario = useMemo(() => input && changes.length ? planScenario(input, changes) : null, [input, changes]);
-  const baselineAssessment = useMemo(() => input && baseline ? assessPlan(input, baseline) : null, [input, baseline]);
-  const scenarioAssessment = useMemo(() => input && scenario ? assessPlan(input, scenario) : null, [input, scenario]);
   /** Shows and saves a list already checked by the engine; null resets. Returns a refusal when the list no longer holds. */
   const apply = (next: ScenarioChange[] | null): string | null => {
     if (!input) return null;
@@ -201,7 +165,6 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
     else setRefresh(n => n + 1);
   };
   const shown = scenario ?? baseline;
-  const shownAssessment = scenarioAssessment ?? baselineAssessment;
   const saving = status === 'saving';
   const closeDialog = (after: 'trigger' | 'refresh') => {
     setPendingFocus(after === 'trigger' ? dialogTriggerRef.current : refreshButtonRef.current);
@@ -214,11 +177,12 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
       </div></header>
     {error && <div role="alert" className="planning-error"><p>{error}</p><button type="button" className="planning-button" onClick={() => setRefresh(n => n + 1)}>Try again</button></div>}
     {!input && !error && <p role="status">Loading your graduation plan…</p>}
-    {input && baseline && baselineAssessment && shown && shownAssessment && <>
+    {input && baseline && shown && <>
       {outdated && <div className="planning-stale" role="status"><WarningIcon /><span>This plan view is out of date: your programme, records or semester setup changed, so your latest change was not saved. Refresh the plan to keep working.</span>
         <button type="button" className="planning-button" disabled={saving} onClick={event => requestRefresh(event.currentTarget)}>Refresh plan</button></div>}
       {stale && <p className="planning-stale" role="status"><WarningIcon />Some saved changes no longer apply and were removed.</p>}
       {outdated && changes.length > 0 && <p className="planning-stale" role="status"><WarningIcon />Your unsaved what-if changes are still shown below, out of date; nothing more will be saved until you refresh.</p>}
+      <PlanNotices plan={shown}/>
       {shown && <div className="planning-toolbar">
         <div className="planning-toggle" role="group" aria-label="Plan view">
           <button type="button" aria-pressed={board === 'plan'} onClick={() => setBoard('plan')}>Semester plan</button>
@@ -230,7 +194,6 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
         heading={shown === scenario ? 'Plan with your changes' : 'Your plan'}
         onChange={next => { apply(next); }}/>}
       {shown && board === 'dependencies' && <PlanDependencies input={input} plan={shown} baseline={scenario ? baseline : null}/>}
-      <Summary plan={shown} assessment={shownAssessment} label={scenario ? 'With your changes (simulation)' : 'Your plan (baseline)'}/>
       {!outdated && scenario && <Comparison input={input} baseline={baseline} scenario={scenario}/>}
       {baseline.bottlenecks.length > 0 && <section className="planning-card" aria-labelledby="planning-bottleneck-heading">
         <h2 id="planning-bottleneck-heading">Subjects not to delay</h2>
