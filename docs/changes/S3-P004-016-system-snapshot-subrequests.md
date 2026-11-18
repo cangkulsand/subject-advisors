@@ -1,6 +1,6 @@
 # S3-P004-016 — "Students in the system" snapshot failed for large programmes (Workers subrequest limit)
 
-- **Status:** On branch `hotfix/system-snapshot-centres` (not merged)
+- **Status:** MERGED to main (fast-forward, ed6d141) and deployed to dev and prod on 2026-11-18
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3 (hotfix)
 - **Owner:** P004 (M6, UC20)
