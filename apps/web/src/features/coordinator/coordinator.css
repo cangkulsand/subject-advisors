@@ -225,3 +225,13 @@
 .coordinator-action-bar.is-first { margin-top: 0; padding-top: 0; border-top: 0; }
 @media (max-width: 1050px) { .admin-shell .coordinator-upload-meta { grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); } .coordinator-template-cell { grid-column: 1 / -1; } .coordinator-label-spacer { display: none; } }
 @media (max-width: 760px) { .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-meta { grid-template-columns: 1fr; } }
+
+/* Forecast table (S3-P004-017): the eligible count opens View students; Uncertain has its own column. */
+.admin-shell .coordinator-count-button { display: inline-flex; align-items: center; gap: 8px; min-height: var(--control-min-height); padding: 4px 12px; border: 1.5px solid var(--color-brand); border-radius: 8px; background: #fff; color: var(--color-brand); font-weight: 650; cursor: pointer; }
+.admin-shell .coordinator-count-button:hover { background: var(--color-surface-subtle); }
+.admin-shell .coordinator-count-button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.admin-shell .coordinator-count-button .coordinator-number { color: inherit; }
+.coordinator-count-icon { flex: none; }
+.coordinator-uncertain { color: #92400e; font-weight: 650; }
+.coordinator-zero { color: var(--color-muted-text); }
+.coordinator-decisions td { vertical-align: middle; }

@@ -96,6 +96,7 @@ function buildRows(run: ForecastRunDetail, decisions: OfferingDecision[]): Subje
   return rows;
 }
 
+const studentsIcon = <svg className="coordinator-count-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const SORT_LABELS = { eligible: 'Eligible to take', name: 'Subject name', code: 'Subject code' } as const;
 type SubjectSort = keyof typeof SORT_LABELS;
 interface SubjectFilters { q: string; type: string; status: string; flag: string; sort: SubjectSort }
@@ -162,13 +163,16 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
   const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={runId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} cache={studentCache} onClose={() => setStudentsFor(null)}/>;
   if (matching.length === 0) return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-empty" role="status"><p>{subjects.length === 0 ? 'Every subject has been removed.' : 'No subjects match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div></div>{side}{studentsDialog}{pickersDialog}</div>;
   return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects coordinator-decisions" role="region" aria-label="Subjects table" tabIndex={0}>
-    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Not taken yet" text={HELP.notTakenYet}/></th><th scope="col"><Help label="Eligible to take" text={HELP.eligible}/></th><th scope="col"><Help label="Action" text={HELP.action}/></th>{closed && <th scope="col"><Help label="Picked" text={HELP.picked}/></th>}</tr></thead>
+    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Not taken yet" text={HELP.notTakenYet}/></th><th scope="col"><Help label="Eligible to take" text={HELP.eligible}/></th><th scope="col"><Help label="Uncertain" text={HELP.uncertain}/></th><th scope="col"><Help label="Action" text={HELP.action}/></th>{closed && <th scope="col"><Help label="Picked" text={HELP.picked}/></th>}</tr></thead>
       <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(row => <tr key={row.subjectId} data-subject={row.subjectCode}>
         <th scope="row"><strong>{row.subjectName}</strong><span className="coordinator-subject-code">{row.subjectCode}</span><span className="admin-audit-id">{classTypeLabel(row.classType)} · {row.creditHours} credit hours</span>
           {!row.inSnapshot && <span className="admin-pill coordinator-pill-muted">not in this snapshot</span>}</th>
         <td><strong className="coordinator-number">{row.notTaken ?? '—'}</strong></td>
-        <td><strong className="coordinator-number">{row.eligible ?? '—'}</strong>
-          {row.run && <button type="button" className="coordinator-expander coordinator-students-button" aria-haspopup="dialog" aria-label={`View students for ${row.subjectCode}`} onClick={() => setStudentsFor(row)}>{row.run.uncertainStudentCount > 0 ? `${row.run.uncertainStudentCount} uncertain · View students` : 'View students'}</button>}</td>
+        <td>{row.run
+          ? <button type="button" className="coordinator-count-button" aria-haspopup="dialog" aria-label={`View students for ${row.subjectCode}`} title="View students" onClick={() => setStudentsFor(row)}>
+            <span className="coordinator-number">{row.eligible ?? 0}</span>{studentsIcon}</button>
+          : <strong className="coordinator-number">{row.eligible ?? '—'}</strong>}</td>
+        <td><span className={'coordinator-number' + (row.run && row.run.uncertainStudentCount > 0 ? ' coordinator-uncertain' : ' coordinator-zero')}>{row.run ? row.run.uncertainStudentCount : '—'}</span></td>
         <td>{editable ? <ActionMenu row={row} onDecide={onDecide}/> : <span className={'admin-pill ' + statusClass[row.status]}>{statusLabels[row.status]}</span>}</td>
         {closed && <td>{row.status === 'APPROVED'
           ? <><strong className="coordinator-number">{pickCounts.get(row.subjectId) ?? 0}</strong>

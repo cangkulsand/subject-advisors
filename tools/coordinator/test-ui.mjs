@@ -338,8 +338,8 @@ else {
       assert.deepEqual(post.body, { ...scopeBody, importBatchId: 1, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
       assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013', 'SECD2523', 'SECJ1023']);
       const table = page.getByRole('region', { name: 'Subjects table', exact: true });
-      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Subject', 'Not taken yet', 'Eligible to take', 'Action']);
-      assert.deepEqual(await table.locator('tr[data-subject="SCSJ1013"] .coordinator-number').allInnerTexts(), ['78', '71'], 'not taken yet = in curriculum minus passed; eligible to take');
+      assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Subject', 'Not taken yet', 'Eligible to take', 'Uncertain', 'Action']);
+      assert.deepEqual(await table.locator('tr[data-subject="SCSJ1013"] .coordinator-number').allInnerTexts(), ['78', '71', '5'], 'not taken yet = in curriculum minus passed; eligible to take; uncertain');
       assert.deepEqual(await page.locator('tr[data-subject="SECJ1013"] th > *').evaluateAll(items => items.map(item => item.textContent.trim())), ['Programming Technique I', 'SECJ1013', 'Lab · 3 credit hours'], 'name first, then code and class type');
       assert.ok(!(await page.locator('body').innerText()).includes('Potential demand'), 'the potential demand label is gone');
       assert.ok(page.url().includes('snapshot=1'));
@@ -439,8 +439,8 @@ else {
       assert.equal(await page.getByRole('button', { name: /^Action for / }).count(), 0, 'no dropdown');
       assert.equal(await page.getByRole('button', { name: /^Add back / }).count(), 0, 'no add back');
       await page.getByRole('columnheader', { name: /^Picked/ }).waitFor();
-      assert.equal((await page.locator('tr[data-subject="SECJ1013"] td').nth(3).innerText()).replace(/\s+/g, ' ').trim().startsWith('3'), true, 'approved subject shows its count');
-      assert.equal((await page.locator('tr[data-subject="SCSJ1013"] td').nth(3).innerText()).trim(), '—', 'a pending subject shows a dash');
+      assert.equal((await page.locator('tr[data-subject="SECJ1013"] td').nth(4).innerText()).replace(/\s+/g, ' ').trim().startsWith('3'), true, 'approved subject shows its count');
+      assert.equal((await page.locator('tr[data-subject="SCSJ1013"] td').nth(4).innerText()).trim(), '—', 'a pending subject shows a dash');
       await page.screenshot({ path: shots + 'forecast-closed-picked-desktop.png' });
       const pickerRequests = () => state.requests.filter(item => /offering-decisions\/101\/pickers/.test(JSON.stringify(item))).length;
       await page.getByRole('button', { name: 'View pickers for SECJ1013' }).click();
@@ -487,7 +487,7 @@ else {
       await page.locator('tr[data-subject="SECJ1013"]').getByRole('button', { name: /^Action for SECJ1013: Approved$/ }).waitFor();
       const missing = page.locator('tr[data-subject="SECJ2203"]');
       assert.ok((await missing.innerText()).includes('not in this snapshot'));
-      assert.deepEqual(await missing.locator('.coordinator-number').allInnerTexts(), ['—', '—']);
+      assert.deepEqual(await missing.locator('.coordinator-number').allInnerTexts(), ['—', '—', '—']);
       assert.equal(await missing.getByRole('button', { name: /View students/ }).count(), 0, 'no student list without a snapshot count');
       await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1023"]').waitFor();
       await page.screenshot({ path: shots + 'forecast-decisions-carry-over-desktop.png', fullPage: true });
@@ -582,6 +582,11 @@ else {
       const state = await mock(page, { seed: 'run' });
       await page.goto(base + forecastUrl); await forecastReady(page);
       const lab = page.locator('tr[data-subject="SECJ1013"]'), button = lab.getByRole('button', { name: 'View students for SECJ1013' });
+      await button.waitFor();
+      assert.deepEqual((await page.getByRole('region', { name: 'Subjects table' }).locator('thead th').allInnerTexts()).map(text => text.trim()).slice(0, 5), ['Subject', 'Not taken yet', 'Eligible to take', 'Uncertain', 'Action'], 'Uncertain has its own column');
+      assert.equal((await button.innerText()).trim(), '46', 'the eligible count is the View students button');
+      assert.equal((await lab.locator('td').nth(2).innerText()).trim(), '3', 'the uncertain count sits in its own column');
+      assert.equal(await lab.getByText(/uncertain · View students/).count(), 0, 'no separate uncertain button text');
       await button.click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
       await dialog.getByLabel('Student counts').waitFor();
