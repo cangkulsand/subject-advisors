@@ -1,7 +1,7 @@
 # SRS/SDD v2.4 amendment — Forecast versions and comparison dropped (2026-11-18)
 
 - **Source decision:** Product owner (P004), 2026-11-18. Change record: [S3-P004-012](../changes/S3-P004-012-drop-forecast-comparison.md).
-- **Target document:** `UTMSPACE_SRS_SDD_v2.4 (15 Nov).docx`. The `.docx` has **not** been edited; the owner applies this amendment to it (for example as v2.5).
+- **Target document:** `UTMSPACE_SRS_SDD_v2.4 (15 Nov).docx`. Applied on 2026-11-18 as `UTMSPACE_SRS_SDD_v2.5 (18 Nov).docx` (v2.4 kept unchanged). v2.5 also corrects the cover (VERSION 2.3, 10 November) and the footer (Version 2.2), keeps `learning_centre_id` as used for filtering, and updates two lines that still called the Offering History page "planned" (UC20 extension points; change log).
 - **Reading guide:** each item gives the affected place, the **old** text and the **new** text.
 
 ## The decision in one paragraph

@@ -20,6 +20,8 @@ plan listed "forecast versioning/comparison" under Sprint 3; v2.4 already remove
   SRS v2.4 (Sprint 4 test row, FR-H14 wording, ForecastRun data dictionary, change-log row, revision history).
 - `docs/databaseimplementation.md`: note that the database still has the forecast version columns and checks,
   but the system does not use them.
+- `docs/System Documents/UTMSPACE_SRS_SDD_v2.5 (18 Nov).docx` (owner's copy, not tracked in git): v2.4 with this
+  amendment applied; checked by opening it in Microsoft Word (146 pages) and the XML validator.
 - No code change. The database columns and their constraints stay, so no migration is needed.
 - Not affected: the student plan comparison (UC14–UC16).
 
