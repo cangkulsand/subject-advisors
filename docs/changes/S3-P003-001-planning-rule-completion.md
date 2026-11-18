@@ -1,7 +1,7 @@
 # S3-P003-001 — Planning rule completion (co-requisites, 2-credit types, far-future pins)
 
 - Owner: P003 Sprint 3 (UC14-UC16 planning correctness)
-- Status: REVIEWED (lead pass; human approval pending)
+- Status: MERGED to `main` on 2026-11-18 (merge commit fe12c47, branch `p003-sprint3-uc14-uc16`, commit dec5d37); integration lead review and full re-verification passed (see "Integration review" in S3-P003-002)
 - Scope: `packages/shared/src/planning`, `apps/api/src/modules/planning`, this record. No UI, no dependencies, no migrations, no P002 changes.
 
 ## 1. Plan (2026-11-17)

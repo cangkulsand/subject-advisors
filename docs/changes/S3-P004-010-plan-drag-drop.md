@@ -10,6 +10,10 @@
   `docs/superpowers/plans/2026-11-17-plan-drag-drop.md`
 - **Reviewer:** Pending
 
+## Later changes
+
+- 2026-11-18: S3-P003-001 / S3-P003-002 (Harraz, merged fe12c47) fixed three of the deferred minors: the 422 "Not saved" loop (now an out-of-date banner with Refresh plan), the Move dialog reasons and current semester, and pins far beyond the plan; unconfigured panels are now labelled.
+
 ## 1. Plan
 
 The project owner asked for a more interactive `/student/plan`:

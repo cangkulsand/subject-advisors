@@ -1,7 +1,7 @@
 # S3-P003-002 — Sprint 3 planning workspace (freshness, requirement comparison, dependencies view)
 
 - Owner: P003 Sprint 3 (UC14–UC16 completion, FR-E2–E6, FR-F1–F5)
-- Status: READY_FOR_REVIEW
+- Status: MERGED to `main` on 2026-11-18 (merge commit fe12c47, branch `p003-sprint3-uc14-uc16`, commit dec5d37); integration lead review and full re-verification passed (see section "Integration review" below)
 - Depends on: S3-P003-001 (lead review pass; human pending)
 - Scope: `packages/shared/src/planning`, `apps/api/src/modules/planning`,
   `apps/web/src/features/planning`, minimal optional `annotations` prop
@@ -219,3 +219,10 @@ control smoke, evidence under `.wrangler/m5-sprint3-review/step2`.
   semester-type default is a separate cross-module follow-up.
 - Status: READY_FOR_REVIEW - final gate green; lead review passed on
   source, regression evidence and final verification; human approval pending.
+
+
+## Integration review (P004, 2026-11-18)
+
+Reviewed the diff against `main` (ce46833) and re-ran everything on the branch with Chrome: typecheck, lint, check:cloudflare pass; `npm test` 1841 passed (65 skipped); browser checks integration 76, admin 51, coordinator 55, landing 9, auth 12. The changes to integration-lead files (`tools/integration/test-ui.mjs`, `apps/web/src/features/pathway/TalentTree.tsx`) were checked: existing checks are kept (only the save-body and selector updates the new token and summary need), the `totalCredits` fixture change 27 → 21 is correct, and the TalentTree `annotations` prop is optional (UC17 unchanged). The 2-credit Short default matches `docs/database/subject-configuration-rules.md`. Merged as-is with a merge commit; no code changed by the lead.
+
+Notes kept open: a what-if change still waiting to be sent is dropped if the student leaves the page while an earlier save is in flight (the save in flight still completes); the Move dialog now runs one simulation per configured semester (up to 60); not yet tried against live Neon data.
