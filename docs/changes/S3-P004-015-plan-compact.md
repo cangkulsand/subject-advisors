@@ -1,6 +1,6 @@
 # S3-P004-015 — Graduation plan: board first, Postpone drop zone, two tabs, no What-if form
 
-- **Status:** On branch `feature/plan-compact` (not merged)
+- **Status:** MERGED to main (fast-forward, 45f9dda) and deployed to dev and prod on 2026-11-18
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3
 - **Owner:** P004 (built for P003 UC14–UC16)
