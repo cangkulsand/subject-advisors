@@ -46,6 +46,19 @@ describe('toPlanningInput', () => {
     expect(input.limits).toHaveLength(3);
     expect(input).toMatchObject({ programmeName: 'Software Engineering', totalCredits: 120, requirements: [{ requirementType: 'CORE' }] });
   });
+  it('maps mandatory, co-requisite and recommended links to the right fields', () => {
+    const input = toPlanningInput(rows({ prerequisites: [
+      { curriculumSubjectId: 12, requiredCurriculumSubjectId: 11 },
+      { curriculumSubjectId: 12, requiredCurriculumSubjectId: 13, requirementType: 'MANDATORY' },
+      { curriculumSubjectId: 11, requiredCurriculumSubjectId: 13, requirementType: 'COREQUISITE' },
+      { curriculumSubjectId: 12, requiredCurriculumSubjectId: 13, requirementType: 'RECOMMENDED' },
+    ] }));
+    const byCode = (code: string) => input.subjects.find(s => s.subjectCode === code)!;
+    expect(byCode('SECJ1023').prerequisites).toEqual([11, 13]);
+    expect(byCode('SECJ1013').corequisites).toEqual([13]);
+    expect(byCode('SECJ1023').corequisites).toBeUndefined();
+    expect(byCode('UHLB1112').prerequisites).toEqual([]);
+  });
   it('counts COMPLETED with full credits and EXEMPTED as the Subject records page saves them (remarks optional)', () => {
     const records = [
       { subjectId: 101, status: 'COMPLETED', recognizedCredits: 0, remarks: null },
@@ -86,6 +99,21 @@ describe('createPlanningRepository', () => {
     expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: [11], subjects: [{ subjectCode: 'SECJ1013', compulsory: true }] });
     expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM public.offering_decision'), [5, 2, 4]);
   });
+  it('reads mandatory and co-requisite links with one parameterized query', async () => {
+    const query = vi.fn(async (text: string) => {
+      if (text.includes('FROM public.student_profile sp')) return [{ curriculum_id: 1, learning_centre_id: 2, programme_id: 5, curriculum_version: '2024', total_credit_required: 120, programme_name: 'SE' }];
+      if (text.includes('FROM public.subject_prerequisite')) return [{ curriculum_subject_id: 11, required_curriculum_subject_id: 12, requirement_type: 'COREQUISITE' }];
+      if (text.includes('FROM public.academic_semester')) return [{ semester_id: 3, academic_year: '2026/2027', semester_no: 1, max_subjects: 3, max_credits: 10, is_current: true }];
+      if (text.includes('FROM public.curriculum_subject cs JOIN public.subject')) return [{ curriculum_subject_id: 11, subject_id: 101, subject_code: 'A', subject_name: 'A', credit_hours: 3, subject_category: 'Core', is_compulsory: 1 }, { curriculum_subject_id: 12, subject_id: 102, subject_code: 'B', subject_name: 'B', credit_hours: 3, subject_category: 'Core', is_compulsory: 1 }];
+      return [];
+    });
+    const input = await createPlanningRepository({ query, transaction: vi.fn() }).load('student_a');
+    const call = query.mock.calls.find(([text]) => String(text).includes('FROM public.subject_prerequisite')) as unknown as [string, unknown[]];
+    expect(String(call[0])).toContain("p.requirement_type IN ('MANDATORY', 'COREQUISITE')");
+    expect(String(call[0])).toContain('cs.curriculum_id = $1');
+    expect(call[1]).toEqual([1]);
+    expect(input?.subjects.find(s => s.curriculumSubjectId === 11)?.corequisites).toEqual([12]);
+  });
 });
 
 function deps(role: 'STUDENT' | 'COORDINATOR' = 'STUDENT') {
@@ -110,7 +138,9 @@ describe('planning route', () => {
     const res = (await handlePlanningRequest(req('/api/planning/input'), d))!;
     expect(res.status).toBe(200);
     expect(repository.load).toHaveBeenCalledWith('student_a');
-    expect(await res.json()).toEqual({ data: toPlanningInput(rows()) });
+    const body = await res.json() as { data: ReturnType<typeof toPlanningInput> };
+    expect(body.data).toMatchObject(toPlanningInput(rows()));
+    expect(body.data.baselineVersion).toMatch(/^[0-9a-f]{64}$/);
   });
   it('checks sign-in before the method', async () => {
     const { d } = deps(); (d.auth.verify as ReturnType<typeof vi.fn>).mockRejectedValue(Object.assign(new Error('no session'), { status: 401 }));

@@ -238,3 +238,137 @@ describe('PLACE (S3-P004-010)', () => {
     expect(plan.semesters.flatMap(s => s.subjects).every(s => !s.pinned)).toBe(true);
   });
 });
+
+describe('co-requisites and semester-type defaults (S3-P003-001)', () => {
+  const only = (list: PlanningSubject[], extra: Partial<PlanningInput> = {}) => input({ subjects: list, requirements: [], ...extra });
+  const at = (plan: ReturnType<typeof planBaseline>, code: string) => plan.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === code && !x.failedAttempt));
+  it('schedules reciprocal co-requisites together in one semester', () => {
+    const plan = planBaseline(only([subject(1, 'SECC1013', 3, { corequisites: [2] }), subject(2, 'SECC1023', 3, { corequisites: [1] })]));
+    expect(plan.status).toBe('PLANNED');
+    expect(at(plan, 'SECC1013')).toBe(0);
+    expect(at(plan, 'SECC1023')).toBe(0);
+  });
+  it('is satisfied by a passed or earlier partner and accepts a one-way link', () => {
+    const plan = planBaseline(only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)], { passed: [2] }));
+    expect(plan.status).toBe('PLANNED');
+    expect(plan.semesters.flatMap(s => s.subjects).map(x => x.subjectCode)).toEqual(['A']);
+    const later = planBaseline(only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)]));
+    expect(at(later, 'A')).toBe(at(later, 'B'));
+  });
+  it('pulls an optional co-requisite partner into the needed set', () => {
+    const plan = planBaseline(input({
+      subjects: [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3, { compulsory: false })],
+      requirements: [{ requirementType: 'CORE', requiredSubjects: 1, requiredCredits: null }],
+    }));
+    const index = at(plan, 'A');
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(plan.semesters[index]!.subjects.map(x => x.subjectCode)).toEqual(['A', 'B']);
+  });
+  it('blocks with a named reason when the partner is not in the curriculum', () => {
+    const plan = planBaseline(only([subject(1, 'A', 3, { corequisites: [77] })]));
+    expect(plan.status).toBe('INCOMPLETE');
+    expect(plan.unplanned[0]!.reason).toContain('co-requisite');
+  });
+  it('blocks with a named reason when the partner cannot be planned at all', () => {
+    const plan = planBaseline(only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 99)]));
+    expect(plan.status).toBe('INCOMPLETE');
+    expect(plan.unplanned.find(u => u.subjectCode === 'A')!.reason).toContain('co-requisite');
+  });
+  it('refuses a bundle where a member needs another member as a mandatory prerequisite', () => {
+    const plan = planBaseline(only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3, { prerequisites: [1] })]));
+    expect(plan.status).toBe('INCOMPLETE');
+  });
+  it('refuses a reciprocal bundle that exceeds the subject cap', () => {
+    const plan = planBaseline(only(
+      [subject(1, 'A', 3, { corequisites: [2, 3] }), subject(2, 'B', 3, { corequisites: [1] }), subject(3, 'C', 3, { corequisites: [1] })],
+      { limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 2, maxCredits: 20 }] }));
+    expect(plan.status).toBe('INCOMPLETE');
+    expect(plan.semesters.flatMap(s => s.subjects)).toHaveLength(0);
+  });
+  it('applies first-semester approval and semester type to every bundle member', () => {
+    const data = input({
+      subjects: [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)],
+      requirements: [], approvedFirst: [1],
+    });
+    expect(planBaseline(data).semesters[0]!.subjects).toHaveLength(0);
+  });
+  it('places a mixed-type reciprocal pair in the one semester type they share', () => {
+    const plan = planBaseline(only([
+      subject(1, 'A', 3, { corequisites: [2], semesterTypes: ['NORMAL', 'SHORT'] }),
+      subject(2, 'B', 3, { corequisites: [1], semesterTypes: ['SHORT'] }),
+    ]));
+    expect(plan.status).toBe('PLANNED');
+    const index = at(plan, 'A');
+    expect(plan.semesters[index]!.semesterType).toBe('SHORT');
+    expect(at(plan, 'B')).toBe(index);
+  });
+  it('never places a co-requisite later than the subject that needs it', () => {
+    const list = [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3, { corequisites: [3] }), subject(3, 'C', 3)];
+    const plan = planBaseline(only(list));
+    expect(plan.status).toBe('PLANNED');
+    for (const s of list) for (const partner of s.corequisites ?? []) {
+      expect(at(plan, list.find(x => x.curriculumSubjectId === partner)!.subjectCode)).toBeLessThanOrEqual(at(plan, s.subjectCode));
+    }
+  });
+  it('keeps a mandatory prerequisite strictly earlier than the co-requisite placement', () => {
+    const plan = planScenario(only([subject(1, 'A', 3, { corequisites: [3], prerequisites: [2] }), subject(2, 'B', 3), subject(3, 'C', 3)]),
+      [{ kind: 'PLACE', curriculumSubjectId: 1, semester: { academicYear: '2027/2028', semesterNo: 1 } }]);
+    expect(plan.status).toBe('PLANNED');
+    expect(at(plan, 'B')).toBeLessThan(at(plan, 'A'));
+    expect(at(plan, 'C')).toBeLessThanOrEqual(at(plan, 'A'));
+  });
+});
+
+describe('two-credit semester defaults (S3-P003-001)', () => {
+  const only = (list: PlanningSubject[], extra: Partial<PlanningInput> = {}) => input({ subjects: list, requirements: [], ...extra });
+  const at = (plan: ReturnType<typeof planBaseline>, code: string) => plan.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === code && !x.failedAttempt));
+  it('places an unconfigured 2-credit subject only in Short semesters', () => {
+    const plan = planBaseline(only([subject(1, 'UHLX1112', 2, { semesterTypes: [] })]));
+    expect(plan.status).toBe('PLANNED');
+    const index = at(plan, 'UHLX1112');
+    expect(plan.semesters[index]!.semesterType).toBe('SHORT');
+    expect(plan.assumptions.join(' ')).toContain('2 credit');
+  });
+  it('honours an explicitly approved Normal exception for a 2-credit subject', () => {
+    const plan = planBaseline(only([subject(1, 'UHLX2112', 2, { semesterTypes: ['NORMAL'] })]));
+    expect(plan.status).toBe('PLANNED');
+    expect(plan.semesters[0]!.subjects.map(x => x.subjectCode)).toContain('UHLX2112');
+  });
+  it('keeps an unconfigured 2-credit prerequisite chain in three separate Short semesters', () => {
+    const chain = [
+      subject(1, 'EN1', 2, { semesterTypes: [] }), subject(2, 'EN2', 2, { semesterTypes: [], prerequisites: [1] }),
+      subject(3, 'EN3', 2, { semesterTypes: [], prerequisites: [2] }),
+    ];
+    const plan = planBaseline(only(chain));
+    const types = [at(plan, 'EN1'), at(plan, 'EN2'), at(plan, 'EN3')].map(i => plan.semesters[i]!.semesterType);
+    expect(types).toEqual(['SHORT', 'SHORT', 'SHORT']);
+  });
+});
+
+describe('far-future pins and targets (S3-P003-001)', () => {
+  const only = (list: PlanningSubject[], extra: Partial<PlanningInput> = {}) => input({ subjects: list, requirements: [], ...extra });
+  const at = (plan: ReturnType<typeof planBaseline>, code: string) => plan.semesters.findIndex(s => s.subjects.some(x => x.subjectCode === code && !x.failedAttempt));
+  const start = { academicYear: '2026/2027', semesterNo: 2 };
+  it('keeps a pin more than nine empty semesters out and still schedules its dependent', () => {
+    const plan = planScenario(only([subject(1, 'A', 3), subject(2, 'B', 3, { prerequisites: [1] })]),
+      [{ kind: 'PLACE', curriculumSubjectId: 1, semester: semesterAt(start, 15) }]);
+    expect(plan.status).toBe('PLANNED');
+    expect(at(plan, 'A')).toBe(15);
+    expect(at(plan, 'B')).toBeGreaterThan(15);
+  });
+  it('accepts a pin at the horizon boundary (offset 59)', () => {
+    const plan = planScenario(only([subject(1, 'A', 3)]), [{ kind: 'PLACE', curriculumSubjectId: 1, semester: semesterAt(start, 59) }]);
+    expect(at(plan, 'A')).toBe(59);
+  });
+  it('still terminates on a deadlocked graph', () => {
+    const plan = planBaseline(only([subject(1, 'A', 3, { prerequisites: [2] }), subject(2, 'B', 3, { prerequisites: [1] })]));
+    expect(plan.status).toBe('INCOMPLETE');
+  });
+  it('does not mutate its input and is deterministic', () => {
+    const data = only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)]);
+    const snapshot = JSON.stringify(data);
+    const changes = [{ kind: 'PLACE' as const, curriculumSubjectId: 1, semester: semesterAt(start, 5) }];
+    expect(JSON.stringify(planScenario(data, changes))).toBe(JSON.stringify(planScenario(data, changes)));
+    expect(JSON.stringify(data)).toBe(snapshot);
+  });
+});

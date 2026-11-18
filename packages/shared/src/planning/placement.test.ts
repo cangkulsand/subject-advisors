@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GraduationPlan, PlanningInput, PlanningSubject, ScenarioChange, SemesterLimit } from './contracts';
 import { planBaseline } from './engine';
 import { checkChange, checkPlacement, cleanChanges, placementTargets, removeChange, validateChanges, withChange } from './placement';
+import { semesterAt, semesterIndex } from './semesters';
 
 const subject = (id: number, code: string, credits: number, extra: Partial<PlanningSubject> = {}): PlanningSubject => ({
   curriculumSubjectId: id, subjectCode: code, subjectName: 'Name ' + code, creditHours: credits, category: 'Core',
@@ -160,5 +161,75 @@ describe('review fixes', () => {
     const later = input({ start: sem('2027/2028', 2) });
     expect(cleanChanges(later, [{ kind: 'FAIL', curriculumSubjectId: 4, semester: sem('2027/2028', 1) }]))
       .toEqual({ changes: [{ kind: 'FAIL', curriculumSubjectId: 4 }], dropped: 0 });
+  });
+});
+
+describe('co-requisite pins and defaults (S3-P003-001)', () => {
+  const only = (list: PlanningSubject[], extra: Partial<PlanningInput> = {}) => input({ subjects: list, requirements: [], ...extra });
+  it('moving a subject brings its co-requisite partner along', () => {
+    const data = only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)]);
+    const check = checkPlacement(data, [], 1, sem('2027/2028', 1));
+    expect(check.ok).toBe(true);
+    if (!check.ok) return;
+    expect(indexOf(check.plan, 'A')).toBe(2);
+    expect(indexOf(check.plan, 'B')).toBeLessThanOrEqual(2);
+  });
+  it('moving a subject with an unplaced reciprocal partner brings the partner along', () => {
+    const data = input({
+      subjects: [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3, { corequisites: [1] })],
+      requirements: [],
+      limits: limits.map(l => l.academicYear === '2027/2028' && l.semesterNo === 1 ? { ...l, maxSubjects: 2 } : l),
+    });
+    expect(data.limits.find(l => l.academicYear === '2027/2028' && l.semesterNo === 1)!.maxSubjects).toBe(2);
+    const check = checkPlacement(data, [], 1, sem('2027/2028', 1));
+    expect(check.ok).toBe(true);
+    if (!check.ok) return;
+    expect(indexOf(check.plan, 'A')).toBe(2);
+    expect(indexOf(check.plan, 'B')).toBe(2);
+  });
+  it('lets a subject move into a later single-slot semester when its partner is already placed earlier', () => {
+    const data = input({
+      subjects: [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)],
+      requirements: [],
+      limits: limits.map(l => l.academicYear === '2027/2028' && l.semesterNo === 1 ? { ...l, maxSubjects: 1, maxCredits: 3 } : l),
+    });
+    const check = checkPlacement(data, [], 1, sem('2027/2028', 1));
+    expect(check.ok).toBe(true);
+    if (!check.ok) return;
+    expect(indexOf(check.plan, 'A')).toBe(2);
+    expect(indexOf(check.plan, 'B')).toBe(0);
+  });
+  it('refuses a reciprocal pin pair that cannot fit the target and names the co-requisite', () => {
+    const data = input({ subjects: [subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 4, { corequisites: [1] })], requirements: [] });
+    const check = validateChanges(data, [place(1, '2026/2027', 3), place(2, '2026/2027', 3)]);
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.reason).toContain('co-requisite');
+  });
+  it('a conflicting partner pin fails validation', () => {
+    const data = only([subject(1, 'A', 3, { corequisites: [2] }), subject(2, 'B', 3)]);
+    const check = validateChanges(data, [place(1, '2027/2028', 1), place(2, '2027/2028', 2)]);
+    expect(check.ok).toBe(false);
+  });
+  it('refuses a Normal semester for a default 2-credit subject', () => {
+    const data = only([subject(1, 'UHLX1112', 2, { semesterTypes: [] })]);
+    expect(refused(checkPlacement(data, [], 1, sem('2026/2027', 2)))).toBe('Runs only in Short semesters.');
+    expect(checkPlacement(data, [], 1, sem('2026/2027', 3)).ok).toBe(true);
+  });
+  it('refuses a pin beyond the horizon', () => {
+    const target = semesterAt(input().start!, 60);
+    expect(validateChanges(input(), [place(4, target.academicYear, target.semesterNo)]).ok).toBe(false);
+  });
+  it('placementTargets covers a distant configured semester and disables the gaps', () => {
+    const distant = { semesterId: 90, academicYear: '2031/2032', semesterNo: 2, maxSubjects: 3, maxCredits: 10 };
+    const data = input({ limits: [...limits, distant] });
+    const targets = placementTargets(data, planBaseline(data), [], 4);
+    const distantIndex = semesterIndex(data.start, { academicYear: '2031/2032', semesterNo: 2 })!;
+    expect(targets.length).toBe(distantIndex + 1);
+    expect(targets[distantIndex]).toMatchObject({ ok: true });
+    const gap = targets[planBaseline(data).semesters.length]!;
+    expect(gap.ok).toBe(false);
+    expect(gap.reason).toBe('This semester is not set up yet.');
+    expect(targets.length).toBeLessThanOrEqual(60);
   });
 });

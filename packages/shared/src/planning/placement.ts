@@ -1,6 +1,6 @@
 import type { GraduationPlan, PlanningInput, PlanningSubject, ScenarioChange, SemesterRef } from './contracts';
 import { planScenario } from './engine';
-import { semesterAt, semesterIndex, semesterLabel, semesterTypeOf } from './semesters';
+import { allowedSemesterTypes, semesterAt, semesterIndex, semesterLabel, semesterTypeOf } from './semesters';
 
 /**
  * Drag-and-drop checks for the graduation plan (S3-P004-010). Pure: the page runs them before showing or saving a
@@ -85,6 +85,17 @@ function brokenPins(input: PlanningInput, changes: ScenarioChange[], plan: Gradu
   return broken;
 }
 
+function coreqReason(input: PlanningInput, plan: GraduationPlan, id: number, index: number): string | null {
+  const byId = new Map(input.subjects.map(s => [s.curriculumSubjectId, s]));
+  const at = positions(plan);
+  const passed = new Set(input.passed);
+  const unmet = (byId.get(id)?.corequisites ?? [])
+    .filter(partner => !passed.has(partner) && (at.get(partner) ?? Infinity) > index)
+    .map(partner => byId.get(partner)?.subjectCode ?? 'another subject')
+    .sort((left, right) => left.localeCompare(right))[0];
+  return unmet ? `Needs co-requisite ${unmet} in the same semester, and it does not fit there.` : null;
+}
+
 /** Why a subject cannot sit at `index` in `plan`: the first prerequisite not placed earlier, else the semester is full. */
 function placementReason(input: PlanningInput, plan: GraduationPlan, id: number, index: number, semester: SemesterRef): string {
   const byId = new Map(input.subjects.map(s => [s.curriculumSubjectId, s]));
@@ -95,6 +106,8 @@ function placementReason(input: PlanningInput, plan: GraduationPlan, id: number,
     .map(required => byId.get(required)?.subjectCode ?? '')
     .sort((left, right) => left.localeCompare(right))[0];
   if (blocking) return `Needs ${blocking} first, and there is no room to fit it in an earlier semester.`;
+  const coreq = coreqReason(input, plan, id, index);
+  if (coreq) return coreq;
   return `${labelOf(semester, index)} is already full with subjects you placed there.`;
 }
 
@@ -109,7 +122,11 @@ export function validateChanges(input: PlanningInput, changes: ScenarioChange[])
     if (broken.index === null) return { ok: false, reason: 'This semester is not set up yet.' };
     const label = labelOf(broken.semester, broken.index);
     const code = input.subjects.find(s => s.curriculumSubjectId === broken.id)?.subjectCode ?? 'A subject';
-    if (broken.where === undefined) return { ok: false, reason: `${code} is placed in ${label} but is no longer in your plan. Remove that move first.` };
+    if (broken.where === undefined) {
+      const coreq = coreqReason(input, plan, broken.id, broken.index);
+      if (coreq) return { ok: false, reason: coreq };
+      return { ok: false, reason: `${code} is placed in ${label} but is no longer in your plan. Remove that move first.` };
+    }
     if (broken.index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(broken.id)) return { ok: false, reason: `Not approved by your coordinator for ${label}.` };
     return { ok: false, reason: placementReason(input, plan, broken.id, broken.index, broken.semester) };
   }
@@ -134,8 +151,9 @@ export function checkPlacement(input: PlanningInput, changes: ScenarioChange[], 
   const row = configuredRow(input, target);
   if (!row) return { ok: false, reason: 'This semester is not set up yet.' };
   const type = semesterTypeOf(target.semesterNo);
-  if (subject.semesterTypes.length > 0 && !subject.semesterTypes.includes(type)) {
-    return { ok: false, reason: subject.semesterTypes.includes('NORMAL') ? 'Runs only in Normal semesters.' : 'Runs only in Short semesters.' };
+  const allowed = allowedSemesterTypes(subject);
+  if (!allowed.includes(type)) {
+    return { ok: false, reason: allowed.includes('NORMAL') ? 'Runs only in Normal semesters.' : 'Runs only in Short semesters.' };
   }
   // A retake (after a fail or withdraw) has to come after the semester of that attempt.
   const retakeAt = changes.findIndex(c => c.curriculumSubjectId === curriculumSubjectId && retakeKinds.has(c.kind));
@@ -190,7 +208,13 @@ export interface PlacementTarget { semester: SemesterRef; label: string; ok: boo
 /** Every semester from the first planned one to one after the plan's last, with whether the subject may move there. */
 export function placementTargets(input: PlanningInput, plan: GraduationPlan, changes: ScenarioChange[], curriculumSubjectId: number): PlacementTarget[] {
   if (input.start === null) return [];
-  return Array.from({ length: plan.semesters.length + 1 }, (_, index) => {
+  let latest = -1;
+  for (const limit of input.limits) {
+    const index = semesterIndex(input.start, limit);
+    if (index !== null && index > latest) latest = index;
+  }
+  const length = Math.min(60, Math.max(plan.semesters.length + 1, latest + 1));
+  return Array.from({ length }, (_, index) => {
     const semester = semesterAt(input.start, index);
     const check = checkPlacement(input, changes, curriculumSubjectId, semester);
     return { semester, label: labelOf(semester, index), ok: check.ok, reason: check.ok ? null : check.reason };

@@ -2,7 +2,7 @@ import type {
   Bottleneck, GraduationPlan, MovedSubject, PlanComparison, PlanCompletion, PlannedSemester, PlannedSubject,
   PlanningInput, PlanningSubject, ScenarioChange, ScenarioChangeKind, UnplannedSubject,
 } from './contracts';
-import { limitsFor, semesterAt, semesterIndex, semesterLabel, semesterTypeOf } from './semesters';
+import { allowedSemesterTypes, limitsFor, semesterAt, semesterIndex, semesterLabel, semesterTypeOf } from './semesters';
 
 /**
  * UC14–UC16 planning engine (M5). Pure and deterministic: the same input and changes always give the same plan,
@@ -77,7 +77,7 @@ function neededSubjects(input: PlanningInput, byId: Map<number, PlanningSubject>
   const queue = [...ids];
   while (queue.length) {
     const subject = byId.get(queue.pop()!);
-    for (const required of subject?.prerequisites ?? []) {
+    for (const required of [...(subject?.prerequisites ?? []), ...(subject?.corequisites ?? [])]) {
       if (!passed.has(required) && byId.has(required) && !ids.has(required)) { ids.add(required); queue.push(required); }
     }
   }
@@ -125,9 +125,15 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
   const setDeadline = (id: number, latest: number, guard: number) => {
     if (guard > 40 || (deadline.get(id) ?? Infinity) <= latest) return;
     deadline.set(id, latest);
-    for (const required of byId.get(id)?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, latest - 1, guard + 1);
+    const subject = byId.get(id);
+    for (const required of subject?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, latest - 1, guard + 1);
+    for (const partner of subject?.corequisites ?? []) if (needed.ids.has(partner)) setDeadline(partner, latest, guard + 1);
   };
-  for (const [id, index] of constraints.pinned) for (const required of byId.get(id)?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, index - 1, 0);
+  for (const [id, index] of constraints.pinned) {
+    const subject = byId.get(id);
+    for (const required of subject?.prerequisites ?? []) if (needed.ids.has(required)) setDeadline(required, index - 1, 0);
+    for (const partner of subject?.corequisites ?? []) if (needed.ids.has(partner)) setDeadline(partner, index, 0);
+  }
   const order = [...needed.ids].map(id => byId.get(id)!).sort((left, right) =>
     (deadline.get(left.curriculumSubjectId) ?? Infinity) - (deadline.get(right.curriculumSubjectId) ?? Infinity)
     || depth.get(right.curriculumSubjectId)! - depth.get(left.curriculumSubjectId)!
@@ -143,12 +149,11 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
   });
 
   const placedAt = new Map<number, number>();
-  const prerequisitesMet = (s: PlanningSubject, index: number) =>
-    s.prerequisites.every(required => passed.has(required) || (placedAt.get(required) ?? Infinity) < index);
   const semesters: PlannedSemester[] = [];
   let emptyStreak = 0;
   let usedDefaults = false;
-  for (let index = 0; placedAt.size < order.length && emptyStreak < EMPTY_STREAK_LIMIT && index < SEMESTER_GUARD; index++) {
+  const waitUntil = Math.max(-1, ...constraints.pinned.values(), ...constraints.notBefore.values(), ...[...constraints.failedIn.values()].flat());
+  for (let index = 0; placedAt.size < order.length && index < SEMESTER_GUARD && (emptyStreak < EMPTY_STREAK_LIMIT || index <= waitUntil); index++) {
     const ref = semesterAt(input.start, index);
     const type = semesterTypeOf(ref.semesterNo);
     const limits = limitsFor(ref, input.limits);
@@ -160,27 +165,55 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
       if (s && failedIndexes.includes(index)) { subjects.push(toPlanned(s, true)); credits += s.creditHours; }
     }
     const placedBefore = subjects.filter(s => !s.failedAttempt).length;
+    const bundleOf = (seed: PlanningSubject): PlanningSubject[] => {
+      const bundle = [seed];
+      const seen = new Set([seed.curriculumSubjectId]);
+      for (let i = 0; i < bundle.length; i++) {
+        for (const id of bundle[i]!.corequisites ?? []) {
+          if (seen.has(id) || passed.has(id) || placedAt.has(id)) continue;
+          const partner = byId.get(id);
+          if (partner) { seen.add(id); bundle.push(partner); }
+        }
+      }
+      return bundle;
+    };
+    const attempt = (seed: PlanningSubject): boolean => {
+      const bundle = bundleOf(seed);
+      if (subjects.length + bundle.length > limits.maxSubjects) return false;
+      if (credits + bundle.reduce((n, member) => n + member.creditHours, 0) > limits.maxCredits) return false;
+      const memberIds = new Set(bundle.map(member => member.curriculumSubjectId));
+      for (const member of bundle) {
+        if ((member.corequisites ?? []).some(id => !byId.has(id) && !passed.has(id))) return false;
+        if (!allowedSemesterTypes(member).includes(type)) return false;
+        const memberPin = constraints.pinned.get(member.curriculumSubjectId);
+        if (memberPin !== undefined && memberPin !== index && (member !== seed || memberPin > index)) return false;
+        if ((constraints.notBefore.get(member.curriculumSubjectId) ?? 0) > index) return false;
+        if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(member.curriculumSubjectId)) return false;
+        for (const required of member.prerequisites) {
+          if (passed.has(required)) continue;
+          if (memberIds.has(required)) return false;
+          if ((placedAt.get(required) ?? Infinity) >= index) return false;
+        }
+      }
+      for (const member of bundle) {
+        placedAt.set(member.curriculumSubjectId, index);
+        subjects.push(toPlanned(member, false, constraints.pinned.get(member.curriculumSubjectId) === index));
+        credits += member.creditHours;
+      }
+      return true;
+    };
     // Subjects the student placed in this semester go first. One whose rules are not met here falls back to normal placement.
     for (const s of order) {
-      const id = s.curriculumSubjectId;
-      if (constraints.pinned.get(id) !== index || placedAt.has(id)) continue;
-      if (subjects.length >= limits.maxSubjects || credits + s.creditHours > limits.maxCredits) continue;
-      if (s.semesterTypes.length > 0 && !s.semesterTypes.includes(type)) continue;
-      if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(id)) continue;
-      if (!prerequisitesMet(s, index)) continue;
-      placedAt.set(id, index); subjects.push(toPlanned(s, false, true)); credits += s.creditHours;
+      if (constraints.pinned.get(s.curriculumSubjectId) !== index || placedAt.has(s.curriculumSubjectId)) continue;
+      attempt(s);
     }
     for (const s of order) {
       if (subjects.length >= limits.maxSubjects) break;
       const id = s.curriculumSubjectId;
-      if (placedAt.has(id) || credits + s.creditHours > limits.maxCredits) continue;
+      if (placedAt.has(id)) continue;
       const pin = constraints.pinned.get(id);
       if (pin !== undefined && index <= pin) continue;
-      if (s.semesterTypes.length > 0 && !s.semesterTypes.includes(type)) continue;
-      if ((constraints.notBefore.get(id) ?? 0) > index) continue;
-      if (index === 0 && input.approvedFirst !== null && !input.approvedFirst.includes(id)) continue;
-      if (!s.prerequisites.every(required => passed.has(required) || (placedAt.get(required) ?? Infinity) < index)) continue;
-      placedAt.set(id, index); subjects.push(toPlanned(s)); credits += s.creditHours;
+      attempt(s);
     }
     emptyStreak = subjects.length > placedBefore ? 0 : emptyStreak + 1;
     semesters.push({ ...ref, index: index + 1, semesterType: type, label: semesterLabel(ref, index + 1, calendar), maxSubjects: limits.maxSubjects, maxCredits: limits.maxCredits, subjects, credits });
@@ -210,12 +243,18 @@ function plan(input: PlanningInput, constraints: Constraints): GraduationPlan {
 
 function unplannedReason(s: PlanningSubject, byId: Map<number, PlanningSubject>, placedAt: Map<number, number>, passed: Set<number>, input: PlanningInput): UnplannedSubject {
   const base = { curriculumSubjectId: s.curriculumSubjectId, subjectCode: s.subjectCode, subjectName: s.subjectName };
-  const largest = Math.max(...(['NORMAL', 'SHORT'] as const)
-    .filter(type => s.semesterTypes.length === 0 || s.semesterTypes.includes(type))
+  const largest = Math.max(...allowedSemesterTypes(s)
     .map(type => limitsFor({ academicYear: '', semesterNo: type === 'SHORT' ? 3 : 1 }, input.limits).maxCredits));
   if (s.creditHours > largest) return { ...base, reason: `Worth ${s.creditHours} credits, more than any semester allows.` };
+  if ((s.corequisites ?? []).some(id => !byId.has(id) && !passed.has(id))) {
+    return { ...base, reason: 'A co-requisite it needs is not part of this curriculum.' };
+  }
   const blocked = s.prerequisites.find(id => !passed.has(id) && !placedAt.has(id));
   if (blocked !== undefined) return { ...base, reason: `Needs ${byId.get(blocked)?.subjectCode ?? 'a prerequisite'} first, which cannot be planned.` };
+  const unplacedPartner = (s.corequisites ?? []).find(id => !passed.has(id) && byId.has(id) && !placedAt.has(id));
+  if (unplacedPartner !== undefined) {
+    return { ...base, reason: `Needs co-requisite ${byId.get(unplacedPartner)?.subjectCode ?? 'another subject'} in the same semester, which cannot be planned.` };
+  }
   return { ...base, reason: 'Could not be placed in any semester under the current limits.' };
 }
 
@@ -261,7 +300,11 @@ function assumptions(input: PlanningInput, needed: Needed, usedDefaults: boolean
   if (usedDefaults) list.push('Some semesters have no configured limits, so the usual limits are used (Normal: 3 subjects, 10 credits; Short: 3 subjects, 6 credits).');
   if (needed.electives.size) list.push('Elective choices are examples: any option from the same elective group works.');
   if (needed.noGroups) list.push('No requirement groups are configured, so every remaining curriculum subject is included.');
-  list.push('Co-requisites and recommended prerequisites are not checked.');
+  list.push('Co-requisites are planned together or accepted from an earlier semester; recommended prerequisites are advisory only.');
+  list.push('Only configured prerequisite, co-requisite, semester-type and load rules are checked. Additional FYP and industrial-training entry conditions must be confirmed with your coordinator.');
+  if (input.subjects.some(s => s.semesterTypes.length === 0)) {
+    list.push('A subject with 2 credit hours and no configured semester types is assumed to run in Short semesters, and other unconfigured subjects in either type; explicit semester types always apply.');
+  }
   return list;
 }
 
