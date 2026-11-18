@@ -71,6 +71,10 @@ else {
     browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
     await check('aggregate overview, clickable planned setup and account filter navigation', async page => {
       const state = await mock(page); await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
+      assert.equal(await page.getByRole('navigation', { name: 'Breadcrumb' }).count(), 0, 'no breadcrumb on staff pages');
+      assert.equal(await page.getByText('ADMIN WORKSPACE', { exact: true }).count(), 0, 'no workspace eyebrow');
+      assert.equal(await page.locator('.admin-topbar-title .admin-admin-badge').innerText(), 'System administrator', 'the role badge is the top-bar title');
+      assert.equal(await page.locator('.admin-topbar-actions .admin-admin-badge').count(), 0, 'the badge is not repeated');
       assert.ok((await page.locator('.admin-metrics').innerText()).includes('23'));
       assert.equal(await page.getByText('Fictional Administrator', { exact: true }).count(), 0);
       assert.equal(await page.getByRole('link', { name: 'Academic Semesters', exact: true, includeHidden: true }).count(), 2); // Desktop and mobile dialog.

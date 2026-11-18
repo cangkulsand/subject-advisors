@@ -61,7 +61,7 @@ export function StatusRegion({ notice }: { notice: Notice }) {
 }
 
 export function PageHeading({ title, text, actions }: { title: string; text?: string; actions?: ReactNode }) {
-  return <header className="admin-page-heading"><div><p className="admin-eyebrow">COORDINATOR WORKSPACE</p><h1>{title}</h1>{text && <p>{text}</p>}</div>{actions}</header>;
+  return <header className="admin-page-heading"><div><h1>{title}</h1>{text && <p>{text}</p>}</div>{actions}</header>;
 }
 
 /** Page-local scope, kept in the URL so links and reloads keep it. */
@@ -148,9 +148,7 @@ export function ScopeFields({ context, path, programmeId, learningCentreId, keep
 }
 
 export function ScopePicker({ context, path, programmeId, learningCentreId, keep }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null; keep?: Record<string, string> }) {
-  const heading = useId();
-  return <section className="admin-card" aria-labelledby={heading}>
-    <div className="admin-card-title"><div><h2 id={heading}>Forecast scope</h2><p className="admin-muted">Choose a programme, then a learning centre. Imports and forecasts are kept separately for each scope.</p></div></div>
+  return <section className="admin-card" aria-label="Forecast scope">
     <ScopeFields context={context} path={path} programmeId={programmeId} learningCentreId={learningCentreId} keep={keep}/>
   </section>;
 }

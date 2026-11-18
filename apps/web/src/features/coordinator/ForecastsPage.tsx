@@ -250,8 +250,7 @@ function Forecast({ client, scope, search, scopeFields }: { client: CoordinatorC
   const rows = run && set ? buildRows(run, set.decisions) : null;
   const pending = rows ? rows.filter(row => row.status === 'PENDING').length : 0;
   return <>
-    <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
-      <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme and a learning centre. Decisions are for the next semester.</p></div></div>
+    <section className="admin-card coordinator-setup" aria-label="Forecast scope">
       <div className="coordinator-setup-section">{scopeFields}</div>
       <div className="coordinator-setup-section">
         <Panel error={imports.error} retry={imports.retry} label="student data snapshots">{imports.data && (snapshots.length === 0
@@ -289,8 +288,7 @@ export function ForecastsPage({ client, search }: { client: CoordinatorClient; s
     <PageHeading title="Class Offering Forecast"/>
     <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && (scope
       ? <Forecast key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope} search={search} scopeFields={fields(context.data)}/>
-      : <section className="admin-card coordinator-setup" aria-labelledby="coordinator-forecast-scope-heading">
-        <div className="admin-card-title"><div><h2 id="coordinator-forecast-scope-heading">Forecast scope</h2><p className="admin-muted">Choose a programme and a learning centre. Decisions are for the next semester.</p></div></div>
+      : <section className="admin-card coordinator-setup" aria-label="Forecast scope">
         <div className="coordinator-setup-section">{fields(context.data)}</div>
         {context.data.programmes.length > 0 && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecast.</p></div>}
       </section>)}

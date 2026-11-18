@@ -343,8 +343,7 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
   }
   return <>
     <StatusRegion notice={notice}/>
-    <section className="admin-card coordinator-setup" aria-labelledby="coordinator-setup-heading">
-      <div className="admin-card-title"><div><h2 id="coordinator-setup-heading">Forecast data setup</h2><p className="admin-muted">Imports and forecasts are kept separately for each scope.</p></div></div>
+    <section className="admin-card coordinator-setup" aria-label="Forecast data setup">
       <div className="coordinator-setup-section"><ScopeFields context={context} path="/coordinator/imports" programmeId={programmeId} learningCentreId={learningCentreId} keep={mode === 'system' ? undefined : { source: mode }}/></div>
       {scope && importId === null && <>
         <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>

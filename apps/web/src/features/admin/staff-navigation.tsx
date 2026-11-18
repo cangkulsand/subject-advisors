@@ -69,17 +69,17 @@ export function StaffNavigationShell({ path, title, workspace, roleLabel, home, 
       <button className="admin-drawer-close" type="button" onClick={close} aria-label="Close navigation">×</button>{brand}<StaffNavigation groups={groups} path={path} label={navLabel} onNavigate={close}/>
     </dialog>
     <div className="admin-main">
-      <header className="admin-topbar"><div className="admin-topbar-title"><button ref={opener} type="button" className="admin-menu-button" aria-label="Open navigation" aria-haspopup="dialog" aria-controls="staff-mobile-menu" onClick={() => dialog.current?.showModal()}>☰</button><span>{workspace}</span></div>
-        <div className="admin-topbar-actions"><RoleSwitcher/><span className="admin-admin-badge">{roleLabel}</span><LogoutButton/></div>
+      <header className="admin-topbar"><div className="admin-topbar-title"><button ref={opener} type="button" className="admin-menu-button" aria-label="Open navigation" aria-haspopup="dialog" aria-controls="staff-mobile-menu" onClick={() => dialog.current?.showModal()}>☰</button><span className="admin-admin-badge">{roleLabel}</span></div>
+        <div className="admin-topbar-actions"><RoleSwitcher/><LogoutButton/></div>
       </header>
-      <main id="staff-content" tabIndex={-1} className="admin-content"><nav className="admin-breadcrumb" aria-label="Breadcrumb"><AppLink href={home}>{workspace}</AppLink><span aria-hidden="true">/</span><span aria-current="page">{title}</span></nav>{children}</main>
+      <main id="staff-content" tabIndex={-1} className="admin-content" aria-label={title}>{children}</main>
     </div>
   </div>;
 }
 
 export function StaffPlannedPage({ title, description }: { title: string; description: string }) {
   return <section className="admin-card admin-planned-page">
-    <p className="admin-eyebrow">STAFF WORKSPACE</p><div className="admin-page-heading"><div><h1>{title}</h1><p>{description}</p></div><span className="admin-pill">Coming soon</span></div>
+    <div className="admin-page-heading"><div><h1>{title}</h1><p>{description}</p></div><span className="admin-pill">Coming soon</span></div>
     <p className="admin-planned-note">This workspace is planned. No academic data or decisions are being shown here.</p>
   </section>;
 }

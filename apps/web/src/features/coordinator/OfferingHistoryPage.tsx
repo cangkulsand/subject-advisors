@@ -57,8 +57,7 @@ function Chooser({ client, context }: { client: CoordinatorClient; context: Fore
   const scope: ForecastScope | null = programmeId !== null && centreId !== null && semesterId !== null && pairs.some(pair => pair.programmeId === programmeId && pair.learningCentreId === centreId)
     ? { programmeId, learningCentreId: centreId, targetSemesterId: semesterId } : null;
   return <>
-    <section className="admin-card coordinator-setup" aria-labelledby="coordinator-history-scope-heading">
-      <div className="admin-card-title"><div><h2 id="coordinator-history-scope-heading">Scope</h2><p className="admin-muted">Choose a programme, a learning centre and a past semester.</p></div></div>
+    <section className="admin-card coordinator-setup" aria-label="Scope">
       <div className="coordinator-scope-grid">
         <div className="admin-field"><label htmlFor={programmeField} className="coordinator-field-label">Programme</label>
           <select id={programmeField} value={programmeId ?? ''} onChange={event => { const next = Number(event.target.value); setProgramme(next); setCentre(pairs.find(pair => pair.programmeId === next)?.learningCentreId ?? null); }}>

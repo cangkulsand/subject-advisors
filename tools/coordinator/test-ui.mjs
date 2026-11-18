@@ -97,6 +97,11 @@ else {
     await check('imports: scope pickers follow assignments, target semester is read-only, template downloads', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports?source=csv');
       await page.getByRole('heading', { name: 'Data Imports', exact: true }).first().waitFor();
+      assert.equal(await page.getByRole('navigation', { name: 'Breadcrumb' }).count(), 0, 'no breadcrumb on staff pages');
+      assert.equal(await page.getByText('COORDINATOR WORKSPACE', { exact: true }).count(), 0, 'no workspace eyebrow');
+      assert.equal(await page.getByText('Forecast data setup', { exact: true }).count(), 0, 'no repeated setup card title');
+      assert.equal(await page.locator('.admin-topbar-title .admin-admin-badge').innerText(), 'Academic coordinator', 'the role badge replaces the Coordinator title');
+      assert.equal(await page.locator('.admin-topbar-title > span:not(.admin-admin-badge)').count(), 0, 'no plain Coordinator title');
       const programme = page.getByLabel('Programme', { exact: true }), centre = page.getByLabel('Learning centre', { exact: true });
       assert.equal(await centre.isDisabled(), true);
       assert.deepEqual(await programme.locator('option').allInnerTexts(), ['Select a programme', 'SECJ · Bachelor of Computer Science (Software Engineering)', 'SECRH · Bachelor of Computer Science (Computer Networks and Security)']);

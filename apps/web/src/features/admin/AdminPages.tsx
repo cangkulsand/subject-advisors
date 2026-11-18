@@ -28,7 +28,7 @@ function Panel({ error, retry, children }: { error?: string; retry: () => void; 
   return <>{children}</>;
 }
 function PageHeading({ title, text, refresh }: { title: string; text: string; refresh?: () => void }) {
-  return <header className="admin-page-heading"><div><p className="admin-eyebrow">ADMIN WORKSPACE</p><h1>{title}</h1><p>{text}</p></div>{refresh && <button type="button" className="admin-secondary" onClick={refresh}>Refresh data</button>}</header>;
+  return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{refresh && <button type="button" className="admin-secondary" onClick={refresh}>Refresh data</button>}</header>;
 }
 export function RolePills({ roles }: { roles: AdminRole[] }) { return <span className="admin-pills">{roles.length ? roles.map(role => <span className={`admin-pill admin-role-${role.toLowerCase()}`} key={role}>{labels[role]}</span>) : <span className="admin-pill">No memberships</span>}</span>; }
 function AccessPill({ status }: { status: AdminAccount['accessStatus'] }) { return <span className={`admin-pill admin-status-${status.toLowerCase()}`}>{status === 'ACTIVE' ? 'Active' : 'Suspended'}</span>; }
