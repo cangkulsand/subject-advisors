@@ -38,3 +38,11 @@ The owner supplied an HTML mockup of `/coordinator/imports`. Adopt its layout; k
 
 - 2026-11-18 - Type: Changed. Data Imports: wider programme field, latest-snapshot line, drag-and-drop CSV zone with
   Replace/Remove, action bars.
+
+## Later changes
+
+- 2026-11-18 (owner request, branch `feature/coordinator-imports-trim`): removed the "Latest snapshot" line, the
+  "Students in the system" description box, and the "CSV import" heading and description; Source date, Source label
+  and Download template now share one row (the template button moves under the fields below 1050px). The sections
+  stay labelled regions ("Students in the system", "CSV import", "Students in the system + CSV import") for screen
+  readers; Both keeps its one-line merge rule. Tests: coordinator UI 56 PASS (one-row check added).

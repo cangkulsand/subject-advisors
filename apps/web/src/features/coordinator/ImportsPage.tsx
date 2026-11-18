@@ -92,13 +92,9 @@ function SystemCard({ client, scope, onCreated }: { client: CoordinatorClient; s
     catch (error) { setFailure(errorText(error, 'The snapshot could not be created. Please retry.')); }
     finally { setBusy(false); }
   }
-  return <section className="coordinator-setup-section" aria-labelledby="coordinator-system-heading">
-    <div className="coordinator-source-box">
-      <h3 id="coordinator-system-heading" tabIndex={-1}>Students in the system</h3>
-      <p className="admin-muted">Uses the academic records that current students have entered in the system for {scope.programmeLabel} at {scope.centreLabel}. No file is needed.</p>
-    </div>
+  return <section className="coordinator-setup-section" id="coordinator-system-section" aria-label="Students in the system" tabIndex={-1}>
     {failure && <p className="admin-form-error" role="alert">{failure}</p>}
-    <div className="coordinator-action-bar"><p>The snapshot is frozen: later changes to student records do not change it.</p>
+    <div className="coordinator-action-bar is-first"><p>The snapshot is frozen: later changes to student records do not change it.</p>
       <button type="button" className="admin-primary" disabled={busy} aria-busy={busy} onClick={() => void create()}>{busy ? 'Creating snapshot…' : 'Create snapshot'}</button></div>
   </section>;
 }
@@ -202,20 +198,16 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
   }
   const message = (key: string) => errors[key] ? <small id={ids[key as 'date'] + '-error'} className="coordinator-field-error">{errors[key]}</small> : null;
   const browse = () => first.current.file?.click();
-  return <section className="coordinator-setup-section" aria-labelledby="coordinator-upload-heading">
-    <div className="admin-card-title coordinator-upload-head"><div>
-      <div className="coordinator-heading-row"><h3 id="coordinator-upload-heading" tabIndex={-1}>{combined ? 'Students in the system + CSV import' : 'CSV import'}</h3>
-        {combined && <span className="admin-pill coordinator-pill-neutral">Merged with system records</span>}</div>
-      {combined
-        ? <p className="admin-muted">Combines system students with non-duplicate CSV records. Matches on matric number, keeps system data, and flags name conflicts for review.</p>
-        : <p className="admin-muted">Upload one CSV of your students' academic history for {scope.programmeLabel} at {scope.centreLabel}.</p>}</div>
-      <button type="button" className="coordinator-outline-button" onClick={() => void template()}>{downloadIcon}Download template</button></div>
+  return <section className="coordinator-setup-section" id="coordinator-upload-section" aria-label={combined ? 'Students in the system + CSV import' : 'CSV import'} tabIndex={-1}>
+    {combined && <p className="admin-muted coordinator-combined-note">Combines system students with non-duplicate CSV records. Matches on matric number, keeps system data, and flags name conflicts for review.</p>}
     <form className="coordinator-upload-form" onSubmit={submit} noValidate>
       <div className="coordinator-upload-meta">
         <div className="admin-field"><label htmlFor={ids.date}>Source date</label>
           <input id={ids.date} ref={element => { first.current.date = element; }} type="date" value={date} max={today()} aria-invalid={!!errors.date || undefined} aria-describedby={errors.date ? ids.date + '-error' : undefined} onChange={event => setDate(event.target.value)}/>{message('date')}</div>
         <div className="admin-field"><label htmlFor={ids.label}>Source label</label>
           <input id={ids.label} ref={element => { first.current.label = element; }} type="text" value={label} maxLength={IMPORT_LIMITS.maxSourceLabelLength} placeholder="Example: September cohort export" aria-invalid={!!errors.label || undefined} aria-describedby={errors.label ? ids.label + '-error' : undefined} onChange={event => setLabel(event.target.value)}/>{message('label')}</div>
+        <div className="coordinator-template-cell"><span className="coordinator-label-spacer" aria-hidden="true">&nbsp;</span>
+          <button type="button" className="coordinator-outline-button" onClick={() => void template()}>{downloadIcon}Download template</button></div>
       </div>
       <div className="admin-field coordinator-upload-file"><label htmlFor={ids.file}>CSV file</label>
         <div className={'coordinator-dropzone' + (dragging ? ' is-dragging' : '') + (file ? ' has-file' : '') + (errors.file ? ' is-invalid' : '')}
@@ -323,16 +315,6 @@ function ImportDetail({ client, scope, mode, importId, onGenerate }: { client: C
   </section>;
 }
 
-/** What already exists for the chosen scope, so the coordinator knows a new snapshot is added next to it. */
-function ScopeSnapshotStatus({ client, scope, version }: { client: CoordinatorClient; scope: ChosenScope; version: number }) {
-  const latest = useRead(signal => client.listImports(scope, { limit: 1 }, signal), ['latest', scope.programmeId, scope.learningCentreId, version].join('|'));
-  if (!latest.data) return null;
-  const item = latest.data.items[0];
-  return item
-    ? <p className="coordinator-scope-status"><strong>Latest snapshot:</strong> "{item.sourceLabel}", source date {item.sourceDate}, {item.counts.uniqueStudents} {item.counts.uniqueStudents === 1 ? 'student' : 'students'}, accepted {when(item.acceptedAt)}. A new snapshot is added next to it; earlier snapshots are kept.</p>
-    : <p className="coordinator-scope-status is-empty">No snapshot for this scope yet. Create the first one below.</p>;
-}
-
 /** One setup card (scope, data source, action for the chosen source); results, accepted imports and detail stay as cards below. Not keyed by scope, so radio focus survives a scope change. */
 function ImportWorkspace({ client, context, scope, programmeId, learningCentreId, importId, mode }: { client: CoordinatorClient; context: ForecastContext; scope: ChosenScope | null; programmeId: number | null; learningCentreId: number | null; importId: number | null; mode: DataMode }) {
   const [notice, setNotice] = useState<Notice>(null), [outcome, setOutcome] = useState<Exclude<UploadOutcome, { kind: 'ACCEPTED' }> | null>(null);
@@ -365,15 +347,14 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
       <div className="admin-card-title"><div><h2 id="coordinator-setup-heading">Forecast data setup</h2><p className="admin-muted">Imports and forecasts are kept separately for each scope.</p></div></div>
       <div className="coordinator-setup-section"><ScopeFields context={context} path="/coordinator/imports" programmeId={programmeId} learningCentreId={learningCentreId} keep={mode === 'system' ? undefined : { source: mode }}/></div>
       {scope && importId === null && <>
-        <ScopeSnapshotStatus client={client} scope={scope} version={version}/>
         <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>
         {mode === 'system'
           ? <SystemCard key={resetKey} client={client} scope={scope} onCreated={result => { setSnapshot(result); setOutcome(null); setNotice(null); setVersion(value => value + 1); }}/>
           : <UploadCard key={resetKey} client={client} scope={scope} combined={mode === 'both'} onOutcome={onOutcome} onTemplateError={text => setNotice({ kind: 'warning', text })}/>}</>}
     </section>
     {scope === null && context.programmes.length > 0 && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to upload data and see accepted imports.</p></section>}
-    {scope && importId === null && snapshot && (snapshot.data.source === 'COMBINED' ? mode === 'both' : mode === 'system') && <SnapshotResult result={snapshot} scope={scope} mode={mode} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })} onDismiss={() => { setSnapshot(null); document.getElementById(snapshot.data.source === 'COMBINED' ? 'coordinator-upload-heading' : 'coordinator-system-heading')?.focus(); }}/>}
-    {scope && importId === null && outcome && <ReportCard outcome={outcome} onAccept={() => setSubset(true)} onDismiss={() => { setOutcome(null); document.getElementById('coordinator-upload-heading')?.focus(); }}/>}
+    {scope && importId === null && snapshot && (snapshot.data.source === 'COMBINED' ? mode === 'both' : mode === 'system') && <SnapshotResult result={snapshot} scope={scope} mode={mode} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })} onDismiss={() => { setSnapshot(null); document.getElementById(snapshot.data.source === 'COMBINED' ? 'coordinator-upload-section' : 'coordinator-system-section')?.focus(); }}/>}
+    {scope && importId === null && outcome && <ReportCard outcome={outcome} onAccept={() => setSubset(true)} onDismiss={() => { setOutcome(null); document.getElementById('coordinator-upload-section')?.focus(); }}/>}
     {scope && (importId === null
       ? <ImportList client={client} scope={scope} mode={mode} version={version} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })}/>
       : <ImportDetail key={importId} client={client} scope={scope} mode={mode} importId={importId} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })}/>)}

@@ -188,16 +188,10 @@
 .admin-shell .coordinator-scope-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr); }
 .admin-shell output.coordinator-readonly-value { justify-content: space-between; gap: 8px; }
 .coordinator-lock-icon { flex: none; color: var(--color-muted-text); }
-.admin-shell .coordinator-scope-status { margin: 16px 0 0; padding: 12px 14px; border: 1px solid var(--color-outline); border-left: 4px solid var(--color-brand); border-radius: 9px; background: var(--color-surface-subtle); color: var(--color-body); font-size: var(--font-size-control); overflow-wrap: anywhere; }
-.admin-shell .coordinator-scope-status.is-empty { border-left-color: var(--color-outline); background: var(--color-app-bg); }
-.coordinator-source-box { padding: 16px 18px; border: 1px solid var(--color-outline); border-radius: 10px; background: var(--color-app-bg); }
-.coordinator-source-box > p { margin: 6px 0 0; }
-.coordinator-heading-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.admin-shell .coordinator-upload-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px 20px; }
 .admin-shell .coordinator-outline-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--control-min-height); padding: 8px 14px; border: 1.5px solid var(--color-brand); border-radius: 8px; background: #fff; color: var(--color-brand); font-size: var(--font-size-control); font-weight: 600; white-space: nowrap; cursor: pointer; }
 .admin-shell .coordinator-outline-button:hover { background: var(--color-surface-subtle); }
 .coordinator-upload-form { display: grid; gap: 16px; margin-top: 18px; }
-.admin-shell .coordinator-upload-meta { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.admin-shell .coordinator-upload-meta { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) auto; gap: 16px; align-items: start; }
 .coordinator-dropzone { position: relative; display: grid; gap: 8px; justify-items: center; padding: 22px 18px; border: 2px dashed var(--color-outline); border-radius: 12px; background: var(--color-app-bg); text-align: center; transition: border-color .15s, background-color .15s; }
 .coordinator-dropzone:hover, .coordinator-dropzone.is-dragging { border-color: var(--color-brand); background: var(--color-surface-subtle); }
 .coordinator-dropzone.has-file { justify-items: stretch; padding: 14px 16px; border-style: solid; text-align: left; }
@@ -221,6 +215,13 @@
 .coordinator-setup-section > .coordinator-action-bar { margin-top: 16px; }
 @media (max-width: 1050px) { .admin-shell .coordinator-scope-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .admin-shell .coordinator-scope-grid > :first-child { grid-column: 1 / -1; } }
 @media (max-width: 760px) {
-  .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-meta, .admin-shell .coordinator-upload-head { grid-template-columns: 1fr; }
   .admin-shell .coordinator-outline-button, .coordinator-action-bar button { width: 100%; }
 }
+.coordinator-template-cell { display: grid; gap: 7px; }
+.coordinator-label-spacer { font-size: var(--font-size-label); font-weight: 600; }
+.admin-shell .coordinator-template-cell .coordinator-outline-button { min-height: 44px; }
+.coordinator-combined-note { margin: 0 0 4px; }
+.coordinator-setup-section:focus { outline: none; }
+.coordinator-action-bar.is-first { margin-top: 0; padding-top: 0; border-top: 0; }
+@media (max-width: 1050px) { .admin-shell .coordinator-upload-meta { grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); } .coordinator-template-cell { grid-column: 1 / -1; } .coordinator-label-spacer { display: none; } }
+@media (max-width: 760px) { .admin-shell .coordinator-scope-grid, .admin-shell .coordinator-upload-meta { grid-template-columns: 1fr; } }
