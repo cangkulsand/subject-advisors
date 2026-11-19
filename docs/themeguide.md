@@ -337,6 +337,16 @@ Refresh, Previous page and Next page are **icon buttons**, not text buttons. Use
 - Every pager uses `PagerButtons page={page} pages={pages} onPage={setPage}`; pass `noun` when one screen has two pagers.
 - A refresh offered as the way out of an error or a warning ("Refresh plan" in the out-of-date notice, "Refresh current semester" after a failure) stays a text button, because there it is the message's call to action.
 
+
+### 5.5 Staff page heading and menu (mandatory)
+
+Admin and coordinator pages share one header pattern. Record: S3-P004-014, S3-P004-019.
+
+- **Top bar:** the role badge (`admin-admin-badge`) only. No breadcrumbs and no "… WORKSPACE" eyebrow.
+- **Page heading:** above the cards, never inside one (`admin-page-heading`). It holds the h1, one short muted sentence, and the page's main actions on the right (for example the Refresh icon and "Add user"). Setup pages get this from `SetupCard`'s `title`, `description` and `action`.
+- **Cards:** no card title that repeats the page heading (for example "Users and invitations" under "Users & Access", or "Forecast data setup"). Give such a card an `aria-label` instead. A card keeps its own heading only when it is a distinct section of the page (for example "Curriculums" on Programmes, "Decisions and picks" on Offering History).
+- **Sidebar menu:** plain links, with no "WORKSPACE" caption. Only a group of several related pages keeps a collapsible heading (admin "Academic setup"). A group with one link renders as that link alone.
+
 ---
 
 ## 6. Spacing, shape, and elevation

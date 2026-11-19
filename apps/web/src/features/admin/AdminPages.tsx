@@ -28,8 +28,8 @@ function Panel({ error, retry, children }: { error?: string; retry: () => void; 
   if (!children) return <section className="admin-card admin-loading" role="status">Loading administration data…</section>;
   return <>{children}</>;
 }
-function PageHeading({ title, text, refresh }: { title: string; text: string; refresh?: () => void }) {
-  return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{refresh && <IconButton icon="refresh" label="Refresh data" onClick={refresh}/>}</header>;
+function PageHeading({ title, text, refresh, action }: { title: string; text: string; refresh?: () => void; action?: ReactNode }) {
+  return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{(refresh || action) && <div className="admin-page-actions">{refresh && <IconButton icon="refresh" label="Refresh data" onClick={refresh}/>}{action}</div>}</header>;
 }
 export function RolePills({ roles }: { roles: AdminRole[] }) { return <span className="admin-pills">{roles.length ? roles.map(role => <span className={`admin-pill admin-role-${role.toLowerCase()}`} key={role}>{labels[role]}</span>) : <span className="admin-pill">No memberships</span>}</span>; }
 function AccessPill({ status }: { status: AdminAccount['accessStatus'] }) { return <span className={`admin-pill admin-status-${status.toLowerCase()}`}>{status === 'ACTIVE' ? 'Active' : 'Suspended'}</span>; }
@@ -77,11 +77,10 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
   const invitationRows = (invitations.data?.items ?? []).filter(item => (!needle || item.email.toLowerCase().includes(needle)) && (!filters.role || item.roles.includes(filters.role)));
   const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined;
   const reset = () => { setTerm(''); setInvited(false); setInvitationFilter({ page: 1, status: 'PENDING' }); setFilters({ page: 1, q: '', role: '', status: '' }); retry(); };
-  return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations." refresh={retry}/>
+  return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations. Invitations are valid for 7 days." refresh={retry}
+      action={<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button>}/>
     <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice.text} {notice.accountId && <AppLink href={'/admin/users/' + notice.accountId}>View account →</AppLink>}</p>}</div>
-    <section className="admin-card admin-users-card" aria-labelledby="admin-users-title">
-      <div className="admin-card-title"><div><h2 id="admin-users-title">Users and invitations</h2><p className="admin-muted">Invitations are valid for 7 days. Roles apply only if the verified email still qualifies at first sign-in.</p></div>
-        <button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>
+    <section className="admin-card admin-users-card" aria-label="Users and invitations">
       <TableToolbar label="Search and filter users" onSubmit={() => { setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>
         <SegmentedFilter label="Access" value={invited ? 'INVITED' : filters.status} onChange={value => { setInvited(value === 'INVITED'); setFilters(old => ({ ...old, status: value === 'INVITED' ? '' : value as AdminUsersQuery['status'], page: 1 })); setInvitationFilter({ page: 1, status: 'PENDING' }); }}
           options={[{ value: '', label: 'All' }, { value: 'ACTIVE', label: 'Active' }, { value: 'SUSPENDED', label: 'Suspended' }, { value: 'INVITED', label: 'Invited' }]}/>

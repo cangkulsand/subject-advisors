@@ -75,6 +75,8 @@ else {
       assert.equal(await page.getByText('ADMIN WORKSPACE', { exact: true }).count(), 0, 'no workspace eyebrow');
       assert.equal(await page.locator('.admin-topbar-title .admin-admin-badge').innerText(), 'System administrator', 'the role badge is the top-bar title');
       assert.equal(await page.locator('.admin-topbar-actions .admin-admin-badge').count(), 0, 'the badge is not repeated');
+      assert.deepEqual(await page.locator('.admin-sidebar summary').allInnerTexts().then(list => list.map(text => text.replace(/[^A-Za-z ]/g, '').trim())), ['Academic setup'], 'only Academic setup keeps a group heading; no Workspace heading');
+      assert.equal(await page.locator('.admin-sidebar').getByText('WORKSPACE', { exact: true }).count(), 0, 'no WORKSPACE caption');
       assert.ok((await page.locator('.admin-metrics').innerText()).includes('23'));
       assert.equal(await page.getByText('Fictional Administrator', { exact: true }).count(), 0);
       assert.equal(await page.getByRole('link', { name: 'Academic Semesters', exact: true, includeHidden: true }).count(), 2); // Desktop and mobile dialog.
@@ -152,7 +154,7 @@ else {
     });
     await check('expanded groups preserve collapse choice and reopen the active group through history', async page => {
       await mock(page); await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
-      const setup = page.locator('.admin-sidebar details').nth(1);
+      const setup = page.locator('.admin-sidebar details').first();
       const summary = setup.locator('summary');
       assert.equal(await setup.evaluate(element => element.open), true);
       await summary.click(); assert.equal(await setup.evaluate(element => element.open), false);

@@ -27,11 +27,12 @@ export function useSetupRead<T>(load: (signal: AbortSignal) => Promise<T>, key =
   }, [key, attempt]);
   return { data: state.key === key ? state.data : undefined, error: state.key === key ? state.error : undefined, refresh: () => setAttempt(v => v + 1) };
 }
-export function SetupCard({ title, data, error, refresh, children, action, success }: { title: string; data: unknown; error?: string; refresh: () => void; children: ReactNode; action?: ReactNode; success: string }) {
-  return <section className="admin-card"><div className="admin-card-title"><h1>{title}</h1>{action}</div>
+/** Setup page: the page heading (title, one-line description, main action) sits above the card, as on every staff page. */
+export function SetupCard({ title, description, data, error, refresh, children, action, success }: { title: string; description: string; data: unknown; error?: string; refresh: () => void; children: ReactNode; action?: ReactNode; success: string }) {
+  return <><header className="admin-page-heading"><div><h1>{title}</h1><p>{description}</p></div>{action}</header><section className="admin-card">
     <div id="admin-action-status" className="admin-status-region" role="status" tabIndex={-1}>{success && <p className="admin-success">{success}</p>}</div>
     {error ? <div><p role="alert" className="admin-form-error">{error}</p><button onClick={refresh}>Retry</button></div> : !data ? <p role="status">Loading academic setup…</p> : children}
-  </section>;
+  </section></>;
 }
 export function SetupForm({ title, fields, initial, onSave, onClose, children }: { title: string; fields: Field[]; initial: Values; onSave: (v: Values, reason: string) => Promise<void>; onClose: () => void; children?: (v: Values, set: (key: string, value: string) => void) => ReactNode }) {
   const [values, setValues] = useState(initial), [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');

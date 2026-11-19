@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { StaffNavigationShell, type StaffNavigationGroup } from './staff-navigation';
 
 const groups: StaffNavigationGroup[] = [
-  { label: 'Workspace', links: [{ href: '/admin', label: 'Overview', icon: 'overview' }, { href: '/admin/users', label: 'Users & Access', icon: 'users' }] },
+  // Single-link groups render as plain menu links with no heading; only Academic setup keeps a heading for its seven pages.
+  { label: 'Overview', links: [{ href: '/admin', label: 'Overview', icon: 'overview' }] },
+  { label: 'Users & Access', links: [{ href: '/admin/users', label: 'Users & Access', icon: 'users' }] },
   { label: 'Academic setup', links: [{ href: '/admin/learning-centres', label: 'Learning Centres', icon: 'curriculum' }, { href: '/admin/faculties', label: 'Faculties', icon: 'curriculum' }, { href: '/admin/departments', label: 'Departments', icon: 'curriculum' }, { href: '/admin/programmes', label: 'Programmes', icon: 'curriculum' }, { href: '/admin/coordinator-assignments', label: 'Coordinator Assignments', icon: 'users' }, { href: '/admin/semesters', label: 'Academic Semesters', icon: 'calendar' }, { href: '/admin/curriculum', label: 'Curriculum & Prerequisites', icon: 'curriculum' }] },
   { label: 'Audit', links: [{ href: '/admin/audit', label: 'Audit Log', icon: 'audit' }] },
 ];

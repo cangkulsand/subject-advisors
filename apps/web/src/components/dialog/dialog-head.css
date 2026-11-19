@@ -1,9 +1,9 @@
 /* Modal title row with the Close (×) button (themeguide "Modal close button"). The dialog sets --dialog-pad to its own padding
    so the sticky row covers the padding above it and stays at the very top while the dialog scrolls. */
 .dialog-head {
-  position: sticky; top: 0; z-index: 2;
+  position: sticky; top: calc(-1 * var(--dialog-pad, 24px)); z-index: 2;
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-  margin-top: calc(-1 * var(--dialog-pad, 24px)); padding-top: var(--dialog-pad, 24px); padding-bottom: 4px;
+  margin-top: calc(-1 * var(--dialog-pad, 24px)); padding-top: var(--dialog-pad, 24px); padding-bottom: 8px;
   background: var(--color-surface, #fff);
 }
 .dialog-head-title { min-width: 0; flex: 1 1 auto; }

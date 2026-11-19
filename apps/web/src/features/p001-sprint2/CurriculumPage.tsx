@@ -77,7 +77,8 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
   const prerequisiteQuery=prerequisiteSearch.trim().toLowerCase();
   const prerequisiteMatches=snapshot&&prerequisiteQuery?snapshot.data.subjects.filter(s=>!prerequisites.some(p=>p.mappingId===s.mappingId)&&(s.name.toLowerCase().includes(prerequisiteQuery)||s.code.toLowerCase().includes(prerequisiteQuery))):[];
   const disabled=busy||review!==null;
-  return <section className="admin-card admin-curriculum" aria-label="Curriculum management"><header className="admin-card-title"><div><h1>Subjects and prerequisites</h1><p className="admin-muted">Maintain the selected curriculum’s subjects, relationships and permitted semester types.</p></div></header>
+  return <><header className="admin-page-heading"><div><h1>Subjects and prerequisites</h1><p>Maintain the selected curriculum’s subjects, relationships and permitted semester types.</p></div></header>
+  <section className="admin-card admin-curriculum" aria-label="Curriculum management">
     <p className="admin-muted">Use verified programme rules. Mandatory prerequisites, concurrent study and advisory prior knowledge are separate relationship types.</p>
     {error&&<p ref={alert} tabIndex={-1} role="alert" className="admin-form-error">{error}</p>}{success&&<p role="status" className="admin-success">{success}</p>}
     <div className="admin-curriculum-selector"><label className="admin-field">Curriculum<select aria-label="Curriculum" value={id} disabled={disabled} onChange={e=>changeCurriculum(e.target.value)}><option value="">Select an existing curriculum</option>{catalogue?.curricula.map(c=><option key={c.curriculumId} value={c.curriculumId}>{c.programme} · {c.version}</option>)}</select></label>
@@ -127,5 +128,5 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
       </div>
       </div>
     </>}
-  </section>;
+  </section></>;
 }
