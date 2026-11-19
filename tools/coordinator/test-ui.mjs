@@ -40,6 +40,8 @@ else {
   await mkdir(shots, { recursive: true });
   async function mock(page, options = {}) {
     const state = createState(options);
+    // CSV import is hidden in the product for now (S3-P004-020); these tests keep covering it unless a test passes csvImport: false.
+    if (options.csvImport !== false) await page.addInitScript(() => { window.__SA_COORDINATOR_CSV_IMPORT__ = true; });
     await page.route(/\/api\//, async route => {
       const request = route.request(), url = new URL(request.url());
       if (state.delay && url.pathname.startsWith('/api/coordinator')) await new Promise(done => setTimeout(done, state.delay));
@@ -179,6 +181,21 @@ else {
       assert.equal(await noOverflow(page), true, 'no horizontal scroll at 375px');
       await page.getByLabel('CSV file', { exact: true }).setInputFiles(csv('VALIDFILE'));
       await page.screenshot({ path: shots + 'imports-file-mobile.png', fullPage: true });
+    });
+
+    await check('imports: CSV import and Both are hidden; only students in the system create a snapshot', async page => {
+      await mock(page, { csvImport: false }); await page.goto(base + '/coordinator/imports' + scoped);
+      await page.getByRole('region', { name: 'Students in the system', exact: true }).waitFor();
+      assert.equal(await page.getByRole('radiogroup', { name: 'Data source' }).count(), 0, 'no data source choice');
+      assert.equal(await page.getByText('CSV import', { exact: true }).count(), 0, 'no CSV import option');
+      assert.equal(await page.getByRole('region', { name: 'CSV import', exact: true }).count(), 0, 'no CSV form');
+      assert.equal(await page.getByRole('group', { name: 'Source' }).count(), 0, 'no source filter on the snapshot list');
+      await page.getByText('Create a snapshot of the students in the system above.', { exact: true }).waitFor();
+      await page.goto(base + '/coordinator/imports' + scoped + '&source=csv');
+      await page.getByRole('region', { name: 'Students in the system', exact: true }).waitFor();
+      assert.equal(await page.getByRole('region', { name: 'CSV import', exact: true }).count(), 0, 'an old ?source=csv link falls back to the system snapshot');
+      await assertReadable(page, 'imports system only');
+      await page.screenshot({ path: shots + 'imports-system-only-desktop.png' });
     });
 
     await check('imports: students in the system is the default, snapshot shows coverage, lists the source and feeds the forecast', async page => {

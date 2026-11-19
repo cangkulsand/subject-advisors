@@ -37,6 +37,14 @@ function CoverageSummary({ coverage }: { coverage: SystemSnapshotCoverage }) {
   </>;
 }
 
+/**
+ * CSV import and "Both" are hidden for now: snapshots come only from the students in the system (S3-P004-020).
+ * They return in a later phase by setting this to true; all CSV code and API routes stay in place.
+ * UI tests turn them on per page with `window.__SA_COORDINATOR_CSV_IMPORT__ = true`.
+ */
+const CSV_IMPORT_ENABLED = false;
+export const csvImportEnabled = () => CSV_IMPORT_ENABLED || (globalThis as { __SA_COORDINATOR_CSV_IMPORT__?: boolean }).__SA_COORDINATOR_CSV_IMPORT__ === true;
+
 export type DataMode = 'system' | 'csv' | 'both';
 const MODES: Array<{ value: DataMode; label: string; hint: string }> = [
   { value: 'system', label: 'Students in the system', hint: 'Student-entered records' },
@@ -44,7 +52,7 @@ const MODES: Array<{ value: DataMode; label: string; hint: string }> = [
   { value: 'both', label: 'Both', hint: 'System + CSV, one snapshot' },
 ];
 const modeExtra = (mode: DataMode): Record<string, string> => mode === 'system' ? {} : { source: mode };
-export const readMode = (value: string | null): DataMode => value === 'csv' || value === 'both' ? value : 'system';
+export const readMode = (value: string | null): DataMode => csvImportEnabled() && (value === 'csv' || value === 'both') ? value : 'system';
 
 /** Per-forecast data source choice; kept in the URL next to the scope. A real radio group, so arrow keys and labels work natively. */
 function DataSourceToggle({ mode, scope }: { mode: DataMode; scope: ChosenScope }) {
@@ -263,11 +271,11 @@ function ImportList({ client, scope, mode, version, onGenerate }: { client: Coor
   const needle = query.trim().toLowerCase(), filtering = source !== '' || needle !== '';
   const rows = list.items.filter(item => (!source || item.source === source) && (!needle || item.sourceLabel.toLowerCase().includes(needle) || String(item.importBatchId).includes(needle.replace(/^#/, '')))).sort(snapshotOrder[sort]);
   return <section className="admin-card" aria-labelledby="coordinator-imports-heading">
-    <div className="admin-card-title"><div><h2 id="coordinator-imports-heading">Student data snapshots</h2><p className="admin-muted">Each snapshot is frozen, taken from the students in the system, a CSV, or both. Generate a forecast from one of them.</p></div></div>
+    <div className="admin-card-title"><div><h2 id="coordinator-imports-heading">Student data snapshots</h2><p className="admin-muted">{csvImportEnabled() ? 'Each snapshot is frozen, taken from the students in the system, a CSV, or both. Generate a forecast from one of them.' : 'Each snapshot is frozen, taken from the students in the system. Generate a forecast from one of them.'}</p></div></div>
     <Panel error={list.error} retry={list.retry} label="snapshots">{list.data && (list.items.length === 0
-      ? <div className="admin-empty"><h3>No snapshots yet</h3><p>Create a snapshot of the students in the system above, or upload a CSV. Valid data is accepted straight away.</p></div>
+      ? <div className="admin-empty"><h3>No snapshots yet</h3><p>{csvImportEnabled() ? 'Create a snapshot of the students in the system above, or upload a CSV. Valid data is accepted straight away.' : 'Create a snapshot of the students in the system above.'}</p></div>
       : <><TableToolbar label="Filter and sort snapshots">
-          <SegmentedFilter label="Source" options={SOURCE_FILTERS} value={source} onChange={setSource}/>
+          {csvImportEnabled() && <SegmentedFilter label="Source" options={SOURCE_FILTERS} value={source} onChange={setSource}/>}
           <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', value: sort, noAll: true, options: SNAPSHOT_SORTS, onChange: value => setSort(value as SnapshotSort) }]}/>
           <SearchField label="Search snapshots" value={query} placeholder="Search name or import #" maxLength={120} onChange={setQuery}/>
           {filtering && <ClearFilters onClear={() => { setSource(''); setQuery(''); }}/>}
@@ -346,12 +354,12 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
     <section className="admin-card coordinator-setup" aria-label="Forecast data setup">
       <div className="coordinator-setup-section"><ScopeFields context={context} path="/coordinator/imports" programmeId={programmeId} learningCentreId={learningCentreId} keep={mode === 'system' ? undefined : { source: mode }}/></div>
       {scope && importId === null && <>
-        <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>
+        {csvImportEnabled() && <div className="coordinator-setup-section"><DataSourceToggle mode={mode} scope={scope}/></div>}
         {mode === 'system'
           ? <SystemCard key={resetKey} client={client} scope={scope} onCreated={result => { setSnapshot(result); setOutcome(null); setNotice(null); setVersion(value => value + 1); }}/>
           : <UploadCard key={resetKey} client={client} scope={scope} combined={mode === 'both'} onOutcome={onOutcome} onTemplateError={text => setNotice({ kind: 'warning', text })}/>}</>}
     </section>
-    {scope === null && context.programmes.length > 0 && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>Select a programme and a learning centre to upload data and see accepted imports.</p></section>}
+    {scope === null && context.programmes.length > 0 && <section className="admin-card admin-empty"><h2>Choose a scope</h2><p>{csvImportEnabled() ? 'Select a programme and a learning centre to upload data and see accepted imports.' : 'Select a programme and a learning centre to create a snapshot and see earlier snapshots.'}</p></section>}
     {scope && importId === null && snapshot && (snapshot.data.source === 'COMBINED' ? mode === 'both' : mode === 'system') && <SnapshotResult result={snapshot} scope={scope} mode={mode} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })} onDismiss={() => { setSnapshot(null); document.getElementById(snapshot.data.source === 'COMBINED' ? 'coordinator-upload-section' : 'coordinator-system-section')?.focus(); }}/>}
     {scope && importId === null && outcome && <ReportCard outcome={outcome} onAccept={() => setSubset(true)} onDismiss={() => { setOutcome(null); document.getElementById('coordinator-upload-section')?.focus(); }}/>}
     {scope && (importId === null
