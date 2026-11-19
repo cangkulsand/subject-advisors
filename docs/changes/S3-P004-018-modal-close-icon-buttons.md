@@ -1,6 +1,6 @@
 # S3-P004-018 — Close (×) at the top of every modal, icon buttons, Counted-first student list, plain coordinator menu
 
-- **Status:** On branch `feature/modal-close-top` (not merged)
+- **Status:** Merged to main and deployed to dev and prod (2026-11-19)
 - **Date:** 2026-11-19
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6, UC20) with shared UI components
