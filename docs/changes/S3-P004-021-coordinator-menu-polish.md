@@ -1,6 +1,6 @@
 # S3-P004-021 — Staff menu focus ring, label size, shorter forecast label; page descriptions on Data Imports and Forecast
 
-- **Status:** IN_REVIEW (not merged)
+- **Status:** Merged to main and pushed to dev and prod (2026-11-19); prod deploy verified live; independent review pending
 - **Date:** 2026-11-19
 - **Sprint:** Sprint 3
 - **Owner:** P004 (coordinator and shared staff UI)
