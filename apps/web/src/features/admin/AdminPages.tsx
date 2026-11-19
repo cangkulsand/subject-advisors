@@ -6,6 +6,7 @@ import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserMa
 import { StudentProgrammeCard } from './StudentProgrammeCard';
 import { ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import { IconButton, PagerButtons } from '../../components/icon-button/IconButton';
 
 const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pending', ACCEPTED: 'Accepted', REVOKED: 'Revoked', EXPIRED: 'Expired' };
 function when(value: string) { return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
@@ -28,7 +29,7 @@ function Panel({ error, retry, children }: { error?: string; retry: () => void; 
   return <>{children}</>;
 }
 function PageHeading({ title, text, refresh }: { title: string; text: string; refresh?: () => void }) {
-  return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{refresh && <button type="button" className="admin-secondary" onClick={refresh}>Refresh data</button>}</header>;
+  return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{refresh && <IconButton icon="refresh" label="Refresh data" onClick={refresh}/>}</header>;
 }
 export function RolePills({ roles }: { roles: AdminRole[] }) { return <span className="admin-pills">{roles.length ? roles.map(role => <span className={`admin-pill admin-role-${role.toLowerCase()}`} key={role}>{labels[role]}</span>) : <span className="admin-pill">No memberships</span>}</span>; }
 function AccessPill({ status }: { status: AdminAccount['accessStatus'] }) { return <span className={`admin-pill admin-status-${status.toLowerCase()}`}>{status === 'ACTIVE' ? 'Active' : 'Suspended'}</span>; }
@@ -39,7 +40,7 @@ function Identity({ account }: { account: AdminAccount }) {
 }
 function Pager({ result, onPage }: { result: AdminPage<unknown>; onPage: (page: number) => void }) {
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
-  return <div className="admin-pagination"><span>{result.total} {result.total === 1 ? 'result' : 'results'} · Page {result.page} of {pages}</span><div><button type="button" disabled={result.page <= 1} onClick={() => onPage(result.page - 1)}>Previous</button><button type="button" disabled={result.page >= pages} onClick={() => onPage(result.page + 1)}>Next</button></div></div>;
+  return <div className="admin-pagination"><span>{result.total} {result.total === 1 ? 'result' : 'results'} · Page {result.page} of {pages}</span><PagerButtons page={result.page} pages={pages} onPage={onPage}/></div>;
 }
 function eventLabel(event: { action: string; role: AdminRole | null; kind: string }) {
   const action = ({ GRANT: 'Role granted', REVOKE: 'Role revoked', POLICY_CHANGE: 'Role policy changed', PROTECT_OWNER: 'Owner protected', ACCESS_STATUS_CHANGE: 'Access status changed', ROLE_CHANGE: 'Legacy role changed' } as Record<string, string>)[event.action] ?? event.action.replaceAll('_', ' ').toLowerCase();

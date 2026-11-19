@@ -5,6 +5,7 @@ import type { ForecastContext, ForecastScope } from '../../../../../packages/sha
 import { RUN_LIMITS } from '../../../../../packages/shared/src/forecasting/runs';
 import '../../app/typography.css';
 import './coordinator.css';
+import { DialogHead } from '../../components/dialog/DialogHead';
 
 export const STATUS_REGION_ID = 'coordinator-action-status';
 export function errorText(error: unknown, fallback = 'The request could not be completed. Please retry.') {
@@ -212,7 +213,7 @@ export function ActionDialog({ title, description, confirmLabel, danger, reasonL
   return <dialog ref={dialog} className={'admin-reason-dialog' + (wide ? ' coordinator-wide-dialog' : '')} aria-labelledby={titleId} aria-modal="true"
     onCancel={event => { event.preventDefault(); if (!inFlight.current) onCancel(); }}>
     <form onSubmit={submit} noValidate>
-      <h2 id={titleId}>{title}</h2>
+      <DialogHead onClose={onCancel} disabled={busy}><h2 id={titleId}>{title}</h2></DialogHead>
       <div className="admin-dialog-text">{description}</div>
       {children?.(busy)}
       {needsReason && <div className="admin-field"><label htmlFor={reasonId}>{reasonLabel}</label>
@@ -255,7 +256,7 @@ export function usePagedList<T>(first: (signal: AbortSignal) => Promise<{ items:
 }
 
 /**
- * Read-only modal: title, content and one Close button. Escape and Close both call `onClose`; focus returns to the opener when it unmounts.
+ * Read-only modal: title with the Close (×) button at the top, then content. Escape and Close both call `onClose`; focus returns to the opener when it unmounts.
  * Use it to show information only; use ActionDialog for anything that records a decision.
  */
 export function ReadOnlyDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
@@ -272,9 +273,8 @@ export function ReadOnlyDialog({ title, children, onClose }: { title: string; ch
   return <dialog ref={dialog} className="admin-reason-dialog coordinator-wide-dialog coordinator-students-dialog" aria-labelledby={titleId} aria-modal="true"
     onCancel={event => { event.preventDefault(); onClose(); }}>
     <div className="coordinator-students-body">
-      <h2 id={titleId}>{title}</h2>
+      <DialogHead onClose={onClose}><h2 id={titleId}>{title}</h2></DialogHead>
       {children}
-      <div className="admin-dialog-actions"><button type="button" data-close onClick={onClose}>Close</button></div>
     </div>
   </dialog>;
 }

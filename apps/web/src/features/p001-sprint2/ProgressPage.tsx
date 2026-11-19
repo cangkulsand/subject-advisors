@@ -8,6 +8,7 @@ import { SubjectDetailsPanel } from './SubjectDetailsPanel';
 import { approvedSubjectIdsFrom, describeSubject, OUTCOME_LABEL } from './subject-details';
 import '../../app/typography.css';
 import './progress-page.css';
+import { IconButton } from '../../components/icon-button/IconButton';
 
 /** `offerings` reads GET /api/semester-offerings once; any failure leaves next-semester availability unconfirmed. */
 export function ProgressPage({ api, offerings }: { api: Sprint2Client; offerings?: AcademicClient }) {
@@ -44,7 +45,7 @@ export function ProgressPage({ api, offerings }: { api: Sprint2Client; offerings
   return <section className="progress-page" aria-label="Academic progress">
     <header><p className="progress-eyebrow">Academic progress</p><h1>Your programme progress</h1><p className="progress-lead">Credits and subject completion from your saved academic history.</p></header>
     <p className="progress-notice">Student-reported information. This summary does not confirm official graduation eligibility.</p>
-    <div className="progress-actions"><AppLink className="progress-button" href="/student/records">Update subject records</AppLink><button type="button" className="progress-button" onClick={() => setRefresh(n => n + 1)}>Refresh progress</button></div>
+    <div className="progress-actions"><AppLink className="progress-button" href="/student/records">Update subject records</AppLink><IconButton icon="refresh" label="Refresh progress" onClick={() => setRefresh(n => n + 1)}/></div>
     {error && <p role="alert" className="progress-error">{error}</p>}
     {!data && !error && <p role="status">Loading academic progress…</p>}
     {data && <>

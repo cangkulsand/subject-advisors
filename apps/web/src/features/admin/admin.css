@@ -48,9 +48,9 @@
 .admin-shell .admin-primary:hover { background: var(--color-action-hover); border-color:var(--color-action-hover); }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; padding: 32px 16px 24px; background: var(--staff-nav-background); color: var(--staff-nav-foreground); border-right:1px solid var(--color-nav-divider); display: flex; flex-direction: column; }
 .admin-shell .admin-brand { display: flex; align-items: center; gap: 10px; color: var(--staff-nav-foreground); font-size: 16px; font-weight: 650; line-height: 1.3; padding: 0 10px; }
+.admin-sidebar > nav { margin-top: 28px; }
 .admin-brand small { display: block; font-size: var(--font-size-small); font-weight: 500; color: var(--staff-nav-muted); letter-spacing: .14em; margin-top: 6px; }
 .admin-brand-mark { width: 35px; height: 35px; display: grid; place-items: center; border: 1px solid var(--staff-nav-muted); border-radius: 10px; font-size: var(--font-size-label); }
-.admin-nav-caption { padding: 38px 14px 12px; color: var(--staff-nav-muted); font-size: var(--font-size-small); font-weight: 600; letter-spacing: .13em; }
 .admin-sidebar nav, .admin-drawer nav { display: grid; gap: 6px; align-items: stretch; }
 .admin-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; }
 .admin-sidebar .staff-nav-group, .admin-drawer .staff-nav-group { min-width: 0; }
@@ -252,6 +252,7 @@
 .admin-group-row th { text-align: left; padding: 10px 14px; background: var(--color-surface-subtle); color: var(--color-heading); font-size: var(--font-size-table); font-weight: 700; letter-spacing: .02em; }
 .admin-invite-tag { color: #3730a3; background: #eef2ff; margin-top: 4px; }
 .admin-invite-dates { display: grid; gap: 2px; font-size: var(--font-size-table); }
+.admin-reason-dialog { --dialog-pad: 24px; }
 .admin-reason-dialog::backdrop { background: rgb(26 26 26 / 50%); }
 .admin-reason-dialog form { display: grid; gap: 16px; }
 .admin-reason-dialog h2 { margin: 0; }
@@ -261,7 +262,7 @@
   .admin-users-card .admin-card-title > button { width: 100%; }
   .admin-inline-filter { width: 100%; }
   .admin-add-role > *, .admin-add-role button { width: 100%; }
-  .admin-reason-dialog { padding: 20px; }
+  .admin-reason-dialog { padding: 20px; --dialog-pad: 20px; }
   .admin-dialog-actions > button { flex: 1 1 140px; }
 }
 

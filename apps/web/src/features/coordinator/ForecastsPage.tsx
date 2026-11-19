@@ -15,6 +15,7 @@ import { HELP, Help } from './coordinator-help';
 import type { ClassType, ForecastContext, ForecastScope, ImportSource, ImportSummary } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ForecastRunDetail, RunSubject } from '../../../../../packages/shared/src/forecasting/runs';
 import type { OfferingDecision, OfferingDecisionAuditEntry, OfferingDecisionSet, OfferingDecisionStatus } from '../../../../../packages/shared/src/forecasting/offering-decisions';
+import { IconButton, PagerButtons } from '../../components/icon-button/IconButton';
 
 const statusLabels: Record<OfferingDecisionStatus, string> = { PENDING: 'Pending', APPROVED: 'Approved', REMOVED: 'Removed' };
 const statusClass: Record<OfferingDecisionStatus, string> = { PENDING: 'coordinator-pill-warning', APPROVED: 'coordinator-pill-success', REMOVED: 'coordinator-pill-muted' };
@@ -163,7 +164,7 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
   const studentsDialog = studentsFor && <SubjectStudentsDialog client={client} forecastRunId={runId} subjectId={studentsFor.subjectId} subjectCode={studentsFor.subjectCode} cache={studentCache} onClose={() => setStudentsFor(null)}/>;
   if (matching.length === 0) return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-empty" role="status"><p>{subjects.length === 0 ? 'Every subject has been removed.' : 'No subjects match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div></div>{side}{studentsDialog}{pickersDialog}</div>;
   return <div className="coordinator-subjects-layout"><div className="coordinator-subjects-main">{toolbar}<div className="admin-table-scroll coordinator-table coordinator-subjects coordinator-decisions" role="region" aria-label="Subjects table" tabIndex={0}>
-    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Not taken yet" text={HELP.notTakenYet}/></th><th scope="col"><Help label="Eligible to take" text={HELP.eligible}/></th><th scope="col"><Help label="Uncertain" text={HELP.uncertain}/></th><th scope="col"><Help label="Action" text={HELP.action}/></th>{closed && <th scope="col"><Help label="Picked" text={HELP.picked}/></th>}</tr></thead>
+    <table><thead><tr><th scope="col">Subject</th><th scope="col"><Help label="Not taken yet" text={HELP.notTakenYet}/></th><th scope="col"><Help label="Eligible to take" text={HELP.eligible}/></th><th scope="col"><Help label="Action" text={HELP.action}/></th>{closed && <th scope="col"><Help label="Picked" text={HELP.picked}/></th>}</tr></thead>
       <tbody>{matching.slice((page - 1) * SUBJECT_PAGE_SIZE, page * SUBJECT_PAGE_SIZE).map(row => <tr key={row.subjectId} data-subject={row.subjectCode}>
         <th scope="row"><strong>{row.subjectName}</strong><span className="coordinator-subject-code">{row.subjectCode}</span><span className="admin-audit-id">{classTypeLabel(row.classType)} · {row.creditHours} credit hours</span>
           {!row.inSnapshot && <span className="admin-pill coordinator-pill-muted">not in this snapshot</span>}</th>
@@ -172,7 +173,6 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
           ? <button type="button" className="coordinator-count-button" aria-haspopup="dialog" aria-label={`View students for ${row.subjectCode}`} title="View students" onClick={() => setStudentsFor(row)}>
             <span className="coordinator-number">{row.eligible ?? 0}</span>{studentsIcon}</button>
           : <strong className="coordinator-number">{row.eligible ?? '—'}</strong>}</td>
-        <td><span className={'coordinator-number' + (row.run && row.run.uncertainStudentCount > 0 ? ' coordinator-uncertain' : ' coordinator-zero')}>{row.run ? row.run.uncertainStudentCount : '—'}</span></td>
         <td>{editable ? <ActionMenu row={row} onDecide={onDecide}/> : <span className={'admin-pill ' + statusClass[row.status]}>{statusLabels[row.status]}</span>}</td>
         {closed && <td>{row.status === 'APPROVED'
           ? <><strong className="coordinator-number">{pickCounts.get(row.subjectId) ?? 0}</strong>
@@ -180,7 +180,7 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
           : <strong className="coordinator-number">—</strong>}</td>}
       </tr>)}</tbody></table>
   </div>
-  {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${subjects.length}` : matching.length} subjects · Page {page} of {pages}</span><div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</div>{side}{studentsDialog}{pickersDialog}</div>;
+  {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${subjects.length}` : matching.length} subjects · Page {page} of {pages}</span><PagerButtons page={page} pages={pages} onPage={setPage}/></div>}</div>{side}{studentsDialog}{pickersDialog}</div>;
 }
 
 function AuditTable({ audit }: { audit: ReturnType<typeof usePagedList<OfferingDecisionAuditEntry>> }) {
@@ -272,7 +272,7 @@ function Forecast({ client, scope, search, scopeFields }: { client: CoordinatorC
     </section>
     {chosen && <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
       <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Eligible students are a forecast, not registration.{set?.editable === false ? " Decisions are locked." : " Choose an action for each subject; it applies at once."}</p></div>
-        <button type="button" onClick={refresh}>Refresh</button></div>
+        <IconButton icon="refresh" label="Refresh" onClick={refresh}/></div>
       <Panel error={forecast.error ?? decisions.error} retry={() => { forecast.retry(); decisions.retry(); }} label="forecast">{rows && run && set && (rows.length === 0
         ? <p className="admin-empty">No subjects are forecast for this scope.</p>
         : <SubjectTable client={client} scope={scope} runId={run.forecastRunId} rows={rows} studentCache={studentCache.current} pickerCache={pickerCache.current} editable={set.editable} closed={set.phase === 'CLOSED'} pickCounts={new Map(set.pickCounts.map(item => [item.subjectId, item.pickCount]))} onDecide={(row, status) => void decide(row, status)}/>)}

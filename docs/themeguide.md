@@ -317,6 +317,26 @@ Every data table that is filtered, searched or sorted uses the shared toolbar in
 
 **Tables that currently use it:** admin Users & Access (tabs by access, role and invitation-status menu, search) and Audit Log (event-type tabs plus date fields), coordinator forecast Subjects (decision tabs, Filter and Sort menus, search), coordinator Student data snapshots and Forecasts list (source or status tabs, Sort menu, search; icon row actions) and the student offerings subject search. Tables with no filters today (semesters, faculties, learning centres, coordinator assignments, offering decisions, records) adopt the component the moment they gain filtering.
 
+
+### 5.3 Modal close button (mandatory)
+
+Every modal has a Close button shaped as an **X icon at the top right of its title row**, never only a text "Close" at the bottom. A user must be able to close a long modal without scrolling to its end. Record: S3-P004-018.
+
+- **Component.** Put the title inside `DialogHead` from `apps/web/src/components/dialog/DialogHead.tsx`: `<DialogHead onClose={onCancel} disabled={busy}><h2 id={titleId}>Title</h2></DialogHead>`. A subtitle or code line can sit next to the heading inside it.
+- **Look.** 44px square, transparent, 20px X stroke in muted text, light grey on hover, 3px focus ring. Accessible name "Close" through `aria-label` and the tooltip (`title`); no visible text.
+- **Sticky.** The title row sticks to the top of the dialog while the content scrolls. The dialog sets `--dialog-pad` to its own padding so the row covers it (`.admin-reason-dialog` 24px, 20px on mobile; `.planning-dialog` 20px; `.progress-details` 24px).
+- **Behaviour.** The X does exactly what Escape does: `onClose` or the dialog's Cancel. It is disabled while a save is in flight. Read-only dialogs (`ReadOnlyDialog`) have only the X and focus it on open; dialogs that record something keep their Cancel and confirm buttons at the bottom as well.
+- **Used by:** coordinator `ActionDialog` and `ReadOnlyDialog` (View students, Pickers), admin `ReasonDialog`, `AddUserDialog` and academic setup `SetupForm`, the planning Move and confirm dialogs, and student subject details. The records detail editor already has its own top X (`p001-records-dialog__close`) and keeps it.
+
+### 5.4 Icon buttons for repeated controls (mandatory)
+
+Refresh, Previous page and Next page are **icon buttons**, not text buttons. Use `IconButton` (`icon="refresh" | "previous" | "next"`) and `PagerButtons` from `apps/web/src/components/icon-button/IconButton.tsx`. Record: S3-P004-018.
+
+- 44px square, 1.5px outline, rounded 8px, 20px stroke icon; brand colour on hover; faded and not clickable when disabled.
+- The text name stays as the `aria-label` and tooltip ("Refresh", "Refresh plan", "Previous", "Next", "Previous coordinators"), so screen readers and tests find the same name.
+- Every pager uses `PagerButtons page={page} pages={pages} onPage={setPage}`; pass `noun` when one screen has two pagers.
+- A refresh offered as the way out of an error or a warning ("Refresh plan" in the out-of-date notice, "Refresh current semester" after a failure) stays a text button, because there it is the message's call to action.
+
 ---
 
 ## 6. Spacing, shape, and elevation

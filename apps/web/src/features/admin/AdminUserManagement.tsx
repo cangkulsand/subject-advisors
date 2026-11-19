@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNod
 import { AdminApiError, type AdminClient } from './client';
 import { ADMIN_REASON_MAX_LENGTH, ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE, normaliseReason, validateCreateAccountRequest, validateCreateInvitationRequest } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminRole } from '../../../../../packages/shared/src/admin/admin';
+import { DialogHead } from '../../components/dialog/DialogHead';
 
 export const roleLabels: Record<AdminRole, string> = { STUDENT: 'Student', COORDINATOR: 'Coordinator', SYSTEM_ADMIN: 'System Admin' };
 export function errorText(error: unknown) { return error instanceof AdminApiError ? error.message : 'The change could not be completed. Please retry.'; }
@@ -45,7 +46,7 @@ export function ReasonDialog({ title, description, confirmLabel, danger, disable
   return <dialog ref={dialog} className="admin-reason-dialog" aria-labelledby={titleId} aria-modal="true"
     onCancel={event => { event.preventDefault(); if (!inFlight.current) onCancel(); }}>
     <form onSubmit={submit} noValidate>
-      <h2 id={titleId}>{title}</h2>
+      <DialogHead onClose={onCancel} disabled={busy}><h2 id={titleId}>{title}</h2></DialogHead>
       <div className="admin-dialog-text">{description}</div>
       <ReasonField label="Reason (recorded in the audit log)" value={reason} onChange={setReason} disabled={busy} textareaRef={field}/>
       {error && <p className="admin-form-error" role="alert">{error}</p>}
@@ -98,7 +99,7 @@ export function AddUserDialog({ client, onClose, onAdded }: { client: AdminClien
   return <dialog ref={dialog} className="admin-reason-dialog admin-add-user-dialog" aria-labelledby={titleId} aria-modal="true"
     onCancel={event => { event.preventDefault(); if (!inFlight.current) onClose(); }}>
     <form className="admin-form" onSubmit={submit} noValidate>
-      <div><h2 id={titleId}>Add user</h2><p className="admin-muted">Give an existing sign-in account access, or invite someone who has not signed up yet.</p></div>
+      <DialogHead onClose={onClose} disabled={busy}><h2 id={titleId}>Add user</h2><p className="admin-muted">Give an existing sign-in account access, or invite someone who has not signed up yet.</p></DialogHead>
       <fieldset className="admin-modes" disabled={busy}><legend>Method</legend>
         <label className="admin-check"><input type="radio" name={modeName} checked={mode === 'existing'} onChange={() => { setMode('existing'); setError(''); }}/>Add existing user</label>
         <label className="admin-check"><input type="radio" name={modeName} checked={mode === 'invite'} onChange={() => { setMode('invite'); setError(''); }}/>Send invitation</label>

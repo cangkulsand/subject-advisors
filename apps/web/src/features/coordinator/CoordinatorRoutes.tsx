@@ -13,7 +13,9 @@ import { OfferingHistoryPage } from './OfferingHistoryPage';
 const groups: StaffNavigationGroup[] = [
   { label: 'Workspace', links: [{ href: '/coordinator', label: 'Overview', icon: 'overview' }] },
   { label: 'Academic data', links: [{ href: '/coordinator/imports', label: 'Data Imports', icon: 'data' }] },
-  { label: 'Forecast planning', links: [{ href: '/coordinator/forecasts', label: 'Class Offering Forecast', icon: 'forecast' }, { href: '/coordinator/history', label: 'Offering History', icon: 'history' }] },
+  // One link per group: single-link groups render as plain menu links with no group heading.
+  { label: 'Class Offering Forecast', links: [{ href: '/coordinator/forecasts', label: 'Class Offering Forecast', icon: 'forecast' }] },
+  { label: 'Offering History', links: [{ href: '/coordinator/history', label: 'Offering History', icon: 'history' }] },
 ];
 const pages: Record<string, { title: string; description: string }> = {
   '/coordinator/imports': { title: 'Data Imports', description: 'Upload and validate student academic history, and keep accepted snapshots for forecast planning.' },

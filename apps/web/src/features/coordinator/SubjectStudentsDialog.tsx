@@ -5,6 +5,7 @@ import type { RunSubjectStudent, RunSubjectStudents, SubjectStudentOutcomeKind }
 import type { CoordinatorClient } from './client';
 import { Panel, ReadOnlyDialog, useRead } from './coordinator-ui';
 import { HELP, Help } from './coordinator-help';
+import { PagerButtons } from '../../components/icon-button/IconButton';
 
 export const reasonLabels: Record<UncertaintyReason, string> = {
   COHORT_STATUS_UNMAPPED: 'Cohort status is not active', HISTORY_UNKNOWN: 'Academic history unknown', HISTORY_PARTIAL: 'Academic history incomplete', SOURCE_STATUS_UNMAPPED: 'Unmapped subject status',
@@ -18,16 +19,17 @@ const statusClass: Record<SubjectStudentOutcomeKind, string> = {
   SUPPORTED: 'coordinator-pill-success', UNCERTAIN: 'coordinator-pill-warning', PASSED: 'coordinator-pill-muted', PREREQUISITE_NOT_MET: 'coordinator-pill-muted', NOT_OFFERED: 'coordinator-pill-muted',
 };
 const FILTERS = [
-  { value: '', label: 'All' }, { value: 'COUNTED', label: 'Counted' }, { value: 'UNCERTAIN', label: 'Uncertain' }, { value: 'NEAR', label: 'Near graduation' }, { value: 'NOT_COUNTED', label: 'Not counted' },
+  { value: 'COUNTED', label: 'Counted' }, { value: 'UNCERTAIN', label: 'Uncertain' }, { value: 'NEAR', label: 'Near graduation' }, { value: 'NOT_COUNTED', label: 'Not counted' },
 ];
+/** The list opens on the students counted as eligible to take: that is who the coordinator clicked the count to see. */
+const DEFAULT_FILTER = 'COUNTED';
 const PAGE_SIZE = 20;
 
 function matchesFilter(student: RunSubjectStudent, filter: string) {
   if (filter === 'COUNTED') return student.outcome === 'SUPPORTED';
   if (filter === 'UNCERTAIN') return student.outcome === 'UNCERTAIN';
   if (filter === 'NEAR') return student.nearGraduation;
-  if (filter === 'NOT_COUNTED') return student.outcome !== 'SUPPORTED' && student.outcome !== 'UNCERTAIN';
-  return true;
+  return student.outcome !== 'SUPPORTED' && student.outcome !== 'UNCERTAIN';
 }
 function Details({ student }: { student: RunSubjectStudent }) {
   const lines: string[] = [];
@@ -39,12 +41,12 @@ function Details({ student }: { student: RunSubjectStudent }) {
 }
 
 function Roster({ data }: { data: RunSubjectStudents }) {
-  const [filter, setFilter] = useState(''), [search, setSearch] = useState(''), [requested, setPage] = useState(1);
-  const term = search.trim().toLowerCase(), filtering = filter !== '' || term !== '';
+  const [filter, setFilter] = useState(DEFAULT_FILTER), [search, setSearch] = useState(''), [requested, setPage] = useState(1);
+  const term = search.trim().toLowerCase(), filtering = filter !== DEFAULT_FILTER || term !== '';
   const matching = data.students.filter(student => matchesFilter(student, filter)
     && (!term || [student.externalReference, student.studentName ?? '', student.matricNo ?? '', student.email ?? ''].some(value => value.toLowerCase().includes(term))));
   const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE)), page = Math.min(requested, pages);
-  const clear = () => { setFilter(''); setSearch(''); setPage(1); };
+  const clear = () => { setFilter(DEFAULT_FILTER); setSearch(''); setPage(1); };
   const s = data.summary;
   const facts: Array<[string, number, string]> = [['Eligible to take (counted)', s.counted, HELP.counted], ['Uncertain', s.uncertain, HELP.uncertain], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted, HELP.notCounted]];
   return <>
@@ -59,7 +61,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
       {filtering && <ClearFilters onClear={clear}/>}
     </TableToolbar>
     {matching.length === 0
-      ? <div className="admin-empty" role="status"><p>{data.students.length === 0 ? 'No students follow a curriculum that includes this subject.' : 'No students match these filters.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div>
+      ? <div className="admin-empty" role="status"><p>{data.students.length === 0 ? 'No students follow a curriculum that includes this subject.' : filtering ? 'No students match these filters.' : 'No students are counted as eligible to take this subject.'}</p>{filtering && <button type="button" onClick={clear}>Clear filters</button>}</div>
       : <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Students table" tabIndex={0}>
         <table><thead><tr><th scope="col"><Help label="Student" text={HELP.student}/></th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
           <tbody>{matching.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(student => <tr key={student.externalReference} data-student={student.externalReference}>
@@ -68,7 +70,7 @@ function Roster({ data }: { data: RunSubjectStudents }) {
             <td><Details student={student}/></td>
           </tr>)}</tbody></table></div>
         {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${data.students.length}` : matching.length} students · Page {page} of {pages}</span>
-          <div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</>}
+          <PagerButtons page={page} pages={pages} onPage={setPage}/></div>}</>}
   </>;
 }
 

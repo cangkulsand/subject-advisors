@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { NO_MANDATORY_TEXT, type SubjectDetails } from './subject-details';
+import { DialogHead } from '../../components/dialog/DialogHead';
 
 /** Read-only UC18 subject details in a modal dialog. Escape or Close returns focus to the opener. */
 export function SubjectDetailsPanel({ details, onClose }: { details: SubjectDetails; onClose: () => void }) {
@@ -12,10 +13,7 @@ export function SubjectDetailsPanel({ details, onClose }: { details: SubjectDeta
   const titleId = 'subject-details-title';
   return <dialog ref={dialog} className="progress-details" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="progress-details__body">
-      <header className="progress-details__header">
-        <div><p className="progress-details__code">{details.code}</p><h2 id={titleId}>{details.name}</h2></div>
-        <button type="button" className="progress-button" onClick={onClose}>Close</button>
-      </header>
+      <DialogHead onClose={onClose}><p className="progress-details__code">{details.code}</p><h2 id={titleId}>{details.name}</h2></DialogHead>
       <dl className="progress-details__facts">
         <div><dt>Credits</dt><dd>{details.credits}</dd></div>
         <div><dt>Category</dt><dd>{details.category}</dd></div>

@@ -4,6 +4,7 @@ import type { ForecastScope } from '../../../../../packages/shared/src/forecasti
 import type { DecisionPickers } from '../../../../../packages/shared/src/forecasting/offering-decisions';
 import type { CoordinatorClient } from './client';
 import { Panel, ReadOnlyDialog, useRead } from './coordinator-ui';
+import { PagerButtons } from '../../components/icon-button/IconButton';
 
 const PAGE_SIZE = 20;
 
@@ -35,7 +36,7 @@ function Pickers({ data }: { data: DecisionPickers }) {
             <th scope="row"><strong>{picker.studentName}</strong>{(picker.matricNo ?? picker.email) && <span className="coordinator-subject-code">{picker.matricNo ?? picker.email}</span>}</th>
           </tr>)}</tbody></table></div>
         {pages > 1 && <div className="admin-pagination"><span>{filtering ? `${matching.length} of ${data.pickers.length}` : matching.length} students · Page {page} of {pages}</span>
-          <div><button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</>}
+          <PagerButtons page={page} pages={pages} onPage={setPage}/></div>}</>}
   </>;
 }
 

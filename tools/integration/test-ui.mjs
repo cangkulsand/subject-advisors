@@ -257,7 +257,7 @@ try{
   await changes.getByRole('button',{name:'Reset to my plan',exact:true}).click();
   await page.getByRole('dialog',{name:'Reset to your plan?'}).getByRole('button',{name:'Reset to my plan',exact:true}).click();
   await compare.waitFor({state:'detached'});assert.equal(await page.getByRole('region',{name:'Your changes',exact:true}).count(),0);
-  await page.waitForFunction(()=>document.activeElement?.textContent==='Refresh plan',null,{timeout:3000});
+  await page.waitForFunction(()=>(document.activeElement?.getAttribute('aria-label')??document.activeElement?.textContent)==='Refresh plan',null,{timeout:3000});
   assert.ok(state.requests.every(r=>r.method==='GET'||r.path==='/api/planning/scenario'));
   await page.locator('.planning-save').getByText('Saved',{exact:true}).waitFor();assert.equal(state.scenarioWrites.at(-1).method,'DELETE');
  });

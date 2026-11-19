@@ -1,0 +1,12 @@
+/* Square icon-only buttons (refresh, previous, next). 44px target; the label lives in aria-label and the tooltip.
+   Doubled class beats feature rules such as `.admin-shell button` without !important. */
+button.icon-button.icon-button {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: var(--control-min-height, 44px); height: var(--control-min-height, 44px); min-height: var(--control-min-height, 44px); padding: 0;
+  border: 1.5px solid var(--color-outline, #ddd3c3); border-radius: 8px; background: var(--color-surface, #fff); color: var(--color-heading, #1a1a1a); cursor: pointer;
+}
+button.icon-button.icon-button:hover:not(:disabled) { border-color: var(--color-brand, #6b1d2f); color: var(--color-brand, #6b1d2f); }
+.icon-button:focus-visible { outline: 3px solid var(--color-focus, #6b1d2f); outline-offset: 2px; }
+button.icon-button.icon-button:disabled { opacity: .45; cursor: not-allowed; }
+.icon-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-pager { display: flex; gap: 8px; }

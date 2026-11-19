@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { AdminApiError } from './client';
 import { errorText } from './AdminUserManagement';
 import { ADMIN_REASON_MAX_LENGTH, normaliseReason, type AdminValidation } from '../../../../../packages/shared/src/admin/admin';
+import { DialogHead } from '../../components/dialog/DialogHead';
 
 export type Values = Record<string, string>;
 export type Field = { key: string; label: string; type?: string; maxLength?: number; optional?: boolean; options?: { value: string; label: string }[] };
@@ -44,7 +45,7 @@ export function SetupForm({ title, fields, initial, onSave, onClose, children }:
     event.preventDefault(); if (flight.current) return; const clean = normaliseReason(reason); if (!clean) { setError('A reason is required.'); return; }
     flight.current = true; setBusy(true); setError('');
     try { await onSave(values, clean); } catch (failure) { if (alive.current) setError(errorText(failure)); } finally { flight.current = false; if (alive.current) setBusy(false); }
-  }}><h2 id={id}>{title}</h2><fieldset disabled={busy} className="admin-setup-fields">
+  }}><DialogHead onClose={onClose} disabled={busy}><h2 id={id}>{title}</h2></DialogHead><fieldset disabled={busy} className="admin-setup-fields">
     {fields.map(f => <div className="admin-field" key={f.key}><label htmlFor={id + f.key}>{f.label}</label>{f.options ? <select id={id + f.key} required={!f.optional} value={values[f.key] ?? ''} onChange={e => set(f.key, e.target.value)}><option value="">{f.optional ? 'None' : 'Choose…'}</option>{f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <input id={id + f.key} type={f.type ?? 'text'} required={!f.optional} maxLength={f.maxLength} min={f.type === 'number' ? 0 : undefined} max={f.type === 'number' ? 32767 : undefined} step={f.type === 'number' ? 1 : undefined} value={values[f.key] ?? ''} onChange={e => set(f.key, e.target.value)}/>}</div>)}
     {children?.(values, set)}
     <div className="admin-field"><label htmlFor={id + 'reason'}>Reason (recorded in the audit log)</label><textarea id={id + 'reason'} required maxLength={ADMIN_REASON_MAX_LENGTH} value={reason} onChange={e => setReason(e.target.value)}/><small>{reason.trim().length} / {ADMIN_REASON_MAX_LENGTH} characters · required</small></div></fieldset>

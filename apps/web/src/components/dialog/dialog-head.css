@@ -1,0 +1,20 @@
+/* Modal title row with the Close (×) button (themeguide "Modal close button"). The dialog sets --dialog-pad to its own padding
+   so the sticky row covers the padding above it and stays at the very top while the dialog scrolls. */
+.dialog-head {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-top: calc(-1 * var(--dialog-pad, 24px)); padding-top: var(--dialog-pad, 24px); padding-bottom: 4px;
+  background: var(--color-surface, #fff);
+}
+.dialog-head-title { min-width: 0; flex: 1 1 auto; }
+.dialog-head-title > * { margin: 0; }
+.dialog-head-title > * + * { margin-top: 4px; }
+button.dialog-close.dialog-close {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: var(--control-min-height, 44px); height: var(--control-min-height, 44px); margin: -8px -8px 0 0; padding: 0;
+  border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--color-muted-text, #555); cursor: pointer;
+}
+button.dialog-close.dialog-close:hover { background: var(--color-surface-muted, #f3f0ea); color: var(--color-heading, #1a1a1a); }
+.dialog-close:focus-visible { outline: 3px solid var(--color-focus, #2563eb); outline-offset: 2px; }
+button.dialog-close.dialog-close:disabled { opacity: .5; cursor: not-allowed; }
+.dialog-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }

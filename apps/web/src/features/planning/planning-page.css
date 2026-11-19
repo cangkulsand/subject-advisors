@@ -152,6 +152,7 @@
 .sortable-fallback { box-shadow: 0 10px 24px rgb(0 0 0 / .18); border-radius: 8px; opacity: .95 !important; }
 
 .planning-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--pl-outline); border-radius: 12px; padding: 20px; background: var(--pl-surface); color: var(--pl-body); font-size: var(--font-size-control); }
+.planning-dialog { --dialog-pad: 20px; }
 .planning-dialog::backdrop { background: rgb(0 0 0 / .35); }
 .planning-dialog h3 { margin: 0; font-size: 19px; color: var(--pl-heading); }
 .planning-dialog-lead { margin: 6px 0 0; color: var(--pl-muted); }

@@ -14,6 +14,8 @@ import { describeChange, differenceText, restoreChanges } from './plan-view';
 import { SaveQueue, type SaveStatus } from './save-queue';
 import '../../app/typography.css';
 import './planning-page.css';
+import { DialogHead } from '../../components/dialog/DialogHead';
+import { IconButton } from '../../components/icon-button/IconButton';
 
 const STATUS_LABEL: Record<RequirementProgress['status'], string> = {
   MET: 'Met', PROJECTED: 'Projected', OUTSTANDING: 'Outstanding', UNVERIFIED: 'Cannot verify',
@@ -96,7 +98,7 @@ function ConfirmDialog({ title, lead, confirm, onCancel, onConfirm }: { title: s
   const leadId = useId();
   useEffect(() => { const dialog = ref.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
   return <dialog ref={ref} className="planning-dialog" aria-labelledby={titleId} aria-describedby={leadId} onCancel={event => { event.preventDefault(); onCancel(); }}>
-    <h3 id={titleId}>{title}</h3>
+    <DialogHead onClose={onCancel}><h3 id={titleId}>{title}</h3></DialogHead>
     <p className="planning-dialog-lead" id={leadId}>{lead}</p>
     <div className="planning-dialog-actions">
       <button type="button" className="planning-button" onClick={onCancel}>Cancel</button>
@@ -172,7 +174,7 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
   return <section className="planning-page" aria-label="Graduation plan">
     <header className="planning-head"><div><p className="planning-eyebrow">Graduation plan</p><h1>When could you finish?</h1></div>
       <div className="planning-header-actions">
-        <button type="button" ref={refreshButtonRef} className="planning-button" disabled={saving} onClick={() => requestRefresh(refreshButtonRef.current)}>Refresh plan</button>
+        <IconButton ref={refreshButtonRef} icon="refresh" label="Refresh plan" disabled={saving} onClick={() => requestRefresh(refreshButtonRef.current)}/>
         <SaveState status={status} retry={outdated ? undefined : () => queueRef.current?.retry()}/>
       </div></header>
     {error && <div role="alert" className="planning-error"><p>{error}</p><button type="button" className="planning-button" onClick={() => setRefresh(n => n + 1)}>Try again</button></div>}

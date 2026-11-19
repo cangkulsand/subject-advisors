@@ -213,7 +213,7 @@ else {
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const opener = page.getByRole('button', { name: 'Open navigation' }); await opener.click();
       const dialog = page.getByRole('dialog', { name: 'Coordinator menu' }); await dialog.waitFor();
-      const targetHeights = await dialog.locator('.staff-nav-group summary, .staff-nav-group-links .admin-nav-link').evaluateAll(elements => elements.filter(element => element.getClientRects().length).map(element => element.getBoundingClientRect().height));
+      const targetHeights = await dialog.locator('.staff-nav-group summary, .staff-nav-group .admin-nav-link').evaluateAll(elements => elements.filter(element => element.getClientRects().length).map(element => element.getBoundingClientRect().height));
       assert.ok(targetHeights.length > 0 && targetHeights.every(height => height >= 44));
       const focusables = await dialog.evaluate(element => [...element.querySelectorAll('button:not([disabled]),a[href],summary')].filter(control => control.getClientRects().length).map(control => ({ tag: control.tagName, label: control.getAttribute('aria-label') || control.textContent?.trim() })));
       assert.ok(focusables.length > 4);

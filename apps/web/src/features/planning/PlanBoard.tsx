@@ -5,6 +5,7 @@ import { semesterAt, semesterLabel, semesterTypeOf } from '../../../../../packag
 import { GripIcon, LockIcon, NormalIcon, PinIcon, ShortIcon, WarningIcon } from './icons';
 import { CHANGE_LABEL, replacementOptions, subjectNote } from './plan-view';
 import { useSortableLists } from './useSortableList';
+import { DialogHead } from '../../components/dialog/DialogHead';
 
 const keyOf = (ref: SemesterRef) => ref.academicYear + '-' + ref.semesterNo;
 const POSTPONE_KEY = 'postpone';
@@ -89,7 +90,7 @@ function MoveDialog({ subject, current, targets, others, onClose, onConfirm, onO
   const chosen = targets.find(t => keyOf(t.semester) === choice && t.ok);
   const other = others.find(o => 'other:' + o.key === choice);
   return <dialog ref={ref} className="planning-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}>
-    <h3 id={titleId}>Move {subject.subjectCode}</h3>
+    <DialogHead onClose={onClose}><h3 id={titleId}>Move {subject.subjectCode}</h3></DialogHead>
     <p className="planning-dialog-lead">{subject.subjectName}{current ? <> — now in <strong>{current}</strong></> : ''}. Choose the semester to take it in; the rest of your plan is rearranged around it.</p>
     <fieldset className="planning-targets"><legend>Semester</legend>
       {targets.map(target => <label key={keyOf(target.semester)} className={'planning-target' + (target.ok ? '' : ' planning-target--off')}>
