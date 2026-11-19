@@ -1,6 +1,6 @@
 # S3-P004-020 — Hide CSV import and "Both" on Data Imports (system snapshot only for now)
 
-- **Status:** On branch `feature/hide-csv-import` (not merged)
+- **Status:** Merged to main and deployed to dev and prod (2026-11-19)
 - **Date:** 2026-11-19
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6, UC20)
