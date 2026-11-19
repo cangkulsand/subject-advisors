@@ -221,3 +221,13 @@ it('reads the pickers of a subject and rejects a body without the list', async (
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'OFFERING_DECISION_NOT_FOUND', message: 'None.' } }), { status: 404, headers: { 'Content-Type': 'application/json' } })));
   await expect(client().getPickers(scope, 8)).rejects.toMatchObject({ status: 404, code: 'OFFERING_DECISION_NOT_FOUND' });
 });
+
+it('removes a snapshot with DELETE on the import and surfaces a not-found error (S3-P004-022)', async () => {
+  const fetcher = vi.fn<Fetch>(async () => reply({ importBatchId: 9, removed: true })); vi.stubGlobal('fetch', fetcher);
+  await client().removeImport(9);
+  expect(fetcher).toHaveBeenCalledWith('/api/coordinator/forecast-imports/9', expect.objectContaining({ method: 'DELETE', credentials: 'omit', cache: 'no-store' }));
+  vi.stubGlobal('fetch', vi.fn<Fetch>(async () => new Response(JSON.stringify({ error: { code: 'IMPORT_NOT_FOUND', message: 'The import was not found.' } }), { status: 404, headers: { 'Content-Type': 'application/json' } })));
+  const failure = await client().removeImport(9).catch(value => value);
+  expect(failure).toBeInstanceOf(CoordinatorApiError);
+  expect(failure).toMatchObject({ status: 404, code: 'IMPORT_NOT_FOUND' });
+});

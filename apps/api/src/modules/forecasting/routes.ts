@@ -328,11 +328,17 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
       return authJson({ data: { items: page.map(summaryOf), ...(rows.length > limit && last ? { nextCursor: encodeCursor(last.importBatchId) } : {}) } });
     }
     if (importId) {
-      if (method !== 'GET') return methodNotAllowed(['GET']);
+      if (method !== 'GET' && method !== 'DELETE') return methodNotAllowed(['GET', 'DELETE']);
       onlyParameters(url, []);
       const batch = await deps.repository.getBatch(Number(importId[1]));
       // Unassigned scopes and non-accepted batches are indistinguishable from absent ones.
       if (!batch || batch.status !== 'ACCEPTED' || !(await deps.scopes.isScopeAssigned(actor, batch.programmeId, batch.learningCentreId))) throw new ForecastingError('IMPORT_NOT_FOUND');
+      if (method === 'DELETE') {
+        // Remove = hide (S3-P004-022): the frozen snapshot stays for existing forecasts and audits. Repeating it is harmless.
+        if (!batch.removedAt) await deps.repository.removeAccepted(batch.importBatchId, actor);
+        return authJson({ data: { importBatchId: batch.importBatchId, removed: true } });
+      }
+      if (batch.removedAt) throw new ForecastingError('IMPORT_NOT_FOUND');
       return authJson({ data: acceptedOf(batch) });
     }
     if (students) {
@@ -342,7 +348,7 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
       if (limit > 100) bad('limit must be between 1 and 100.');
       const cursor = url.searchParams.has('cursor') ? decodeCursor(url.searchParams.get('cursor')!) : null;
       const batch = await deps.repository.getBatch(Number(students[1]));
-      if (!batch || batch.status !== 'ACCEPTED' || !(await deps.scopes.isScopeAssigned(actor, batch.programmeId, batch.learningCentreId))) throw new ForecastingError('IMPORT_NOT_FOUND');
+      if (!batch || batch.status !== 'ACCEPTED' || batch.removedAt || !(await deps.scopes.isScopeAssigned(actor, batch.programmeId, batch.learningCentreId))) throw new ForecastingError('IMPORT_NOT_FOUND');
       const rows = await deps.repository.listStudents(batch.importBatchId, limit + 1, cursor);
       const page = rows.slice(0, limit);
       const last = page[page.length - 1];

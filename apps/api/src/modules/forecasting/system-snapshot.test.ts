@@ -48,7 +48,7 @@ function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')
       const batch: ImportBatchRow = {
         importBatchId: batches.length + 1, programmeId: input.programmeId, learningCentreId: input.learningCentreId, targetSemesterId: input.targetSemesterId,
         status: input.outcome, sourceDate: input.sourceDate, sourceLabel: input.sourceLabel, providedBy: input.actor, sourceFingerprint: input.sourceFingerprint,
-        acceptedAt: '2026-11-02T10:00:00.000Z', acceptedBy: input.actor, summary: input.summary,
+        acceptedAt: '2026-11-02T10:00:00.000Z', acceptedBy: input.actor, summary: input.summary, removedAt: null,
       };
       batches.push(batch);
       return batch;

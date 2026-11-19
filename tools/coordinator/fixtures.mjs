@@ -188,6 +188,7 @@ export function handle(state, request) {
   if (importMatch) {
     const item = state.imports.find(entry => entry.importBatchId === Number(importMatch[1]));
     if (!item) return failure(404, 'IMPORT_NOT_FOUND', 'The import was not found.');
+    if (method === 'DELETE' && !importMatch[2]) { state.imports = state.imports.filter(entry => entry !== item); state.removed = [...(state.removed ?? []), item.importBatchId]; return ok({ importBatchId: item.importBatchId, removed: true }); }
     if (importMatch[2]) return ok(paginate(roster(item), url));
     if (item.source === 'SYSTEM') return ok({ ...item, validationReport: systemReport(item) });
     if (item.source === 'COMBINED') return ok({ ...item, validationReport: combinedReport(item) });

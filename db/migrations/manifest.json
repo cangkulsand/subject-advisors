@@ -72,6 +72,11 @@
       "version": "0013",
       "file": "0013_graduation_confirmations.sql",
       "description": "UC13 graduation check: student-confirmed fees-cleared and MUET timestamps on student_profile"
+    },
+    {
+      "version": "0014",
+      "file": "0014_import_snapshot_removal.sql",
+      "description": "Coordinators remove (hide) an accepted student data snapshot; one immutable removal row, snapshots stay frozen"
     }
   ],
   "historicalExcluded": [

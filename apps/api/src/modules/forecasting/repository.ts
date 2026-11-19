@@ -20,7 +20,10 @@ const isoSql = (column: string) => `to_char(${column} AT TIME ZONE 'UTC','YYYY-M
 const CURRENT_BATCH = "currval(pg_get_serial_sequence('public.academic_import_batch','import_batch_id'))";
 const BATCH_COLUMNS = `import_batch_id, programme_id, learning_centre_id, target_semester_id, import_status,
   to_char(snapshot_date,'YYYY-MM-DD') AS source_date, source_label, provided_by, source_fingerprint,
-  to_char(accepted_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS accepted_at, accepted_by, validation_summary`;
+  to_char(accepted_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS accepted_at, accepted_by, validation_summary,
+  (SELECT to_char(r.removed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') FROM public.academic_import_batch_removal r WHERE r.import_batch_id=academic_import_batch.import_batch_id) AS removed_at`;
+/** Snapshots a coordinator removed (S3-P004-022) are left out of lists and fingerprint re-use. */
+const NOT_REMOVED = 'NOT EXISTS (SELECT 1 FROM public.academic_import_batch_removal r WHERE r.import_batch_id=academic_import_batch.import_batch_id)';
 /** Programme-scoped (UC20) batches only; legacy batches without a programme are never exposed. */
 const SCOPED = 'programme_id=$1 AND learning_centre_id=$2 AND target_semester_id=$3';
 
@@ -34,6 +37,7 @@ function batchFrom(row: Record<string, unknown>): ImportBatchRow {
     sourceDate: text(row.source_date), sourceLabel: text(row.source_label), providedBy: text(row.provided_by),
     sourceFingerprint: text(row.source_fingerprint), acceptedAt: row.accepted_at == null ? null : text(row.accepted_at),
     acceptedBy: row.accepted_by == null ? null : text(row.accepted_by), summary,
+    removedAt: row.removed_at == null ? null : text(row.removed_at),
   };
 }
 
@@ -109,7 +113,7 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
 
     findAcceptedByFingerprint: (scope: ForecastScope, fingerprint) => read(async () => {
       const rows = await query(`SELECT ${BATCH_COLUMNS} FROM public.academic_import_batch
-        WHERE ${SCOPED} AND import_status='ACCEPTED' AND source_fingerprint=$4 ORDER BY import_batch_id DESC LIMIT 1`,
+        WHERE ${SCOPED} AND import_status='ACCEPTED' AND source_fingerprint=$4 AND ${NOT_REMOVED} ORDER BY import_batch_id DESC LIMIT 1`,
       [scope.programmeId, scope.learningCentreId, scope.targetSemesterId, fingerprint]);
       return rows[0] ? batchFrom(rows[0]) : null;
     }),
@@ -162,7 +166,7 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
     }),
 
     listAccepted: (scope, limit, before) => read(async () => (await query(`SELECT ${BATCH_COLUMNS} FROM public.academic_import_batch
-      WHERE ${SCOPED} AND import_status='ACCEPTED' AND ($5::integer IS NULL OR import_batch_id<$5::integer)
+      WHERE ${SCOPED} AND import_status='ACCEPTED' AND ${NOT_REMOVED} AND ($5::integer IS NULL OR import_batch_id<$5::integer)
       ORDER BY import_batch_id DESC LIMIT $4`, [scope.programmeId, scope.learningCentreId, scope.targetSemesterId, limit, before])).map(batchFrom)),
 
     listStudents: (importBatchId, limit, afterId) => read(async () => (await query(`SELECT s.imported_student_id, s.external_reference, s.student_name, c.curriculum_version, s.cohort_status, s.history_completeness
@@ -170,6 +174,11 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
       WHERE s.import_batch_id=$1 AND ($3::integer IS NULL OR s.imported_student_id>$3::integer) ORDER BY s.imported_student_id LIMIT $2`, [importBatchId, limit, afterId]))
       .map((row): StoredStudentSummary => ({ importedStudentId: integer(row.imported_student_id), externalReference: text(row.external_reference), studentName: row.student_name == null ? null : text(row.student_name),
         curriculumVersion: text(row.curriculum_version), cohortStatus: text(row.cohort_status), historyCompleteness: text(row.history_completeness) as ImportedStudentSummary['historyCompleteness'] }))),
+
+    removeAccepted: (importBatchId, actor) => read(async () => {
+      // The table's trigger allows only ACCEPTED snapshots; the snapshot rows are never touched. A repeat changes nothing.
+      await query(`INSERT INTO public.academic_import_batch_removal(import_batch_id, removed_by) VALUES ($1, $2) ON CONFLICT (import_batch_id) DO NOTHING`, [importBatchId, actor]);
+    }),
 
     acceptValidated: (importBatchId, actor) => read(async () => {
       // Status-guarded single statement: a concurrent or repeated acceptance matches no row. The database

@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -207,7 +207,7 @@ test('0011 follows the exact 0010 prefix, adds no public table and keeps the pro
  await assert.rejects(migrationStatus(client({applied:applied.map(m=>m.version==='0010'?{...m,sha256:'0'.repeat(64)}:m)}),entries),/HISTORY_OR_CHECKSUM/);
 });
 test('0012 follows 0011, adds no table, activates NULL curricula and audits programme/curriculum',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-3,-1).map(m=>m.version),['0011','0012']);
+ const entries=(await loadMigrations()).slice(0,14);assert.deepEqual(entries.slice(-3,-1).map(m=>m.version),['0011','0012']);
  const sql=entries.at(-2).sql, code=sql.replace(/--.*$/gm,'');
  assert.doesNotMatch(code,/CREATE\s+TABLE|DROP\s+(?:TABLE|COLUMN)|TRUNCATE|ALTER\s+TABLE/i);
  assert.match(code,/UPDATE public\.curriculum SET status='ACTIVE' WHERE status IS NULL;/);
@@ -218,11 +218,23 @@ test('0012 follows 0011, adds no table, activates NULL curricula and audits prog
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0012','0013']);
 });
 test('0013 follows 0012 and only adds two nullable student_profile timestamps',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0012','0013']);
+ const entries=(await loadMigrations()).slice(0,14);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0012','0013']);
  const sql=entries.at(-1).sql, code=sql.replace(/--.*$/gm,'');
  assert.match(code,/ADD COLUMN IF NOT EXISTS fees_cleared_confirmed_at timestamptz/);
  assert.match(code,/ADD COLUMN IF NOT EXISTS muet_confirmed_at timestamptz/);
  assert.doesNotMatch(code,/CREATE\s+TABLE|DEFAULT|NOT\s+NULL/i);
  const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0013']);
+});
+test('0014 follows 0013, adds only the immutable snapshot removal table and leaves the snapshot freeze alone',async()=>{
+ const entries=(await loadMigrations()).slice(0,15);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0013','0014']);
+ const sql=entries.at(-1).sql, code=sql.replace(/--.*$/gm,'');
+ assert.deepEqual([...code.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.academic_import_batch_removal']);
+ assert.doesNotMatch(code,/DROP\s|TRUNCATE\s+TABLE|ALTER\s+TABLE|academic_import_batch\s+(?:SET|DISABLE)|DELETE\s+FROM/i);
+ assert.match(code,/REFERENCES public\.academic_import_batch\(import_batch_id\) ON DELETE RESTRICT/);
+ assert.match(code,/CREATE TRIGGER immutable_import_batch_removal BEFORE UPDATE OR DELETE ON public\.academic_import_batch_removal/);
+ assert.match(code,/import_status = 'ACCEPTED'/);
+ assert.match(code,/REVOKE ALL ON public\.academic_import_batch_removal FROM PUBLIC/);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0014']);
 });

@@ -36,6 +36,8 @@ export interface CoordinatorClient {
   acceptSubset(scope: ForecastScope, report: Pick<ImportValidationReport, 'validationId' | 'validationRevision'>, revision: string): Promise<AcceptedImport>;
   listImports(scope: ForecastScope, page?: PageQuery, signal?: AbortSignal): Promise<ImportListData>;
   getImport(importBatchId: number, signal?: AbortSignal): Promise<AcceptedImport>;
+  /** Removes (hides) an accepted snapshot; repeating it is harmless (S3-P004-022). */
+  removeImport(importBatchId: number): Promise<void>;
   listStudents(importBatchId: number, page?: PageQuery, signal?: AbortSignal): Promise<ImportStudentListData>;
   generateRun(request: GenerateRunRequest): Promise<MutationResult>;
   getRun(forecastRunId: number, signal?: AbortSignal): Promise<RunWithRevision>;
@@ -111,7 +113,7 @@ function idempotencyKey() {
 }
 
 interface Raw { status: number; etag: string | null; data: unknown; disposition: string | null }
-interface Init { method: 'GET' | 'POST'; headers?: Record<string, string>; body?: BodyInit; text?: boolean; timeoutMs?: number }
+interface Init { method: 'GET' | 'POST' | 'DELETE'; headers?: Record<string, string>; body?: BodyInit; text?: boolean; timeoutMs?: number }
 
 export function createCoordinatorClient(getToken: () => Promise<string | null>, baseUrl = ''): CoordinatorClient {
   const base = baseUrl.replace(/\/+$/, '');
@@ -201,6 +203,7 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
     },
     listImports: async (scope, paging, signal) => page((await request(prefix + 'forecast-imports' + scopeQuery(scope, paging), { method: 'GET' }, signal)).data, item => requireKeys(item, ['importBatchId'], ['sourceLabel'], [])) as ImportListData,
     getImport: async (id, signal) => acceptedImport((await request(prefix + 'forecast-imports/' + id, { method: 'GET' }, signal)).data),
+    removeImport: async (id) => { await request(prefix + 'forecast-imports/' + id, { method: 'DELETE' }); },
     listStudents: async (id, paging, signal) => page((await request(prefix + 'forecast-imports/' + id + '/students' + query({ limit: paging?.limit, cursor: paging?.cursor }), { method: 'GET' }, signal)).data, item => requireKeys(item, ['importedStudentId'], ['externalReference'], [])) as ImportStudentListData,
     generateRun: request0 => mutate('forecast-runs', undefined, request0),
     getRun: async (id, signal) => {

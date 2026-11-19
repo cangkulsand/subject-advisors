@@ -41,7 +41,7 @@ const inputs: EngineInputRows = {
 
 const batch = (importBatchId: number, status: ImportBatchRow['status'] = 'ACCEPTED', overrides: Partial<ImportBatchRow> = {}): ImportBatchRow => ({
   importBatchId, ...scope, status, sourceDate: '2026-10-30', sourceLabel: 'Registry export', providedBy: COORDINATOR, sourceFingerprint: 'f'.repeat(64),
-  acceptedAt: status === 'ACCEPTED' ? '2026-11-01T09:00:00.000Z' : null, acceptedBy: COORDINATOR,
+  acceptedAt: status === 'ACCEPTED' ? '2026-11-01T09:00:00.000Z' : null, acceptedBy: COORDINATOR, removedAt: null,
   summary: { internal: { schemaVersion: 1, csvVersion: 1, dataRows: 46, rejectedRowsByStudent: {} } } as never, ...overrides,
 });
 
@@ -49,7 +49,8 @@ function fixture(options: { shortOnly?: boolean; roles?: ('STUDENT' | 'COORDINAT
   const roles = options.roles ?? ['COORDINATOR'];
   const batches = [batch(1), batch(2), batch(3, 'VALIDATED'), batch(4, 'ACCEPTED', { learningCentreId: 2 }),
     batch(5, 'ACCEPTED', { summary: { source: 'SYSTEM', internal: { schemaVersion: 1, csvVersion: 1, source: 'PORTAL', dataRows: 0, rejectedRowsByStudent: {} } } as never }),
-    batch(6, 'ACCEPTED', { summary: { source: 'COMBINED', internal: { schemaVersion: 1, csvVersion: 1, source: 'COMBINED', dataRows: 3, rejectedRowsByStudent: {}, sourceByReference: {} } } as never })];
+    batch(6, 'ACCEPTED', { summary: { source: 'COMBINED', internal: { schemaVersion: 1, csvVersion: 1, source: 'COMBINED', dataRows: 3, rejectedRowsByStudent: {}, sourceByReference: {} } } as never }),
+    batch(7, 'ACCEPTED', { removedAt: '2026-11-19T04:00:00.000Z' })]; // removed (hidden) snapshot, S3-P004-022
   const liveInputs: EngineInputRows = { ...inputs, curricula: [options.shortOnly ? withShortOnly : curriculum] };
   const fake = fakeRunsRepository(liveInputs);
   const deps: ForecastingDependencies = {
@@ -259,7 +260,7 @@ describe('UC20 forecast run API', () => {
 
     it('refuses imports that are not accepted, not in scope or unknown, and malformed requests', async () => {
       const { deps, runs } = fixture();
-      for (const importBatchId of [3, 4, 99]) expect(await errorOf(await generate(deps, importBatchId))).toMatchObject({ code: 'IMPORT_NOT_FOUND' });
+      for (const importBatchId of [3, 4, 7, 99]) expect(await errorOf(await generate(deps, importBatchId))).toMatchObject({ code: 'IMPORT_NOT_FOUND' });
       const body = { ...scope, importBatchId: 1, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' };
       expect((await post(deps, 'forecast-runs', { ...body, demandAssumption: 'ALL' })).status).toBe(400);
       expect((await post(deps, 'forecast-runs', { ...body, extra: 1 })).status).toBe(400);

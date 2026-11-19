@@ -21,6 +21,8 @@ export interface ImportBatchRow extends ForecastScope {
   acceptedAt: string | null;
   acceptedBy: string | null;
   summary: StoredValidationSummary;
+  /** Set once a coordinator removed (hid) the snapshot (S3-P004-022); the frozen rows themselves are never deleted. */
+  removedAt: string | null;
 }
 
 /** A roster row as stored; the route adds the per-student `source`. */
@@ -70,12 +72,16 @@ export interface ForecastingRepository {
   catalogue(programmeId: number): Promise<ProgrammeCatalogue | null>;
   /** Read-only selection of the students in the system for a programme (never writes student tables). */
   systemStudents(programmeId: number): Promise<PortalStudentSelection>;
+  /** Removed snapshots are skipped, so the same data creates a new snapshot. */
   findAcceptedByFingerprint(scope: ForecastScope, fingerprint: string): Promise<ImportBatchRow | null>;
   /** One transaction: batch UPLOADED, students, records, then VALIDATED/REJECTED (and ACCEPTED when asked). */
   storeImport(input: StoreImportInput): Promise<ImportBatchRow>;
   getBatch(importBatchId: number): Promise<ImportBatchRow | null>;
   findByValidationId(validationId: string): Promise<ImportBatchRow | null>;
+  /** Accepted snapshots that were not removed, newest first. */
   listAccepted(scope: ForecastScope, limit: number, beforeImportBatchId: number | null): Promise<ImportBatchRow[]>;
+  /** Records that `actor` removed an accepted snapshot; a second call changes nothing (S3-P004-022). */
+  removeAccepted(importBatchId: number, actor: string): Promise<void>;
   /** Retained roster students of a batch, keyset-paged by imported_student_id. */
   listStudents(importBatchId: number, limit: number, afterImportedStudentId: number | null): Promise<StoredStudentSummary[]>;
   /** VALIDATED -> ACCEPTED guarded by status; returns null when the batch was not VALIDATED any more. */

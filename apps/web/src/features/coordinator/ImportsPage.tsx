@@ -243,14 +243,16 @@ function UploadCard({ client, scope, combined, onOutcome, onTemplateError }: { c
 
 const rosterIcon = <ActionIcon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></ActionIcon>;
 const forecastIcon = <ActionIcon><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></ActionIcon>;
+const deleteIcon = <ActionIcon><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></ActionIcon>;
 
-function importRow(item: ImportSummary, scope: ChosenScope, mode: DataMode, onGenerate: (item: ImportSummary) => void) {
+function importRow(item: ImportSummary, scope: ChosenScope, mode: DataMode, onGenerate: (item: ImportSummary) => void, onRemove: (item: ImportSummary) => void) {
   return <tr key={item.importBatchId}>
     <td><strong>{item.sourceLabel}</strong><span className="admin-audit-id">Import #{item.importBatchId}</span></td><td><SourceBadge source={item.source}/></td>
     <td>{item.sourceDate}</td><td>{when(item.acceptedAt)}</td><td>{item.counts.uniqueStudents}</td><td>{item.counts.rejectedRows}</td>
     <td><div className="coordinator-row-actions">
       <AppLink className="coordinator-icon-button" href={scopeHref('/coordinator/imports', scope, { ...modeExtra(mode), import: item.importBatchId })} aria-label={`View roster for ${item.sourceLabel}`} title="View roster">{rosterIcon}</AppLink>
-      <button type="button" className="coordinator-icon-button coordinator-icon-button-primary" onClick={() => onGenerate(item)} aria-label={`Generate forecast from ${item.sourceLabel}`} title="Generate forecast">{forecastIcon}</button></div></td>
+      <button type="button" className="coordinator-icon-button coordinator-icon-button-primary" onClick={() => onGenerate(item)} aria-label={`Generate forecast from ${item.sourceLabel}`} title="Generate forecast">{forecastIcon}</button>
+      <button type="button" className="coordinator-icon-button coordinator-icon-button-danger" aria-haspopup="dialog" onClick={() => onRemove(item)} aria-label={`Delete snapshot ${item.sourceLabel} (import #${item.importBatchId})`} title="Delete snapshot">{deleteIcon}</button></div></td>
   </tr>;
 }
 
@@ -264,7 +266,7 @@ const snapshotOrder: Record<SnapshotSort, (a: ImportSummary, b: ImportSummary) =
   students: (a, b) => b.counts.uniqueStudents - a.counts.uniqueStudents || b.importBatchId - a.importBatchId,
 };
 
-function ImportList({ client, scope, mode, version, onGenerate }: { client: CoordinatorClient; scope: ChosenScope; mode: DataMode; version: number; onGenerate: (item: ImportSummary) => void }) {
+function ImportList({ client, scope, mode, version, onGenerate, onRemove }: { client: CoordinatorClient; scope: ChosenScope; mode: DataMode; version: number; onGenerate: (item: ImportSummary) => void; onRemove: (item: ImportSummary) => void }) {
   // Snapshots per scope are few, so a page of 100 normally holds the whole list and the filters apply to all of it.
   const list = usePagedList(signal => client.listImports(scope, { limit: 100 }, signal), cursor => client.listImports(scope, { limit: 100, cursor }), [scope.programmeId, scope.learningCentreId, version].join('|'));
   const [source, setSource] = useState(''), [query, setQuery] = useState(''), [sort, setSort] = useState<SnapshotSort>('newest');
@@ -284,7 +286,7 @@ function ImportList({ client, scope, mode, version, onGenerate }: { client: Coor
           ? <div className="admin-empty"><h3>No snapshots match</h3><p>Change the source or the search to see more snapshots.</p></div>
           : <div className="admin-table-scroll coordinator-table" role="region" aria-label="Student data snapshots table" tabIndex={0}>
             <table><thead><tr><th scope="col">Snapshot</th><th scope="col">Source</th><th scope="col">Source date</th><th scope="col">Accepted</th><th scope="col">Students</th><th scope="col">Rejected rows</th><th scope="col">Actions</th></tr></thead>
-              <tbody>{rows.map(item => importRow(item, scope, mode, onGenerate))}</tbody></table></div>}
+              <tbody>{rows.map(item => importRow(item, scope, mode, onGenerate, onRemove))}</tbody></table></div>}
         {filtering && list.cursor && <p className="admin-muted">Filters apply to the snapshots loaded so far. Load more to include older ones.</p>}
         {list.loadMoreError && <p className="admin-form-error" role="alert">{list.loadMoreError}</p>}
         <LoadMore cursor={list.cursor} busy={list.loadingMore} onMore={() => void list.more()} label="Load more snapshots"/></>)}
@@ -328,9 +330,10 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
   const [notice, setNotice] = useState<Notice>(null), [outcome, setOutcome] = useState<Exclude<UploadOutcome, { kind: 'ACCEPTED' }> | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotResultData | null>(null);
   const [version, setVersion] = useState(0), [subset, setSubset] = useState(false), [generate, setGenerate] = useState<{ importBatchId: number; label: string } | null>(null);
+  const [removing, setRemoving] = useState<{ importBatchId: number; label: string } | null>(null);
   // Reports and results belong to the scope and mode that produced them.
   const resetKey = `${scope?.programmeId}-${scope?.learningCentreId}-${mode}`, [seenKey, setSeenKey] = useState(resetKey);
-  if (seenKey !== resetKey) { setSeenKey(resetKey); setOutcome(null); setSnapshot(null); setSubset(false); setNotice(null); setGenerate(null); }
+  if (seenKey !== resetKey) { setSeenKey(resetKey); setOutcome(null); setSnapshot(null); setSubset(false); setNotice(null); setGenerate(null); setRemoving(null); }
   function accepted(text: string) { setOutcome(null); setNotice({ kind: 'success', text }); setVersion(value => value + 1); }
   function onOutcome(result: UploadOutcome) {
     if (result.kind === 'ACCEPTED' && result.data.source === 'COMBINED') {
@@ -342,6 +345,14 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
       return;
     }
     setNotice(null); setOutcome(result);
+  }
+  /** Remove = hide (S3-P004-022): the frozen data is kept for existing forecasts and audits. */
+  async function removeSnapshot(target: { importBatchId: number; label: string }) {
+    await client.removeImport(target.importBatchId);
+    setRemoving(null);
+    if (snapshot?.data.importBatchId === target.importBatchId) setSnapshot(null);
+    setNotice({ kind: 'success', text: `Snapshot "${target.label}" deleted.` });
+    setVersion(value => value + 1);
   }
   async function generateRun(importBatchId: number) {
     if (!scope) return;
@@ -363,7 +374,8 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
     {scope && importId === null && snapshot && (snapshot.data.source === 'COMBINED' ? mode === 'both' : mode === 'system') && <SnapshotResult result={snapshot} scope={scope} mode={mode} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })} onDismiss={() => { setSnapshot(null); document.getElementById(snapshot.data.source === 'COMBINED' ? 'coordinator-upload-section' : 'coordinator-system-section')?.focus(); }}/>}
     {scope && importId === null && outcome && <ReportCard outcome={outcome} onAccept={() => setSubset(true)} onDismiss={() => { setOutcome(null); document.getElementById('coordinator-upload-section')?.focus(); }}/>}
     {scope && (importId === null
-      ? <ImportList client={client} scope={scope} mode={mode} version={version} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })}/>
+      ? <ImportList client={client} scope={scope} mode={mode} version={version} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })}
+          onRemove={item => setRemoving({ importBatchId: item.importBatchId, label: item.sourceLabel })}/>
       : <ImportDetail key={importId} client={client} scope={scope} mode={mode} importId={importId} onGenerate={item => setGenerate({ importBatchId: item.importBatchId, label: item.sourceLabel })}/>)}
     {scope && subset && outcome?.kind === 'CORRECTION_REQUIRED' && <ActionDialog title="Accept the valid subset" confirmLabel="Accept valid subset" reasonLabel={null}
       acknowledgement={`I understand that ${outcome.report.counts.rejectedRows} rejected ${outcome.report.counts.rejectedRows === 1 ? 'row is' : 'rows are'} left out and only the valid rows are used for the forecast.`}
@@ -380,6 +392,9 @@ function ImportWorkspace({ client, context, scope, programmeId, learningCentreId
     {scope && generate && <ActionDialog title="Generate forecast" confirmLabel="Generate forecast" reasonLabel={null}
       description={<>Create the forecast from "{generate.label}" for {scope.programmeLabel} at {scope.centreLabel} and open it in the Class Offering Forecast, where you approve or remove subjects. The result is potential demand for planning, not student registration.</>}
       onCancel={() => setGenerate(null)} onSubmit={() => generateRun(generate.importBatchId)}/>}
+    {scope && removing && <ActionDialog title="Delete snapshot" confirmLabel="Delete snapshot" danger reasonLabel={null}
+      description={<>Delete "{removing.label}" (import #{removing.importBatchId})? It disappears from Data Imports and from the Class Offering Forecast, and cannot be used for a new forecast. Subject decisions you already made stay as they are. This cannot be undone.</>}
+      onCancel={() => setRemoving(null)} onSubmit={() => removeSnapshot(removing)}/>}
   </>;
 }
 

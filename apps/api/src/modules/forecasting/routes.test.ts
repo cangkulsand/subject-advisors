@@ -32,26 +32,32 @@ const semesters = [
 function fakeRepository() {
   const batches: ImportBatchRow[] = [];
   const stored: StoreImportInput[] = [];
+  const removals: Array<{ id: number; actor: string }> = [];
   const repository: ForecastingRepository = {
     semesters: vi.fn(async () => semesters),
     catalogue: vi.fn(async (programmeId: number) => programmeId === 5 ? catalogue : null),
     systemStudents: vi.fn(async () => ({ students: [], records: [], otherProgrammeStudents: 0 })),
-    findAcceptedByFingerprint: vi.fn(async (scope, fingerprint) => batches.find((b) => b.status === 'ACCEPTED' && b.programmeId === scope.programmeId && b.learningCentreId === scope.learningCentreId && b.targetSemesterId === scope.targetSemesterId && b.sourceFingerprint === fingerprint) ?? null),
+    findAcceptedByFingerprint: vi.fn(async (scope, fingerprint) => batches.find((b) => b.status === 'ACCEPTED' && !b.removedAt && b.programmeId === scope.programmeId && b.learningCentreId === scope.learningCentreId && b.targetSemesterId === scope.targetSemesterId && b.sourceFingerprint === fingerprint) ?? null),
     storeImport: vi.fn(async (input: StoreImportInput) => {
       stored.push(input);
       const batch: ImportBatchRow = {
         importBatchId: batches.length + 1, programmeId: input.programmeId, learningCentreId: input.learningCentreId, targetSemesterId: input.targetSemesterId,
         status: input.outcome, sourceDate: input.sourceDate, sourceLabel: input.sourceLabel, providedBy: input.actor, sourceFingerprint: input.sourceFingerprint,
-        acceptedAt: input.outcome === 'ACCEPTED' ? '2026-11-01T10:00:00.000Z' : null, acceptedBy: input.outcome === 'ACCEPTED' ? input.actor : null, summary: input.summary,
+        acceptedAt: input.outcome === 'ACCEPTED' ? '2026-11-01T10:00:00.000Z' : null, acceptedBy: input.outcome === 'ACCEPTED' ? input.actor : null, summary: input.summary, removedAt: null,
       };
       batches.push(batch);
       return batch;
     }),
     getBatch: vi.fn(async (id: number) => batches.find((b) => b.importBatchId === id) ?? null),
     findByValidationId: vi.fn(async (id: string) => batches.find((b) => b.summary.validationId === id) ?? null),
-    listAccepted: vi.fn(async (scope, limit, before) => batches.filter((b) => b.status === 'ACCEPTED' && b.programmeId === scope.programmeId && b.learningCentreId === scope.learningCentreId && b.targetSemesterId === scope.targetSemesterId && (before === null || b.importBatchId < before)).sort((a, b) => b.importBatchId - a.importBatchId).slice(0, limit)),
+    listAccepted: vi.fn(async (scope, limit, before) => batches.filter((b) => b.status === 'ACCEPTED' && !b.removedAt && b.programmeId === scope.programmeId && b.learningCentreId === scope.learningCentreId && b.targetSemesterId === scope.targetSemesterId && (before === null || b.importBatchId < before)).sort((a, b) => b.importBatchId - a.importBatchId).slice(0, limit)),
     listStudents: vi.fn(async (_id: number, limit: number, after: number | null) => [1, 2, 3].filter((n) => after === null || n > after).slice(0, limit)
       .map((n) => ({ importedStudentId: n, externalReference: 'S' + n, studentName: n === 2 ? null : 'Student ' + n, curriculumVersion: '2024-DEMO', cohortStatus: 'ACTIVE', historyCompleteness: 'COMPLETE' as const }))),
+    removeAccepted: vi.fn(async (id: number, actor: string) => {
+      const batch = batches.find((b) => b.importBatchId === id);
+      if (!batch || batch.status !== 'ACCEPTED') throw new Error('Only accepted import snapshots can be removed');
+      if (!batch.removedAt) { batch.removedAt = '2026-11-01T12:00:00.000Z'; removals.push({ id, actor }); }
+    }),
     acceptValidated: vi.fn(async (id: number, actor: string) => {
       const batch = batches.find((b) => b.importBatchId === id);
       if (!batch || batch.status !== 'VALIDATED') return null;
@@ -60,7 +66,7 @@ function fakeRepository() {
       return batch;
     }),
   };
-  return { repository, batches, stored };
+  return { repository, batches, stored, removals };
 }
 
 function fixture(options: { roles?: ('STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN')[]; scopes?: ScopeProvider; actor?: string } = {}) {
@@ -103,7 +109,7 @@ const denyScope: ScopeProvider = { ...assignedTo(), isScopeAssigned: vi.fn(async
 describe('role and ownership checks', () => {
   it.each([['STUDENT'], ['SYSTEM_ADMIN']] as const)('denies %s on every route before touching data', async (role) => {
     const { deps, repository } = fixture({ roles: [role] });
-    for (const [path, method] of [['forecast-context', 'GET'], ['forecast-import-template', 'GET'], ['forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2', 'GET'], ['forecast-imports/1', 'GET'], ['forecast-imports', 'POST']] as const) {
+    for (const [path, method] of [['forecast-context', 'GET'], ['forecast-import-template', 'GET'], ['forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2', 'GET'], ['forecast-imports/1', 'GET'], ['forecast-imports/1', 'DELETE'], ['forecast-imports', 'POST']] as const) {
       const response = await send(deps, path, { method });
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ error: { code: 'ROLE_DENIED' } });
@@ -126,6 +132,9 @@ describe('role and ownership checks', () => {
     const response = await send(deps, 'forecast-imports', { method: 'DELETE' });
     expect(response.status).toBe(405);
     expect(response.headers.get('Allow')).toBe('GET, POST');
+    const one = await send(deps, 'forecast-imports/1', { method: 'PUT' });
+    expect(one.status).toBe(405);
+    expect(one.headers.get('Allow')).toBe('GET, DELETE');
   });
 });
 
@@ -432,6 +441,61 @@ describe('list and get', () => {
     expect((await send(deps, 'forecast-imports/9/students', { method: 'GET' })).status).toBe(404);
     expect((await send({ ...deps, scopes: denyScope }, 'forecast-imports/1/students', { method: 'GET' })).status).toBe(404);
     expect((await send(deps, 'forecast-imports/1/students?limit=101', { method: 'GET' })).status).toBe(400);
+  });
+});
+
+describe('remove snapshot (S3-P004-022)', () => {
+  const listPath = 'forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2';
+  const ids = async (deps: ForecastingDependencies) => (await (await send(deps, listPath, { method: 'GET' })).json()).data.items.map((i: { importBatchId: number }) => i.importBatchId);
+  it('hides an accepted snapshot from the list, the detail and the roster, and records who removed it', async () => {
+    const { deps, removals } = fixture();
+    await upload(deps, validCsv);
+    await upload(deps, validCsv + '\n' + row('X1', '2024-DEMO', 'ACTIVE', 'UNKNOWN'));
+    expect(await ids(deps)).toEqual([2, 1]);
+    const removed = await send(deps, 'forecast-imports/1', { method: 'DELETE' });
+    expect(removed.status).toBe(200);
+    expect(removed.headers.get('Cache-Control')).toBe('no-store');
+    expect((await removed.json()).data).toEqual({ importBatchId: 1, removed: true });
+    expect(removals).toEqual([{ id: 1, actor: COORDINATOR }]);
+    expect(await ids(deps)).toEqual([2]);
+    expect((await send(deps, 'forecast-imports/1', { method: 'GET' })).status).toBe(404);
+    expect((await send(deps, 'forecast-imports/1/students', { method: 'GET' })).status).toBe(404);
+  });
+  it('is idempotent: removing again answers the same and records nothing new', async () => {
+    const { deps, removals } = fixture();
+    await upload(deps, validCsv);
+    expect((await send(deps, 'forecast-imports/1', { method: 'DELETE' })).status).toBe(200);
+    const again = await send(deps, 'forecast-imports/1', { method: 'DELETE' });
+    expect(again.status).toBe(200);
+    expect((await again.json()).data).toEqual({ importBatchId: 1, removed: true });
+    expect(removals).toHaveLength(1);
+  });
+  it('does not replay a removed snapshot: the same data creates a new one', async () => {
+    const { deps } = fixture();
+    await upload(deps, validCsv);
+    await send(deps, 'forecast-imports/1', { method: 'DELETE' });
+    const fresh = await upload(deps, validCsv);
+    expect(fresh.status).toBe(201);
+    expect((await fresh.json()).data.importBatchId).toBe(2);
+    expect(await ids(deps)).toEqual([2]);
+  });
+  it('hides unknown, pending and unassigned snapshots as not found and removes nothing', async () => {
+    const { deps, repository } = fixture();
+    await upload(deps, validCsv);
+    await upload(deps, errorCsv);
+    expect((await send(deps, 'forecast-imports/2', { method: 'DELETE' })).status).toBe(404);
+    expect((await send(deps, 'forecast-imports/99', { method: 'DELETE' })).status).toBe(404);
+    expect((await send({ ...deps, scopes: denyScope }, 'forecast-imports/1', { method: 'DELETE' })).status).toBe(404);
+    expect((await send(deps, 'forecast-imports/1?x=1', { method: 'DELETE' })).status).toBe(400);
+    expect(repository.removeAccepted).not.toHaveBeenCalled();
+  });
+  it('maps a repository failure to the safe unavailable error', async () => {
+    const { deps, repository } = fixture();
+    await upload(deps, validCsv);
+    repository.removeAccepted = vi.fn(async () => { throw new ForecastingError('FORECASTING_UNAVAILABLE'); });
+    const response = await send(deps, 'forecast-imports/1', { method: 'DELETE' });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: 'FORECASTING_UNAVAILABLE' } });
   });
 });
 

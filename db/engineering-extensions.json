@@ -193,6 +193,11 @@
       "migration": "0012",
       "tables": [],
       "purpose": "P004 admin programme and curriculum maintenance (S2-P001-005, P001 UC25/FR-B9); sets NULL curriculum status ACTIVE and adds audit/guard triggers only, no public table or column"
+    },
+    {
+      "migration": "0014",
+      "tables": ["academic_import_batch_removal"],
+      "purpose": "P004 coordinator snapshot removal (S3-P004-022, UC20): one immutable row per removed (hidden) accepted import snapshot; snapshots and their freeze triggers are unchanged"
     }
   ]
 }

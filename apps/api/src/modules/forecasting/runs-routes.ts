@@ -58,7 +58,8 @@ async function generate(request: Request, deps: ForecastingDependencies, actor: 
   await requireScope(deps, actor, scope);
 
   const batch = await deps.repository.getBatch(importBatchId);
-  if (!batch || batch.status !== 'ACCEPTED' || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
+  // A removed snapshot (S3-P004-022) cannot start a new forecast; forecasts made before the removal stay readable.
+  if (!batch || batch.status !== 'ACCEPTED' || batch.removedAt || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
     throw new ForecastingError('IMPORT_NOT_FOUND');
   }
   // Replay: an import snapshot yields exactly one forecast; a retry returns the receipt of the one already created.

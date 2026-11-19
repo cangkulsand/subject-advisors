@@ -23,7 +23,7 @@ const baseSemesters = [
 ];
 const batch = (importBatchId: number, overrides: Partial<ImportBatchRow> = {}): ImportBatchRow => ({
   importBatchId, ...scope, status: 'ACCEPTED', sourceDate: '2026-10-30', sourceLabel: 'Registry export', providedBy: COORDINATOR, sourceFingerprint: 'f'.repeat(64),
-  acceptedAt: '2026-11-01T09:00:00.000Z', acceptedBy: COORDINATOR, summary: {} as never, ...overrides,
+  acceptedAt: '2026-11-01T09:00:00.000Z', acceptedBy: COORDINATOR, summary: {} as never, removedAt: null, ...overrides,
 });
 
 function fixture(options: { window?: { selectionOpensAt: string | null; selectionClosesAt: string | null }; scopes?: ScopeProvider; portalContacts?: ForecastingDependencies['portalContacts'] } = {}) {

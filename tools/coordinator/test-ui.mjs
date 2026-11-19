@@ -198,6 +198,33 @@ else {
       await page.screenshot({ path: shots + 'imports-system-only-desktop.png' });
     });
 
+    await check('imports: Delete snapshot confirms, removes the row and keeps the other snapshots (S3-P004-022)', async page => {
+      const state = await mock(page, { seed: 'run', csvImport: false }); await page.goto(base + '/coordinator/imports' + scoped);
+      const table = page.getByRole('region', { name: 'Student data snapshots table' }); await table.waitFor();
+      const before = await table.locator('tbody tr').count();
+      assert.ok(before >= 1, 'the seed has a snapshot');
+      const target = state.imports[0], name = `Delete snapshot ${target.sourceLabel} (import #${target.importBatchId})`;
+      const button = table.getByRole('button', { name, exact: true });
+      assert.equal(await button.innerText(), '', 'Delete is an icon button');
+      assert.equal(await button.getAttribute('title'), 'Delete snapshot');
+      await button.click();
+      const dialog = page.getByRole('dialog', { name: 'Delete snapshot' }); await dialog.waitFor();
+      await dialog.getByText('Subject decisions you already made stay as they are.', { exact: false }).waitFor();
+      assert.equal(await dialog.locator('textarea').count(), 0, 'no reason is asked');
+      await dialog.getByRole('button', { name: 'Cancel' }).click(); await dialog.waitFor({ state: 'detached' });
+      assert.equal(await button.evaluate(element => element === document.activeElement), true, 'Cancel returns focus to the Delete button');
+      assert.equal(state.requests.filter(r => r.method === 'DELETE').length, 0, 'Cancel deletes nothing');
+      await button.click(); await dialog.waitFor();
+      await page.screenshot({ path: shots + 'imports-delete-dialog-desktop.png' });
+      await dialog.getByRole('button', { name: 'Delete snapshot' }).click(); await dialog.waitFor({ state: 'detached' });
+      await page.getByText(`Snapshot "${target.sourceLabel}" deleted.`).waitFor();
+      const deletes = state.requests.filter(r => r.method === 'DELETE');
+      assert.deepEqual(deletes.map(r => r.path), ['/api/coordinator/forecast-imports/' + target.importBatchId]);
+      if (before > 1) await table.getByRole('button', { name, exact: true }).waitFor({ state: 'detached' });
+      else await page.getByRole('heading', { name: 'No snapshots yet' }).waitFor();
+      assert.equal(await page.getByRole('button', { name, exact: true }).count(), 0, 'the deleted snapshot is gone from the list');
+    });
+
     await check('imports: students in the system is the default, snapshot shows coverage, lists the source and feeds the forecast', async page => {
       const state = await mock(page); await page.goto(base + '/coordinator/imports' + scoped);
       const system = page.getByRole('region', { name: 'Students in the system', exact: true }); await system.waitFor();
