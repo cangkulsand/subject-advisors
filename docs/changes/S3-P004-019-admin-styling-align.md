@@ -1,6 +1,6 @@
 # S3-P004-019 — Admin pages follow the staff page styling; modal title row spacing fix
 
-- **Status:** On branch `feature/admin-styling-align` (not merged)
+- **Status:** Merged to main and deployed to dev and prod (2026-11-19)
 - **Date:** 2026-11-19
 - **Sprint:** Sprint 3
 - **Owner:** P004 (admin and shared UI)
