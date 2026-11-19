@@ -1,6 +1,6 @@
 # S3-P004-017 — Forecast table: Uncertain column; the eligible count opens View students
 
-- **Status:** On branch `feature/forecast-uncertain-column` (not merged)
+- **Status:** Merged to main and deployed to dev and prod (2026-11-19)
 - **Date:** 2026-11-18
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6, UC20/UC23)
