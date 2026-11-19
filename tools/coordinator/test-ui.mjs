@@ -104,7 +104,7 @@ else {
       const sidebar = page.locator('.admin-sidebar');
       assert.equal(await sidebar.getByText('WORKSPACE', { exact: true }).count(), 0, 'no WORKSPACE caption above the menu');
       assert.equal(await sidebar.getByText('Forecast planning').count(), 0, 'no Forecast planning group heading');
-      assert.deepEqual((await sidebar.locator('nav .admin-nav-link').allInnerTexts()).map(text => text.trim()), ['Overview', 'Data Imports', 'Class Offering Forecast', 'Offering History'], 'the menu is plain links');
+      assert.deepEqual((await sidebar.locator('nav .admin-nav-link').allInnerTexts()).map(text => text.trim()), ['Overview', 'Data Imports', 'Offering Forecast', 'Offering History'], 'the menu is plain links');
       assert.equal(await page.getByText('Forecast data setup', { exact: true }).count(), 0, 'no repeated setup card title');
       assert.equal(await page.locator('.admin-topbar-title .admin-admin-badge').innerText(), 'Academic coordinator', 'the role badge replaces the Coordinator title');
       assert.equal(await page.locator('.admin-topbar-title > span:not(.admin-admin-badge)').count(), 0, 'no plain Coordinator title');
@@ -993,7 +993,7 @@ else {
         await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
       }
       const links = await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link').allInnerTexts();
-      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Class Offering Forecast', 'Offering History']);
+      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Data Imports', 'Offering Forecast', 'Offering History']);
     });
 
     console.log('PASS ' + passed + ' coordinator browser checks');

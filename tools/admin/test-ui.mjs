@@ -106,7 +106,7 @@ else {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const quicklinks = page.locator('.coordinator-quicklinks');
-      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Data Imports', 'Class Offering Forecast', 'Offering History']);
+      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Data Imports', 'Offering Forecast', 'Offering History']);
       assert.equal(await quicklinks.getByText('Planned workspace').count(), 0);
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });

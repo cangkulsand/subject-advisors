@@ -289,7 +289,7 @@ export function ForecastsPage({ client, search }: { client: CoordinatorClient; s
   const scope = context.data ? chooseScope(context.data, programmeId, learningCentreId) : null;
   const fields = (data: ForecastContext) => <ScopeFields context={data} path="/coordinator/forecasts" programmeId={programmeId} learningCentreId={learningCentreId}/>;
   return <>
-    <PageHeading title="Class Offering Forecast"/>
+    <PageHeading title="Class Offering Forecast" text="See how many students can take each subject next semester, then decide which subjects are offered."/>
     <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && (scope
       ? <Forecast key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope} search={search} scopeFields={fields(context.data)}/>
       : <section className="admin-card coordinator-setup" aria-label="Forecast scope">

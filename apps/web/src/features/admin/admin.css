@@ -29,6 +29,7 @@
   --staff-nav-active-background: #f0e9da;
   --staff-nav-active-foreground: #6b1d2f;
   --staff-nav-indicator: #6b1d2f;
+  --staff-nav-link: #3d3d3d;
 }
 .admin-shell *, .admin-shell *::before, .admin-shell *::after { box-sizing: border-box; }
 .admin-shell nav { margin: 0; }
@@ -56,12 +57,14 @@
 .admin-sidebar .staff-nav-group, .admin-drawer .staff-nav-group { min-width: 0; }
 .admin-sidebar .staff-nav-group details > summary, .admin-drawer .staff-nav-group details > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 13px; color: var(--staff-nav-muted); font-size: var(--font-size-small); font-weight: 650; cursor: pointer; border-radius: 7px; }
 .admin-sidebar .staff-nav-group details > summary::-webkit-details-marker, .admin-drawer .staff-nav-group details > summary::-webkit-details-marker { display: none; }
-.admin-shell .staff-nav-group details > summary:focus-visible { outline: 3px solid var(--staff-nav-indicator); outline-offset: 2px; }
+.admin-shell .staff-nav-group details > summary:focus-visible { outline: 3px solid var(--staff-nav-indicator); outline-offset: -3px; }
+/* The menu scrolls (overflow-y: auto), which clips an outline drawn outside the link; draw it inside instead (S3-P004-021). */
+.admin-shell :is(.admin-sidebar, .admin-drawer) .admin-nav-link:focus-visible { outline-offset: -3px; }
 .admin-sidebar .staff-nav-group details > summary:hover, .admin-drawer .staff-nav-group details > summary:hover { background: var(--staff-nav-hover); }
 .staff-nav-group-links { display: grid; gap: 4px; margin-left: 8px; }
-.admin-shell .staff-nav-group-links .admin-nav-link { min-height: 44px; padding: 8px 10px; font-size: var(--font-size-label); }
+.admin-shell .staff-nav-group-links .admin-nav-link { min-height: 44px; padding: 8px 10px; font-size: var(--font-size-control); }
 .admin-shell .staff-nav-group-links .admin-nav-link[aria-current="page"] { background: var(--staff-nav-active-background); color: var(--staff-nav-active-foreground); }
-.admin-shell .admin-nav-link { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 10px 13px; color: var(--staff-nav-muted); border-radius: 8px; font-size: var(--font-size-label); }
+.admin-shell .admin-nav-link { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 10px 13px; color: var(--staff-nav-link, var(--staff-nav-muted)); border-radius: 8px; font-size: var(--font-size-control); }
 .admin-nav-link svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; flex: 0 0 auto; stroke-linecap: round; stroke-linejoin: round; }
 .admin-shell a.admin-nav-link:hover { background: var(--staff-nav-hover); color:var(--staff-nav-foreground); text-decoration: none; }
 .admin-shell .admin-nav-link[aria-current="page"] { background: var(--staff-nav-active-background); color: var(--staff-nav-active-foreground); font-weight: 650; box-shadow: inset 3px 0 var(--staff-nav-indicator); }

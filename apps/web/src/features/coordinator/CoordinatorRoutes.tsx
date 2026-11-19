@@ -14,13 +14,14 @@ const groups: StaffNavigationGroup[] = [
   { label: 'Workspace', links: [{ href: '/coordinator', label: 'Overview', icon: 'overview' }] },
   { label: 'Academic data', links: [{ href: '/coordinator/imports', label: 'Data Imports', icon: 'data' }] },
   // One link per group: single-link groups render as plain menu links with no group heading.
-  { label: 'Class Offering Forecast', links: [{ href: '/coordinator/forecasts', label: 'Class Offering Forecast', icon: 'forecast' }] },
+  { label: 'Offering Forecast', links: [{ href: '/coordinator/forecasts', label: 'Offering Forecast', icon: 'forecast' }] },
   { label: 'Offering History', links: [{ href: '/coordinator/history', label: 'Offering History', icon: 'history' }] },
 ];
-const pages: Record<string, { title: string; description: string }> = {
-  '/coordinator/imports': { title: 'Data Imports', description: 'Upload and validate student academic history, and keep accepted snapshots for forecast planning.' },
-  '/coordinator/forecasts': { title: 'Class Offering Forecast', description: 'Look at the forecast for a student data snapshot and decide which subjects are offered.' },
-  '/coordinator/history': { title: 'Offering History', description: "Look back at past semesters' offering decisions and how many students picked each subject." },
+// Page titles for the main landmark label; each page renders its own heading and description.
+const pages: Record<string, { title: string }> = {
+  '/coordinator/imports': { title: 'Data Imports' },
+  '/coordinator/forecasts': { title: 'Class Offering Forecast' },
+  '/coordinator/history': { title: 'Offering History' },
 };
 const quickLinks = groups.slice(1).flatMap(group => group.links);
 

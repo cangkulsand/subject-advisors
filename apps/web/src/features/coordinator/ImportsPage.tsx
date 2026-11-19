@@ -389,7 +389,7 @@ export function ImportsPage({ client, search }: { client: CoordinatorClient; sea
   const mode = readMode(extra.get('source')), importParam = extra.get('import'), importId = importParam && /^[1-9]\d*$/.test(importParam) ? Number(importParam) : null;
   const scope = context.data ? chooseScope(context.data, programmeId, learningCentreId) : null;
   return <>
-    <PageHeading title="Data Imports" />
+    <PageHeading title="Data Imports" text={csvImportEnabled() ? "Upload and validate student academic history, and keep accepted snapshots for forecast planning." : "Take a snapshot of the students in the system and keep it for forecast planning."}/>
     <Panel error={context.error} retry={context.retry} label="forecast scope">{context.data && <>
       <ImportWorkspace client={client} context={context.data} scope={scope} programmeId={programmeId} learningCentreId={learningCentreId} importId={importId} mode={mode}/>
     </>}</Panel>
