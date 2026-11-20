@@ -1,6 +1,6 @@
 # S3-P004-024 — Remove the `gpt-6-luna` execution rule from AGENTS.md
 
-- **Status:** Committed on main; not pushed
+- **Status:** On main and pushed to dev and prod (2026-11-20) (docs only)
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (project instructions)
