@@ -1,6 +1,6 @@
 # S3-P004-025 — Admin menu readability and one-line labels; card heading gap; short row buttons; readable values and dates
 
-- **Status:** Implemented on `feature/admin-ui-polish` (2026-11-20); not merged; independent review pending
+- **Status:** Merged to main and pushed to dev and prod (2026-11-20); prod deploy verified live; independent review pending
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (admin and shared staff UI)
