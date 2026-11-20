@@ -1,6 +1,6 @@
 # S3-P004-023 — Hide "Academic progress" and "Recommendations" from the student menu
 
-- **Status:** Implemented on branch; not merged or deployed
+- **Status:** Merged to main and pushed to dev and prod (2026-11-20); independent review pending
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (shared student shell)
