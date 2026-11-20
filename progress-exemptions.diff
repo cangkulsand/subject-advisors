@@ -1,0 +1,27 @@
+diff --git a/apps/api/src/modules/p001-sprint2/progress.ts b/apps/api/src/modules/p001-sprint2/progress.ts
+index 6913c64..a199b27 100644
+--- a/apps/api/src/modules/p001-sprint2/progress.ts
++++ b/apps/api/src/modules/p001-sprint2/progress.ts
+@@ -15,8 +15,9 @@ export function calculateProgress(source: ProgressSource): Progress {
+   const subjects: ProgressSubject[] = curriculum.subjects.map(subject => {
+     const valid = attempts.filter(a => a.subjectId === subject.subjectId).filter(a => {
+       const credits = a.recognizedCredits;
++      // EXEMPTED needs no remarks: the Subject records page saves it immediately and remarks are optional (S3-P004-008).
+       const okay = Number.isInteger(credits) && credits! >= 0 && credits! <= subject.credits &&
+-        (a.status === 'COMPLETED' ? credits === subject.credits : a.status === 'EXEMPTED' ? Boolean(a.remarks?.trim()) :
++        (a.status === 'COMPLETED' ? credits === subject.credits : a.status === 'EXEMPTED' ? true :
+           (a.status === 'FAILED' || a.status === 'WITHDRAWN') && credits === 0);
+       if (!okay) warn('Some academic records have incomplete or inconsistent credit/exemption information and were excluded. Review your subject records.');
+       return okay;
+diff --git a/apps/api/src/modules/p001-sprint2/sprint2.test.ts b/apps/api/src/modules/p001-sprint2/sprint2.test.ts
+index 7c630f7..4283188 100644
+--- a/apps/api/src/modules/p001-sprint2/sprint2.test.ts
++++ b/apps/api/src/modules/p001-sprint2/sprint2.test.ts
+@@ -24,6 +24,7 @@ describe('UC05 academic progress',()=>{
+  it('separates zero-credit exemption satisfaction from earned credits',()=>{const s=source();s.attempts=[{subjectId:1,status:'EXEMPTED',recognizedCredits:0,remarks:'Non-credit exemption'}];const p=calculateProgress(s);expect(p.earnedCredits).toBe(0);expect(p.exemptedSubjects).toBe(1);expect(p.zeroCreditExemptions).toBe(1);expect(p.outstandingCompulsory).toBe(1);});
+  it('uses maximum exemption recognition rather than summing attempts',()=>{const s=source();s.attempts=[1,2].map(n=>({subjectId:1,status:'EXEMPTED',recognizedCredits:n,remarks:'Recognized'}));expect(calculateProgress(s).exemptionCredits).toBe(2);});
+  it.each(['FAILED','WITHDRAWN'])('excludes %s credits',status=>{const s=source();s.attempts=[{subjectId:1,status,recognizedCredits:0}];expect(calculateProgress(s).earnedCredits).toBe(0);});
++ it('counts an exemption saved without remarks, as the Subject records page allows (S3-P004-008)',()=>{const s=source();s.attempts=[{subjectId:1,status:'EXEMPTED',recognizedCredits:3,remarks:null},{subjectId:2,status:'EXEMPTED',recognizedCredits:3,remarks:'  '}];const p=calculateProgress(s);expect(p.subjects.filter(x=>x.outcome==='EXEMPTED').length).toBe(2);expect(p.earnedCredits).toBe(6);expect(p.warnings.join(' ')).not.toContain('inconsistent');});
+  it('flags missing exemption information without counting unsupported credits',()=>{const s=source();s.attempts=[{subjectId:1,status:'EXEMPTED',recognizedCredits:null}];const p=calculateProgress(s);expect(p.earnedCredits).toBe(0);expect(p.warnings.join(' ')).toContain('incomplete');});
+  it('excludes out-of-curriculum records',()=>{const s=source();s.attempts=[{subjectId:999,status:'COMPLETED',recognizedCredits:50}];expect(calculateProgress(s).earnedCredits).toBe(0);expect(calculateProgress(s).warnings.join(' ')).toContain('outside');});
+  it('matches requirement types to categories with spaces and underscores alike (S3-P004-006)',()=>{const s=source();s.curriculum.subjects[2]!.category='Elective E1';s.requirements=[{type:'ELECTIVE_E1',credits:2,subjects:1},{type:' elective  e1 ',credits:null,subjects:1}];s.attempts=[{subjectId:3,status:'COMPLETED',recognizedCredits:2}];const p=calculateProgress(s);expect(p.requirements.map(r=>r.status)).toEqual(['MET','MET']);expect(p.requirements[0]).toMatchObject({earnedCredits:2,satisfiedSubjects:1});expect(p.warnings.join(' ')).not.toContain('no matching classification');});
