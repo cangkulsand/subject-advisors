@@ -396,7 +396,9 @@ and divider `#521624`. The requested inactive color has approximately **3.89:1**
 contrast against the burgundy base, below the 4.5:1 normal-text target; retain the
 specified color and document this known limitation rather than silently changing
 it. Administrator navigation uses the existing Degree Progress card's dark slate
-gradient with cream active item/indicator. Coordinator navigation uses an inverse
+gradient with cream active item/indicator; its inactive links use `#ebe0e3`
+and its group heading and captions `#d4b5be` (at least 5.5:1 across the
+gradient, S3-P004-025). Coordinator navigation uses an inverse
 cream surface with burgundy active text/indicator and dark readable inactive text;
 this applies to navigation only and does not invert page/card surfaces. Do not use
 the student inactive pink on the light coordinator navigation.

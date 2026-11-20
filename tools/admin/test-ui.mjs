@@ -96,7 +96,17 @@ else {
       await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
       await page.screenshot({ path: '.wrangler/staff-menu-review/admin-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Administration navigation' });
-      await navigation.getByRole('link', { name: 'Curriculum & Prerequisites', exact: true }).click();
+      // S3-P004-025: every menu label fits on one line, menu text is readable on the slate gradient, and a card heading that opens its card has no top gap.
+      for (const width of [1440, 1024]) {
+        await page.setViewportSize({ width, height: 900 });
+        const lines = await navigation.locator('.admin-nav-link > span').evaluateAll(spans => spans.map(span => { const range = document.createRange(); range.selectNodeContents(span); return [span.textContent, range.getClientRects().length]; }));
+        for (const [text, count] of lines) assert.equal(count, 1, text + ' wraps at ' + width + 'px');
+      }
+      const menuColours = await navigation.evaluate(nav => [getComputedStyle(nav.querySelector('.admin-nav-link:not([aria-current])')).color, getComputedStyle(nav.querySelector('summary')).color, getComputedStyle(nav.querySelector('summary')).fontSize]);
+      assert.deepEqual(menuColours, ['rgb(235, 224, 227)', 'rgb(212, 181, 190)', '13px']);
+      assert.equal(await page.getByRole('heading', { name: 'Academic setup', exact: true }).evaluate(h => getComputedStyle(h).marginTop), '0px');
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await navigation.getByRole('link', { name: 'Subjects & Prerequisites', exact: true }).click();
       await page.getByRole('heading', { name: 'Subjects and prerequisites', exact: true }).waitFor();
       await page.getByLabel('Curriculum', { exact: true }).waitFor();
       assert.deepEqual(state.requests.map(request => request.path), ['/api/me', '/api/admin/overview', '/api/p001-sprint2/curricula']);
@@ -236,6 +246,10 @@ else {
       assert.equal(await page.locator('.admin-memberships article').count(), 3);
       await page.getByRole('region', { name: 'Access audit table' }).waitFor();
       assert.equal(await page.evaluate(() => window.untrustedExecuted), undefined);
+      // S3-P004-025: audit values read in words, not database codes; the first heading in a card has no top gap.
+      const auditText = await page.getByRole('region', { name: 'Access audit table' }).innerText();
+      assert.match(auditText, /Role eligibility policy/); assert.doesNotMatch(auditText, /ROLE_DOMAIN/);
+      assert.equal(await page.getByRole('heading', { name: 'Role memberships' }).evaluate(h => getComputedStyle(h).marginTop), '0px');
       assert.ok(state.requests.some(request => request.search.includes('accountId=1')));
       assert.ok(state.requests.every(request => request.method === 'GET'));
       await page.screenshot({ path: '.wrangler/admin-review/account-desktop.png', fullPage: true });

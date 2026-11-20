@@ -7,6 +7,13 @@ import { DialogHead } from '../../components/dialog/DialogHead';
 export type Values = Record<string, string>;
 export type Field = { key: string; label: string; type?: string; maxLength?: number; optional?: boolean; options?: { value: string; label: string }[] };
 /** `datetime-local` values are local wall-clock time without a zone. */
+/** Date and time in the same style as the rest of the admin pages, for example "28 Oct 2026, 18:00" (S3-P004-025). */
+export function formatDateTime(iso: string): string { return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+/** A calendar date stored as YYYY-MM-DD, read as a local date so it never shifts a day, for example "1 Sep 2027". */
+export function formatDate(day: string): string {
+  const [year, month, date] = day.split('-').map(Number);
+  return year && month && date ? new Date(year, month - 1, date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : day;
+}
 export function toLocalInput(iso: string): string {
   const date = new Date(iso), pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;

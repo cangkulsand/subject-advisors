@@ -125,7 +125,13 @@ export async function academicUiChecks({ check, mock, base }) {
     await first.getByRole('button', { name: 'Deactivate TEST 2026', exact: true }).click(); await confirm(page, 'Deactivate curriculum', 'Deactivate'); await first.getByText('Inactive', { exact: true }).waitFor();
     await first.getByRole('button', { name: 'Reactivate TEST 2026', exact: true }).click(); await confirm(page, 'Reactivate curriculum', 'Reactivate'); await first.getByText('Active', { exact: true }).waitFor();
     assert.ok(state.bodies.every(b => b.body.reason === reason)); assert.ok(state.bodies.every(b => b.method !== 'DELETE'));
-    await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: '.wrangler/admin-review/academic-programmes-desktop.png', fullPage: true });
+    // S3-P004-025: row buttons show a short verb; the code stays in the accessible name; a row's buttons sit on one line at 1440px.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert.equal(await page.getByRole('button', { name: 'Edit TEST', exact: true }).innerText(), 'Edit');
+    assert.equal(await page.getByRole('button', { name: 'Department TEST', exact: true }).innerText(), 'Department');
+    assert.equal(await page.getByRole('button', { name: 'Deactivate TEST 2026', exact: true }).innerText(), 'Deactivate');
+    for (const actions of await page.locator('.admin-setup-actions').all()) { const tops = await actions.locator('button').evaluateAll(buttons => buttons.map(b => Math.round(b.getBoundingClientRect().top))); assert.equal(new Set(tops).size, 1, 'row actions wrap'); }
+    await page.screenshot({ path: '.wrangler/admin-review/academic-programmes-desktop.png', fullPage: true });
     await page.setViewportSize({ width: 375, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: '.wrangler/admin-review/academic-programmes-mobile.png', fullPage: true });
   });
@@ -165,6 +171,10 @@ export async function academicUiChecks({ check, mock, base }) {
       const box = await button.boundingBox(); assert.ok(box && box.height >= 44);
       assert.ok(Number.parseFloat(await button.evaluate(el => getComputedStyle(el).fontSize)) >= 14);
     }
+    // S3-P004-025: semester types and dates read in words, not database codes or ISO dates.
+    const semesterText = await page.getByRole('region', { name: 'Academic semesters', exact: true }).innerText();
+    assert.match(semesterText, /Regular/); assert.match(semesterText, /Short/); assert.doesNotMatch(semesterText, /NORMAL|SHORT|2027-09-01|— to —/);
+    assert.match(semesterText, /Not set/); assert.match(semesterText, /Sept? 2027 to .*Dec 2027/);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-desktop.png', fullPage: true });
     for (const width of [375, 800, 1024, 1440]) {

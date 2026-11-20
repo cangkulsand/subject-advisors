@@ -6,7 +6,9 @@
   --admin-border: var(--color-outline);
   --staff-nav-background: var(--color-progress-surface);
   --staff-nav-foreground: #fff;
-  --staff-nav-muted: #b88b96;
+  /* Admin menu text on the slate gradient (#0f172a to #334155): muted about 5.5:1, links about 8:1 at the lightest end (S3-P004-025). */
+  --staff-nav-muted: #d4b5be;
+  --staff-nav-link: #ebe0e3;
   --staff-nav-hover: #334155;
   --staff-nav-active-background: color-mix(in srgb, #faf6ee 14%, transparent);
   --staff-nav-active-foreground: #fff;
@@ -55,16 +57,16 @@
 .admin-sidebar nav, .admin-drawer nav { display: grid; gap: 6px; align-items: stretch; }
 .admin-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; }
 .admin-sidebar .staff-nav-group, .admin-drawer .staff-nav-group { min-width: 0; }
-.admin-sidebar .staff-nav-group details > summary, .admin-drawer .staff-nav-group details > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 13px; color: var(--staff-nav-muted); font-size: var(--font-size-small); font-weight: 650; cursor: pointer; border-radius: 7px; }
+.admin-sidebar .staff-nav-group details > summary, .admin-drawer .staff-nav-group details > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 8px 10px; color: var(--staff-nav-muted); font-size: var(--font-size-label); font-weight: 650; cursor: pointer; border-radius: 7px; }
 .admin-sidebar .staff-nav-group details > summary::-webkit-details-marker, .admin-drawer .staff-nav-group details > summary::-webkit-details-marker { display: none; }
 .admin-shell .staff-nav-group details > summary:focus-visible { outline: 3px solid var(--staff-nav-indicator); outline-offset: -3px; }
 /* The menu scrolls (overflow-y: auto), which clips an outline drawn outside the link; draw it inside instead (S3-P004-021). */
 .admin-shell :is(.admin-sidebar, .admin-drawer) .admin-nav-link:focus-visible { outline-offset: -3px; }
 .admin-sidebar .staff-nav-group details > summary:hover, .admin-drawer .staff-nav-group details > summary:hover { background: var(--staff-nav-hover); }
-.staff-nav-group-links { display: grid; gap: 4px; margin-left: 8px; }
+.staff-nav-group-links { display: grid; gap: 4px; }
 .admin-shell .staff-nav-group-links .admin-nav-link { min-height: 44px; padding: 8px 10px; font-size: var(--font-size-control); }
 .admin-shell .staff-nav-group-links .admin-nav-link[aria-current="page"] { background: var(--staff-nav-active-background); color: var(--staff-nav-active-foreground); }
-.admin-shell .admin-nav-link { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 10px 13px; color: var(--staff-nav-link, var(--staff-nav-muted)); border-radius: 8px; font-size: var(--font-size-control); }
+.admin-shell .admin-nav-link { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px; color: var(--staff-nav-link, var(--staff-nav-muted)); border-radius: 8px; font-size: var(--font-size-control); }
 .admin-nav-link svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.6; flex: 0 0 auto; stroke-linecap: round; stroke-linejoin: round; }
 .admin-shell a.admin-nav-link:hover { background: var(--staff-nav-hover); color:var(--staff-nav-foreground); text-decoration: none; }
 .admin-shell .admin-nav-link[aria-current="page"] { background: var(--staff-nav-active-background); color: var(--staff-nav-active-foreground); font-weight: 650; box-shadow: inset 3px 0 var(--staff-nav-indicator); }
@@ -167,7 +169,7 @@
 .admin-sr-only, .admin-skip { position: fixed; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; top: 0; left: 0; }
 .admin-skip:focus { width: auto; height: auto; clip-path: none; padding: 12px; background: #fff; z-index: 100; }
 @media (max-width: 1050px) {
-  .admin-shell { grid-template-columns: 218px minmax(0, 1fr); }
+  .admin-shell { grid-template-columns: 240px minmax(0, 1fr); }
   .admin-topbar, .admin-content { padding-left: 22px; padding-right: 22px; }
   .admin-two-columns { grid-template-columns: 1fr; gap: 0; }
 }
@@ -272,7 +274,8 @@
 
 /* Academic setup uses the existing card and modal system. */
 .admin-setup-fields { display: grid; gap: 16px; min-width: 0; }
-.admin-card > h2 { margin-top: 28px; }
+/* Space a heading from the content above it, but not when it opens the card (S3-P004-025). */
+.admin-card > h2:not(:first-child) { margin-top: 28px; }
 
 /* Typography guard (S2-INT-003): row headers inside table bodies read like body cells; numbers align and use tabular figures. */
 .admin-table-scroll tbody th { font-size: var(--font-size-table); line-height: var(--line-height-table); }
@@ -351,13 +354,13 @@
   font-size: var(--font-size-control);
   font-weight: 650;
 }
-.admin-semester-actions {
+.admin-semester-actions, .admin-setup-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
 }
-.admin-shell .admin-semester-actions button {
+.admin-shell :is(.admin-semester-actions, .admin-setup-actions) button {
   min-height: 44px;
   padding: 8px 12px;
   font-size: var(--font-size-control);
@@ -378,10 +381,10 @@
   .admin-shell .admin-semesters-advance {
     align-self: stretch;
   }
-  .admin-semester-actions {
+  .admin-semester-actions, .admin-setup-actions {
     gap: 6px;
   }
-  .admin-shell .admin-semester-actions button {
+  .admin-shell :is(.admin-semester-actions, .admin-setup-actions) button {
     padding-inline: 10px;
   }
 }

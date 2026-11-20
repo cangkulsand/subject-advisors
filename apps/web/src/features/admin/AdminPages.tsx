@@ -9,6 +9,9 @@ import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation
 import { IconButton, PagerButtons } from '../../components/icon-button/IconButton';
 
 const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pending', ACCEPTED: 'Accepted', REVOKED: 'Revoked', EXPIRED: 'Expired' };
+// Audit values are database codes; show them in words. Unknown codes still show as they are (S3-P004-025).
+const auditValueLabels: Record<string, string> = { ROLE_DOMAIN: 'Role eligibility policy', OWNER_STUDENT_COORDINATOR: 'Protected owner exception', ACTIVE: 'Active', SUSPENDED: 'Suspended' };
+const auditValue = (value: string | null | undefined) => value ? auditValueLabels[value] ?? value : '—';
 function when(value: string) { return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
 function useRead<T>(load: (signal: AbortSignal) => Promise<T>, key: string) {
   const latest = useRef(load); latest.current = load;
@@ -126,7 +129,7 @@ export function AdminAuditView({ client, accountId }: { client: AdminClient; acc
     </TableToolbar>
     <Panel error={result.error} retry={result.retry}>{result.data && <>
       {!result.data.items.length ? <p className="admin-empty">No access changes match these filters.</p> : <div className="admin-table-scroll" role="region" aria-label="Access audit table" tabIndex={0}><table><thead><tr><th>When</th><th>Change</th>{!accountId && <th>Account</th>}<th>Administrator / actor</th><th>Previous → New</th><th>Reason</th></tr></thead><tbody>{result.data.items.map(event => <tr key={event.eventId}>
-        <td><time dateTime={event.occurredAt}>{when(event.occurredAt)}</time></td><td>{eventLabel(event)}</td>{!accountId && <td><AppLink href={'/admin/users/' + event.accountId}>Account #{event.accountId}</AppLink><code className="admin-audit-id">{event.target}</code></td>}<td className="admin-actor">{event.actor === '__MIGRATION_0004__' ? 'System migration' : event.actor}</td><td>{event.before ?? '—'} → {event.after ?? '—'}</td><td className="admin-reason">{event.reason ?? '—'}</td>
+        <td><time dateTime={event.occurredAt}>{when(event.occurredAt)}</time></td><td>{eventLabel(event)}</td>{!accountId && <td><AppLink href={'/admin/users/' + event.accountId}>Account #{event.accountId}</AppLink><code className="admin-audit-id">{event.target}</code></td>}<td className="admin-actor">{event.actor === '__MIGRATION_0004__' ? 'System migration' : event.actor}</td><td>{auditValue(event.before)} → {auditValue(event.after)}</td><td className="admin-reason">{event.reason ?? '—'}</td>
       </tr>)}</tbody></table></div>}
       <Pager result={result.data} onPage={page => setFilters(old => ({ ...old, page }))}/>
     </>}</Panel>
