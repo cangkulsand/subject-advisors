@@ -1,0 +1,35 @@
+diff --git a/apps/api/src/modules/p001-sprint2/progress.ts b/apps/api/src/modules/p001-sprint2/progress.ts
+index 290e3d9..6913c64 100644
+--- a/apps/api/src/modules/p001-sprint2/progress.ts
++++ b/apps/api/src/modules/p001-sprint2/progress.ts
+@@ -1,4 +1,7 @@
+ import type { Progress, ProgressSource, ProgressSubject } from './contracts';
++/** Requirement type / category key: upper case, spaces and underscores alike, so requirement 'ELECTIVE_E1' matches
++ * category 'Elective E1'. Same rule as the planning engine (packages/shared/src/planning, normaliseRequirementType). */
++const requirementKey = (value: string) => value.trim().toUpperCase().replace(/[\s_]+/g, '_');
+ export function calculateProgress(source: ProgressSource): Progress {
+   const { curriculum, attempts } = source;
+   const warnings: string[] = [];
+@@ -26,8 +29,8 @@ export function calculateProgress(source: ProgressSource): Progress {
+   const sum = (rows: ProgressSubject[]) => rows.reduce((n,s) => n + s.earnedCredits, 0);
+   const earnedCredits = sum(subjects), completedCredits = sum(subjects.filter(s => s.outcome === 'COMPLETED'));
+   const requirements = source.requirements.map(r => {
+-    const type = r.type.trim().toUpperCase();
+-    const matches = type === 'COMPULSORY' ? subjects.filter(s => s.compulsory) : subjects.filter(s => s.category.trim().toUpperCase() === type);
++    const type = requirementKey(r.type);
++    const matches = type === 'COMPULSORY' ? subjects.filter(s => s.compulsory) : subjects.filter(s => requirementKey(s.category) === type);
+     const configured = matches.length > 0 && (r.credits !== null || r.subjects !== null);
+     const earned = sum(matches), satisfied = matches.filter(s => s.outcome !== 'REMAINING').length;
+     return { ...r, earnedCredits: configured ? earned : null, satisfiedSubjects: configured ? satisfied : null,
+diff --git a/apps/api/src/modules/p001-sprint2/sprint2.test.ts b/apps/api/src/modules/p001-sprint2/sprint2.test.ts
+index 4f838fe..7c630f7 100644
+--- a/apps/api/src/modules/p001-sprint2/sprint2.test.ts
++++ b/apps/api/src/modules/p001-sprint2/sprint2.test.ts
+@@ -26,6 +26,7 @@ describe('UC05 academic progress',()=>{
+  it.each(['FAILED','WITHDRAWN'])('excludes %s credits',status=>{const s=source();s.attempts=[{subjectId:1,status,recognizedCredits:0}];expect(calculateProgress(s).earnedCredits).toBe(0);});
+  it('flags missing exemption information without counting unsupported credits',()=>{const s=source();s.attempts=[{subjectId:1,status:'EXEMPTED',recognizedCredits:null}];const p=calculateProgress(s);expect(p.earnedCredits).toBe(0);expect(p.warnings.join(' ')).toContain('incomplete');});
+  it('excludes out-of-curriculum records',()=>{const s=source();s.attempts=[{subjectId:999,status:'COMPLETED',recognizedCredits:50}];expect(calculateProgress(s).earnedCredits).toBe(0);expect(calculateProgress(s).warnings.join(' ')).toContain('outside');});
++ it('matches requirement types to categories with spaces and underscores alike (S3-P004-006)',()=>{const s=source();s.curriculum.subjects[2]!.category='Elective E1';s.requirements=[{type:'ELECTIVE_E1',credits:2,subjects:1},{type:' elective  e1 ',credits:null,subjects:1}];s.attempts=[{subjectId:3,status:'COMPLETED',recognizedCredits:2}];const p=calculateProgress(s);expect(p.requirements.map(r=>r.status)).toEqual(['MET','MET']);expect(p.requirements[0]).toMatchObject({earnedCredits:2,satisfiedSubjects:1});expect(p.warnings.join(' ')).not.toContain('no matching classification');});
+  it('does not invent a requirement total or a percentage',()=>{const s=source();s.curriculum.totalCredits=0;expect(calculateProgress(s)).toMatchObject({percent:null,remainingCredits:null,totalCredits:null});});
+  it('clamps percentage but preserves actual earned credits',()=>{const s=source();s.curriculum.totalCredits=1;s.attempts=[{subjectId:1,status:'COMPLETED',recognizedCredits:3}];expect(calculateProgress(s)).toMatchObject({percent:100,earnedCredits:3,remainingCredits:0});});
+  it('checks both group thresholds and leaves unknown groups unassessed',()=>{const s=source();s.attempts=[{subjectId:1,status:'COMPLETED',recognizedCredits:3},{subjectId:2,status:'EXEMPTED',recognizedCredits:0,remarks:'No credits'}];s.requirements.push({type:'UNMAPPED',credits:5,subjects:null});const p=calculateProgress(s);expect(p.requirements[0]).toMatchObject({satisfiedSubjects:2,earnedCredits:3,status:'OUTSTANDING'});expect(p.requirements[2]?.status).toBe('UNASSESSED');});
