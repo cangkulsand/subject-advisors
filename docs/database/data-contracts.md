@@ -3,6 +3,8 @@
 Status: development draft, not production-frozen. See schema-decisions.md and
 verification.md for exact evidence and blockers. The dictionary maps 26 entities,
 171 fields and 39 source FKs without adding domain tables.
+Approved additive engineering extensions are registered separately in
+`db/engineering-extensions.json`; they do not rewrite that frozen baseline dictionary.
 
 ## IDs and storage
 
@@ -44,6 +46,8 @@ until CGPA handling is defined.
 
 ## P002 — semesters, offerings and plans
 
+> **S2-P004-006 (2026-11-01):** offerings are now confirmed by the coordinator and students pick from them. `semester_offering` (below) is the legacy student-reported table: deprecated, read-only, not counted. Planned: `confirmed_offering` + `confirmed_offering_audit` (P004; unique programme + learning centre + target semester + subject) and `student_offering_pick` (P002; FK to `confirmed_offering`, unique student + confirmed offering). Picks are for the next semester after the profile current semester. Also planned: `offering_confirmation` (pick deadline per scope), coordinator assignments (admin-managed), an admin-managed current-semester marker on `academic_semester` (the target semester is the next one after it), and `forecast_run.programme_id`. Picks respect `academic_semester.max_subjects` / `max_credits`; already-passed subjects are hidden. See the change record for columns and migration order. Assigned coordinators see the pickers per subject (`student_profile.student_name`, `matric_no`, `current_semester_id`, credits completed derived from `academic_record.recognized_credits`) for their programme + learning centre; planned `student_profile.intake_semester_id` (P001) for the seniority tie-break; students never see others' picks. Planned migrations target the development database only.
+
 Consume academic_semester, semester_offering, academic_plan and plan_subject.
 SemesterOffering uniqueness: student_id + semester_id + curriculum_subject_id.
 Storage uses integer IDs. The current P002 integration adapter serializes these as
@@ -59,7 +63,7 @@ Read the same catalogue and academic records. Treat duplicate attempts with the
 agreed outcome/credit policy; do not count every attempt as independent earned credit.
 MANDATORY is a blocking edge, RECOMMENDED advisory, COREQUISITE distinct.
 SimulationScenario source plan must have the same owner; simulated subjects remain
-separate from academic_record. No learning-centre FK is invented for StudentProfile.
+separate from academic_record. Superseded (S2-P004-006): StudentProfile gains a learning centre (`student_profile.learning_centre_id`, P001); programme, curriculum and learning centre are locked after setup.
 The DB contains scenario/plan data structures, not scheduling/forecast algorithms.
 
 ## P004 — authentication, M6 and M7 persistence
@@ -70,6 +74,54 @@ no auth UI/API changes were made in this task.
 Existing auth database tests build an isolated historical UUID test table. They test
 that historical contract, not the 26-table schema. Use db:verify/db:test for this baseline.
 Future account APIs that expose assignment IDs must adapt to integers explicitly.
+
+### Package A academic setup (0008, local implementation)
+
+SYSTEM_ADMIN management APIs are wired at `/api/admin/academic-setup`; see
+`docs/api/admin-academic-setup.openapi.json` and `packages/shared/src/admin/academic-setup.ts`.
+The backend repository implements reference/semester maintenance, programme faculty
+assignment, explicit current-semester selection and coordinator assignment creation/end.
+All mutations require a normalized 1-500 character reason and use the verified actor
+with transaction-local settings. SQL binds values, PATCH changes only supplied whitelisted
+fields and PostgreSQL validates merged semester dates/type. Failures expose fixed domain
+messages, never driver SQL. No Clerk API call is added by this academic module.
+
+`faculty` is an active/inactive reference and `programme.faculty_id` is optional.
+No institutional mapping/catalogue is seeded. `learning_centre.is_active` preserves
+historical references when deactivated; inactive references cannot be used for new links
+or assignments. Programme reassignment is rejected while live assignments reference it.
+`academic_semester.is_current` is a system marker separate from the profile's current
+semester: no current row is valid and GET returns null until deliberate admin selection.
+The atomic setter permits at most one current row, with no automatic date-based choice.
+
+`coordinator_assignment` records account/faculty/programme/centre plus start/end timestamps.
+Only one unended account/programme/centre scope is permitted; ending retains history.
+Creation requires an ACTIVE account with a current COORDINATOR membership, active
+faculty/centre/programme and matching programme/faculty. Admin history remains readable
+after suspension, role removal or reference deactivation. Immutable
+`academic_setup_audit_log` stores actor/reason and before/after data for academic changes;
+one SET_CURRENT audit event represents each actual switch, with repeated selection a no-op.
+
+Future forecast adapters may consume the exported `AcademicScopeReader` through
+`createAcademicRepository` in `apps/api/src/modules/admin/index.ts`:
+
+| Method | Read contract |
+| --- | --- |
+| `currentSemesterId()` | Explicit system current ID or null; never infer from dates/order. |
+| `listActiveLearningCentres()` | Only active centre options. |
+| `listScopes(clerkUserId)` | Distinct live faculty/programme/centre scopes for the supplied verified identity. |
+| `isScopeAssigned(clerkUserId, programmeId, learningCentreId)` | Live assignment predicate for the requested programme/centre. |
+
+Scope reads are uncached and join the currently ACTIVE account, COORDINATOR membership,
+unended assignment, active faculty/centre and programme with matching faculty.
+Programme status uses `coalesce(upper(status),'ACTIVE')='ACTIVE'`. Consuming adapters
+must authenticate/authorize their caller; supplying an arbitrary Clerk ID is not an
+authorization mechanism. This package does not change the forecast ScopeProvider or
+implement `studentLearningCentreId`; profile learning-centre ownership remains P001.
+
+Local verification uses isolated 0000-0006+0008 only. Shared development must first
+integrate exact 0007/checksum/prefix, then 0008, then 0009; see migrations.md.
+No shared/Neon 0008 application or deployed service-role readiness is implied.
 
 Keep STUDENT/COORDINATOR/SYSTEM_ADMIN and ACTIVE/SUSPENDED.
 Clerk owns credentials and verified identity. DB roles do not authenticate Clerk users.

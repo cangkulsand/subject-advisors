@@ -1,7 +1,7 @@
 import type { AuthDependencies } from '../auth/contracts';
 import type { ForecastScope, ImportedStudentSummary, ImportSummary, ImportValidationReport, SemesterOption, StoredValidationInternals } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ScopeProvider } from './scope-provider';
-import type { OfferingDecisionsRepository } from './decisions-contracts';
+import type { OfferingsRepository } from './offerings-contracts';
 import type { ForecastRunsRepository } from './runs-contracts';
 import type { CatalogueCurriculum, ImportCatalogue, RecordToStore, StudentToStore } from './validation';
 
@@ -82,22 +82,14 @@ export interface ForecastingRepository {
   acceptValidated(importBatchId: number, actor: string): Promise<ImportBatchRow | null>;
 }
 
-export interface PortalContact { matricNo: string | null; email: string | null }
-
 export interface ForecastingDependencies {
   auth: AuthDependencies;
   repository: ForecastingRepository;
   /** Forecast runs (UC20 Package 6). */
   runs: ForecastRunsRepository;
-  /** Per-scope offering decisions: Pending / Approved / Removed (S2-P004-018). */
-  decisions: OfferingDecisionsRepository;
+  /** Coordinator offering confirmation (S2-P004-006). */
+  offerings: OfferingsRepository;
   scopes: ScopeProvider;
-  /**
-   * Live matric number (student_profile) and sign-in email (primary Clerk email) of portal students by `student_id`, for display in the
-   * subject student list only; never stored. Absent in tests and local tools: the list then shows the student reference.
-   * `emailsAvailable` is false when the identity provider could not be read (matric numbers are still returned).
-   */
-  portalContacts?: (studentIds: number[]) => Promise<{ contacts: Map<number, PortalContact>; emailsAvailable: boolean }>;
   now?: () => Date;
 }
 

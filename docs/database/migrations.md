@@ -15,6 +15,35 @@ alongside this baseline. The old P004 file is historical evidence only.
 4. 0003_profile_current_semester.sql: adds nullable `student_profile.current_semester_id`
    referencing `academic_semester.semester_id` with `ON DELETE RESTRICT`; no existing
    profile is backfilled and no default is assigned.
+5. 0004_multi_role_access.sql: explicit role memberships and immutable role history.
+6. 0005_network_security_reference_support.sql: nullable curriculum reference metadata
+   and private import receipts.
+7. 0006_admin_user_management.sql: pending invitations and access-status auditing.
+8. 0008_admin_academic_setup.sql: faculty/programme links, centre activation, explicit
+   system current semester, coordinator assignment history and immutable academic audit.
+   This branch's manifest intentionally skips absent 0007 for isolated local testing only.
+
+### Academic setup integration gate (0008)
+
+The disposable local runner applies exactly 0000-0006 plus 0008, with the numeric gap
+accepted. Migration 0008 does not reference forecast tables from 0007. This standalone
+history proves local compatibility; it does not authorize applying this branch's manifest
+to shared development. Integrate the forecast owner's exact 0007 bytes/checksum and
+ordered manifest prefix first, then 0008, then Package B 0009. Verify target identity and
+the complete applied prefix/checksums before shared `db:migrate`; changed, missing or
+unknown applied versions must fail closed. Never insert a sentinel version, rewrite an
+applied checksum, edit historical SQL or reset metadata to bypass the gate. If numbering
+must change, resolve it with the integration owner before any shared application.
+
+0008 seeds no catalogue, faculty mapping or current semester. Existing centres become
+active; programme faculty remains nullable; current markers default false. A partial
+unique index enforces zero or one current semester. `public.db_set_current_semester(integer)`
+returns void, serializes switches and audits one transition; the repository reads back
+the selected row in the same transaction. All academic writes require transaction-local
+`app.access_actor` and `app.access_reason` from the verified backend actor and normalized
+reason. Coordinator assignments are ended rather than deleted; audit is append-only.
+Runtime permission grants require separate reviewed configuration; the migration revokes
+PUBLIC privileges and does not provision service roles.
 
 All pending versions and their checksum records commit in one transaction, with a
 transaction advisory lock. Failure rolls back the entire batch, including legacy DDL.
@@ -28,7 +57,8 @@ line endings of applied SQL: that changes its recorded SHA-256 and must be rejec
 as migration drift. The historical dated P004 source keeps its prior text handling.
 
 Technical tables are in migration_meta: schema_migrations, legacy_access_id_map,
-and legacy_user_access_assignment only when adoption is needed. They do not change
+legacy_user_access_assignment only when adoption is needed, and the 0008 private
+academic_switch_context helper. They do not change
 the 26-entity public model. Metadata has no PUBLIC grants.
 
 ## Target approval
@@ -78,8 +108,9 @@ No production execution or official data import is authorized by this runbook.
 ## SQL checks
 
 001_schema_verification.sql asserts the frozen 26-table/171-column/39-source-FK
-baseline, enabled triggers, valid indexes and absence of PUBLIC grants. It allows only
-the one registered `student_profile` extension; 004_profile_current_semester.sql
+baseline, enabled triggers, valid indexes and absence of PUBLIC grants. It narrowly
+allows the registered engineering tables/columns, including the 0008 additions;
+004_profile_current_semester.sql
 asserts the exact 0003 nullable integer, no-default field and validated FK target and
 delete action. The baseline schema contract and migrations 0000–0002 remain unchanged.
 002_behavior_tests.sql uses synthetic, rollback-only fixtures for valid/invalid writes,
@@ -98,3 +129,16 @@ back; these tests do not provision production/runtime service roles.
 DB schema tests do not prove Clerk authentication, owner authorization or service-level
 actor audit coupling. Existing auth unit tests verify those implemented API guards;
 future privileged services need their own end-to-end and concurrent tests.
+
+012_admin_academic_setup.sql raises on incorrect 0008 columns/defaults, restrictive
+FKs, partial unique indexes, enabled triggers and PUBLIC privileges.
+013_admin_academic_setup_behavior.sql exercises rollback-only academic mutations.
+`node tools/admin/test-academic-database.mjs` creates a fresh loopback PostgreSQL cluster,
+applies the isolated manifest, runs structural/behavior checks, the concrete repository
+suite and two-session lock-observed races, then stops the cluster in `finally`. It never
+reads `.dev.vars` or application `DATABASE_URL`. Prepared binaries default to
+`.wrangler/multi-role-postgres/node_modules/@embedded-postgres/windows-x64/native/bin`;
+`MULTI_ROLE_POSTGRES_BIN` can select an existing compatible binary directory. The runner
+does not install/download PostgreSQL. Repository tests use only the runner-provided
+`ACADEMIC_TEST_DATABASE_URL`, guarded to loopback `utm_db_foundation_*_test` targets,
+and wrap fixtures in rollback transactions. No shared/Neon 0008 application is claimed.

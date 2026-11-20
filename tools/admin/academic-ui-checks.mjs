@@ -64,7 +64,7 @@ export async function academicUiChecks({ check, mock, base }) {
   });
   await check('semesters: nullable current, validated create/edit dates, set/switch/advance current and inline error', async page => {
     const state = await mock(page); await page.goto(base + '/admin/semesters');
-    await page.getByText('Not configured', { exact: true }).waitFor(); assert.equal(await page.getByRole('button', { name: 'Advance to next semester' }).count(), 0);
+    await page.getByRole('group', { name: 'Current semester', exact: true }).getByText('Not configured', { exact: true }).waitFor(); assert.equal(await page.getByRole('group', { name: 'Current semester' }).getByText('Not configured', { exact: true }).count(), 1); assert.equal(await page.getByRole('group', { name: 'Next semester' }).getByText('Not configured', { exact: true }).count(), 1); assert.equal(await page.getByRole('button', { name: 'Advance to next semester' }).count(), 0);
     await page.getByRole('button', { name: 'Add semester', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Add semester', exact: true });
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-dialog-desktop.png', fullPage: true });
     await dialog.getByLabel('Academic year (YYYY/YYYY)', { exact: true }).fill('invalid'); await dialog.getByLabel('Semester number', { exact: true }).selectOption('1');
@@ -82,7 +82,30 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.equal(academicStore(state).semesters.find(s => s.isCurrent).semesterId, 2); assert.equal(academicStore(state).semesters.filter(s => s.isCurrent).length, 1);
     await page.getByRole('button', { name: 'Set current 2027/2028 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
     assert.equal(academicStore(state).semesters.find(s => s.isCurrent).semesterId, 4);
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).click(); await confirm(page, 'Set current semester', 'Set current');
+    const add = page.getByRole('button', { name: 'Add semester', exact: true });
+    const advance = page.getByRole('button', { name: 'Advance to next semester', exact: true });
+    assert.equal(await add.locator('svg[aria-hidden="true"]').count(), 1);
+    assert.equal(await page.locator('.admin-semester-current-row').count(), 1);
+    assert.equal(await page.locator('.admin-semester-current-badge').innerText(), 'Current');
+    assert.equal(await page.getByRole('button', { name: 'Edit 2026/2027 · Semester 1', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 1', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).count(), 1);
+    for (const button of [add, advance, page.getByRole('button', { name: 'Edit 2026/2027 · Semester 1', exact: true }), page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true })]) {
+      const box = await button.boundingBox(); assert.ok(box && box.height >= 44);
+      assert.ok(Number.parseFloat(await button.evaluate(el => getComputedStyle(el).fontSize)) >= 14);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-desktop.png', fullPage: true });
+    for (const width of [375, 800, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'page should not overflow at ' + width + 'px');
+    }
+    await page.setViewportSize({ width: 375, height: 844 });
+    const tableRegion = page.getByRole('region', { name: 'Academic semesters', exact: true });
+    await tableRegion.evaluate(el => { el.scrollLeft = el.scrollWidth; });
+    await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).waitFor();
+    await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-375.png', fullPage: true });
   });
   await check('coordinator assignments: eligible picker, search/empty, active reference filtering, duplicate, end history and add', async page => {
     const state = await mock(page), data = academicStore(state);

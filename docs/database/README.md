@@ -17,6 +17,7 @@ and UUID history were preserved. Production freeze and independent review remain
 - [Actual evidence and unrun tests](verification.md)
 - [Full Mermaid ERD](../../db/erd/schema.mmd)
 - [Machine-readable source mapping](../../db/schema-contract.json)
+- [Subject configuration rules (admin subject menu)](subject-configuration-rules.md)
 - [Four-stage change record](../changes/DB-FOUNDATION-001-schema-baseline.md)
 
 The initial/check SQL files were missing from the supplied repository. Their replacements

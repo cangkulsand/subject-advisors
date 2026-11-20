@@ -99,8 +99,10 @@ describe('P001 profile options subject metadata', () => {
     expect(studentB.subjects[0]?.subjectId).toBe(202);
     expect(studentA.subjectGroups?.[0]?.category).toBe('student-a');
     expect(studentB.subjectGroups?.[0]?.category).toBe('student-b');
-    expect(Object.keys(studentA)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups', 'learningCentres']);
-    // Mock query-count evidence: cold options loads four SQL queries; warm options loads only the two owner-scoped queries.
+    expect(studentA.currentAcademicYear).toBeNull();
+    expect(studentA.currentSemester).toBeNull();
+    expect(Object.keys(studentA)).toEqual(['curricula', 'subjects', 'semesters', 'currentSemester', 'currentAcademicYear', 'subjectGroups']);
+    // Cold options loads five SQL queries including the live marker; warm options still reads the marker and both owner scopes.
     expect(query).toHaveBeenCalledTimes(8);
     expect(query.mock.calls.filter(([sql]) => sql.includes('SELECT c.curriculum_id AS "curriculumId"'))).toHaveLength(1);
     expect(query.mock.calls.filter(([sql]) => sql.includes('SELECT semester_id AS "semesterId"'))).toHaveLength(1);
@@ -187,18 +189,18 @@ describe('P001 profile options subject metadata', () => {
       if (sql.includes('SELECT semester_id AS "semesterId"')) return [
         { semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' },
       ];
-      if (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1')) return [{ learning_centre_id: 1 }];
+      if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' }];
       return [];
     }) as Query & ReturnType<typeof vi.fn>;
     const profiles = createProfileRepository(query, cache.cache);
     await profiles.options('student-a');
     const cacheReadsBeforeSave = cache.gets.length;
     await expect(profiles.save('student-a', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 10, currentSemesterId: 30,
+      studentName: 'Student', matricNo: null, curriculumId: 10, currentSemesterId: 30,
       weeklyWorkingHours: 0, availableStudyHours: 8,
-    })).rejects.toMatchObject({ status: 400, code: 'INVALID_SEMESTER' });
+    })).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
     expect(query.mock.calls.some(([sql]) => sql.includes('JOIN public.academic_semester s ON s.semester_id=$5'))).toBe(true);
-    expect(query.mock.calls.some(([sql, parameters]) => sql.includes('SELECT semester_id FROM public.academic_semester WHERE semester_id=$1') && parameters[0] === 30)).toBe(true);
+    expect(query.mock.calls.some(([sql, parameters]) => sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1') && parameters[0] === 30)).toBe(true);
     expect(cache.gets).toHaveLength(cacheReadsBeforeSave);
   });
 });
@@ -234,7 +236,7 @@ describe('P001 curriculum-scoped options cache', () => {
     const second = await setupResult.profiles.options('student-b');
     expect(first.subjects).toEqual(second.subjects);
     expect(first.subjectGroups).toEqual(second.subjectGroups);
-    expect(setupResult.query).toHaveBeenCalledTimes(8); // cold 6 incl. centres; second request association only
+    expect(setupResult.query).toHaveBeenCalledTimes(8); // cold 6; warm request association and live current-year reads
     expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile'))).toHaveLength(2);
     expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))).toHaveLength(1);
     expect(setupResult.query.mock.calls.filter(([sql]) => sql.includes('WITH category_counts AS'))).toHaveLength(1);
@@ -244,7 +246,8 @@ describe('P001 curriculum-scoped options cache', () => {
     expect(JSON.stringify(cached.data)).not.toContain('student-a');
     expect(JSON.stringify(cached.data)).not.toContain('student-b');
     expect(first).not.toHaveProperty('curriculumId');
-    expect(Object.keys(first)).toEqual(['curricula', 'subjects', 'semesters', 'subjectGroups', 'learningCentres']);
+    expect(first.currentAcademicYear).toBeNull();
+    expect(Object.keys(first)).toEqual(['curricula', 'subjects', 'semesters', 'currentSemester', 'currentAcademicYear', 'subjectGroups']);
   });
 
   it('isolates different curricula and uses the captured ID for both loaders after an association change during a delayed load', async () => {
@@ -295,7 +298,7 @@ describe('P001 curriculum-scoped options cache', () => {
     expect(result.subjectGroups).toEqual([]);
     expect(result.curricula).toHaveLength(1);
     expect(result.semesters).toHaveLength(1);
-    expect(query).toHaveBeenCalledTimes(4); // live association + two global cache loads
+    expect(query).toHaveBeenCalledTimes(4); // live association + live year + two global cache loads
     expect(query.mock.calls.some(([sql]) => sql.includes('FROM public.curriculum_subject cs JOIN public.subject s'))).toBe(false);
     expect(query.mock.calls.some(([sql]) => sql.includes('WITH category_counts AS'))).toBe(false);
   });
@@ -395,95 +398,115 @@ describe('P001 current semester persistence', () => {
     await expect(createProfileRepository(query).find('verified-student')).rejects.toThrow('Invalid profile curriculum total');
   });
   it('validates configured current semester in the profile upsert and returns it', async () => {
-    const query = vi.fn(async (sql: string) => sql.includes('WITH saved AS') ? [{ studentId: 9, studentName: 'Student', matricNo: null, learningCentreId: 1,
+    const query = vi.fn(async (sql: string) => sql.includes('INSERT INTO public.student_profile') ? [{ studentId: 9, studentName: 'Student', matricNo: null,
       curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
       createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' }] : []) as unknown as Query & ReturnType<typeof vi.fn>;
     const saved = await createProfileRepository(query).save('verified-student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
     });
     expect(saved.currentSemesterId).toBe(22);
-    expect(saved.learningCentreId).toBe(1);
-    const [sql, parameters] = query.mock.calls.find(([text]) => text.includes('WITH saved AS'))!;
-    expect(sql).toContain('JOIN public.learning_centre lc ON lc.learning_centre_id=$8 AND (lc.is_active OR lc.learning_centre_id=$9)');
-    expect(sql).toContain('learning_centre_id=EXCLUDED.learning_centre_id');
+    const [sql, parameters] = query.mock.calls[0]!;
     expect(sql).toContain('current_semester_id'); expect(sql).toContain('JOIN public.academic_semester s ON s.semester_id=$5');
+    expect(sql).toContain('SELECT semester_id FROM public.academic_semester WHERE is_current=true FOR SHARE');
+    expect(sql).toContain('s.semester_id=cp.semester_id');
     expect(sql).toContain('current_semester_id=EXCLUDED.current_semester_id');
-    expect(parameters).toEqual(['verified-student', 'Student', null, 4, 22, 0, 8, 1, null]);
+    expect(parameters).toEqual(['verified-student', 'Student', null, 4, 22, 0, 8]);
   });
   it('rejects an unconfigured semester without accepting it as a valid profile', async () => {
-    const query = vi.fn(async (sql: string) => sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1') ? [{ learning_centre_id: 1 }] : []) as unknown as Query;
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT semester_id FROM public.academic_semester') ? [] : []) as unknown as Query;
     await expect(createProfileRepository(query).save('verified-student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
     })).rejects.toMatchObject({ status: 400, code: 'INVALID_SEMESTER' });
+  });
+  it('rejects profile saves when the admin has not configured a current academic year', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 99 }];
+      return [];
+    }) as unknown as Query;
+    await expect(createProfileRepository(query).save('student', {
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
+    })).rejects.toMatchObject({ status: 503, code: 'ACADEMIC_SEMESTER_UNAVAILABLE' });
+  });
+  it('rejects a different semester in the same year even when it remains configured', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 30 }];
+      if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 31 }];
+      return [];
+    }) as unknown as Query;
+    await expect(createProfileRepository(query).save('student', {
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8,
+    })).rejects.toMatchObject({ status: 409, code: 'ACADEMIC_SEMESTER_MISMATCH' });
+  });
+  it('keeps the exact current semester eligible for the existing curriculum validation', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 30 }];
+      if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 30 }];
+      return [];
+    }) as unknown as Query;
+    await expect(createProfileRepository(query).save('student', {
+      studentName: 'Student', matricNo: null, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8,
+    })).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
   });
 });
 
-describe('P001 learning centre (S2-P004-023)', () => {
-  const row = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22,
-    weeklyWorkingHours: 0, availableStudyHours: 8, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
-    curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' };
-  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 2, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8 };
-  const now = () => new Date('2026-11-10T00:00:00Z');
-  const isWindow = (sql: string) => sql.includes('AS "selectionOpensAt"');
-  function repo(opts: { saved: number | null; window: Record<string, unknown>[]; upsert?: Record<string, unknown>[] }) {
-    const query = vi.fn(async (sql: string) => {
-      if (isWindow(sql)) return opts.window;
-      if (sql.includes('WITH saved AS')) return opts.upsert ?? [{ ...row, learningCentreId: input.learningCentreId }];
-      if (sql.includes('SELECT learning_centre_id AS "learningCentreId" FROM public.student_profile')) return opts.saved === null ? [] : [{ learningCentreId: opts.saved }];
-      if (sql.includes('FROM public.student_profile p')) return [{ ...row, learningCentreId: opts.saved }];
+describe('P001 live admin current-semester options', () => {
+  it('reads the exact semester independently on warm cached-options requests and retains semester history', async () => {
+    const cache = referenceCacheHarness();
+    let currentSemester = { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' as const };
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return [{ curriculumId: 12 }];
+      if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+      ];
+      if (sql.includes('FROM public.academic_semester ORDER BY')) return [
+        { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' },
+        { semesterId: 32, academicYear: '2026/2027', semesterNo: 2, semesterType: 'NORMAL' },
+        { semesterId: 31, academicYear: '2027/2028', semesterNo: 1, semesterType: 'NORMAL' },
+      ];
+      if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ ...currentSemester }];
+      if (sql.includes('FROM public.curriculum_subject cs JOIN public.subject s')) return [];
+      if (sql.includes('WITH category_counts AS')) return [];
+      void parameters;
       return [];
-    }) as unknown as Query & ReturnType<typeof vi.fn>;
-    return { query, repository: createProfileRepository(query, undefined, { now }) };
-  }
-  const opened = [{ selectionOpensAt: '2026-11-01T00:00:00.000Z', selectionClosesAt: '2026-12-01T00:00:00.000Z' }];
-  const planned = [{ selectionOpensAt: '2026-12-01T00:00:00.000Z', selectionClosesAt: null }];
+    }) as Query & ReturnType<typeof vi.fn>;
+    const profiles = createProfileRepository(query, cache.cache, { curriculumCacheEnabled: true });
+    const first = await profiles.options('student-a');
+    currentSemester = { semesterId: 32, academicYear: '2026/2027', semesterNo: 2, semesterType: 'NORMAL' };
+    const second = await profiles.options('student-a');
 
-  it('find returns learningCentreId and learningCentreLocked from the next semester window', async () => {
-    const open = await repo({ saved: 1, window: opened }).repository.find('s');
-    expect(open).toMatchObject({ learningCentreId: 1, learningCentreLocked: true });
-    expect(await repo({ saved: 1, window: planned }).repository.find('s')).toMatchObject({ learningCentreLocked: false });
-    expect(await repo({ saved: 1, window: [] }).repository.find('s')).toMatchObject({ learningCentreLocked: false });
-    expect(await repo({ saved: 1, window: [{ selectionOpensAt: null, selectionClosesAt: null }] }).repository.find('s')).toMatchObject({ learningCentreLocked: false });
-    const closed = [{ selectionOpensAt: '2026-10-01T00:00:00.000Z', selectionClosesAt: '2026-11-05T00:00:00.000Z' }];
-    expect(await repo({ saved: 1, window: closed }).repository.find('s')).toMatchObject({ learningCentreLocked: true });
+    expect(first.currentSemester).toEqual({ semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' });
+    expect(second.currentSemester).toEqual({ semesterId: 32, academicYear: '2026/2027', semesterNo: 2, semesterType: 'NORMAL' });
+    expect(first.currentAcademicYear).toBe(second.currentAcademicYear);
+    expect(second.semesters.map(semester => semester.semesterId)).toEqual([30, 32, 31]);
+    expect(query.mock.calls.filter(([sql]) => sql.includes('FROM public.academic_semester a WHERE a.is_current=true'))).toHaveLength(2);
+    expect(query.mock.calls.filter(([sql]) => sql.includes('FROM public.academic_semester ORDER BY'))).toHaveLength(1);
+    expect(cache.gets).toContain('sa:test:profile:v1:reference:semesters');
+    expect(cache.gets).not.toContainEqual(expect.stringContaining('current'));
   });
-  it('find never locks a profile without a centre and skips the window query', async () => {
-    const { query, repository } = repo({ saved: null, window: opened });
-    expect(await repository.find('s')).toMatchObject({ learningCentreId: null, learningCentreLocked: false });
-    expect(query.mock.calls.some(([sql]) => isWindow(sql))).toBe(false);
+  it('returns a null current marker and complete historical semesters when none is configured', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM public.academic_semester ORDER BY')) return [
+        { semesterId: 1, academicYear: '2025/2026', semesterNo: 1, semesterType: 'NORMAL' },
+      ];
+      return [];
+    }) as unknown as Query;
+    const result = await createProfileRepository(query).options('new-student');
+    expect(result.currentSemester).toBeNull();
+    expect(result.currentAcademicYear).toBeNull();
+    expect(result.semesters).toHaveLength(1);
   });
-  it('window query looks at the semester after the admin current semester', async () => {
-    const { query, repository } = repo({ saved: 1, window: opened });
-    await repository.find('s');
-    const sql = query.mock.calls.find(([text]) => isWindow(text))![0];
-    expect(sql).toContain('c.is_current AND (s.academic_year, s.semester_no) > (c.academic_year, c.semester_no)');
-  });
-  it('lock allows the first centre and blocks a change while selection is open', async () => {
-    const first = repo({ saved: null, window: opened });
-    await expect(first.repository.save('s', input)).resolves.toMatchObject({ learningCentreId: 2 });
-    expect(first.query.mock.calls.some(([sql]) => isWindow(sql))).toBe(false);
-    const changed = repo({ saved: 1, window: opened });
-    await expect(changed.repository.save('s', input)).rejects.toMatchObject({ status: 409, code: 'PROFILE_CENTRE_LOCKED' });
-    expect(changed.query.mock.calls.some(([sql]) => sql.includes('WITH saved AS'))).toBe(false);
-  });
-  it('saving the same centre while locked succeeds and stays locked', async () => {
-    const same = repo({ saved: 1, window: opened, upsert: [{ ...row, learningCentreId: 1 }] });
-    await expect(same.repository.save('s', { ...input, learningCentreId: 1 })).resolves.toMatchObject({ learningCentreId: 1, learningCentreLocked: true });
-  });
-  it('a change before selection opens is saved', async () => {
-    await expect(repo({ saved: 1, window: planned }).repository.save('s', input)).resolves.toMatchObject({ learningCentreId: 2, learningCentreLocked: false });
-  });
-  it('save rejects an inactive centre with INVALID_LEARNING_CENTRE', async () => {
-    const { repository } = repo({ saved: null, window: [], upsert: [] });
-    await expect(repository.save('s', input)).rejects.toMatchObject({ status: 400, code: 'INVALID_LEARNING_CENTRE' });
-  });
-  it('options lists active learning centres', async () => {
-    const query = vi.fn(async (sql: string) => sql.includes('FROM public.learning_centre') ? [
-      { learningCentreId: 1, centreCode: 'JB', centreName: 'Johor Bahru' }, { learningCentreId: 2, centreCode: 'KL', centreName: 'Kuala Lumpur' }] : []) as unknown as Query & ReturnType<typeof vi.fn>;
-    const options = await createProfileRepository(query).options('s');
-    expect(options.learningCentres).toEqual([{ learningCentreId: 1, centreCode: 'JB', centreName: 'Johor Bahru' }, { learningCentreId: 2, centreCode: 'KL', centreName: 'Kuala Lumpur' }]);
-    const sql = query.mock.calls.find(([text]) => text.includes('FROM public.learning_centre'))![0];
-    expect(sql).toContain('WHERE is_active OR learning_centre_id=(SELECT learning_centre_id FROM public.student_profile WHERE clerk_user_id=$1)');
-    expect(sql).toContain('ORDER BY centre_code');
+  it('returns a live current year on the uncached options path for a profile owner', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' }];
+      if (sql.includes('FROM public.academic_semester ORDER BY')) return [
+        { semesterId: 20, academicYear: '2025/2026', semesterNo: 2, semesterType: 'NORMAL' },
+        { semesterId: 21, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' },
+      ];
+      return [];
+    }) as unknown as Query;
+    const result = await createProfileRepository(query).options('student');
+    expect(result.currentSemester).toEqual({ semesterId: 21, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' });
+    expect(result.currentAcademicYear).toBe('2026/2027');
+    expect(result.semesters.map(({ academicYear }) => academicYear)).toEqual(['2025/2026', '2026/2027']);
   });
 });

@@ -1,9 +1,10 @@
+import type { ForecastAuditEntry } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ConfigurationIssueCode, DemandBreakdown, UncertaintyReasonCount } from '../../../../../packages/shared/src/forecasting/engine/types';
-import { runRevision, sectionFlags, subjectDecisionStatus } from '../../../../../packages/shared/src/forecasting/runs';
+import { RUN_LIMITS, runRevision, sectionFlags, subjectDecisionStatus } from '../../../../../packages/shared/src/forecasting/runs';
 import type {
-  ForecastRunDetail, ForecastRunHeader, RunSection, RunSubject, RunSummary,
+  ForecastRunDetail, ForecastRunHeader, ForecastRunSummary, NewerForecastAvailable, RunSection, RunSubject, RunSummary,
 } from '../../../../../packages/shared/src/forecasting/runs';
-import type { RunDetailRows, RunRecord, RunSectionRow, RunSubjectRow } from './runs-contracts';
+import type { RunDetailRows, RunListRow, RunRecord, RunSectionRow, RunSubjectRow } from './runs-contracts';
 
 /** Per-subject data the engine produces that has no column of its own; stored in `forecast_run.scenario_assumptions.subjects`. */
 export interface StoredSubjectAssumptions {
@@ -21,14 +22,20 @@ export interface StoredSubjectAssumptions {
 
 export const revisionOf = (run: Pick<RunRecord, 'forecastRunId' | 'status' | 'auditCount'>) => runRevision(run.forecastRunId, run.status, run.auditCount);
 
-/** The "newer forecast" notice belonged to the removed forecast-version flow; a snapshot has exactly one forecast. */
-export function headerOf(run: RunRecord): ForecastRunHeader {
+export function headerOf(run: RunRecord, newer: NewerForecastAvailable | null): ForecastRunHeader {
   return {
     forecastRunId: run.forecastRunId, programmeId: run.programmeId, learningCentreId: run.learningCentreId, targetSemesterId: run.targetSemesterId,
     importBatchId: run.importBatchId, versionNumber: run.versionNumber, parentForecastRunId: run.parentForecastRunId, status: run.status, revision: revisionOf(run),
     demandAssumption: 'SUPPORTED_ELIGIBLE_POOL', engineVersion: run.engineVersion, generatedBy: run.generatedBy, generatedAt: run.generatedAt,
-    finalizedBy: run.finalizedBy, finalizedAt: run.finalizedAt, newerForecastAvailable: null,
+    finalizedBy: run.finalizedBy, finalizedAt: run.finalizedAt, newerForecastAvailable: newer,
   };
+}
+
+export const newerOf = (latest: { forecastRunId: number; versionNumber: number; status: NewerForecastAvailable['status'] } | null, run: Pick<RunRecord, 'versionNumber'>): NewerForecastAvailable | null =>
+  latest && latest.versionNumber > run.versionNumber ? { forecastRunId: latest.forecastRunId, versionNumber: latest.versionNumber, status: latest.status } : null;
+
+export function summaryOfList(row: RunListRow, newer: NewerForecastAvailable | null): ForecastRunSummary {
+  return { ...headerOf(row, newer), summary: row.summary };
 }
 
 function sectionOf(row: RunSectionRow): RunSection {
@@ -69,16 +76,14 @@ export function summaryOf(subjects: RunSubject[]): RunSummary {
     totalSections: sections.length, pendingSections: sections.filter((section) => section.reviewStatus === 'PENDING').length,
     sectionsBelowMinimum: sections.filter((section) => section.flags.includes('BELOW_MINIMUM')).length,
     sectionsBelowOptimal: sections.filter((section) => section.flags.includes('BELOW_OPTIMAL')).length,
-    pendingSubjects: subjects.filter((subject) => subject.sections.some((section) => section.reviewStatus === 'PENDING')).length,
-    subjectsBelowMinimum: subjects.filter((subject) => subject.sections.some((section) => section.flags.includes('BELOW_MINIMUM'))).length,
   };
 }
 
-export function detailOf(rows: RunDetailRows): ForecastRunDetail {
+export function detailOf(rows: RunDetailRows, newer: NewerForecastAvailable | null, audit: ForecastAuditEntry[], auditTruncated: boolean): ForecastRunDetail {
   const subjects = rows.subjects.map((row) => subjectOf(row, assumptionsFor(rows, row.subjectId), rows.sections));
   return {
-    ...headerOf(rows.run), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' || rows.scenarioAssumptions.importSource === 'COMBINED' ? rows.scenarioAssumptions.importSource : 'CSV', summary: summaryOf(subjects), subjects,
+    ...headerOf(rows.run, newer), assumptionNote: rows.ruleSnapshot.assumptionNote, dataSource: rows.scenarioAssumptions.importSource === 'SYSTEM' || rows.scenarioAssumptions.importSource === 'COMBINED' ? rows.scenarioAssumptions.importSource : 'CSV', summary: summaryOf(subjects), subjects,
     ruleSnapshot: rows.ruleSnapshot, originalRecommendations: rows.originalRecommendations,
-    audit: [], auditTruncated: false,
+    audit: audit.slice(0, RUN_LIMITS.embeddedAuditEntries), auditTruncated,
   };
 }

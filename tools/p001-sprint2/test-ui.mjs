@@ -5,6 +5,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
 const output=await build({entryPoints:['tools/p001-sprint2/testing/main.tsx'],bundle:true,write:false,outdir:'.wrangler/p001-sprint2-ui',jsx:'automatic',alias:{'@clerk/react':resolve('apps/web/src/features/auth/testing/clerk-mock.tsx')},define:{'process.env.NODE_ENV':'"development"'}});
 const script=output.outputFiles.find(f=>f.path.endsWith('.js')).text,css=output.outputFiles.find(f=>f.path.endsWith('.css'))?.text??'';
@@ -32,7 +33,7 @@ async function fixture(page,settings={}){
  });return state;
 }
 let browser,passed=0;
-async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
+async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);await assertReadable(page,name);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 async function curriculum(page){await page.goto(base+'/admin/curriculum');await page.getByLabel('Curriculum',{exact:true}).selectOption('1');await page.getByRole('heading',{name:'Curriculum subjects',exact:true}).waitFor();}
 async function fillSubject(page){await page.getByLabel('Subject code',{exact:true}).fill('DEMO4');await page.getByLabel('Subject name',{exact:true}).fill('Fictional new subject');await page.getByLabel('Credit hours',{exact:true}).fill('2');await page.getByLabel('Classification',{exact:true}).fill('ELECTIVE');await page.getByLabel('Short semester (3)',{exact:true}).check();}
 try{

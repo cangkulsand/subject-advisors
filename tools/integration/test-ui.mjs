@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { assertReadable } from '../ui/readability.mjs';
 import { prepareIntegration } from './prepare.mjs';
 import { fixtureResponse as adminFixtureResponse } from '../admin/fixtures.mjs';
 process.chdir(fileURLToPath(new URL('../../',import.meta.url)));
@@ -25,7 +26,7 @@ async function mock(page,state={}){
   const role=state.role??'STUDENT',roles=state.roles??[role],availableRoles=state.availableRoles??roles;
   const studentProfileState=availableRoles.includes('STUDENT')?(state.setup?'SETUP_REQUIRED':'COMPLETE'):'NOT_APPLICABLE';
   const data=path==='/api/me'?{clerkUserId:'user_test',appRole:role,roles,availableRoles,studentProfileState,accessStatus:'ACTIVE',profileState:role==='STUDENT'?studentProfileState:'NOT_APPLICABLE',landingPath:role==='SYSTEM_ADMIN'?'/admin':role==='COORDINATOR'?'/coordinator':state.setup?'/student/setup':'/student'}
-   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
+   :path==='/api/profile'?profile:path==='/api/profile/options'?{curricula:[{curriculumId:1,curriculumVersion:'DEMO',programmeId:1,programmeCode:'DEMO',programmeName:'DEMO'}],subjects:[{subjectId:1,subjectCode:'DEMO101',subjectName:'DEMO Subject',creditHours:3,subjectCategory:'CORE'}],currentSemester:{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'},currentAcademicYear:'1001/1002',semesters:[{semesterId:1,academicYear:'1001/1002',semesterNo:1,semesterType:'NORMAL'}]}
    :path==='/api/academic-records'?[]:path==='/api/semester-offerings'?{currentSemesterId:'1',curriculum:{curriculumId:'1',name:'DEMO',programmeName:'DEMO'},subjects:[{curriculumSubjectId:'1',code:'DEMO101',name:'DEMO Subject',creditHours:3}],semesters:[{semesterId:'1',academicYear:'1001/1002',semesterNo:1}],selection:{semesterId:'1',curriculumSubjectIds:[]}}
    :path==='/api/pathway/graph'?{curriculumId:1,curriculumVersion:'DEMO',programmeName:'Fictional demo programme',demo:true,nodes:[
     {id:'10',subjectCode:'DEMO101',subjectName:'Foundations',creditHours:3,isCompulsory:true,subjectCategory:'CORE',status:'COMPLETED',grade:'A',recognizedCredits:3},
@@ -40,7 +41,7 @@ async function clickStudentLink(page,name){
  if(page.viewportSize().width<1280){const toggle=page.locator('button[aria-controls="student-sidebar"]');await toggle.waitFor();if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();}
  await nav.getByRole('link',{name,exact:true}).click();
 }
-async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
+async function check(name,body,width=390){const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));try{await body(page);await assertReadable(page,name);assert.deepEqual(errors,[]);passed++;console.log('PASS '+name);}finally{await page.close();}}
 try{
  browser=await chromium.launch({headless:true});
  await check('a student-only account has no staff view selector',async page=>{
@@ -67,7 +68,7 @@ try{
  await check('a coordinator-only account has no student or admin choices',async page=>{
   const coordinator=await mock(page,{role:'COORDINATOR'});await page.goto(base+'/coordinator');await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
   await page.getByRole('link',{name:'Data Imports',exact:true}).click();await page.getByRole('heading',{name:'Data Imports',exact:true}).waitFor();
-  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me']);
+  assert.deepEqual(coordinator.requests.filter(request=>request.path.startsWith('/api/')).map(request=>request.path),['/api/me','/api/coordinator/forecast-context']);
   assert.equal(await page.getByRole('combobox',{name:'Workspace view'}).count(),0);
  },1440);
  await check('a revoked role cannot be selected using an older account snapshot',async page=>{
@@ -148,7 +149,7 @@ try{
   });
   await check('saving setup reaches records in the same initialized document',async page=>{
    const state=await mock(page,{setup:true});await page.goto(base+'/student/setup');await page.getByRole('button',{name:'Save profile',exact:true}).waitFor();const mounts=await page.evaluate(()=>document.documentElement.dataset.clerkMounts);
-   await page.getByLabel('Student name',{exact:true}).fill('DEMO new student');await page.getByLabel('Programme',{exact:true}).selectOption('1');await page.getByLabel('Weekly working hours',{exact:true}).fill('0');await page.getByLabel('Available study hours per week').fill('8');await page.getByLabel('Academic year').selectOption('1001/1002');await page.getByLabel('Semester',{exact:true}).selectOption('1');
+   await page.getByLabel('Student name',{exact:true}).fill('DEMO new student');await page.getByLabel('Programme',{exact:true}).selectOption('1');await page.getByLabel('Weekly working hours',{exact:true}).fill('0');await page.getByLabel('Available study hours per week').fill('8');assert.equal(await page.getByLabel('Academic year').inputValue(),'1001/1002');
    await page.getByRole('button',{name:'Save profile',exact:true}).click();await page.waitForURL('**/student');await page.getByRole('table',{name:'Subject records'}).waitFor();assert.equal(state.accountReads,1);assert.equal(await page.evaluate(()=>document.documentElement.dataset.clerkMounts),mounts);
   });
  }

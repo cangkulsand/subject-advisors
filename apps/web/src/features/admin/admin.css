@@ -279,3 +279,111 @@
 /* Typography guard (S2-INT-003): row headers inside table bodies read like body cells; numbers align and use tabular figures. */
 .admin-table-scroll tbody th { font-size: var(--font-size-table); line-height: var(--line-height-table); }
 .admin-table-scroll :is(td, th).admin-number, .admin-table-scroll td[data-numeric] { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-semesters {
+  display: grid;
+  gap: 18px;
+}
+.admin-shell .admin-semesters-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: var(--font-size-control);
+}
+.admin-semesters-add svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.admin-semesters-overview {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+}
+.admin-semesters-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 12px;
+  flex: 1;
+}
+.admin-semesters-summary > div {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 66px;
+  padding: 8px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+.admin-semesters-summary strong {
+  font-size: var(--font-size-body);
+}
+.admin-semesters-kicker {
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--color-muted-text);
+}
+.admin-shell .admin-semesters-advance {
+  align-self: center;
+  min-height: 44px;
+  font-size: var(--font-size-control);
+  white-space: nowrap;
+}
+.admin-semester-current-row td {
+  background: color-mix(in srgb, var(--color-surface-subtle) 58%, var(--color-surface));
+}
+.admin-semester-current-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: var(--font-size-control);
+  font-weight: 650;
+}
+.admin-semester-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.admin-shell .admin-semester-actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: var(--font-size-control);
+}
+@media (max-width: 1000px) {
+  .admin-semesters-overview {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+  }
+  .admin-semesters-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-semesters-summary > div {
+    padding: 8px;
+    overflow-wrap: anywhere;
+  }
+  .admin-shell .admin-semesters-advance {
+    align-self: stretch;
+  }
+  .admin-semester-actions {
+    gap: 6px;
+  }
+  .admin-shell .admin-semester-actions button {
+    padding-inline: 10px;
+  }
+}

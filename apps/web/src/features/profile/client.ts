@@ -3,7 +3,7 @@ import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache } from './da
 export class AcademicApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); }
 }
-type RequestOptions = { method?: 'GET' | 'PUT' | 'POST' | 'DELETE'; body?: unknown; signal?: AbortSignal };
+type RequestOptions = { method?: 'GET' | 'PUT' | 'POST' | 'DELETE'; body?: unknown; signal?: AbortSignal; bypassCache?: boolean };
 export type AcademicClient = <T>(path: string, options?: RequestOptions) => Promise<T>;
 const cachedPaths = new Set(['/api/profile', '/api/profile/options', '/api/academic-records']);
 export function createAcademicClient(getToken: () => Promise<string | null>, baseUrl = ''): AcademicClient {
@@ -11,7 +11,7 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
   return <T>(path: string, options: RequestOptions = {}): Promise<T> => {
     const sessionStamp = accountSessionStamp();
     const method = options.method ?? 'GET';
-    const cacheable = Boolean(sessionStamp) && method === 'GET' && cachedPaths.has(path);
+    const cacheable = Boolean(sessionStamp) && method === 'GET' && cachedPaths.has(path) && !options.bypassCache;
     async function request(): Promise<T> {
       const token = await getToken();
       const assertSession = () => {
@@ -52,7 +52,7 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
     }
     const contractVersions = path === '/api/profile'
       ? ['current-semester-required-v1', 'configured-credit-total-v1']
-      : path === '/api/profile/options' ? ['current-semester-required-v1'] : [];
+      : path === '/api/profile/options' ? ['profile-options-admin-current-semester-v3'] : [];
     const cacheKey = JSON.stringify([sessionStamp, base, path, ...contractVersions]);
     return cacheable ? cachedAcademicRead(cacheKey, request, options.signal, path === '/api/profile/options' ? ACADEMIC_CACHE_TTL : null) : request();
   };

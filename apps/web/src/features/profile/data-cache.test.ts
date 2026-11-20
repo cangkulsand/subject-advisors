@@ -24,6 +24,29 @@ it('bypasses old profile snapshots when current semester and configured total co
   const profile = await createAcademicClient(async () => 'token')<{studentName:string,currentSemesterId:number,totalCreditRequired:number}>('/api/profile');
   expect(profile).toEqual({ studentName: 'Profile with semester', currentSemesterId: 201, totalCreditRequired: 131 }); expect(fetcher).toHaveBeenCalledOnce();
 });
+it('bypasses only the requested options snapshot without replacing other callers cached snapshot', async () => {
+  let currentSemester = { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' as const };
+  const response = () => ({ currentSemester, currentAcademicYear: currentSemester.academicYear });
+  const fetcher = vi.fn(async () => Response.json({ data: response() })); vi.stubGlobal('fetch', fetcher);
+  const api = createAcademicClient(async () => 'token');
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 30, semesterNo: 1 } });
+  currentSemester = { ...currentSemester, semesterId: 32, semesterNo: 2 };
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 30, semesterNo: 1 } });
+  expect(await api('/api/profile/options', { bypassCache: true })).toMatchObject({ currentSemester: { semesterId: 32, semesterNo: 2 } });
+  currentSemester = { semesterId: 40, academicYear: '2027/2028', semesterNo: 1, semesterType: 'NORMAL' };
+  expect(await api('/api/profile/options', { bypassCache: true })).toMatchObject({ currentSemester: { semesterId: 40, academicYear: '2027/2028' } });
+  expect(await api('/api/profile/options')).toMatchObject({ currentSemester: { semesterId: 30, semesterNo: 1 } });
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});
+it('does not reuse profile-options snapshots from the previous response contract marker', async () => {
+  const oldKey = JSON.stringify([accountSessionStamp(), '', '/api/profile/options', 'profile-options-admin-current-academic-year-v2']);
+  await cachedAcademicRead(oldKey, async () => ({ currentSemester: { semesterId: 9 } }), undefined, ACADEMIC_CACHE_TTL);
+  const currentSemester = { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' };
+  const fetcher = vi.fn(async () => Response.json({ data: { currentSemester, currentAcademicYear: currentSemester.academicYear } })); vi.stubGlobal('fetch', fetcher);
+  const result = await createAcademicClient(async () => 'token')<{currentSemester:{semesterId:number}}>('/api/profile/options');
+  expect(result.currentSemester.semesterId).toBe(30);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
 it('refreshes records and curriculum options after a successful save', async () => {
   const fetcher = vi.fn(async () => Response.json({ data: [] })); vi.stubGlobal('fetch', fetcher);
   const api = createAcademicClient(async () => 'token');

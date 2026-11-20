@@ -1,7 +1,8 @@
-﻿# Database verification evidence
+# Database verification evidence
 
 Executed 26 October 2026, DATABASE_FOUNDATION scope. Source: supplied SRS/SDD v2.0 DOCX.
-Status: approved shared development application and SQL validation complete.
+Status: approved shared development application and SQL validation complete for the
+historical 0000-0002 baseline below. Later follow-ups have separately scoped evidence.
 Independent review and production freeze remain pending.
 
 ## Confirmed target
@@ -101,3 +102,49 @@ locking, bounded timeouts and exact target/ledger guards. The transaction applie
 only migration 0003 and its canonical ledger row; no student data was modified.
 The optional live fixture database suite was not run. This follow-up does not
 change the historical 2026-10-26 foundation evidence above.
+
+## Follow-up: Package A academic setup (2026-11-02, disposable local only)
+
+Coordinator reviewed the concrete backend diff and accepted its checkpoint after the
+following checks. This is local implementation evidence; human peer review remains
+pending and no Neon/shared-development 0008 application occurred.
+
+| Command / scope | Actual result |
+| --- | --- |
+| `node tools/admin/test-academic-database.mjs` | PASS on fresh PostgreSQL 18.4 loopback cluster: 0000-0006+0008 applied; repeated apply no-op; structural assertions; 135 behavior assertions; 13 concrete repository tests; 16 two-session lock-observed races. Cluster stopped in finally. |
+| Focused Vitest: academic repository, factory/dispatch, academic routes, existing admin reads/mutations | PASS: 5 files / 318 tests, including 24 new SQL/error-boundary tests and 5 new Neon-factory/dispatch tests. |
+| `npm.cmd run typecheck` | PASS after backend integration. |
+| `npm.cmd run lint` | PASS after backend integration and separate fixture fix. |
+| `git diff --check` | PASS after backend checkpoint. |
+| Earlier `npm.cmd run test:db-tooling`, `npm.cmd run db:review`, `npm.cmd run lint:db` | PASS: 21 tooling tests; 26 baseline entities/171 source fields/39 source FKs plus 5 registered extension columns; SQL/PLpgSQL parsing and source hash checks. |
+
+The 135 behavior assertions comprise 59 baseline, 9 role-boundary, 19 multi-role,
+38 admin-user and 10 academic cases. Structural checks 001/004/005/007/008/012 also
+passed. Repository tests cover all sixteen operations and the live scope reader:
+audited transaction context, sparse PATCH and merged invariants, explicit no-current,
+atomic switch/readback, missing/duplicate errors, assignment history, live role/access/
+reference invalidation and mismatched programme/faculty denial. Fixtures run under
+outer rollback transactions with savepoints for each exact repository transaction.
+The Neon HTTP transaction transport is unit-tested with mocks; real SQL uses `pg` on
+loopback PostgreSQL. No deployed Worker-to-Neon coupling result is claimed.
+
+The race suite observed `pg_stat_activity` Lock waits and blocking PIDs for concurrent
+current switches and duplicate live assignment; programme reassignment in both orders;
+centre/faculty/programme-status/account-suspension/role-deletion in both orders; and
+programme link/faculty deactivation in both orders. It also checked switch audit counts,
+rollback/failed-target preservation and ended assignment history. This is evidence for
+these tested scenarios, not a general concurrency/security proof.
+
+The runner never reads application credentials. It initializes a new disposable
+`utm_db_foundation_admin_academic_test` database and stops its cluster in `finally`.
+`MULTI_ROLE_POSTGRES_BIN` optionally overrides the prepared binary directory documented
+in migrations.md. The repository suite accepts only explicit `ACADEMIC_TEST_DATABASE_URL`
+loopback URLs with the guarded disposable database name; there is no DATABASE_URL fallback.
+
+Backend checkpoint review PASS is coordinator review, not human peer approval.
+Separate UI/browser evidence and screenshot review are recorded in
+`docs/changes/S2-P004-008-admin-academic-setup.md`. Final documentation review, build and
+full combined suite remain pending at this evidence checkpoint. Before any shared application, integrate and verify
+the exact applied 0007 manifest prefix/checksum, then 0008, then Package B 0009; confirm
+the private development target identity. Never rewrite applied history to fit the
+isolated local gap. No production action, deployment or official data import occurred.
