@@ -5,14 +5,13 @@ import type { StudentArea } from './StudentRoutes';
 import './typography.css';
 import './student-shell.css';
 import { RoleSwitcher } from '../features/auth/RoleSwitcher';
+// Academic progress and Recommendations are hidden from the menu (S3-P004-023); their routes still work.
 const links = [
   { area: 'profile', href: '/student/profile', label: 'Academic profile', icon: 'user' },
   { area: 'records', href: '/student/records', label: 'Subject records', icon: 'records' },
-  { area: 'progress', href: '/student/progress', label: 'Academic progress', icon: 'progress' },
   { area: 'graduation', href: '/student/graduation', label: 'Graduation check', icon: 'records' },
   { area: 'plan', href: '/student/plan', label: 'Graduation plan', icon: 'plan' },
   { area: 'offerings', href: '/student/offerings', label: 'Semester offerings', icon: 'calendar' },
-  { area: 'recommendations', href: '/student/recommendations', label: 'Recommendations', icon: 'recommend' },
   { area: 'pathway', href: '/student/pathway', label: 'Academic pathway', icon: 'pathway' },
 ] as const;
 function Icon({ name }: { name: string }) {

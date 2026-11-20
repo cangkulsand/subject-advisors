@@ -117,18 +117,18 @@ try{
  },1440);
  for(const path of ['/student/profile','/student/records','/student/progress','/student/graduation','/student/plan','/student/offerings','/student/recommendations','/student/pathway'])await check('shared route and navigation '+path,async page=>{
   await mock(page);await page.goto(base+path);const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});
-  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Academic progress','/student/progress'],['Graduation check','/student/graduation'],['Graduation plan','/student/plan'],['Semester offerings','/student/offerings'],['Recommendations','/student/recommendations'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
+  for(const [name,href]of [['Academic profile','/student/profile'],['Subject records','/student/records'],['Graduation check','/student/graduation'],['Graduation plan','/student/plan'],['Semester offerings','/student/offerings'],['Academic pathway','/student/pathway']])assert.equal(await nav.getByRole('link',{name,exact:true,includeHidden:true}).getAttribute('href'),href);
   assert.equal(await page.getByRole('heading',{name:'Page not found',exact:true}).count(),0);
   if(installed)assert.equal(await page.getByText('This page is not available yet. Please try again when the service is enabled.',{exact:true}).count(),0);
  });
 
  const shots=process.env.PROGRESS_SHOTS;
- async function progressPage(page,state){await mock(page,state);await page.goto(base+'/student/records');await clickStudentLink(page,'Academic progress');await page.waitForURL('**/student/progress');await page.getByText('Credit completion: 33%',{exact:true}).waitFor();}
+ async function progressPage(page,state){await mock(page,state);await page.goto(base+'/student/progress');await page.getByText('Credit completion: 33%',{exact:true}).waitFor();}
  async function shot(page,name){if(!shots)return;const {mkdirSync}=await import('node:fs');mkdirSync(shots,{recursive:true});await page.screenshot({path:shots+'/'+name+'.png',fullPage:true});}
  async function shotTop(page,name){if(!shots)return;await page.evaluate(()=>window.scrollTo(0,0));const {mkdirSync}=await import('node:fs');mkdirSync(shots,{recursive:true});await page.screenshot({path:shots+'/'+name+'.png',fullPage:false});}
- for(const width of [1440,375])await check('Academic progress is in the menu, details show prerequisites, unlocks and approval at '+width,async page=>{
+ for(const width of [1440,375])await check('Academic progress is hidden from the menu, details show prerequisites, unlocks and approval at '+width,async page=>{
   await progressPage(page,{});
-  const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});assert.equal(await nav.getByRole('link',{name:'Academic progress',exact:true,includeHidden:true}).getAttribute('aria-current'),'page');
+  const nav=page.getByRole('navigation',{name:'Student navigation',includeHidden:true});await nav.waitFor({state:'attached'});assert.equal(await nav.getByRole('link',{name:'Academic progress',exact:true,includeHidden:true}).count(),0);assert.equal(await nav.getByRole('link',{name:'Recommendations',exact:true,includeHidden:true}).count(),0);
   await page.getByText('DEMO1 — Fictional subject 1',{exact:true}).first().waitFor();await shot(page,'progress-'+width);
   const opener=page.getByRole('button',{name:'Details for DEMO2',exact:true});await opener.click();
   const dialog=page.getByRole('dialog',{name:'Fictional subject 2'});await dialog.waitFor();
@@ -362,7 +362,7 @@ try{
   state.planFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('group',{name:'Plan view'}).waitFor();
  });
  for(const width of [1440,375])await check('Recommendations rank the next semester, explain why and list alternatives at '+width,async page=>{
-  const state=await mock(page);await page.goto(base+'/student/records');await clickStudentLink(page,'Recommendations');await page.waitForURL('**/student/recommendations');
+  const state=await mock(page);await page.goto(base+'/student/recommendations');
   await page.getByRole('heading',{name:'Recommended for 2026/2027 – Semester 2',exact:true}).waitFor();
   const best=page.getByRole('region',{name:'Recommended subjects'});
   assert.deepEqual(await best.locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.dataset.subject)),['DEMA1013','DEMB1013','DEME1013']);
@@ -574,7 +574,7 @@ try{
   await page.waitForTimeout(300);
   await page.getByRole('button',{name:'Move DEMA1013',exact:true}).click();
   const dialog2=page.getByRole('dialog',{name:'Move DEMA1013'});await dialog2.getByRole('radio',{name:'2027/2028 – Semester 1',exact:true}).check();await dialog2.getByRole('button',{name:'Move here',exact:true}).click();
-  await clickStudentLink(page,'Academic progress');await page.waitForURL('**/student/progress');
+  await clickStudentLink(page,'Graduation check');await page.waitForURL('**/student/graduation');
   if(state.releaseSave)state.releaseSave();state.holdSave=false;await page.waitForTimeout(300);
   assert.equal(state.scenarioWrites.length,1);
  });
