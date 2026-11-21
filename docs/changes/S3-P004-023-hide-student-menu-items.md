@@ -1,12 +1,12 @@
 # S3-P004-023 — Hide "Academic progress" and "Recommendations" from the student menu
 
-- **Status:** Merged to main and pushed to dev and prod (2026-11-20); independent review pending
+- **Status:** Merged to main and pushed to dev and prod (2026-11-20); reviewed (see Reviewer)
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (shared student shell)
 - **Related UC / FR:** Student workspace navigation
 - **Branch / PR:** `feature/hide-student-menu-items`; no PR
-- **Reviewer:** Pending
+- **Reviewer:** Automated code review 2026-11-20: no findings
 
 ## 1. Plan
 

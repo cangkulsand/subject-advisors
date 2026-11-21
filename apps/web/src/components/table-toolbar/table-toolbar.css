@@ -29,7 +29,8 @@
 .table-toolbar :is(.tt-segment, .tt-menu-button, .tt-option, .tt-clear):focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 @media (max-width: 640px) {
   .table-toolbar .tt-segmented { flex-basis: 100%; }
-  .table-toolbar .tt-segment { padding: 0 4px; }
+  /* Size tabs by their label on narrow screens so a long one ("Suspended") is not cut off (S3-P004-025). */
+  .table-toolbar .tt-segment { padding: 0 4px; flex: 1 1 auto; }
   .table-toolbar .tt-search { order: 5; flex: 1 1 100%; min-width: 0; }
   .table-toolbar .tt-menu-button { max-width: calc(100vw - 32px); }
 }

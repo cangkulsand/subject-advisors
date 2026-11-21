@@ -267,6 +267,7 @@ async function acceptSubset(request: Request, validationId: string, deps: Foreca
   }
   const revision = batch.summary.validationRevision;
   if (header !== revision || body.validationRevision !== revision) throw new ForecastingError('IMPORT_REVISION_MISMATCH');
+  if (batch.removedAt) throw new ForecastingError('IMPORT_NOT_FOUND'); // removed after acceptance (S3-P004-022): a retry must not return it (S3-P004-026)
   if (batch.status === 'ACCEPTED' && batch.summary.internal.subsetAcknowledgedBy === actor) return authJson({ data: acceptedOf(batch) }, 201); // retry after success
   if (batch.status !== 'VALIDATED') throw new ForecastingError('IMPORT_STATE_CONFLICT');
   if (!batch.summary.subsetAcknowledgementRequired || batch.summary.status !== 'CORRECTION_REQUIRED') throw new ForecastingError('IMPORT_NOT_SUBSET_ACCEPTABLE');

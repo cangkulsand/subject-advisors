@@ -250,6 +250,17 @@ describe('UC20 forecast run API', () => {
       expect(runs).toHaveLength(1);
     });
 
+    it('replays a forecast made before its snapshot was removed, but starts none for a removed snapshot (S3-P004-026)', async () => {
+      const { deps, runs } = fixture();
+      const first = await generate(deps);
+      (await deps.repository.getBatch(1))!.removedAt = '2026-11-20T04:00:00.000Z';
+      const again = await generate(deps);
+      expect(again.status).toBe(200);
+      expect((await readData<{ resourceId: number }>(again)).resourceId).toBe((await readData<{ resourceId: number }>(first)).resourceId);
+      expect(await errorOf(await generate(deps, 7))).toMatchObject({ code: 'IMPORT_NOT_FOUND' });
+      expect(runs).toHaveLength(1);
+    });
+
     it('creates the next version for a newer snapshot of the same scope, parented to the previous one', async () => {
       const { deps } = fixture();
       const first = await newRun(deps, 1);
@@ -301,6 +312,7 @@ describe('UC20 forecast run API', () => {
     const run = (code: string, message: string) => mapForecastingDatabaseError({ code, message }, 'run');
     it('maps guard and constraint errors to stable codes without leaking text', () => {
       expect(run('22P02', 'invalid input syntax for type integer: "GUARD_RUN_EXISTSACCEPTED"').code).toBe('RUN_ALREADY_EXISTS');
+      expect(run('22P02', 'invalid input syntax for type integer: "GUARD_RUN_REMOVEDACCEPTED"').code).toBe('IMPORT_NOT_FOUND');
       expect(run('23514', 'Forecast requires an ACCEPTED import snapshot').code).toBe('IMPORT_NOT_FOUND');
       expect(run('23514', 'something else').code).toBe('RUN_CONFLICT');
       expect(run('23505', 'duplicate key value violates unique constraint "forecast_run_programme_scope_version_key"').code).toBe('RUN_CONFLICT');

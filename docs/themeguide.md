@@ -603,7 +603,7 @@ In Sprint 1 UC17, graph status data must reflect actual available records and cl
 | Pathway | List fallback or simplified graph with obvious zoom controls | Full graph/canvas with details pane |
 | Metrics | 1–2 per row with visible labels | 3–4 per row where space allows |
 
-No horizontal **page-level** overflow. For a genuinely wide table or graph, provide a local scroll/pan container and a non-visual alternative as appropriate. Buttons and selectable controls should have practical touch target sizes (use `min-h-11`; ensure sufficient width/spacing).
+No horizontal **page-level** overflow. For a genuinely wide table or graph, provide a local scroll/pan container and a non-visual alternative as appropriate. Admin tables (`.admin-stack`: setup tables through `SetupTable`, Users & Access, access history) instead stack each row at 600px and below, with the column heading shown beside each value from the cell's `data-label`; give every cell of a new admin table a `data-label` (empty for an actions cell). Record: S3-P004-026. Buttons and selectable controls should have practical touch target sizes (use `min-h-11`; ensure sufficient width/spacing).
 
 ---
 

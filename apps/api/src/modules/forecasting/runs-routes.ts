@@ -58,13 +58,15 @@ async function generate(request: Request, deps: ForecastingDependencies, actor: 
   await requireScope(deps, actor, scope);
 
   const batch = await deps.repository.getBatch(importBatchId);
-  // A removed snapshot (S3-P004-022) cannot start a new forecast; forecasts made before the removal stay readable.
-  if (!batch || batch.status !== 'ACCEPTED' || batch.removedAt || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
+  if (!batch || batch.status !== 'ACCEPTED' || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
     throw new ForecastingError('IMPORT_NOT_FOUND');
   }
   // Replay: an import snapshot yields exactly one forecast; a retry returns the receipt of the one already created.
+  // This runs before the removal check, so a forecast made before its snapshot was removed stays readable (S3-P004-022, S3-P004-026).
   const existing = await deps.runs.findByImportBatch(importBatchId);
   if (existing) return receiptResponse(existing, 200, existing.generatedAt);
+  // A removed snapshot cannot start a new forecast. createRun checks this again under the batch lock.
+  if (batch.removedAt) throw new ForecastingError('IMPORT_NOT_FOUND');
 
   const inputs = await deps.runs.engineInputs(scope, importBatchId);
   const result = runForecastEngine({

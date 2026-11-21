@@ -6,7 +6,7 @@ import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetai
 import { fingerprint } from '../../../../../packages/shared/src/forecasting/engine/hash';
 import type { EngineCapacityRule, EngineCurriculum, EngineRecord, EngineRuleSnapshot, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
 import type { ForecastRunStatus, SectionReviewStatus } from '../../../../../packages/shared/src/forecasting/runs';
-import { ForecastingError, mapForecastingDatabaseError, RUN_GUARD_EXISTS } from './errors';
+import { ForecastingError, mapForecastingDatabaseError, RUN_GUARD_EXISTS, RUN_GUARD_REMOVED } from './errors';
 import type {
   EngineInputRows, ForecastRunsRepository, NewRunInput, RunDetailRows, RunRecord, RunSectionRow, RunSubjectRow,
 } from './runs-contracts';
@@ -146,7 +146,10 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
     createRun: (input: NewRunInput) => run([
       { text: 'SELECT 1 AS locked FROM public.academic_import_batch b WHERE b.import_batch_id = $1::integer FOR UPDATE OF b', values: [input.importBatchId] },
       {
-        text: `SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM public.forecast_run x WHERE x.import_batch_id = b.import_batch_id)
+        // Under the batch lock: a removal committed after the route's check still stops the run (S3-P004-026).
+        text: `SELECT CASE WHEN EXISTS (SELECT 1 FROM public.academic_import_batch_removal z WHERE z.import_batch_id = b.import_batch_id)
+            THEN ('${RUN_GUARD_REMOVED}' || b.import_status)::integer -- the column keeps Postgres from folding the cast at plan time
+            WHEN NOT EXISTS (SELECT 1 FROM public.forecast_run x WHERE x.import_batch_id = b.import_batch_id)
             THEN 0 ELSE ('${RUN_GUARD_EXISTS}' || b.import_status)::integer END AS ok
           FROM public.academic_import_batch b WHERE b.import_batch_id = $1::integer`,
         values: [input.importBatchId],

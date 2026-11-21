@@ -204,11 +204,18 @@ export async function academicUiChecks({ check, mock, base }) {
     await save(dialog); await dialog.getByRole('alert').filter({ hasText: 'An active assignment already exists.' }).waitFor();
     assert.equal(state.requests.filter(r => r.path === '/api/admin/users').every(r => r.search.includes('role=COORDINATOR') && r.search.includes('status=ACTIVE')), true);
     await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
-    await page.getByRole('button', { name: 'End assignment 1', exact: true }).click(); await confirm(page, 'End coordinator assignment', 'End assignment');
-    assert.equal(await page.getByRole('button', { name: 'End assignment 1', exact: true }).count(), 0); assert.ok(data.assignments[0].endedAt);
+    // S3-P004-025: the account shows its name and email, not "Account 2"; the end button names who and where, and times have no seconds.
+    const assignmentsTable = page.getByRole('region', { name: 'Coordinator assignments', exact: true });
+    await assignmentsTable.getByRole('link', { name: 'Fictional Account 2', exact: true }).waitFor(); await assignmentsTable.getByText('fixture2@example.invalid', { exact: true }).waitFor();
+    const assignmentsText = await assignmentsTable.innerText(); assert.doesNotMatch(assignmentsText, /Account #|\d\d:\d\d:\d\d/);
+    assert.equal(await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).innerText(), 'End assignment');
+    await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).click();
+    await page.getByRole('dialog', { name: 'End coordinator assignment', exact: true }).getByText('End Fictional Account 2’s assignment to TEST at Fictional learning centre. Its history is retained.').waitFor();
+    await confirm(page, 'End coordinator assignment', 'End assignment');
+    assert.equal(await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).count(), 0); assert.ok(data.assignments[0].endedAt);
     await page.getByRole('button', { name: 'Add assignment', exact: true }).click(); await picker.selectOption('2');
     await dialog.getByLabel('Faculty', { exact: true }).selectOption('1'); await dialog.getByLabel('Programme', { exact: true }).selectOption('1'); await dialog.getByLabel('Learning centre', { exact: true }).selectOption('1'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
-    await page.getByRole('button', { name: 'End assignment 2', exact: true }).waitFor(); assert.equal(data.assignments.length, 2); assert.ok(data.assignments[0].endedAt);
+    await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).waitFor(); assert.equal(data.assignments.length, 2); assert.ok(data.assignments[0].endedAt);
     await page.screenshot({ path: '.wrangler/admin-review/academic-assignments-desktop.png', fullPage: true });
   });
   for (const width of [320, 375, 768]) await check('academic pages single card, responsive tables/dialogs and focus at ' + width, async page => {
@@ -219,7 +226,12 @@ export async function academicUiChecks({ check, mock, base }) {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       const tableRegion = page.locator('.admin-table-scroll').first();
       assert.equal(await tableRegion.getAttribute('tabindex'), '0');
-      if (width < 768) {
+      if (width <= 600) {
+        // S3-P004-025: rows stack with a label per value, so nothing needs a sideways scroll and every row button is on screen.
+        assert.ok(await tableRegion.evaluate(el => el.scrollWidth <= el.clientWidth));
+        assert.ok(await tableRegion.locator('td[data-label]').count() > 0);
+        for (const button of await tableRegion.locator('tbody button').all()) { const b = await button.boundingBox(); assert.ok(b && b.x >= 0 && b.x + b.width <= width, 'row button off screen at ' + width); }
+      } else {
         assert.ok(await tableRegion.evaluate(el => el.scrollWidth > el.clientWidth));
         await tableRegion.evaluate(el => { el.scrollLeft = el.scrollWidth; });
         assert.ok(await tableRegion.evaluate(el => el.scrollLeft > 0));

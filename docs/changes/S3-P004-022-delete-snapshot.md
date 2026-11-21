@@ -6,7 +6,7 @@
 - **Owner:** P004 (M6, UC20)
 - **Related UC / FR:** UC20 data import
 - **Branch / PR:** `feature/delete-snapshot`; no PR
-- **Reviewer:** Pending
+- **Reviewer:** Automated code review 2026-11-20: 4 findings, fixed in S3-P004-026
 
 ## 1. Plan
 

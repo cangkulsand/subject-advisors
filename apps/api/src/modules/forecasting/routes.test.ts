@@ -347,6 +347,12 @@ describe('subset acceptance', () => {
     // A retry after success replays the receipt without a second acceptance.
     expect((await accept(deps, report.validationId, report.validationRevision)).status).toBe(201);
     expect(repository.acceptValidated).toHaveBeenCalledTimes(1);
+    // Once removed, a retry no longer returns the snapshot (S3-P004-026).
+    batches[0]!.removedAt = '2026-11-20T04:00:00.000Z';
+    const retry = await accept(deps, report.validationId, report.validationRevision);
+    expect(retry.status).toBe(404);
+    expect((await retry.json()).error.code).toBe('IMPORT_NOT_FOUND');
+    expect(repository.acceptValidated).toHaveBeenCalledTimes(1);
   });
   it('requires If-Match and rejects a stale or mismatched revision with 412', async () => {
     const { deps, repository } = fixture();

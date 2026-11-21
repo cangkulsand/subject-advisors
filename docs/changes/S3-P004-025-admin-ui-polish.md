@@ -1,12 +1,12 @@
 # S3-P004-025 — Admin menu readability and one-line labels; card heading gap; short row buttons; readable values and dates
 
-- **Status:** Merged to main and pushed to dev and prod (2026-11-20); prod deploy verified live; independent review pending
+- **Status:** Merged to main and pushed to dev and prod (2026-11-20); prod deploy verified live; reviewed (see Reviewer)
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (admin and shared staff UI)
 - **Related UC / FR:** Administration; themeguide 5.5, 7.1, 12 and "Typography and readability (mandatory)"
 - **Branch / PR:** `feature/admin-ui-polish`; no PR
-- **Reviewer:** Pending
+- **Reviewer:** Automated code review 2026-11-20: no findings
 
 ## 1. Plan
 

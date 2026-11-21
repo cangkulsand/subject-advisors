@@ -75,7 +75,8 @@ async function decide(request: Request, deps: ForecastingDependencies, actor: st
   if (!subject.includeInOfferingForecast && input.status === 'APPROVED') throw new ForecastingError('SUBJECT_EXCLUDED');
   if (input.importBatchId !== null) {
     const batch = await deps.repository.getBatch(input.importBatchId);
-    if (!batch || batch.status !== 'ACCEPTED' || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
+    // A removed snapshot (S3-P004-022) cannot be the source of a new decision (S3-P004-026).
+    if (!batch || batch.status !== 'ACCEPTED' || batch.removedAt || batch.programmeId !== scope.programmeId || batch.learningCentreId !== scope.learningCentreId || batch.targetSemesterId !== scope.targetSemesterId) {
       throw new ForecastingError('IMPORT_NOT_FOUND');
     }
   }

@@ -60,6 +60,8 @@ function readError(error: unknown): { code: string; message: string } {
 
 /** Guard tokens raised by the run repository (a failing cast on a locked row) to abort a transaction atomically. */
 export const RUN_GUARD_EXISTS = 'GUARD_RUN_EXISTS';
+/** The snapshot was removed after the route checked it; raised under the batch lock in createRun (S3-P004-026). */
+export const RUN_GUARD_REMOVED = 'GUARD_RUN_REMOVED';
 export const DECISION_GUARD_STALE = 'GUARD_DECISION_STALE';
 
 /** Converts a database/driver error into a safe ForecastingError. Unknown errors never leak their text. */
@@ -74,6 +76,7 @@ export function mapForecastingDatabaseError(error: unknown, context: 'import' | 
     return new ForecastingError('DECISION_FAILED');
   }
   if (context === 'run') {
+    if (code === '22P02' && message.includes(RUN_GUARD_REMOVED)) return new ForecastingError('IMPORT_NOT_FOUND');
     if (code === '22P02' && message.includes(RUN_GUARD_EXISTS)) return new ForecastingError('RUN_ALREADY_EXISTS');
     if (code === '23514') {
       if (lower.includes('accepted import snapshot')) return new ForecastingError('IMPORT_NOT_FOUND');

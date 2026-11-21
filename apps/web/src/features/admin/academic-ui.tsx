@@ -59,4 +59,23 @@ export function SetupForm({ title, fields, initial, onSave, onClose, children }:
     <div className="admin-field"><label htmlFor={id + 'reason'}>Reason (recorded in the audit log)</label><textarea id={id + 'reason'} required maxLength={ADMIN_REASON_MAX_LENGTH} value={reason} onChange={e => setReason(e.target.value)}/><small>{reason.trim().length} / {ADMIN_REASON_MAX_LENGTH} characters · required</small></div></fieldset>
     {error && <p role="alert" className="admin-form-error">{error}</p>}<div className="admin-dialog-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" className="admin-primary" disabled={busy || !normaliseReason(reason)} aria-busy={busy}>{busy ? 'Working…' : 'Save'}</button></div></form></dialog>;
 }
-export function SetupTable({ headings, children, label = 'Academic setup records' }: { headings: string[]; children: ReactNode; label?: string }) { return <div className="admin-table-scroll" role="region" aria-label={label} tabIndex={0}><table className="admin-table"><thead><tr>{headings.map(h => <th scope="col" key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
+/** On phones each row stacks with a visible label per value (S3-P004-025), so every cell gets its column heading as data-label. */
+/** Stacked rows use display: block on phones, which makes some browsers drop table semantics; explicit roles keep rows and cells announced (S3-P004-026). */
+export function keepTableRoles(table: HTMLTableElement | null) {
+  if (!table) return;
+  table.setAttribute('role', 'table');
+  table.querySelectorAll('thead, tbody').forEach(group => group.setAttribute('role', 'rowgroup'));
+  table.querySelectorAll('tr').forEach(row => row.setAttribute('role', 'row'));
+  table.querySelectorAll('th').forEach(cell => cell.setAttribute('role', cell.closest('tbody') && cell.getAttribute('scope') !== 'col' ? 'rowheader' : 'columnheader'));
+  table.querySelectorAll('td').forEach(cell => cell.setAttribute('role', 'cell'));
+}
+/** On phones each row stacks with a visible label per value (S3-P004-025), so every cell gets its column heading as data-label. */
+export function SetupTable({ headings, children, label = 'Academic setup records' }: { headings: string[]; children: ReactNode; label?: string }) {
+  const table = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => {
+    table.current?.querySelectorAll('tbody tr').forEach(row => [...row.children].forEach((cell, index) => { (cell as HTMLElement).dataset.label = headings[index] ?? ''; }));
+    keepTableRoles(table.current);
+  });
+  return <div className="admin-table-scroll admin-stack" role="region" aria-label={label} tabIndex={0}><table ref={table} className="admin-table"><thead><tr>{headings.map(h => <th scope="col" key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;
+}
+export function StatusPill({ active }: { active: boolean }) { return <span className={`admin-pill ${active ? 'admin-status-active' : 'admin-status-inactive'}`}>{active ? 'Active' : 'Inactive'}</span>; }

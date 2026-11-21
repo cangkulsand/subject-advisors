@@ -27,7 +27,7 @@ const batch = (importBatchId: number, overrides: Partial<ImportBatchRow> = {}): 
 });
 
 function fixture(options: { window?: { selectionOpensAt: string | null; selectionClosesAt: string | null }; scopes?: ScopeProvider; portalContacts?: ForecastingDependencies['portalContacts'] } = {}) {
-  const batches = [batch(1), batch(2, { status: 'VALIDATED' }), batch(3, { learningCentreId: 2 })];
+  const batches = [batch(1), batch(2, { status: 'VALIDATED' }), batch(3, { learningCentreId: 2 }), batch(4, { removedAt: '2026-11-20T04:00:00.000Z' })];
   const semesters = baseSemesters.map((semester) => semester.semesterId === 2 && options.window ? { ...semester, ...options.window } : semester);
   const fake = fakeDecisionsRepository(new Map(subjects.map((s) => [s.subjectId, { subjectCode: s.subjectCode, subjectName: s.subjectName, creditHours: s.creditHours, classType: s.classType }])));
   const deps: ForecastingDependencies = {
@@ -126,7 +126,7 @@ describe('offering decisions', () => {
 
   it('POST rejects a snapshot that is not an accepted import of the scope', async () => {
     const { deps } = fixture();
-    for (const importBatchId of [2, 3, 404]) {
+    for (const importBatchId of [2, 3, 4, 404]) { // 4 is a removed snapshot (S3-P004-026)
       const response = await decide(deps, A, 'APPROVED', 'PENDING', { importBatchId });
       expect(response.status).toBe(404);
       expect(await errorCode(response)).toBe('IMPORT_NOT_FOUND');

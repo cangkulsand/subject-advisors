@@ -288,14 +288,37 @@ else {
         await page.keyboard.press('Shift+Tab'); assert.ok(await page.evaluate(() => !!document.activeElement?.closest('dialog')));
         await page.keyboard.press('Escape'); assert.equal(await page.getByRole('dialog').isVisible(), false); assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
         const table = page.getByRole('region', { name: 'Users and invitations table' });
-        // Closing the menu returns focus to its toggle, sometimes a moment after Escape; that can take focus back from the
-        // table. Refocus the table on each attempt so the arrow key reaches it.
-        let scrolled = false;
-        for (let attempt = 0; attempt < 5 && !scrolled; attempt++) { await table.focus(); await page.keyboard.press('ArrowRight'); scrolled = await page.waitForFunction(() => document.querySelector('[aria-label="Users and invitations table"]').scrollLeft > 0, null, { timeout: 2000 }).then(() => true, () => false); }
-        assert.ok(scrolled, 'keyboard ArrowRight scrolls the focused users table');
+        if (width <= 600) {
+          // S3-P004-025: rows stack on phones, so status and actions show without a sideways scroll; the top bar stays on one row.
+          assert.ok(await table.evaluate(el => el.scrollWidth <= el.clientWidth));
+          for (const action of [page.getByRole('button', { name: /^Revoke/ }).first(), page.getByRole('link', { name: /^View details/ }).first(), page.getByText('Pending', { exact: true }).first()]) { const b = await action.boundingBox(); assert.ok(b && b.x >= 0 && b.x + b.width <= width); }
+          for (const tab of await page.getByRole('group', { name: 'Access', exact: true }).getByRole('button').all()) assert.ok(await tab.evaluate(el => el.scrollWidth <= el.clientWidth), 'tab label cut off');
+          // Review fix (S3-P004-026): a cell with several values keeps them all in the value column; rows and cells keep their table roles.
+          const dates = table.locator('.admin-invite-dates').first();
+          const [invitedX, expiresX] = await dates.locator('span').evaluateAll(spans => spans.map(span => Math.round(span.getBoundingClientRect().left)));
+          assert.equal(invitedX, expiresX, 'Expires sits under Invited, not in the label column');
+          assert.match(await dates.innerText(), /Expires .*\d{1,2}:\d{2}/);
+          assert.ok(await table.getByRole('row').count() > 2); assert.ok(await table.getByRole('cell').count() > 8); assert.equal(await table.getByRole('columnheader').count(), 5);
+          const bar = await page.locator('.admin-topbar').boundingBox(); assert.ok(bar && bar.height <= 84, 'top bar is ' + bar?.height + 'px tall');
+        } else {
+          // Closing the menu returns focus to its toggle, sometimes a moment after Escape; that can take focus back from the
+          // table. Refocus the table on each attempt so the arrow key reaches it.
+          let scrolled = false;
+          for (let attempt = 0; attempt < 5 && !scrolled; attempt++) { await table.focus(); await page.keyboard.press('ArrowRight'); scrolled = await page.waitForFunction(() => document.querySelector('[aria-label="Users and invitations table"]').scrollLeft > 0, null, { timeout: 2000 }).then(() => true, () => false); }
+          assert.ok(scrolled, 'keyboard ArrowRight scrolls the focused users table');
+        }
       }
       if (width === 375 || width === 1280) await page.screenshot({ path: '.wrangler/admin-review/users-' + width + '.png', fullPage: true });
     }, width);
+    await check('tables fit the content area at 1024px with no sideways scroll (S3-P004-025)', async page => {
+      await mock(page); await page.setViewportSize({ width: 1024, height: 800 });
+      for (const path of ['users', 'users/1', 'learning-centres', 'faculties', 'departments', 'programmes', 'coordinator-assignments', 'semesters']) {
+        await page.goto(base + '/admin/' + path); await page.locator('.admin-table-scroll table').first().waitFor();
+        await page.waitForLoadState('networkidle');
+        for (const region of await page.locator('.admin-table-scroll').all()) assert.ok(await region.evaluate(el => el.scrollWidth <= el.clientWidth), path + ' table scrolls sideways at 1024px');
+      }
+      await page.goto(base + '/admin/programmes'); await page.locator('table').first().waitFor(); await page.screenshot({ path: '.wrangler/admin-review/programmes-1024.png', fullPage: true });
+    });
     const reasonLabel = 'Reason (recorded in the audit log)';
     const usersTable = 'Users and invitations table';
     async function openAddDialog(page) {

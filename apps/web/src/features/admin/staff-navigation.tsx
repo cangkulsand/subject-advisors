@@ -10,6 +10,10 @@ export type StaffNavigationGroup = { label: string; links: StaffNavigationLink[]
 const paths: Record<string, ReactNode> = {
   overview: <><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></>,
   users: <><circle cx="9" cy="8" r="3"/><path d="M2 21v-2a7 7 0 0 1 14 0v2m0-16a3 3 0 0 1 0 6m3 3a6 6 0 0 1 3 5v2"/></>,
+  centre: <><path d="M4 21V9l8-5 8 5v12M3 21h18M9 21v-6h6v6M10 10h4"/></>,
+  faculty: <><path d="M3 9h18L12 4 3 9Zm2 0v9m4.7-9v9m4.6-9v9M19 9v9M3 21h18"/></>,
+  department: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></>,
+  programme: <><path d="M2 9l10-5 10 5-10 5L2 9Zm4 2v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5m4-2v6"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 11h18"/></>,
   curriculum: <><path d="M4 3h13a3 3 0 0 1 3 3v15H7a3 3 0 0 1-3-3V3Zm0 14h16M8 7h8m-8 4h6"/></>,
   audit: <><path d="M6 3h12v18H6zM9 8h6m-6 4h6m-6 4h4"/></>,

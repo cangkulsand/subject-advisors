@@ -1,5 +1,6 @@
 import { ClearFilters, FilterMenu, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { keepTableRoles } from './academic-ui';
 import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
 import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
@@ -12,6 +13,7 @@ const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pend
 // Audit values are database codes; show them in words. Unknown codes still show as they are (S3-P004-025).
 const auditValueLabels: Record<string, string> = { ROLE_DOMAIN: 'Role eligibility policy', OWNER_STUDENT_COORDINATOR: 'Protected owner exception', ACTIVE: 'Active', SUSPENDED: 'Suspended' };
 const auditValue = (value: string | null | undefined) => value ? auditValueLabels[value] ?? value : '—';
+function day(value: string) { return new Date(value).toLocaleDateString(undefined, { dateStyle: 'medium' }); }
 function when(value: string) { return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
 function useRead<T>(load: (signal: AbortSignal) => Promise<T>, key: string) {
   const latest = useRef(load); latest.current = load;
@@ -55,9 +57,9 @@ export function AdminOverviewPage({ client }: { client: AdminClient }) {
   return <><PageHeading title="Overview" text="Account access, role distribution and academic setup at a glance." refresh={result.retry}/>
     <Panel error={result.error} retry={result.retry}>{data && <>
       <p className="admin-snapshot">Snapshot calculated {when(data.generatedAt)}</p>
-      <div className="admin-metrics">{[{ label: 'Total accounts', value: data.accounts.total, href: '/admin/users' }, { label: 'Active accounts', value: data.accounts.active, href: '/admin/users?status=ACTIVE' }, { label: 'Suspended accounts', value: data.accounts.suspended, href: '/admin/users?status=SUSPENDED' }].map(item => <AppLink className="admin-card admin-metric" href={item.href} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>View accounts <span aria-hidden="true">↗</span></small></AppLink>)}</div>
+      <div className="admin-metrics">{[{ label: 'Total accounts', value: data.accounts.total, href: '/admin/users', link: 'View all accounts' }, { label: 'Active accounts', value: data.accounts.active, href: '/admin/users?status=ACTIVE', link: 'View active accounts' }, { label: 'Suspended accounts', value: data.accounts.suspended, href: '/admin/users?status=SUSPENDED', link: 'View suspended accounts' }].map(item => <AppLink className="admin-card admin-metric" href={item.href} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.link} <span aria-hidden="true">→</span></small></AppLink>)}</div>
       <div className="admin-two-columns">
-        <section className="admin-card"><div className="admin-card-title"><h2>Assigned roles</h2><span className="admin-small-label">MEMBERSHIPS</span></div><p className="admin-muted">An account can have more than one role.</p><div className="admin-role-counts">{Object.entries(data.roles).map(([role, count]) => <AppLink href={'/admin/users?role=' + role} key={role}><RolePills roles={[role as AdminRole]}/><strong>{count}</strong><span aria-hidden="true">→</span></AppLink>)}</div></section>
+        <section className="admin-card"><h2>Assigned roles</h2><p className="admin-muted">An account can have more than one role.</p><div className="admin-role-counts">{Object.entries(data.roles).map(([role, count]) => <AppLink href={'/admin/users?role=' + role} key={role}><RolePills roles={[role as AdminRole]}/><strong>{count}</strong><span aria-hidden="true">→</span></AppLink>)}</div></section>
         <section className="admin-card"><h2>Academic setup</h2><p className="admin-muted">Configured reference data available to academic features.</p><dl className="admin-readiness">{Object.entries(data.configuration).map(([name, count]) => <div key={name}><dt>{name.charAt(0).toUpperCase() + name.slice(1)}</dt><dd><strong>{count}</strong><span className={`admin-pill ${count ? 'admin-ready' : 'admin-missing'}`}>{count ? 'Configured' : 'Setup needed'}</span></dd></div>)}</dl></section>
       </div>
       <section className="admin-card"><div className="admin-card-title"><div><h2>Recent access activity</h2><p className="admin-muted">Role and access events, without account details.</p></div><AppLink href="/admin/audit">View audit log →</AppLink></div>
@@ -67,6 +69,8 @@ export function AdminOverviewPage({ client }: { client: AdminClient }) {
 }
 function InviteIcon() { return <svg className="admin-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>; }
 export function AdminUsersPage({ client, search }: { client: AdminClient; search: string }) {
+  const usersTable = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => keepTableRoles(usersTable.current));
   const parameters = new URLSearchParams(search);
   const [filters, setFilters] = useState<AdminUsersQuery>({ page: 1, q: '', role: ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'].includes(parameters.get('role') ?? '') ? parameters.get('role') as AdminRole : '', status: ['ACTIVE', 'SUSPENDED'].includes(parameters.get('status') ?? '') ? parameters.get('status') as 'ACTIVE' | 'SUSPENDED' : '' });
   const [invited, setInvited] = useState(false), [invitationFilter, setInvitationFilter] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
@@ -96,14 +100,14 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
       </TableToolbar>
       <Panel error={accounts.error ?? invitations.error} retry={retry}>{loaded && <>
         {accountRows.some(item => item.identity.state !== 'available') && <p className="admin-notice" role="status">Some Clerk identity details are unavailable. Application roles and access status are shown below.</p>}
-        {!invitationRows.length && !accountRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll" role="region" aria-label="Users and invitations table" tabIndex={0}><table><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
+        {!invitationRows.length && !accountRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll admin-stack" role="region" aria-label="Users and invitations table" tabIndex={0}><table ref={usersTable}><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
           {!!invitationRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Invitations ({invitationRows.length})</th></tr>{invitationRows.map(item => <tr key={item.id}>
-            <td className="admin-wrap"><div className="admin-identity"><strong>{item.email}</strong><span className="admin-pill admin-invite-tag">Invitation</span></div></td><td><RolePills roles={item.roles}/></td><td><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
-            <td className="admin-invite-dates"><span>Invited <time dateTime={item.createdAt}>{when(item.createdAt)}</time></span><span>Expires <time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></span></td>
-            <td>{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
+            <td className="admin-wrap" data-label="Account"><div className="admin-identity"><strong>{item.email}</strong><span className="admin-pill admin-invite-tag">Invitation</span></div></td><td data-label="Roles"><RolePills roles={item.roles}/></td><td data-label="Status"><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
+            <td className="admin-invite-dates" data-label="Updated"><span>Invited <time dateTime={item.createdAt} title={when(item.createdAt)}>{day(item.createdAt)}</time></span><span>Expires <time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></span></td>
+            <td data-label="">{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
           </tr>)}</tbody>}
           {!!accountRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Accounts ({accounts.data?.total ?? accountRows.length})</th></tr>{accountRows.map(account => <tr key={account.accountId}>
-            <td><Identity account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td><RolePills roles={account.roles}/></td><td><AccessPill status={account.accessStatus}/></td><td><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
+            <td data-label="Account"><Identity account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td data-label="Roles"><RolePills roles={account.roles}/></td><td data-label="Status"><AccessPill status={account.accessStatus}/></td><td data-label="Updated"><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td data-label=""><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
           </tr>)}</tbody>}
         </table></div>}
         {invited && invitations.data && invitations.data.total > invitations.data.pageSize && <Pager result={invitations.data} onPage={page => setInvitationFilter(old => ({ ...old, page }))}/>}
@@ -117,6 +121,8 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
   </>;
 }
 export function AdminAuditView({ client, accountId }: { client: AdminClient; accountId?: number }) {
+  const auditTable = useRef<HTMLTableElement>(null);
+  useLayoutEffect(() => keepTableRoles(auditTable.current));
   const [filters, setFilters] = useState<AdminAuditQuery>({ page: 1, accountId, kind: 'ALL' });
   const [from, setFrom] = useState(''), [to, setTo] = useState('');
   const result = useRead(signal => client.audit(filters, signal), 'audit:' + JSON.stringify(filters));
@@ -128,8 +134,8 @@ export function AdminAuditView({ client, accountId }: { client: AdminClient; acc
       <label className="tt-date">From<input type="date" value={from} onChange={event => setFrom(event.target.value)}/></label><label className="tt-date">To<input type="date" min={from || undefined} value={to} onChange={event => setTo(event.target.value)}/></label><button type="submit" className="admin-primary">Apply filters</button>
     </TableToolbar>
     <Panel error={result.error} retry={result.retry}>{result.data && <>
-      {!result.data.items.length ? <p className="admin-empty">No access changes match these filters.</p> : <div className="admin-table-scroll" role="region" aria-label="Access audit table" tabIndex={0}><table><thead><tr><th>When</th><th>Change</th>{!accountId && <th>Account</th>}<th>Administrator / actor</th><th>Previous → New</th><th>Reason</th></tr></thead><tbody>{result.data.items.map(event => <tr key={event.eventId}>
-        <td><time dateTime={event.occurredAt}>{when(event.occurredAt)}</time></td><td>{eventLabel(event)}</td>{!accountId && <td><AppLink href={'/admin/users/' + event.accountId}>Account #{event.accountId}</AppLink><code className="admin-audit-id">{event.target}</code></td>}<td className="admin-actor">{event.actor === '__MIGRATION_0004__' ? 'System migration' : event.actor}</td><td>{auditValue(event.before)} → {auditValue(event.after)}</td><td className="admin-reason">{event.reason ?? '—'}</td>
+      {!result.data.items.length ? <p className="admin-empty">No access changes match these filters.</p> : <div className="admin-table-scroll admin-stack" role="region" aria-label="Access audit table" tabIndex={0}><table ref={auditTable}><thead><tr><th>When</th><th>Change</th>{!accountId && <th>Account</th>}<th>Administrator / actor</th><th>Previous → New</th><th>Reason</th></tr></thead><tbody>{result.data.items.map(event => <tr key={event.eventId}>
+        <td data-label="When"><time dateTime={event.occurredAt}>{when(event.occurredAt)}</time></td><td data-label="Change">{eventLabel(event)}</td>{!accountId && <td data-label="Account"><AppLink href={'/admin/users/' + event.accountId}>Account #{event.accountId}</AppLink><code className="admin-audit-id">{event.target}</code></td>}<td className="admin-actor" data-label="Administrator / actor">{event.actor === '__MIGRATION_0004__' ? 'System migration' : event.actor}</td><td data-label="Previous → New">{auditValue(event.before)} → {auditValue(event.after)}</td><td className="admin-reason" data-label="Reason">{event.reason ?? '—'}</td>
       </tr>)}</tbody></table></div>}
       <Pager result={result.data} onPage={page => setFilters(old => ({ ...old, page }))}/>
     </>}</Panel>
