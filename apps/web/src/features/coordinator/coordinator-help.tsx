@@ -2,7 +2,6 @@ import { InfoTip } from '../../components/info-tip/InfoTip';
 
 /** Plain-language explanations shown in the hover info tips of the forecast screens. */
 export const HELP = {
-  snapshot: 'Forecast numbers come from the chosen student data snapshot. Decisions belong to the semester and carry over when you choose another snapshot.',
   notTakenYet: 'Students whose curriculum includes the subject and who have not passed it or been exempted.',
   eligible: 'Students who have not taken the subject and meet its prerequisites according to their records. This is the number you decide on; it is a forecast, not registration.',
   action: 'Pending subjects are not shown to students. Approved subjects are offered when selection opens. Removed subjects are listed beside the table and can be added back.',

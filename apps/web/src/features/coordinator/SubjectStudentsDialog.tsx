@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ClearFilters, SearchField, SegmentedFilter, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 import type { UncertaintyReason } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { RunSubjectStudent, RunSubjectStudents, SubjectStudentOutcomeKind } from '../../../../../packages/shared/src/forecasting/runs';
-import type { CoordinatorClient } from './client';
+import type { RunSubjectStudent, SubjectStudentOutcomeKind } from '../../../../../packages/shared/src/forecasting/runs';
+import type { LiveSubjectStudents } from '../../../../../packages/shared/src/forecasting/live';
 import { Panel, ReadOnlyDialog, useRead } from './coordinator-ui';
 import { HELP, Help } from './coordinator-help';
 import { PagerButtons } from '../../components/icon-button/IconButton';
@@ -40,7 +40,7 @@ function Details({ student }: { student: RunSubjectStudent }) {
   return <>{lines.map(line => <span key={line} className="coordinator-student-details">{line}</span>)}</>;
 }
 
-function Roster({ data }: { data: RunSubjectStudents }) {
+function Roster({ data }: { data: LiveSubjectStudents }) {
   const [filter, setFilter] = useState(DEFAULT_FILTER), [search, setSearch] = useState(''), [requested, setPage] = useState(1);
   const term = search.trim().toLowerCase(), filtering = filter !== DEFAULT_FILTER || term !== '';
   const matching = data.students.filter(student => matchesFilter(student, filter)
@@ -52,7 +52,6 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   return <>
     <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
     {!data.emailsAvailable && <p className="coordinator-warning" role="status">Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.</p>}
-    {!data.catalogueMatchesRun && <p className="coordinator-warning" role="status">This list was recomputed with the current curriculum, so it may differ from the counts saved with this forecast.</p>}
     <TableToolbar label="Filter students">
       <SegmentedFilter label="Show" value={filter} onChange={value => { setFilter(value); setPage(1); }} options={FILTERS}/>
       <SearchField label="Search students" value={search} placeholder="Search name, matric or email" onChange={value => { setSearch(value); setPage(1); }}/>
@@ -73,15 +72,15 @@ function Roster({ data }: { data: RunSubjectStudents }) {
 }
 
 /**
- * Student lists already loaded on the open forecast page, keyed `forecastRunId|subjectId`. Memory only: the lists hold
- * personal data, so they are never written to browser storage (docs/cachingguide.md). A run's frozen snapshot does not
- * change, so a list stays valid until the page is left or refreshed, which clears it.
+ * Student lists already loaded on the open forecast page, keyed by subject. Memory only: the lists hold personal data, so they are
+ * never written to browser storage (docs/cachingguide.md). The live forecast is recalculated on Refresh, which clears this cache,
+ * so a list always matches the numbers on screen (S3-P004-032).
  */
-export type StudentListCache = Map<string, RunSubjectStudents>;
+export type StudentListCache = Map<string, LiveSubjectStudents>;
 
-function LoadRoster({ client, forecastRunId, subjectId, cache, cacheKey }: { client: CoordinatorClient; forecastRunId: number; subjectId: number; cache: StudentListCache; cacheKey: string }) {
+function LoadRoster({ load, cache, cacheKey }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cache: StudentListCache; cacheKey: string }) {
   const read = useRead(async signal => {
-    const data = await client.getSubjectStudents(forecastRunId, subjectId, signal);
+    const data = await load(signal);
     cache.set(cacheKey, data);
     return data;
   }, 'students|' + cacheKey);
@@ -89,9 +88,9 @@ function LoadRoster({ client, forecastRunId, subjectId, cache, cacheKey }: { cli
 }
 
 /** Read-only list of the students behind one subject's numbers. Never changes demand. Reopening a subject uses the page's cache. */
-export function SubjectStudentsDialog({ client, forecastRunId, subjectId, subjectCode, cache, onClose }: { client: CoordinatorClient; forecastRunId: number; subjectId: number; subjectCode: string; cache: StudentListCache; onClose: () => void }) {
-  const cacheKey = `${forecastRunId}|${subjectId}`, cached = cache.get(cacheKey);
+export function SubjectStudentsDialog({ load, cacheKey, subjectCode, cache, onClose }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cacheKey: string; subjectCode: string; cache: StudentListCache; onClose: () => void }) {
+  const cached = cache.get(cacheKey);
   return <ReadOnlyDialog title={`Students · ${subjectCode}`} onClose={onClose}>
-    {cached ? <Roster data={cached}/> : <LoadRoster client={client} forecastRunId={forecastRunId} subjectId={subjectId} cache={cache} cacheKey={cacheKey}/>}
+    {cached ? <Roster data={cached}/> : <LoadRoster load={load} cache={cache} cacheKey={cacheKey}/>}
   </ReadOnlyDialog>;
 }

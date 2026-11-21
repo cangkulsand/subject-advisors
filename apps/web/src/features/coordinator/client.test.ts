@@ -231,3 +231,21 @@ it('removes a snapshot with DELETE on the import and surfaces a not-found error 
   expect(failure).toBeInstanceOf(CoordinatorApiError);
   expect(failure).toMatchObject({ status: 404, code: 'IMPORT_NOT_FOUND' });
 });
+
+it('reads the live forecast for a scope (S3-P004-032)', async () => {
+  const live = { programmeId: 5, learningCentreId: 1, targetSemesterId: 2, calculatedAt: '2026-11-21T10:00:00.000Z', studentsInScope: 3, subjects: [] };
+  const fetcher = vi.fn<Fetch>(async () => reply(live)); vi.stubGlobal('fetch', fetcher);
+  expect(await client().getLiveForecast(scope)).toEqual(live);
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/forecast-live?programmeId=5&learningCentreId=1');
+});
+
+it('reads the live students of one subject and rejects a malformed reply', async () => {
+  const students = { subjectId: 101, subjectCode: 'LEC101', subjectName: 'Lecture', summary: { counted: 1 }, students: [], emailsAvailable: true };
+  const fetcher = vi.fn<Fetch>(async () => reply(students)); vi.stubGlobal('fetch', fetcher);
+  expect(await client().getLiveSubjectStudents(scope, 101)).toEqual(students);
+  expect(fetcher.mock.calls[0]![0]).toBe('/api/coordinator/forecast-live/subjects/101/students?programmeId=5&learningCentreId=1');
+  vi.stubGlobal('fetch', vi.fn<Fetch>(async () => reply({ subjectId: 101 })));
+  await expect(client().getLiveSubjectStudents(scope, 101)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  vi.stubGlobal('fetch', vi.fn<Fetch>(async () => reply({ calculatedAt: 'x' })));
+  await expect(client().getLiveForecast(scope)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+});

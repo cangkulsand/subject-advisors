@@ -105,7 +105,12 @@ function subjectStudents(state, run, subjectRow) {
   });
 }
 function addRun(state, importBatchId) {
-  const id = state.nextRun++;
+  const run = makeRun(state, state.nextRun++, importBatchId);
+  state.runs.set(run.forecastRunId, run);
+  return run;
+}
+/** The fixture forecast subjects (stored runs and the live forecast use the same ones). */
+function makeRun(state, id, importBatchId) {
   const lab = capacity.LAB, lec = capacity.LECTURE;
   const run = {
     forecastRunId: id, importBatchId, dataSource: state.imports.find(item => item.importBatchId === importBatchId)?.source ?? 'CSV', ...scopeOf, versionNumber: id, parentForecastRunId: null, status: 'DRAFT', demandAssumption: 'SUPPORTED_ELIGIBLE_POOL', engineVersion: 'uc20-engine-1.1.0',
@@ -122,8 +127,22 @@ function addRun(state, importBatchId) {
   };
   // `manySubjects`: 21 reviewed filler subjects listed before the real ones, so the subjects table has two pages and the pending subjects sit on page 2.
   if (state.manySubjects) { run.subjects.unshift(...Array.from({ length: 21 }, (_, i) => subject(200 + i, `FILL${String(1001 + i)}`, `Advanced filler ${String(i + 1).padStart(2, '0')}`, 'LECTURE', 20, 0, [], 0, [section(100 + i, 1, 20, lec, 'APPROVED')]))); run.nextSection = 300; }
-  state.runs.set(id, run);
   return run;
+}
+/** Live forecast (S3-P004-032): built from the fixture subjects on every read, never stored. `liveEmpty`: no students in the scope. */
+function liveRun(state) { return state.liveTemplate ??= makeRun(state, 0, null); }
+const LIVE_KEYS = ['subjectId', 'subjectCode', 'subjectName', 'creditHours', 'classType', 'excluded', 'semesterTypeExcluded', 'supportedEligibleCount', 'uncertainStudentCount', 'nearGraduationCount', 'breakdown'];
+function liveForecast(state) {
+  state.liveReads = (state.liveReads ?? 0) + 1;
+  const subjects = state.liveEmpty ? [] : liveRun(state).subjects.filter(row => !(state.liveMissing ?? []).includes(row.subjectId)).map(row => Object.fromEntries(LIVE_KEYS.map(key => [key, row[key]])));
+  return ok({ programmeId: scopeOf.programmeId, learningCentreId: scopeOf.learningCentreId, targetSemesterId: scopeOf.targetSemesterId, calculatedAt: generatedAt, studentsInScope: state.liveEmpty ? 0 : 55, subjects });
+}
+function liveSubjectStudents(state, subjectId) {
+  const row = state.liveEmpty ? null : liveRun(state).subjects.find(item => item.subjectId === subjectId);
+  if (!row) return failure(404, 'RUN_SUBJECT_NOT_FOUND', 'The subject is not part of this forecast.');
+  const reply = subjectStudents(state, { forecastRunId: 0 }, row);
+  const { forecastRunId, catalogueMatchesRun, ...data } = reply.payload.data; void forecastRunId; void catalogueMatchesRun;
+  return ok(data);
 }
 const revisionOf = (run) => `fr${run.forecastRunId}.${run.status}.${run.audit.length}`;
 function view(state, run) {
@@ -196,6 +215,12 @@ export function handle(state, request) {
   }
   const decisionResult = handleDecisions(state, route, method, url, headers, body);
   if (decisionResult) return decisionResult;
+  const liveMatch = /^forecast-live(?:\/subjects\/(\d+)\/students)?$/.exec(route);
+  if (liveMatch) {
+    if (method !== 'GET') return failure(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
+    if (!inScope({ programmeId: Number(url.searchParams.get('programmeId')), learningCentreId: Number(url.searchParams.get('learningCentreId')) })) return failure(403, 'SCOPE_NOT_ASSIGNED', 'You are not assigned to this programme and learning centre.');
+    return liveMatch[1] ? liveSubjectStudents(state, Number(liveMatch[1])) : liveForecast(state);
+  }
   const runMatch = /^forecast-runs(?:\/(\d+)(?:\/subjects\/(\d+)\/students)?)?$/.exec(route);
   if (!runMatch) return null;
   if (!runMatch[1]) return method === 'POST' ? generate(state, safeJson(body)) : null;

@@ -270,7 +270,7 @@ else {
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
       await forecastReady(page);
       assert.ok(page.url().includes('snapshot=1'));
-      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /System students · System students/);
+      await page.getByText(/^Live student data · calculated /).waitFor();
       await page.screenshot({ path: shots + 'forecast-system-desktop.png', fullPage: true });
     });
 
@@ -380,18 +380,19 @@ else {
       assert.equal(state.runs.size, 1, 'a repeat reuses the same forecast');
     });
 
-    await check('forecast: the newest snapshot is pre-selected, its forecast is generated when missing, and subjects are sorted by eligible students', async page => {
-      const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
-      const post = state.bodies.find(item => item.path === '/api/coordinator/forecast-runs');
-      assert.deepEqual(post.body, { ...scopeBody, importBatchId: 1, demandAssumption: 'SUPPORTED_ELIGIBLE_POOL' });
+    await check('forecast: the page reads the live forecast with no snapshot step, and subjects are sorted by eligible students (S3-P004-032)', async page => {
+      const state = await mock(page, { seed: 'empty' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.equal(state.bodies.filter(item => item.path === '/api/coordinator/forecast-runs').length, 0, 'no forecast run is created');
+      assert.equal(state.liveReads, 1, 'one live read');
+      assert.equal(await page.getByLabel('Student data snapshot', { exact: true }).count(), 0, 'no snapshot field');
+      assert.equal(await page.getByRole('link', { name: 'Go to Data Imports' }).count(), 0, 'no data import step');
+      await page.getByText(/^Live student data · calculated /).waitFor();
       assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013', 'SECD2523', 'SECJ1023']);
       const table = page.getByRole('region', { name: 'Subjects table', exact: true });
       assert.deepEqual(await table.locator('thead th').allInnerTexts(), ['Subject', 'Not taken yet', 'Eligible to take', 'Action'], 'no Uncertain column in the main table');
       assert.deepEqual(await table.locator('tr[data-subject="SCSJ1013"] .coordinator-number').allInnerTexts(), ['78', '71'], 'not taken yet = in curriculum minus passed; eligible to take');
       assert.deepEqual(await page.locator('tr[data-subject="SECJ1013"] th > *').evaluateAll(items => items.map(item => item.textContent.trim())), ['Programming Technique I', 'SECJ1013', 'Lab · 3 credit hours'], 'name first, then code and class type');
       assert.ok(!(await page.locator('body').innerText()).includes('Potential demand'), 'the potential demand label is gone');
-      assert.ok(page.url().includes('snapshot=1'));
-      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /^September cohort · CSV upload · 2026-10-30$/);
       assert.equal(await page.getByRole('button', { name: /^Action for SECJ1013: Pending$/ }).count(), 1);
       await page.screenshot({ path: shots + 'forecast-decisions-desktop.png', fullPage: true });
     });
@@ -403,12 +404,12 @@ else {
       const auditFirst = () => page.getByRole('region', { name: 'Audit history table' }).locator('tbody tr').first();
       await pickAction(page, 'SECJ1013', 'Approved');
       await page.getByText('SECJ1013 approved.').waitFor();
-      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: 1 });
+      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 101, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: null });
       assert.ok(posts().at(-1).headers['idempotency-key']);
       assert.equal(await page.getByRole('dialog').count(), 0, 'no dialog');
       await page.getByRole('button', { name: /^Action for SECJ1013: Approved$/ }).waitFor();
       await auditFirst().getByText('Pending → Approved').waitFor();
-      assert.match(await auditFirst().innerText(), /Programming Technique I\s*SECJ1013[\s\S]*user_test[\s\S]*Snapshot #1/);
+      assert.match(await auditFirst().innerText(), /Programming Technique I\s*SECJ1013[\s\S]*user_test\s*—/);
       await pickAction(page, 'SECD2523', 'Removed');
       await page.getByText('SECD2523 removed.').waitFor();
       assert.equal(await subjects.locator('tr[data-subject="SECD2523"]').count(), 0, 'a removed subject leaves the main table');
@@ -417,7 +418,7 @@ else {
       await page.screenshot({ path: shots + 'forecast-decisions-removed-desktop.png', fullPage: true });
       await page.getByRole('button', { name: 'Add back SECD2523' }).click();
       await page.getByText('SECD2523 added back.').waitFor();
-      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 104, status: 'PENDING', expectedStatus: 'REMOVED', importBatchId: 1 });
+      assert.deepEqual(posts().at(-1).body, { scope: scopeBody, subjectId: 104, status: 'PENDING', expectedStatus: 'REMOVED', importBatchId: null });
       await subjects.locator('tr[data-subject="SECD2523"]').getByRole('button', { name: /^Action for SECD2523: Pending$/ }).waitFor();
       assert.equal(await removed.count(), 0, 'the Removed subjects table disappears when empty');
       await auditFirst().getByText('Removed → Pending').waitFor();
@@ -525,16 +526,11 @@ else {
       await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
     });
 
-    await check('forecast: decisions carry over when another snapshot is chosen and a decided subject missing from it is marked', async page => {
-      const state = await mock(page, { seed: 'decided', secondImport: true }); await page.goto(base + forecastUrl); await forecastReady(page);
-      assert.equal(await page.getByLabel('Student data snapshot', { exact: true }).inputValue(), '2', 'the newest snapshot is chosen first');
-      await page.waitForURL(/snapshot=2/);
-      await page.getByLabel('Student data snapshot', { exact: true }).selectOption('1');
-      await page.waitForURL(/snapshot=1/); await forecastReady(page);
-      assert.equal(state.runs.size, 2, 'the forecast of the other snapshot is created when chosen');
+    await check('forecast: decisions show on the live forecast and a decided subject missing from it is marked', async page => {
+      await mock(page, { seed: 'decided' }); await page.goto(base + forecastUrl); await forecastReady(page);
       await page.locator('tr[data-subject="SECJ1013"]').getByRole('button', { name: /^Action for SECJ1013: Approved$/ }).waitFor();
       const missing = page.locator('tr[data-subject="SECJ2203"]');
-      assert.ok((await missing.innerText()).includes('not in this snapshot'));
+      assert.ok((await missing.innerText()).includes('not in the forecast'));
       assert.deepEqual(await missing.locator('.coordinator-number').allInnerTexts(), ['—', '—'], 'not taken yet and eligible show dashes');
       assert.equal(await missing.getByRole('button', { name: /View students/ }).count(), 0, 'no student list without a snapshot count');
       await page.getByRole('region', { name: 'Removed subjects table' }).locator('tr[data-subject="SECJ1023"]').waitFor();
@@ -591,11 +587,19 @@ else {
       assert.equal(state.decisions.size, 0);
     });
 
-    await check('forecast: without a snapshot the screen asks for a data import first', async page => {
-      const state = await mock(page, { seed: 'empty' }); await page.goto(base + forecastUrl);
-      await page.getByRole('heading', { name: 'No student data snapshots yet' }).waitFor();
-      await page.getByRole('link', { name: 'Go to Data Imports' }).waitFor();
-      assert.equal(state.bodies.length, 0, 'no forecast is generated without a snapshot');
+    await check('forecast: a scope with no students says so and creates nothing', async page => {
+      const state = await mock(page, { seed: 'empty', liveEmpty: true }); await page.goto(base + forecastUrl);
+      await page.getByText('No students in this programme and learning centre yet.').waitFor();
+      assert.equal(await page.getByRole('link', { name: 'Go to Data Imports' }).count(), 0);
+      assert.equal(state.bodies.length, 0, 'nothing is written');
+    });
+
+    await check('forecast: Refresh recalculates the live forecast', async page => {
+      const state = await mock(page, { seed: 'empty' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      assert.equal(state.liveReads, 1);
+      await page.getByRole('button', { name: 'Refresh' }).click();
+      for (let i = 0; i < 50 && state.liveReads < 2; i++) await page.waitForTimeout(100);
+      assert.equal(state.liveReads, 2, 'Refresh reads the live forecast again');
     });
 
     await check('forecast: info icons show a popover on hover and focus, inside the viewport, and Escape closes it', async page => {
@@ -688,15 +692,15 @@ else {
       assert.equal(state.runs.get(1).subjects.find(item => item.subjectCode === 'SECJ1013').supportedEligibleCount, 46, 'viewing students changes nothing');
     });
 
-    await check('forecast: the students dialog shows an error with retry, the recomputed-catalogue note and an empty reasons list', async page => {
-      const state = await mock(page, { seed: 'run', catalogueChanged: true });
+    await check('forecast: the students dialog shows an error with retry and an empty reasons list', async page => {
+      const state = await mock(page, { seed: 'run' });
       await page.goto(base + forecastUrl); await forecastReady(page);
       state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
       await dialog.getByRole('alert').getByText('Forecasting data is unavailable. Please retry.').waitFor();
       await dialog.getByRole('button', { name: 'Retry' }).click();
-      await dialog.getByText(/recomputed with the current curriculum/).waitFor();
+      await dialog.getByRole('region', { name: /students/i }).first().waitFor();
       assert.equal(await dialog.getByText(/Sign-in emails could not be loaded/).count(), 0);
       await dialog.getByRole('button', { name: 'Close' }).click();
       await page.getByRole('button', { name: 'View students for SECJ1023' }).click();
@@ -837,7 +841,7 @@ else {
       await page.getByRole('button', { name: 'Generate forecast' }).first().click();
       await page.getByRole('dialog', { name: 'Generate forecast' }).getByRole('button', { name: 'Generate forecast' }).click();
       await forecastReady(page);
-      assert.match(await page.getByLabel('Student data snapshot', { exact: true }).locator('option:checked').innerText(), /· Combined ·/);
+      await page.getByText(/^Live student data · calculated /).waitFor();
       await page.screenshot({ path: shots + 'forecast-combined-desktop.png', fullPage: true });
     });
 

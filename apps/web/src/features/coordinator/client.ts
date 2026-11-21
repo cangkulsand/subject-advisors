@@ -1,4 +1,5 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
+import type { LiveForecast, LiveSubjectStudents } from '../../../../../packages/shared/src/forecasting/live';
 import type {
   AcceptedImport, ForecastContext, ForecastScope, ImportListData, ImportStudentListData, ImportValidationReport, OperationReceipt, Paginated,
   SystemSnapshotRequest,
@@ -43,6 +44,10 @@ export interface CoordinatorClient {
   getRun(forecastRunId: number, signal?: AbortSignal): Promise<RunWithRevision>;
   /** View only: the students behind one subject's numbers. */
   getSubjectStudents(forecastRunId: number, subjectId: number, signal?: AbortSignal): Promise<RunSubjectStudents>;
+  /** Live forecast of the scope's students right now; nothing is stored (S3-P004-032). */
+  getLiveForecast(scope: ForecastScope, signal?: AbortSignal): Promise<LiveForecast>;
+  /** View only: the live students behind one subject's numbers, from the same calculation as `getLiveForecast`. */
+  getLiveSubjectStudents(scope: ForecastScope, subjectId: number, signal?: AbortSignal): Promise<LiveSubjectStudents>;
   /** Decisions (Approved / Removed; no row is Pending) of one scope, with the selection phase of its semester. */
   getDecisions(scope: ForecastScope, signal?: AbortSignal): Promise<OfferingDecisionSet>;
   /** One click, no reason: sets a subject to Pending, Approved or Removed. 409 DECISION_STALE when the stored status differs from `expectedStatus`. */
@@ -79,6 +84,8 @@ function report(value: unknown): ImportValidationReport {
 }
 function receipt(value: unknown) { requireKeys(value, ['resourceId'], ['acceptedAt', 'revision'], []); return value as OperationReceipt; }
 function runDetail(value: unknown) { requireKeys(value, ['forecastRunId', 'versionNumber'], ['status', 'revision'], ['subjects']); object(object(value).summary); return value as ForecastRunDetail; }
+function liveForecast(value: unknown) { requireKeys(value, ['programmeId', 'learningCentreId', 'targetSemesterId', 'studentsInScope'], ['calculatedAt'], ['subjects']); return value as LiveForecast; }
+function liveSubjectStudents(value: unknown) { requireKeys(value, ['subjectId'], ['subjectCode'], ['students']); object(object(value).summary); return value as LiveSubjectStudents; }
 function subjectStudents(value: unknown) { requireKeys(value, ['forecastRunId', 'subjectId'], ['subjectCode'], ['students']); object(object(value).summary); return value as RunSubjectStudents; }
 function decisionSet(value: unknown) {
   const item = requireKeys(value, [], ['phase', 'asOf'], ['decisions', 'pickCounts']);
@@ -103,6 +110,8 @@ function query(values: object) {
   const text = parameters.toString();
   return text ? '?' + text : '';
 }
+/** The live forecast always targets the next Normal semester on the server, so only the programme and centre are sent. */
+const liveQuery = (scope: ForecastScope) => query({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId });
 const scopeQuery = (scope: ForecastScope, page: PageQuery = {}) => query({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId, targetSemesterId: scope.targetSemesterId, limit: page.limit, cursor: page.cursor });
 /** Callers may pass richer scope objects (labels); the API accepts only the three ids. */
 const plainScope = (scope: ForecastScope): ForecastScope => ({ programmeId: scope.programmeId, learningCentreId: scope.learningCentreId, targetSemesterId: scope.targetSemesterId });
@@ -212,6 +221,8 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
       return { run, revision: raw.etag ?? run.revision };
     },
     getSubjectStudents: async (id, subjectId, signal) => subjectStudents((await request(prefix + 'forecast-runs/' + id + '/subjects/' + subjectId + '/students', { method: 'GET' }, signal)).data),
+    getLiveForecast: async (scope, signal) => liveForecast((await request(prefix + 'forecast-live' + liveQuery(scope), { method: 'GET' }, signal)).data),
+    getLiveSubjectStudents: async (scope, subjectId, signal) => liveSubjectStudents((await request(prefix + 'forecast-live/subjects/' + subjectId + '/students' + liveQuery(scope), { method: 'GET' }, signal)).data),
     getDecisions: async (scope, signal) => decisionSet((await request(prefix + 'offering-decisions' + scopeQuery(scope), { method: 'GET' }, signal)).data),
     decide: async input => {
       const body: DecideOfferingRequest = { scope: plainScope(input.scope), subjectId: input.subjectId, status: input.status, expectedStatus: input.expectedStatus, importBatchId: input.importBatchId };
