@@ -541,7 +541,7 @@ else {
       await page.screenshot({ path: shots + 'forecast-decisions-carry-over-desktop.png', fullPage: true });
     });
 
-    await check('forecast: tabs, class type, uncertain filter, sort and search use the shared toolbar', async page => {
+    await check('forecast: tabs, class type, sort and search use the shared toolbar; no uncertain filter (S3-P004-030)', async page => {
       await mock(page, { seed: 'decided' }); await page.goto(base + forecastUrl); await forecastReady(page);
       const bar = page.getByRole('search', { name: 'Filter and sort subjects' }), menu = index => bar.locator('button[aria-haspopup="menu"]').nth(index);
       const choose = async (index, group, option) => { await menu(index).click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
@@ -559,8 +559,8 @@ else {
       await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' });
       await choose(0, 'Class type', 'Lab'); assert.deepEqual(await subjectCodes(page), ['SECJ1013']);
       await choose(0, 'Class type', 'Not set'); assert.deepEqual(await subjectCodes(page), ['SECD2523']);
-      await choose(0, 'Class type', 'All'); await choose(0, 'Flags', 'Has uncertain students'); assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECJ1013']);
-      await choose(0, 'Flags', 'All');
+      await choose(0, 'Class type', 'All');
+      await menu(0).click(); assert.equal(await page.getByRole('group', { name: 'Flags', exact: true }).count(), 0, 'no uncertain flag filter'); await page.keyboard.press('Escape');
       await choose(1, 'Sort by', 'Subject name'); assert.deepEqual(await subjectCodes(page), ['SECD2523', 'SCSJ1013', 'SECJ1013', 'SECJ2203']);
       await choose(1, 'Sort by', 'Subject code'); assert.deepEqual(await subjectCodes(page), ['SCSJ1013', 'SECD2523', 'SECJ1013', 'SECJ2203']);
       await bar.getByLabel('Search subjects').fill('SECD'); assert.deepEqual(await subjectCodes(page), ['SECD2523']);
@@ -637,8 +637,9 @@ else {
       await button.click();
       const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
       await dialog.getByLabel('Student counts').waitFor();
-      assert.deepEqual(await dialog.getByLabel('Student counts').locator('dd').allInnerTexts(), ['46', '3', '4', '5'], 'counted, uncertain, near graduation, not counted');
-      await dialog.getByText('Academic history incomplete: 2').waitFor(); await dialog.getByText('Prerequisite not proven: 1').waitFor();
+      assert.deepEqual(await dialog.getByLabel('Student counts').locator('dt').allInnerTexts(), ['Eligible to take (counted)', 'Near graduation', 'Not counted'], 'no Uncertain count (S3-P004-030)');
+      assert.deepEqual(await dialog.getByLabel('Student counts').locator('dd').allInnerTexts(), ['46', '4', '8'], 'the 3 uncertain students are part of Not counted');
+      assert.equal(await dialog.getByText(/uncertain/i).count(), 0, 'the word uncertain is not shown');
       assert.equal(await dialog.getByText(/recomputed with the current curriculum/).count(), 0, 'no catalogue note when the catalogue is unchanged');
       assert.equal(await dialog.locator('textarea, input[type="checkbox"]').count(), 0, 'read only: no reason form');
       assert.deepEqual(await dialog.getByRole('region', { name: 'Students table' }).locator('thead th').allInnerTexts(), ['Student', 'Status', 'Details']);
@@ -661,14 +662,11 @@ else {
       await dialog.getByRole('button', { name: 'Next' }).click(); await dialog.getByText(/Page 2 of 3/).waitFor();
       await dialog.getByRole('button', { name: 'Previous' }).click();
       const filters = dialog.getByRole('group', { name: 'Show' });
-      assert.deepEqual(await filters.getByRole('button').allInnerTexts(), ['Counted', 'Uncertain', 'Near graduation', 'Not counted'], 'no All option');
-      await filters.getByRole('button', { name: 'Uncertain' }).click();
-      assert.equal(await rows.count(), 3);
-      assert.ok((await rows.first().innerText()).includes('Academic history incomplete'));
+      assert.deepEqual(await filters.getByRole('button').allInnerTexts(), ['Counted', 'Near graduation', 'Not counted'], 'no All or Uncertain option');
       await filters.getByRole('button', { name: 'Near graduation' }).click(); assert.equal(await rows.count(), 4);
-      await filters.getByRole('button', { name: 'Not counted' }).click(); assert.equal(await rows.count(), 5);
+      await filters.getByRole('button', { name: 'Not counted' }).click(); assert.equal(await rows.count(), 8);
       const texts = (await rows.allInnerTexts()).join('|');
-      for (const label of ['Already passed', 'Prerequisite not met', 'Not offered this semester', 'Passed after a repeat attempt']) assert.ok(texts.includes(label), label);
+      for (const label of ['Already passed', 'Prerequisite not met', 'Not offered this semester', 'Passed after a repeat attempt', 'Records incomplete', 'Academic history incomplete']) assert.ok(texts.includes(label), label);
       await filters.getByRole('button', { name: 'Counted', exact: true }).click();
       const search = dialog.getByLabel('Search students');
       await search.fill('a22ec010'); assert.equal(await rows.count(), 1);
@@ -704,8 +702,7 @@ else {
       await page.getByRole('button', { name: 'View students for SECJ1023' }).click();
       const second = page.getByRole('dialog', { name: 'Students · SECJ1023' }); await second.waitFor();
       await second.getByLabel('Student counts').waitFor();
-      assert.deepEqual(await second.getByLabel('Student counts').locator('dd').allInnerTexts(), ['14', '0', '0', '5']);
-      assert.equal(await second.getByLabel('Why students are uncertain').count(), 0);
+      assert.deepEqual(await second.getByLabel('Student counts').locator('dd').allInnerTexts(), ['14', '0', '5']);
       await second.getByRole('button', { name: 'Close' }).click();
       const listCalls = () => state.requests.filter(r => /\/subjects\/\d+\/students$/.test(r.path)).length, before = listCalls();
       await page.getByRole('button', { name: 'View students for SECJ1013' }).click();

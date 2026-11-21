@@ -13,13 +13,14 @@ export const reasonLabels: Record<UncertaintyReason, string> = {
   PREREQUISITE_EVIDENCE_MISSING: 'Prerequisite not proven', COREQUISITE_EVIDENCE_MISSING: 'Corequisite not proven', CURRICULUM_VERSION_UNRESOLVED: 'Curriculum version unresolved', REJECTED_HISTORY_ROW: 'History row rejected in import',
 };
 const statusLabels: Record<SubjectStudentOutcomeKind, string> = {
-  SUPPORTED: 'Counted', UNCERTAIN: 'Uncertain', PASSED: 'Already passed', PREREQUISITE_NOT_MET: 'Prerequisite not met', NOT_OFFERED: 'Not offered this semester',
+  SUPPORTED: 'Counted', UNCERTAIN: 'Records incomplete', PASSED: 'Already passed', PREREQUISITE_NOT_MET: 'Prerequisite not met', NOT_OFFERED: 'Not offered this semester',
 };
 const statusClass: Record<SubjectStudentOutcomeKind, string> = {
-  SUPPORTED: 'coordinator-pill-success', UNCERTAIN: 'coordinator-pill-warning', PASSED: 'coordinator-pill-muted', PREREQUISITE_NOT_MET: 'coordinator-pill-muted', NOT_OFFERED: 'coordinator-pill-muted',
+  SUPPORTED: 'coordinator-pill-success', UNCERTAIN: 'coordinator-pill-muted', PASSED: 'coordinator-pill-muted', PREREQUISITE_NOT_MET: 'coordinator-pill-muted', NOT_OFFERED: 'coordinator-pill-muted',
 };
 const FILTERS = [
-  { value: 'COUNTED', label: 'Counted' }, { value: 'UNCERTAIN', label: 'Uncertain' }, { value: 'NEAR', label: 'Near graduation' }, { value: 'NOT_COUNTED', label: 'Not counted' },
+  // Uncertain students are shown as Not counted (S3-P004-030): they were never counted as eligible.
+  { value: 'COUNTED', label: 'Counted' }, { value: 'NEAR', label: 'Near graduation' }, { value: 'NOT_COUNTED', label: 'Not counted' },
 ];
 /** The list opens on the students counted as eligible to take: that is who the coordinator clicked the count to see. */
 const DEFAULT_FILTER = 'COUNTED';
@@ -27,9 +28,8 @@ const PAGE_SIZE = 20;
 
 function matchesFilter(student: RunSubjectStudent, filter: string) {
   if (filter === 'COUNTED') return student.outcome === 'SUPPORTED';
-  if (filter === 'UNCERTAIN') return student.outcome === 'UNCERTAIN';
   if (filter === 'NEAR') return student.nearGraduation;
-  return student.outcome !== 'SUPPORTED' && student.outcome !== 'UNCERTAIN';
+  return student.outcome !== 'SUPPORTED';
 }
 function Details({ student }: { student: RunSubjectStudent }) {
   const lines: string[] = [];
@@ -48,11 +48,9 @@ function Roster({ data }: { data: RunSubjectStudents }) {
   const pages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE)), page = Math.min(requested, pages);
   const clear = () => { setFilter(DEFAULT_FILTER); setSearch(''); setPage(1); };
   const s = data.summary;
-  const facts: Array<[string, number, string]> = [['Eligible to take (counted)', s.counted, HELP.counted], ['Uncertain', s.uncertain, HELP.uncertain], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted, HELP.notCounted]];
+  const facts: Array<[string, number, string]> = [['Eligible to take (counted)', s.counted, HELP.counted], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted + s.uncertain, HELP.notCounted]];
   return <>
     <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
-    {s.uncertaintyReasonCounts.length > 0 && <ul className="coordinator-students-reasons" aria-label="Why students are uncertain">
-      {s.uncertaintyReasonCounts.map(item => <li key={item.reason}>{reasonLabels[item.reason] ?? item.reason}: {item.count}</li>)}</ul>}
     {!data.emailsAvailable && <p className="coordinator-warning" role="status">Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.</p>}
     {!data.catalogueMatchesRun && <p className="coordinator-warning" role="status">This list was recomputed with the current curriculum, so it may differ from the counts saved with this forecast.</p>}
     <TableToolbar label="Filter students">

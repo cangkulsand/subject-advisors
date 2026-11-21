@@ -32,7 +32,7 @@ function CoverageSummary({ coverage }: { coverage: SystemSnapshotCoverage }) {
   return <>
     <dl className="coordinator-counts" aria-label="Snapshot coverage">{rows.map(([text, value]) => <div key={text}><dt>{text}</dt><dd>{value}</dd></div>)}</dl>
     <p className="admin-muted">Not included: {excluded.otherProgramme} in other programmes, {excluded.otherCentre} at other learning centres, {excluded.inactiveAccess} without active student access.</p>
-    {coverage.studentsWithoutRecords > 0 && <p className="admin-muted">Students without any academic record have unknown history, so they count as uncertain in the forecast.</p>}
+    {coverage.studentsWithoutRecords > 0 && <p className="admin-muted">Students without any academic record have unknown history, so they are not counted in the forecast.</p>}
     <p className="admin-muted">{coverage.centreNote}</p>
   </>;
 }

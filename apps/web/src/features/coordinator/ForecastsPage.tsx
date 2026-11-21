@@ -100,14 +100,13 @@ function buildRows(run: ForecastRunDetail, decisions: OfferingDecision[]): Subje
 const studentsIcon = <svg className="coordinator-count-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const SORT_LABELS = { eligible: 'Eligible to take', name: 'Subject name', code: 'Subject code' } as const;
 type SubjectSort = keyof typeof SORT_LABELS;
-interface SubjectFilters { q: string; type: string; status: string; flag: string; sort: SubjectSort }
-const NO_FILTERS: SubjectFilters = { q: '', type: '', status: '', flag: '', sort: 'eligible' };
-function matchesFilters(row: SubjectRow, { q, type, status, flag }: SubjectFilters) {
+interface SubjectFilters { q: string; type: string; status: string; sort: SubjectSort }
+const NO_FILTERS: SubjectFilters = { q: '', type: '', status: '', sort: 'eligible' };
+function matchesFilters(row: SubjectRow, { q, type, status }: SubjectFilters) {
   const term = q.trim().toLowerCase();
   if (term && !row.subjectCode.toLowerCase().includes(term) && !row.subjectName.toLowerCase().includes(term)) return false;
   if (type && (row.classType ?? 'NONE') !== type) return false;
   if (status && row.status !== status) return false;
-  if (flag === 'UNCERTAIN') return (row.run?.uncertainStudentCount ?? 0) > 0;
   return true;
 }
 const byName = (left: SubjectRow, right: SubjectRow) => left.subjectName.localeCompare(right.subjectName, undefined, { sensitivity: 'base' }) || left.subjectCode.localeCompare(right.subjectCode);
@@ -144,7 +143,7 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
   const [studentsFor, setStudentsFor] = useState<SubjectRow | null>(null), [pickersFor, setPickersFor] = useState<SubjectRow | null>(null);
   // Removed subjects leave the main table and are listed beside it, where they can be added back.
   const subjects = rows.filter(row => row.status !== 'REMOVED'), removed = sortRows(rows.filter(row => row.status === 'REMOVED'), 'name');
-  const [filters, setFilters] = useState(NO_FILTERS), [requested, setPage] = useState(1), filtering = filters.q !== '' || filters.type !== '' || filters.status !== '' || filters.flag !== '';
+  const [filters, setFilters] = useState(NO_FILTERS), [requested, setPage] = useState(1), filtering = filters.q !== '' || filters.type !== '' || filters.status !== '';
   const matching = sortRows(subjects.filter(row => matchesFilters(row, filters)), filters.sort);
   const pages = Math.max(1, Math.ceil(matching.length / SUBJECT_PAGE_SIZE)), page = Math.min(requested, pages);
   const change = (patch: Partial<SubjectFilters>) => { setFilters(current => ({ ...current, ...patch })); setPage(1); };
@@ -153,7 +152,6 @@ function SubjectTable({ client, scope, runId, rows, studentCache, pickerCache, e
     <SegmentedFilter label="Status" value={filters.status} onChange={status => change({ status })} options={[{ value: '', label: 'All' }, { value: 'PENDING', label: 'Pending' }, { value: 'APPROVED', label: 'Approved' }]}/>
     <FilterMenu groups={[
       { id: 'type', heading: 'Class type', value: filters.type, onChange: type => change({ type }), options: [{ value: 'LECTURE', label: 'Lecture' }, { value: 'LAB', label: 'Lab' }, { value: 'NONE', label: 'Not set' }] },
-      { id: 'flag', heading: 'Flags', value: filters.flag, onChange: flag => change({ flag }), options: [{ value: 'UNCERTAIN', label: 'Has uncertain students' }] },
     ]}/>
     <FilterMenu label="Sort" icon="sort" showValue groups={[{ id: 'sort', heading: 'Sort by', noAll: true, value: filters.sort, onChange: sort => change({ sort: sort as SubjectSort }), options: Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label })) }]}/>
     <SearchField label="Search subjects" value={filters.q} placeholder="Search subject code or name" onChange={q => change({ q })}/>
