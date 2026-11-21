@@ -24,6 +24,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       expireInvitations: vi.fn(), acceptInvitation: vi.fn(),
       studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
       changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
+      createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24),
     },
     identities: {
       search: vi.fn(), lookup: vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'Target', email: 'target@utm.my', emailVerified: true }]])),
@@ -51,6 +52,7 @@ const routes: { name: string; path: string; method: string; body: unknown; statu
   { name: 'change student programme', path: '/api/admin/users/5/programme', method: 'PATCH', body: { curriculumId: 2, reason }, status: 200, repo: 'changeStudentProgramme' },
   { name: 'create invitation', path: '/api/admin/invitations', method: 'POST', body: { email: 'new@utm.my', roles: ['COORDINATOR'], reason }, status: 201, repo: 'createInvitation' },
   { name: 'revoke invitation', path: '/api/admin/invitations/2f1c0f0e-0000-4000-8000-000000000001', method: 'DELETE', body: { reason }, status: 200, repo: 'revokeInvitation' },
+  { name: 'create dummy user', path: '/api/admin/dummy-users', method: 'POST', body: { role: 'STUDENT', name: 'Aina', curriculumId: 2, learningCentreId: 3, reason }, status: 201, repo: 'createDummyAccount' },
 ];
 
 describe.each(routes)('$name ($method $path)', route => {
@@ -381,5 +383,117 @@ describe('student programme (S2-P004-026)', () => {
       expect((await send(denied, '/api/admin/users/5/programme', 'GET')).status).toBe(403);
       expect(denied.repository.curriculumOptions).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('dummy users (S3-P004-029)', () => {
+  const studentBody = { role: 'STUDENT', name: 'Aina', curriculumId: 2, learningCentreId: 3, reason };
+  const coordinatorBody = { role: 'COORDINATOR', name: 'Lim', programmeId: 8, learningCentreId: 3, reason };
+  const json = async (response: Response) => JSON.parse(await response.text());
+  const createInput = (deps: AdminDependencies) => (deps.identities.createUser as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { email: string; firstName: string; password: string };
+
+  it('creates the Clerk user then the account, and returns the one-time credentials with no-store', async () => {
+    const deps = fixture();
+    const order: string[] = [];
+    deps.identities.userCount = vi.fn(async () => { order.push('count'); return 52; });
+    deps.identities.createUser = vi.fn(async () => { order.push('clerk'); return { clerkUserId: 'user_dummy' }; });
+    mocked(deps, 'createDummyAccount').mockImplementation(async () => { order.push('db'); return { ...account, clerkUserId: 'user_dummy', roles: ['STUDENT'] }; });
+    const response = await send(deps, '/api/admin/dummy-users', 'POST', studentBody);
+    expect(response.status).toBe(201);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(order).toEqual(['count', 'clerk', 'db']);
+    const input = createInput(deps);
+    expect(input.email).toMatch(/^aina-[0-9a-f]{4}\+clerk_test@graduate\.utm\.my$/);
+    expect(input.firstName).toBe('Aina');
+    expect(input.password).toHaveLength(20);
+    const [clerkUserId, request, matric, actor, auditReason] = mocked(deps, 'createDummyAccount').mock.calls[0]!;
+    expect([clerkUserId, request, actor, auditReason]).toEqual(['user_dummy', studentBody, ADMIN, reason]);
+    expect(matric).toMatch(/^DUMMY\d{6}$/);
+    const body = await json(response);
+    expect(body.data.credentials).toEqual({ email: input.email, password: input.password });
+    expect(body.data.account.clerkUserId).toBe('user_dummy');
+    expect(JSON.stringify(mocked(deps, 'createDummyAccount').mock.calls)).not.toContain(input.password);
+  });
+
+  it('uses utm.my for a coordinator and does not need a current semester', async () => {
+    const deps = fixture();
+    mocked(deps, 'currentSemesterId').mockResolvedValue(null);
+    expect((await send(deps, '/api/admin/dummy-users', 'POST', coordinatorBody)).status).toBe(201);
+    expect(createInput(deps).email).toMatch(/^lim-[0-9a-f]{4}\+clerk_test@utm\.my$/);
+  });
+
+  it('refuses a dummy student when no current semester is set, before calling Clerk', async () => {
+    const deps = fixture();
+    mocked(deps, 'currentSemesterId').mockResolvedValue(null);
+    const response = await send(deps, '/api/admin/dummy-users', 'POST', studentBody);
+    expect(response.status).toBe(409);
+    expect((await json(response)).error.code).toBe('ACADEMIC_SEMESTER_UNAVAILABLE');
+    expect(deps.identities.createUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses at the 100-user Clerk limit before creating anything', async () => {
+    const deps = fixture();
+    deps.identities.userCount = vi.fn(async () => 100);
+    const response = await send(deps, '/api/admin/dummy-users', 'POST', studentBody);
+    expect(response.status).toBe(409);
+    expect((await json(response)).error.code).toBe('DUMMY_LIMIT_REACHED');
+    expect(deps.identities.createUser).not.toHaveBeenCalled();
+  });
+
+  it('deletes the Clerk user when the database step fails, and returns no password', async () => {
+    const deps = fixture();
+    mocked(deps, 'createDummyAccount').mockRejectedValue(new AdminMutationError('DUMMY_SCOPE_INVALID'));
+    const response = await send(deps, '/api/admin/dummy-users', 'POST', studentBody);
+    expect(response.status).toBe(409);
+    const text = await response.text();
+    expect(JSON.parse(text).error.code).toBe('DUMMY_SCOPE_INVALID');
+    expect(deps.identities.deleteUser).toHaveBeenCalledExactlyOnceWith('user_dummy');
+    expect(text).not.toContain(createInput(deps).password);
+  });
+
+  it('maps a Clerk failure to DUMMY_CREATE_FAILED and never touches the database', async () => {
+    const deps = fixture();
+    deps.identities.createUser = vi.fn(async () => { throw new Error('clerk sk_live_secret down'); });
+    const response = await send(deps, '/api/admin/dummy-users', 'POST', studentBody);
+    expect(response.status).toBe(502);
+    const text = await response.text();
+    expect(JSON.parse(text).error.code).toBe('DUMMY_CREATE_FAILED');
+    expect(text).not.toContain('sk_live');
+    expect(deps.repository.createDummyAccount).not.toHaveBeenCalled();
+  });
+
+  it('reports Clerk capacity', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/dummy-users/capacity', 'GET', undefined, {});
+    expect(response.status).toBe(200);
+    expect((await json(response)).data).toEqual({ used: 52, limit: 100 });
+    expect((await send(deps, '/api/admin/dummy-users/capacity', 'POST', {})).status).toBe(405);
+  });
+
+  it('resets a dummy password with no-store and refuses a real account without calling Clerk', async () => {
+    const deps = fixture();
+    deps.identities.lookup = vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'D', email: 'd-1a2b+clerk_test@utm.my', emailVerified: true }]]));
+    const ok = await send(deps, '/api/admin/users/5/dummy-password', 'POST', {});
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('cache-control')).toContain('no-store');
+    const credentials = (await json(ok)).data;
+    expect(credentials.email).toBe('d-1a2b+clerk_test@utm.my');
+    expect(credentials.password).toHaveLength(20);
+    expect(deps.identities.setPassword).toHaveBeenCalledExactlyOnceWith('user_target', credentials.password);
+    const real = fixture();
+    const refused = await send(real, '/api/admin/users/5/dummy-password', 'POST', {});
+    expect(refused.status).toBe(409);
+    expect((await json(refused)).error.code).toBe('NOT_A_DUMMY_ACCOUNT');
+    expect(real.identities.setPassword).not.toHaveBeenCalled();
+  });
+
+  it('protects the reset: 403 for a coordinator, 400 for a body with fields, 404 for an unknown account', async () => {
+    const coordinator = fixture(['COORDINATOR']);
+    expect((await send(coordinator, '/api/admin/users/5/dummy-password', 'POST', {})).status).toBe(403);
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/users/5/dummy-password', 'POST', { reason })).status).toBe(400);
+    mocked(deps, 'account').mockResolvedValue(null);
+    expect((await send(deps, '/api/admin/users/5/dummy-password', 'POST', {})).status).toBe(404);
+    expect(deps.identities.setPassword).not.toHaveBeenCalled();
   });
 });

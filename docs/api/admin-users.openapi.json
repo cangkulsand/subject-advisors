@@ -1279,6 +1279,238 @@
           }
         }
       }
+    },
+    "/api/admin/dummy-users": {
+      "post": {
+        "operationId": "createDummyUser",
+        "summary": "Create a ready-to-use dummy Student or Coordinator (S3-P004-029)",
+        "description": "Creates a Clerk user with a verified +clerk_test email (<slug>-<4 hex>+clerk_test@graduate.utm.my for STUDENT, @utm.my for COORDINATOR) and a generated 20-character password, then in one transaction the application account with its role and either a complete student profile (admin current semester, matric DUMMY + 6 digits, hours 0 and 20) or one coordinator assignment. If the database step fails the Clerk user is deleted. The password is returned once; the reason goes to the audit log, the password never does.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDummyUserRequest"
+              },
+              "example": {
+                "role": "STUDENT",
+                "name": "Aina",
+                "curriculumId": 1,
+                "learningCentreId": 2,
+                "reason": "Testing the graduation plan"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Dummy user created",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDummyUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown field or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an active System Administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ACADEMIC_SEMESTER_UNAVAILABLE (student, no current semester), DUMMY_LIMIT_REACHED (Clerk has 100 users), DUMMY_SCOPE_INVALID (inactive programme or learning centre)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "DUMMY_CREATE_FAILED: the Clerk user could not be created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/dummy-users/capacity": {
+      "get": {
+        "operationId": "dummyUserCapacity",
+        "summary": "Clerk users in use against the development-instance limit",
+        "responses": {
+          "200": {
+            "description": "Usage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DummyCapacityEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an active System Administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/dummy-password": {
+      "post": {
+        "operationId": "resetDummyPassword",
+        "summary": "Generate a new one-time password for a dummy account",
+        "description": "Only for accounts whose primary email is a +clerk_test address. The body is an empty object (a confirm). The new password is returned once.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New password",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DummyCredentialsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown field or a failed validator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an active System Administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "NOT_A_DUMMY_ACCOUNT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1708,7 +1940,12 @@
           "STUDENT_PROFILE_NOT_FOUND",
           "CURRICULUM_UNAVAILABLE",
           "PROGRAMME_UNCHANGED",
-          "ACCOUNT_NOT_FOUND"
+          "ACCOUNT_NOT_FOUND",
+          "ACADEMIC_SEMESTER_UNAVAILABLE",
+          "DUMMY_LIMIT_REACHED",
+          "NOT_A_DUMMY_ACCOUNT",
+          "DUMMY_SCOPE_INVALID",
+          "DUMMY_CREATE_FAILED"
         ]
       },
       "CurriculumOption": {
@@ -1847,6 +2084,152 @@
                 "description": "Saved semester picks deleted because they belonged to the old curriculum"
               }
             }
+          }
+        }
+      },
+      "DummyCredentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "aina-3f9a+clerk_test@graduate.utm.my"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 20,
+            "description": "Generated one-time password. Returned once and never stored by the application."
+          }
+        }
+      },
+      "CreateDummyUserRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "name",
+              "curriculumId",
+              "learningCentreId",
+              "reason"
+            ],
+            "properties": {
+              "role": {
+                "const": "STUDENT"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "curriculumId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "learningCentreId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "$ref": "#/components/schemas/Reason"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "name",
+              "programmeId",
+              "learningCentreId",
+              "reason"
+            ],
+            "properties": {
+              "role": {
+                "const": "COORDINATOR"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "programmeId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "learningCentreId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "$ref": "#/components/schemas/Reason"
+              }
+            }
+          }
+        ]
+      },
+      "CreateDummyUserEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "account",
+              "credentials"
+            ],
+            "properties": {
+              "account": {
+                "$ref": "#/components/schemas/AccountDetail"
+              },
+              "credentials": {
+                "$ref": "#/components/schemas/DummyCredentials"
+              }
+            }
+          }
+        }
+      },
+      "DummyCapacityEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "used",
+              "limit"
+            ],
+            "properties": {
+              "used": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer",
+                "example": 100
+              }
+            }
+          }
+        }
+      },
+      "DummyCredentialsEnvelope": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DummyCredentials"
           }
         }
       }

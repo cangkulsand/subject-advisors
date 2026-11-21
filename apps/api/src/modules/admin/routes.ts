@@ -5,6 +5,13 @@ import type { AccountDetailRow, AccountRow, AdminDependencies } from './contract
 import { AdminMutationError } from './errors';
 import { checkRoleEligibility } from './eligibility';
 import { handleAcademicSetupRequest } from './academic-routes';
+import { DUMMY_CLERK_USER_LIMIT, dummyEmail, dummyMatric, isDummyEmail, validateCreateDummyUserRequest, validateResetDummyPasswordRequest } from '../../../../../packages/shared/src/admin/dummy';
+import { generateDummyPassword } from './dummy-password';
+
+/** Lower-case hex or decimal digits from the platform CSPRNG (dummy email suffix, fake matric). */
+function randomDigits(count: number, radix: 16 | 10): string {
+  return [...crypto.getRandomValues(new Uint8Array(count))].map(byte => (byte % radix).toString(radix)).join('');
+}
 
 function invalid(message: string): never { throw new AuthError(400, 'INVALID_ADMIN_QUERY', message); }
 function positive(value: string, label: string) {
@@ -97,6 +104,46 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
     const roleDelete = /^\/api\/admin\/users\/([1-9]\d*)\/roles\/([^/]+)$/.exec(url.pathname);
     const invitationDelete = /^\/api\/admin\/invitations\/([^/]+)$/.exec(url.pathname);
 
+    // Dummy users (S3-P004-029). The password is generated here, sent to Clerk and returned once; it is never stored or logged.
+    if (url.pathname === '/api/admin/dummy-users/capacity') {
+      const denied = allow('GET'); if (denied) return denied;
+      parameters(url, []);
+      return authJson({ data: { used: await deps.identities.userCount(), limit: DUMMY_CLERK_USER_LIMIT } });
+    }
+    if (url.pathname === '/api/admin/dummy-users') {
+      const denied = allow('POST'); if (denied) return denied;
+      parameters(url, []);
+      const input = validated(validateCreateDummyUserRequest(await readJson(request)));
+      if (input.role === 'STUDENT' && await deps.repository.currentSemesterId() === null) throw new AdminMutationError('ACADEMIC_SEMESTER_UNAVAILABLE');
+      if (await deps.identities.userCount() >= DUMMY_CLERK_USER_LIMIT) throw new AdminMutationError('DUMMY_LIMIT_REACHED');
+      const email = dummyEmail(input.name, input.role, randomDigits(4, 16));
+      if (!checkRoleEligibility({ address: email, verified: true }, [input.role]).eligible) throw new AdminMutationError('ROLE_NOT_ELIGIBLE');
+      const password = generateDummyPassword();
+      let clerkUserId: string;
+      try { clerkUserId = (await deps.identities.createUser({ email, firstName: input.name, password })).clerkUserId; }
+      catch { throw new AdminMutationError('DUMMY_CREATE_FAILED'); }
+      try {
+        const created = await deps.repository.createDummyAccount(clerkUserId, input, dummyMatric(randomDigits(6, 10)), actor, input.reason);
+        return authJson({ data: { account: await detail(created, deps), credentials: { email, password } } }, 201);
+      } catch (error) {
+        // No orphan login: the Clerk user exists only if the account does.
+        await deps.identities.deleteUser(clerkUserId).catch(() => undefined);
+        throw error;
+      }
+    }
+    const dummyPassword = /^\/api\/admin\/users\/([1-9]\d*)\/dummy-password$/.exec(url.pathname);
+    if (dummyPassword) {
+      const denied = allow('POST'); if (denied) return denied;
+      parameters(url, []);
+      validated(validateResetDummyPasswordRequest(await readJson(request)));
+      const account = await deps.repository.account(positive(dummyPassword[1]!, 'account ID'));
+      if (!account) throw new AdminMutationError('NOT_FOUND');
+      const email = (await deps.identities.lookup([account.clerkUserId])).get(account.clerkUserId)?.email ?? null;
+      if (!email || !isDummyEmail(email)) throw new AdminMutationError('NOT_A_DUMMY_ACCOUNT');
+      const password = generateDummyPassword();
+      await deps.identities.setPassword(account.clerkUserId, password);
+      return authJson({ data: { email, password } });
+    }
     if (url.pathname === '/api/admin/users' && method === 'POST') {
       parameters(url, []);
       const input = validated(validateCreateAccountRequest(await readJson(request)));

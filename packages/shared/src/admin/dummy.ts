@@ -48,9 +48,8 @@ export function validateCreateDummyUserRequest(body: unknown): AdminValidation<C
     : { role, name, programmeId: scope, learningCentreId, reason } };
 }
 
-export function validateResetDummyPasswordRequest(body: unknown): AdminValidation<{ reason: string }> {
-  const record = asRecord(body, ['reason']);
-  if (typeof record === 'string') return { ok: false, error: record };
-  const reason = normaliseReason(record.reason);
-  return reason ? { ok: true, value: { reason } } : { ok: false, error: 'Reason is required.' };
+/** A password reset is a confirm with an empty body: there is no audit table for it, so no reason is collected. */
+export function validateResetDummyPasswordRequest(body: unknown): AdminValidation<Record<string, never>> {
+  const record = asRecord(body, []);
+  return typeof record === 'string' ? { ok: false, error: record } : { ok: true, value: {} };
 }

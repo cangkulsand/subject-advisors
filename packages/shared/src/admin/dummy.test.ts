@@ -61,9 +61,9 @@ describe('validateCreateDummyUserRequest', () => {
 });
 
 describe('validateResetDummyPasswordRequest', () => {
-  it('needs a reason and nothing else', () => {
-    expect(validateResetDummyPasswordRequest({ reason: ' lost it ' })).toEqual({ ok: true, value: { reason: 'lost it' } });
-    expect(validateResetDummyPasswordRequest({ reason: '' }).ok).toBe(false);
-    expect(validateResetDummyPasswordRequest({ reason: 'x', password: 'y' }).ok).toBe(false);
+  it('takes an empty body only (a confirm, no reason: nothing could store it)', () => {
+    expect(validateResetDummyPasswordRequest({})).toEqual({ ok: true, value: {} });
+    expect(validateResetDummyPasswordRequest({ reason: 'x' }).ok).toBe(false);
+    expect(validateResetDummyPasswordRequest(null).ok).toBe(false);
   });
 });
