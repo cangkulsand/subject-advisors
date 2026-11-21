@@ -139,7 +139,8 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       const account = await deps.repository.account(positive(dummyPassword[1]!, 'account ID'));
       if (!account) throw new AdminMutationError('NOT_FOUND');
       const email = (await deps.identities.lookup([account.clerkUserId])).get(account.clerkUserId)?.email ?? null;
-      if (!email || !isDummyEmail(email)) throw new AdminMutationError('NOT_A_DUMMY_ACCOUNT');
+      // A dummy that somehow holds SYSTEM_ADMIN must never have an admin-issued password.
+      if (!email || !isDummyEmail(email) || account.roles.includes('SYSTEM_ADMIN')) throw new AdminMutationError('NOT_A_DUMMY_ACCOUNT');
       const password = generateDummyPassword();
       await deps.identities.setPassword(account.clerkUserId, password);
       return authJson({ data: { email, password } });

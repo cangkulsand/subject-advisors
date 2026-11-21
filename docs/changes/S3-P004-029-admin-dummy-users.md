@@ -44,12 +44,25 @@ Decisions made during the build:
 - **Scope checks run as guards before the inserts.** A non-interactive transaction cannot check whether an earlier statement wrote a row.
 - **The create dialog keeps the name "Create dummy user"** after success, for screen readers.
 
+Final review (fresh reviewer, whole branch): no critical findings.
+- Fixed: a dummy could be given System Admin through "Add role" and then have its password reset. `checkRoleEligibility` now refuses SYSTEM_ADMIN for any `+clerk_test` address (covers add, invite, grant and invitation redemption), and reset refuses accounts holding SYSTEM_ADMIN. Three tests added.
+- For the owner: test code `424242` plus a guessable email is a weak second factor on a database shared with prod. This is documented in `docs/clerk.md`.
+- Deferred minors (not fixed):
+  - a failed Clerk clean-up is silent;
+  - the capacity check can race;
+  - resets have no in-app audit row;
+  - Copy button feedback is not announced to screen readers;
+  - focus is lost when the credentials appear;
+  - the readability guard does not inspect the open credentials panel at 375px;
+  - the "not active" message is shown for a programme with no faculty;
+  - the new pill uses raw hex colours.
+
 ## 3. Verification
 
 | Check | Result |
 | --- | --- |
 | `npm run typecheck`, `npm run lint` | PASS |
-| `npm test` | 1895 passed, 67 skipped |
+| `npm test` | 1898 passed, 67 skipped |
 | `npm run test:ui:admin` | 57 PASS (6 new, readability guard included) |
 | `node tools/admin/test-academic-database.mjs` (disposable PostgreSQL) | new dummy tests PASS; 20/21 overall. The one failure ("allows NULL and mixed-case active programme status…") also fails on `main` (18/19), so it was there before this change |
 

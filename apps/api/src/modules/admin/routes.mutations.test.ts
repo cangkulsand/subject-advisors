@@ -496,4 +496,22 @@ describe('dummy users (S3-P004-029)', () => {
     expect((await send(deps, '/api/admin/users/5/dummy-password', 'POST', {})).status).toBe(404);
     expect(deps.identities.setPassword).not.toHaveBeenCalled();
   });
+
+  it('refuses to reset the password of a dummy that holds SYSTEM_ADMIN (S3-P004-029 review)', async () => {
+    const deps = fixture();
+    deps.identities.lookup = vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'D', email: 'd-1a2b+clerk_test@utm.my', emailVerified: true }]]));
+    mocked(deps, 'account').mockResolvedValue({ ...account, roles: ['COORDINATOR', 'SYSTEM_ADMIN'] });
+    const response = await send(deps, '/api/admin/users/5/dummy-password', 'POST', {});
+    expect(response.status).toBe(409);
+    expect((await json(response)).error.code).toBe('NOT_A_DUMMY_ACCOUNT');
+    expect(deps.identities.setPassword).not.toHaveBeenCalled();
+  });
+
+  it('refuses to grant SYSTEM_ADMIN to a dummy account', async () => {
+    const deps = fixture();
+    deps.identities.lookup = vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'D', email: 'd-1a2b+clerk_test@utm.my', emailVerified: true }]]));
+    const response = await send(deps, '/api/admin/users/5/roles', 'POST', { role: 'SYSTEM_ADMIN', reason });
+    expect(response.status).toBe(422);
+    expect(deps.repository.grantRole).not.toHaveBeenCalled();
+  });
 });

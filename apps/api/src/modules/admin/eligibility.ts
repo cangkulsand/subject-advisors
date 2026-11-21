@@ -1,6 +1,7 @@
 import type { AdminRole } from '../../../../../packages/shared/src/admin/admin';
 import { eligibleRoles } from '../auth/policy';
 import type { VerifiedIdentity } from '../auth/contracts';
+import { isDummyEmail } from '../../../../../packages/shared/src/admin/dummy';
 
 export interface EligibilityResult { eligible: boolean; ineligible: AdminRole[] }
 
@@ -13,6 +14,7 @@ export function checkRoleEligibility(email: { address: string; verified: boolean
   if (!email?.verified || roles.length === 0) return { eligible: false, ineligible: [...roles] };
   const identity: VerifiedIdentity = { clerkUserId: 'eligibility-check', sessionId: 'eligibility-check', primaryEmail: email };
   const allowed = new Set(eligibleRoles(identity, { clerkUserId: identity.clerkUserId, appRole: 'STUDENT', accessStatus: 'ACTIVE', roles: [...roles] }));
-  const ineligible = roles.filter(role => !allowed.has(role));
+  // Dummy (+clerk_test) logins have admin-issued passwords and accept test code 424242: never System Admin (S3-P004-029).
+  const ineligible = roles.filter(role => !allowed.has(role) || (role === 'SYSTEM_ADMIN' && isDummyEmail(email.address)));
   return { eligible: ineligible.length === 0, ineligible };
 }

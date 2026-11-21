@@ -226,4 +226,6 @@ System admins can create test logins from **Users & Access → Create dummy user
 - If Clerk asks for a verification code (new device), enter `424242`. This works only for `+clerk_test` emails on a development instance.
 - The development instance allows **100 users**. The dialog shows how many are in use, and creation stops at the limit.
 - Dev and prod share this Clerk instance and the Neon database, so a dummy made on one shows on the other.
+- A `+clerk_test` email can never hold **System Admin**: adding the role, inviting or accepting an invitation is refused, and Reset password refuses any account that holds it.
+- Risk to know: with code `424242`, anyone who knows a dummy's email can pass a Clerk email-code prompt. Because the database is shared with prod, a dummy coordinator sees real students in its scope. Keep email-code sign-in and "forgot password" off in the Clerk dashboard, and suspend dummies you no longer need.
 - Removing a dummy: suspend the account (this also bans it in Clerk). Access rows cannot be deleted (see the database audit rules).

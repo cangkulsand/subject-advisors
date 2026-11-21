@@ -222,6 +222,11 @@ describe('database error mapping', () => {
 
 describe('role eligibility', () => {
   const verified = (address: string) => ({ address, verified: true });
+  it('never lets a dummy (+clerk_test) address hold SYSTEM_ADMIN (S3-P004-029 review)', () => {
+    expect(checkRoleEligibility(verified('d-1a2b+clerk_test@utm.my'), ['SYSTEM_ADMIN'])).toEqual({ eligible: false, ineligible: ['SYSTEM_ADMIN'] });
+    expect(checkRoleEligibility(verified('d-1a2b+CLERK_TEST@graduate.utm.my'), ['STUDENT', 'SYSTEM_ADMIN'])).toEqual({ eligible: false, ineligible: ['SYSTEM_ADMIN'] });
+    expect(checkRoleEligibility(verified('d-1a2b+clerk_test@utm.my'), ['COORDINATOR'])).toEqual({ eligible: true, ineligible: [] });
+  });
   it('requires an exact verified graduate.utm.my address for STUDENT', () => {
     expect(checkRoleEligibility(verified('a@graduate.utm.my'), ['STUDENT'])).toEqual({ eligible: true, ineligible: [] });
     expect(checkRoleEligibility(verified('a@utm.my'), ['STUDENT'])).toEqual({ eligible: false, ineligible: ['STUDENT'] });
