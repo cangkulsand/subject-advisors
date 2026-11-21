@@ -315,4 +315,16 @@ describe('offering picks', () => {
     expect(fake.withdrawals).toEqual([]);
     expect((await readSet(deps)).pickCounts).toEqual([{ subjectId: A, pickCount: 3 }]);
   });
+
+  it('after a Normal current semester with a Short one next, only the next Normal semester can be planned (S3-P004-031)', async () => {
+    const { deps, fake } = fixture({ scopes: { ...testScopeProvider, currentSemesterId: vi.fn(async () => 2) } });
+    deps.repository.semesters = vi.fn(async () => [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1 as const, semesterType: 'NORMAL' as const }, { semesterId: 2, academicYear: '2026/2027', semesterNumber: 2 as const, semesterType: 'NORMAL' as const }, { semesterId: 3, academicYear: '2026/2027', semesterNumber: 3 as const, semesterType: 'SHORT' as const }, { semesterId: 4, academicYear: '2027/2028', semesterNumber: 1 as const, semesterType: 'NORMAL' as const }]);
+    const shortSet = await readData<OfferingDecisionSet>(await get(deps, 'offering-decisions?programmeId=5&learningCentreId=1&targetSemesterId=3'));
+    expect(shortSet.editable).toBe(false);
+    const shortWrite = await post(deps, { scope: { ...scope, targetSemesterId: 3 }, subjectId: A, status: 'APPROVED', expectedStatus: 'PENDING', importBatchId: null });
+    expect(await errorCode(shortWrite)).toBe('SEMESTER_READ_ONLY');
+    expect(fake.audit).toEqual([]);
+    const normalSet = await readData<OfferingDecisionSet>(await get(deps, 'offering-decisions?programmeId=5&learningCentreId=1&targetSemesterId=4'));
+    expect(normalSet.editable).toBe(true);
+  });
 });

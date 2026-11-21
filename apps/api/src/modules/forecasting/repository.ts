@@ -46,10 +46,11 @@ export function createForecastingRepository(query: ForecastingQuery, transaction
     try { return await operation(); } catch (error) { throw mapForecastingDatabaseError(error); }
   };
   return {
-    semesters: () => read(async () => (await query(`SELECT semester_id, academic_year, semester_no, ${isoSql('selection_opens_at')} AS selection_opens_at,
+    semesters: () => read(async () => (await query(`SELECT semester_id, academic_year, semester_no, semester_type, ${isoSql('selection_opens_at')} AS selection_opens_at,
         ${isoSql('selection_closes_at')} AS selection_closes_at FROM public.academic_semester ORDER BY academic_year, semester_no`, []))
       .map((row) => ({
         semesterId: integer(row.semester_id), academicYear: text(row.academic_year), semesterNumber: integer(row.semester_no) as 1 | 2 | 3,
+        ...(row.semester_type === 'SHORT' || row.semester_type === 'NORMAL' ? { semesterType: row.semester_type as 'NORMAL' | 'SHORT' } : {}),
         selectionOpensAt: row.selection_opens_at == null ? null : text(row.selection_opens_at), selectionClosesAt: row.selection_closes_at == null ? null : text(row.selection_closes_at),
       }))),
 

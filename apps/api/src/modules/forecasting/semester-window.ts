@@ -1,12 +1,12 @@
 import type { SemesterOption } from '../../../../../packages/shared/src/forecasting/contracts';
 import { selectionPhase, type SelectionPhase, type SelectionWindow } from '../../../../../packages/shared/src/forecasting/selection-window';
-import { nextSemesterAfter } from '../../../../../packages/shared/src/offerings/confirmed-offerings';
+import { coordinatorTargetSemester } from '../../../../../packages/shared/src/forecasting/target-semester';
 import type { ForecastingDependencies } from './contracts';
 import { ForecastingError } from './errors';
 
 export interface SemesterWindow {
   semester: SemesterOption & SelectionWindow;
-  /** True when the semester is the one after the current semester (the only one that can be planned). */
+  /** True when the semester is the coordinator target: the next NORMAL semester after the current one (the only one that can be planned; S3-P004-031). */
   isNext: boolean;
   phase: SelectionPhase;
 }
@@ -17,8 +17,7 @@ export async function resolveSemesterWindow(deps: ForecastingDependencies, targe
   const found = semesters.find((semester) => semester.semesterId === targetSemesterId);
   if (!found) throw new ForecastingError('SCOPE_NOT_FOUND');
   const semester = { ...found, selectionOpensAt: found.selectionOpensAt ?? null, selectionClosesAt: found.selectionClosesAt ?? null };
-  const next = currentSemesterId === null ? null
-    : nextSemesterAfter(String(currentSemesterId), semesters.map((s) => ({ semesterId: String(s.semesterId), academicYear: s.academicYear, semesterNo: s.semesterNumber })));
+  const next = coordinatorTargetSemester(currentSemesterId, semesters);
   const clock = (deps.now ?? (() => new Date()))();
-  return { semester, isNext: next?.semesterId === String(targetSemesterId), phase: selectionPhase(semester, clock) };
+  return { semester, isNext: next?.semesterId === targetSemesterId, phase: selectionPhase(semester, clock) };
 }

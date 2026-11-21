@@ -561,4 +561,13 @@ describe('coordinator export format (S2-P004-010)', () => {
     expect(response.status).toBe(201);
     expect((await response.json()).data.validationReport.coordinatorExport).toMatchObject({ skippedOtherCentre: 6 });
   });
+
+  it('skips a Short next semester: the coordinator target is the next Normal semester (S3-P004-031)', async () => {
+    const scopes: ScopeProvider = { ...assignedTo([5, 2]), currentSemesterId: vi.fn(async () => 2) };
+    const { deps } = fixture({ scopes });
+    deps.repository.semesters = vi.fn(async () => [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1 as const, semesterType: 'NORMAL' as const }, { semesterId: 2, academicYear: '2026/2027', semesterNumber: 2 as const, semesterType: 'NORMAL' as const }, { semesterId: 3, academicYear: '2026/2027', semesterNumber: 3 as const, semesterType: 'SHORT' as const }, { semesterId: 4, academicYear: '2027/2028', semesterNumber: 1 as const, semesterType: 'NORMAL' as const }]);
+    const body = await (await send(deps, 'forecast-context', { method: 'GET' })).json();
+    expect(body.data).toMatchObject({ currentSemesterId: 2, targetSemesterId: 4 });
+    expect(body.data.targetSemesters.map((s: { semesterId: number }) => s.semesterId)).toEqual([4]);
+  });
 });

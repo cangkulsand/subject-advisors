@@ -3,7 +3,7 @@ import { IMPORT_CSV_HEADER, IMPORT_LIMITS } from '../../../../../packages/shared
 import type {
   AcceptedImport, ForecastContext, ForecastScope, ForecastSubjectOption, ImportSummary, ImportValidationReport, SemesterOption,
 } from '../../../../../packages/shared/src/forecasting/contracts';
-import { nextSemesterAfter } from '../../../../../packages/shared/src/offerings/confirmed-offerings';
+import { coordinatorTargetSemester } from '../../../../../packages/shared/src/forecasting/target-semester';
 import type { ForecastingDependencies, ImportBatchRow, StoredValidationSummary } from './contracts';
 import { ForecastingError } from './errors';
 import { bad, decodeCursor, encodeCursor, errorResponse, methodNotAllowed, noStore, onlyParameters, positive, readBounded, readJson, sha256Hex } from './http';
@@ -115,9 +115,8 @@ function ifMatchValue(request: Request): string {
 async function resolveTarget(deps: ForecastingDependencies): Promise<{ currentSemesterId: number | null; target: SemesterOption | null }> {
   const [currentSemesterId, semesters] = await Promise.all([deps.scopes.currentSemesterId(), deps.repository.semesters()]);
   if (currentSemesterId === null) return { currentSemesterId, target: null };
-  const next = nextSemesterAfter(String(currentSemesterId), semesters.map((s) => ({ semesterId: String(s.semesterId), academicYear: s.academicYear, semesterNo: s.semesterNumber })));
-  const target = next ? semesters.find((s) => String(s.semesterId) === next.semesterId) ?? null : null;
-  return { currentSemesterId, target };
+  // Coordinators forecast the next NORMAL semester; Short semesters are arranged outside the app (S3-P004-031).
+  return { currentSemesterId, target: coordinatorTargetSemester(currentSemesterId, semesters) };
 }
 
 async function requireScope(deps: ForecastingDependencies, actor: string, scope: Pick<ForecastScope, 'programmeId' | 'learningCentreId'>) {

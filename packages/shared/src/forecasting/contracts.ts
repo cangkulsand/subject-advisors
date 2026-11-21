@@ -41,6 +41,8 @@ export interface ProgrammeOption { programmeId: Int32Id; programmeCode: string; 
 export interface CentreOption { learningCentreId: Int32Id; centreCode: string; centreName: string }
 export interface SemesterOption {
   semesterId: Int32Id; academicYear: string; semesterNumber: 1 | 2 | 3;
+  /** Admin-set Normal or Short type; coordinators skip Short semesters (S3-P004-031). Absent means Normal. */
+  semesterType?: 'NORMAL' | 'SHORT';
   /** Admin-set selection window (UTC ISO); null when not scheduled. */
   selectionOpensAt?: string | null; selectionClosesAt?: string | null;
 }
