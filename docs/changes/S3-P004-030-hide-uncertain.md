@@ -1,6 +1,6 @@
 # S3-P004-030 — Forecast: show uncertain students as "Not counted"
 
-- **Status:** Implemented on branch; not merged or deployed
+- **Status:** Merged to main and pushed to dev and prod (2026-11-21); independent review pending
 - **Date:** 2026-11-21
 - **Sprint:** Sprint 3
 - **Owner:** P004 (coordinator forecast UI)
