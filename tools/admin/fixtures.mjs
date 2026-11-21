@@ -76,6 +76,8 @@ export function fixtureResponse(url, state = {}) {
     return profile ? programmeOf(profile) : null;
   }
   if (url.pathname === '/api/admin/curriculum-options') return curricula;
+  // Dummy users (S3-P004-029).
+  if (url.pathname === '/api/admin/dummy-users/capacity') return { used: state.dummyUsed ?? 52, limit: 100 };
   if (url.pathname === '/api/admin/invitations') {
     const status = url.searchParams.get('status');
     return paged(state.empty ? [] : store(state).invitations.filter(item => !status || item.status === status), url);
@@ -89,6 +91,22 @@ export function fixtureMutation(method, url, body, state = {}) {
   const academic = academicMutation(method, url, body, state, data.accounts);
   if (academic !== undefined) return academic;
   const audit = (account, action, role, before, after, reason) => data.events.unshift({ eventId: 'mutation:' + data.events.length, accountId: account.accountId, target: account.clerkUserId, actor: 'user_test', kind: action === 'ACCESS_STATUS_CHANGE' ? 'ACCESS' : 'ROLE', action, role, before, after, reason, occurredAt: now });
+  // Dummy users (S3-P004-029): fixed fictional credentials so the browser checks can read them.
+  const dummyReset = /^\/api\/admin\/users\/(\d+)\/dummy-password$/.exec(url.pathname);
+  if (method === 'POST' && dummyReset) {
+    const account = data.accounts.find(item => item.accountId === Number(dummyReset[1]));
+    if (!account) return failure(404, 'NOT_FOUND', 'The requested account or invitation was not found.');
+    if (!account.identity.email?.includes('+clerk_test@')) return failure(409, 'NOT_A_DUMMY_ACCOUNT', 'Only dummy accounts can have their password reset here.');
+    return { status: 200, payload: { data: { email: account.identity.email, password: 'Fixture-New-Pass-12' } } };
+  }
+  if (method === 'POST' && url.pathname === '/api/admin/dummy-users') {
+    if (state.dummyError) return failure(409, state.dummyError, 'Fixture message for ' + state.dummyError);
+    const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'dummy';
+    const email = slug + '-0a1b+clerk_test@' + (body.role === 'STUDENT' ? 'graduate.utm.my' : 'utm.my');
+    const created = { accountId: data.nextId++, clerkUserId: 'user_fictional_dummy_' + data.nextId, roles: [body.role], accessStatus: 'ACTIVE', protectedOwner: false, createdAt: now, updatedAt: now, identity: { state: 'available', name: body.name, email, emailVerified: true } };
+    data.accounts.push(created);
+    return { status: 201, payload: { data: { account: detailOf(created), credentials: { email, password: 'Fixture-Pass-123456' } } } };
+  }
   if (typeof body?.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 500) return failure(400, 'INVALID_REQUEST', 'Reason is required (1-500 characters).');
   const reason = body.reason.trim();
   if (method === 'POST' && url.pathname === '/api/admin/users') {

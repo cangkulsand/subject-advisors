@@ -82,3 +82,19 @@ it('changeProgramme PATCHes the curriculum with a reason and decodes the removed
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'PROGRAMME_UNCHANGED', message: 'The student is already on this programme.' } }, { status: 409 })));
   await expect(createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).rejects.toMatchObject({ status: 409, code: 'PROGRAMME_UNCHANGED' });
 });
+it('dummy users: reads capacity, POSTs a create and a reset, and rejects malformed credentials (S3-P004-029)', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { used: 52, limit: 100 } })));
+  expect(await createAdminClient(async () => 'TEST_ONLY').dummyCapacity()).toEqual({ used: 52, limit: 100 });
+  const accountRow = { accountId: 24, clerkUserId: 'user_dummy', roles: ['STUDENT'], accessStatus: 'ACTIVE', protectedOwner: false, createdAt: '2026-11-21T00:00:00Z', updatedAt: '2026-11-21T00:00:00Z',
+    identity: { state: 'available', name: 'Aina', email: 'aina-0a1b+clerk_test@graduate.utm.my', emailVerified: true }, memberships: [] };
+  const credentials = { email: 'aina-0a1b+clerk_test@graduate.utm.my', password: 'Fixture-Pass-123456' };
+  const create = vi.fn(async () => Response.json({ data: { account: accountRow, credentials } }, { status: 201 })); vi.stubGlobal('fetch', create);
+  const input = { role: 'STUDENT' as const, name: 'Aina', curriculumId: 1, learningCentreId: 1, reason: 'Why' };
+  expect(await createAdminClient(async () => 'TEST_ONLY').createDummyUser(input)).toEqual({ account: accountRow, credentials });
+  expect(create).toHaveBeenCalledWith('/api/admin/dummy-users', expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }));
+  const reset = vi.fn(async () => Response.json({ data: credentials })); vi.stubGlobal('fetch', reset);
+  expect(await createAdminClient(async () => 'TEST_ONLY').resetDummyPassword(24)).toEqual(credentials);
+  expect(reset).toHaveBeenCalledWith('/api/admin/users/24/dummy-password', expect.objectContaining({ method: 'POST', body: '{}' }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { email: 'x', password: '' } })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').resetDummyPassword(24)).rejects.toThrow('Invalid administration response');
+});

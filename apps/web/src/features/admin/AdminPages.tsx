@@ -5,6 +5,9 @@ import { AppLink } from '../../app/navigation';
 import { AdminApiError, type AdminClient } from './client';
 import { AddUserDialog, ReasonDialog, roleLabels as labels } from './AdminUserManagement';
 import { StudentProgrammeCard } from './StudentProgrammeCard';
+import { CreateDummyUserDialog, ResetDummyPasswordDialog } from './DummyUserDialog';
+import type { AcademicSetupClient } from './academic-client';
+import { isDummyEmail } from '../../../../../packages/shared/src/admin/dummy';
 import { ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import { IconButton, PagerButtons } from '../../components/icon-button/IconButton';
@@ -38,6 +41,8 @@ function PageHeading({ title, text, refresh, action }: { title: string; text: st
 }
 export function RolePills({ roles }: { roles: AdminRole[] }) { return <span className="admin-pills">{roles.length ? roles.map(role => <span className={`admin-pill admin-role-${role.toLowerCase()}`} key={role}>{labels[role]}</span>) : <span className="admin-pill">No memberships</span>}</span>; }
 function AccessPill({ status }: { status: AdminAccount['accessStatus'] }) { return <span className={`admin-pill admin-status-${status.toLowerCase()}`}>{status === 'ACTIVE' ? 'Active' : 'Suspended'}</span>; }
+/** Dummy users (S3-P004-029) are recognised by their +clerk_test sign-in email. */
+function DummyPill({ account }: { account: AdminAccount }) { return isDummyEmail(account.identity.email) ? <span className="admin-pill admin-dummy-pill">Dummy</span> : null; }
 function Identity({ account }: { account: AdminAccount }) {
   const value = account.identity;
   return <div className="admin-identity"><strong>{value.state === 'available' ? value.name ?? value.email ?? 'Unnamed account' : value.state === 'not_found' ? 'Clerk identity not found' : 'Identity unavailable'}</strong>
@@ -68,14 +73,14 @@ export function AdminOverviewPage({ client }: { client: AdminClient }) {
     </>}</Panel></>;
 }
 function InviteIcon() { return <svg className="admin-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>; }
-export function AdminUsersPage({ client, search }: { client: AdminClient; search: string }) {
+export function AdminUsersPage({ client, academic, search }: { client: AdminClient; academic?: AcademicSetupClient; search: string }) {
   const usersTable = useRef<HTMLTableElement>(null);
   useLayoutEffect(() => keepTableRoles(usersTable.current));
   const parameters = new URLSearchParams(search);
   const [filters, setFilters] = useState<AdminUsersQuery>({ page: 1, q: '', role: ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'].includes(parameters.get('role') ?? '') ? parameters.get('role') as AdminRole : '', status: ['ACTIVE', 'SUSPENDED'].includes(parameters.get('status') ?? '') ? parameters.get('status') as 'ACTIVE' | 'SUSPENDED' : '' });
   const [invited, setInvited] = useState(false), [invitationFilter, setInvitationFilter] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
   const [term, setTerm] = useState('');
-  const [changes, setChanges] = useState(0), [notice, setNotice] = useState<{ text: string; accountId?: number }>(), [adding, setAdding] = useState(false), [target, setTarget] = useState<AdminInvitation>();
+  const [changes, setChanges] = useState(0), [notice, setNotice] = useState<{ text: string; accountId?: number }>(), [adding, setAdding] = useState(false), [dummy, setDummy] = useState(false), [target, setTarget] = useState<AdminInvitation>();
   const showInvitations = invited || !filters.status, invitationQuery = invited ? invitationFilter : { page: 1, status: 'PENDING' as const };
   const accounts = useRead(signal => invited ? Promise.resolve(null) : client.users(filters, signal), 'users:' + changes + ':' + invited + ':' + JSON.stringify(filters));
   const invitations = useRead(signal => showInvitations ? client.listInvitations(invitationQuery, signal) : Promise.resolve(null), 'invitations:' + changes + ':' + showInvitations + ':' + JSON.stringify(invitationQuery));
@@ -85,7 +90,7 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
   const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined;
   const reset = () => { setTerm(''); setInvited(false); setInvitationFilter({ page: 1, status: 'PENDING' }); setFilters({ page: 1, q: '', role: '', status: '' }); retry(); };
   return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations. Invitations are valid for 7 days." refresh={retry}
-      action={<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button>}/>
+      action={<div className="admin-heading-actions">{academic && <button type="button" className="admin-icon-button" aria-haspopup="dialog" onClick={() => setDummy(true)}>Create dummy user</button>}<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>}/>
     <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice.text} {notice.accountId && <AppLink href={'/admin/users/' + notice.accountId}>View account →</AppLink>}</p>}</div>
     <section className="admin-card admin-users-card" aria-label="Users and invitations">
       <TableToolbar label="Search and filter users" onSubmit={() => { setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>
@@ -107,13 +112,14 @@ export function AdminUsersPage({ client, search }: { client: AdminClient; search
             <td data-label="">{item.status === 'PENDING' && <button type="button" className="admin-row-action" onClick={() => setTarget(item)}>Revoke<span className="admin-sr-only"> invitation for {item.email}</span></button>}</td>
           </tr>)}</tbody>}
           {!!accountRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Accounts ({accounts.data?.total ?? accountRows.length})</th></tr>{accountRows.map(account => <tr key={account.accountId}>
-            <td data-label="Account"><Identity account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td data-label="Roles"><RolePills roles={account.roles}/></td><td data-label="Status"><AccessPill status={account.accessStatus}/></td><td data-label="Updated"><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td data-label=""><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
+            <td data-label="Account"><Identity account={account}/><DummyPill account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</td><td data-label="Roles"><RolePills roles={account.roles}/></td><td data-label="Status"><AccessPill status={account.accessStatus}/></td><td data-label="Updated"><time dateTime={account.updatedAt}>{when(account.updatedAt)}</time></td><td data-label=""><AppLink className="admin-detail-link" href={'/admin/users/' + account.accountId}>View details<span className="admin-sr-only"> for {account.identity.name ?? account.clerkUserId}</span> →</AppLink></td>
           </tr>)}</tbody>}
         </table></div>}
         {invited && invitations.data && invitations.data.total > invitations.data.pageSize && <Pager result={invitations.data} onPage={page => setInvitationFilter(old => ({ ...old, page }))}/>}
         {accounts.data && <><Pager result={accounts.data} onPage={page => setFilters(old => ({ ...old, page }))}/><p className="admin-snapshot">Retrieved {when(accounts.data.generatedAt)}</p></>}
       </>}</Panel>
     </section>
+    {dummy && academic && <CreateDummyUserDialog client={client} academic={academic} onClose={() => setDummy(false)} onCreated={done => { setDummy(false); setNotice(done); setChanges(value => value + 1); }}/>}
     {adding && <AddUserDialog client={client} onClose={() => setAdding(false)} onAdded={done => { setAdding(false); setNotice(done); setChanges(value => value + 1); }}/>}
     {target && <ReasonDialog title="Revoke invitation" confirmLabel="Revoke invitation" danger onCancel={() => setTarget(undefined)}
       description={<p>The invitation for <strong>{target.email}</strong> will stop working. You can send a new invitation later.</p>}
@@ -153,7 +159,7 @@ export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { cli
   const result = useRead(signal => client.account(accountId, signal), 'account:' + accountId);
   const [updated, setUpdated] = useState<AdminAccountDetail>();
   const [pending, setPending] = useState<PendingAction>();
-  const [notice, setNotice] = useState(''), [auditVersion, setAuditVersion] = useState(0), [grant, setGrant] = useState(''), [programmeVersion, setProgrammeVersion] = useState(0);
+  const [notice, setNotice] = useState(''), [auditVersion, setAuditVersion] = useState(0), [grant, setGrant] = useState(''), [programmeVersion, setProgrammeVersion] = useState(0), [resetting, setResetting] = useState(false);
   const account = updated ?? result.data;
   const self = !!account && !!viewerClerkUserId && account.clerkUserId === viewerClerkUserId;
   const missing = account ? ADMIN_ROLES.filter(role => !account.roles.includes(role)) : [];
@@ -168,7 +174,7 @@ export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { cli
   return <><AppLink className="admin-back" href="/admin/users">← All accounts</AppLink><PageHeading title="Account details" text="Identity, assigned memberships and recorded access changes." refresh={() => { setUpdated(undefined); result.retry(); }}/>
     <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice}</p>}</div>
     <Panel error={result.error} retry={result.retry}>{account && <>
-      <section className="admin-card"><div className="admin-account-heading"><span className="admin-account-avatar" aria-hidden="true">{(account.identity.name ?? 'A').slice(0, 1).toUpperCase()}</span><Identity account={account}/><AccessPill status={account.accessStatus}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</div>
+      <section className="admin-card"><div className="admin-account-heading"><span className="admin-account-avatar" aria-hidden="true">{(account.identity.name ?? 'A').slice(0, 1).toUpperCase()}</span><Identity account={account}/><AccessPill status={account.accessStatus}/><DummyPill account={account}/>{account.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}</div>
         <dl className="admin-account-facts"><div><dt>Primary email</dt><dd>{account.identity.email ?? 'Unavailable'}</dd></div><div><dt>Email verification</dt><dd>{account.identity.state !== 'available' ? 'Unavailable' : account.identity.emailVerified ? 'Verified' : 'Not verified'}</dd></div><div><dt>Application account created</dt><dd>{when(account.createdAt)}</dd></div><div><dt>Last access update</dt><dd>{when(account.updatedAt)}</dd></div></dl>
       </section>
       <section className="admin-card"><h2>Role memberships</h2>{!account.memberships.length ? <p>No explicit memberships are assigned.</p> : <div className="admin-memberships">{account.memberships.map(membership => <article key={membership.role}><RolePills roles={[membership.role]}/><dl><div><dt>Assigned</dt><dd>{when(membership.grantedAt)}</dd></div><div><dt>Source</dt><dd>{({ MIGRATION_COMPAT: 'Legacy role migration', LEGACY_INIT: 'Student registration', OPERATOR: 'Trusted operator' } as Record<string, string>)[membership.source] ?? membership.source}</dd></div><div><dt>Email policy</dt><dd>{membership.emailPolicy === 'OWNER_STUDENT_COORDINATOR' ? 'Protected owner exception' : 'Role eligibility policy'}</dd></div><div><dt>Reason</dt><dd>{membership.reason}</dd></div></dl>{membership.protectedOwner && <span className="admin-pill admin-owner">Protected owner</span>}
@@ -185,9 +191,12 @@ export function AdminAccountPage({ client, accountId, viewerClerkUserId }: { cli
           : self ? <p className="admin-locked">You cannot suspend your own account.</p>
           : <button type="button" className="admin-danger-outline" onClick={() => setPending({ kind: 'access', status: 'SUSPENDED' })}>Suspend account</button>}
       </section>
+      {isDummyEmail(account.identity.email) && <section className="admin-card"><h2>Dummy account</h2><p className="admin-muted">A test login. Generate a new password if the old one was lost; it is shown once.</p>
+        <button type="button" className="admin-row-action" onClick={() => setResetting(true)}>Reset password</button></section>}
       <StudentProgrammeCard client={client} accountId={accountId} version={programmeVersion} onChanged={text => { setNotice(text); setProgrammeVersion(value => value + 1); }}/>
       <AdminAuditView key={auditVersion} client={client} accountId={accountId}/>
     </>}</Panel>
+    {resetting && account && <ResetDummyPasswordDialog client={client} accountId={accountId} email={account.identity.email ?? ''} onClose={() => setResetting(false)}/>}
     {pending && copy && <ReasonDialog title={copy.title} confirmLabel={copy.confirm} danger={copy.danger} description={<p>{copy.text}</p>} onCancel={() => setPending(undefined)} onSubmit={confirm}/>}
   </>;
 }

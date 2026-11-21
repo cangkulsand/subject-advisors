@@ -480,3 +480,17 @@
   /* Three row buttons (Programmes) may share two lines here rather than push the table past the screen. */
   .admin-setup-actions { flex-wrap: wrap; white-space: normal; }
 }
+
+/* Dummy users (S3-P004-029) */
+.admin-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-dummy-pill { margin-left: 6px; color: #7a4a00; background: #fff4dc; }
+.admin-dummy-capacity { margin: 0; }
+.admin-credentials { display: grid; gap: 12px; }
+.admin-credentials-warning { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fff4dc; color: #6b3f00; font-weight: 650; }
+.admin-credentials dl { display: grid; gap: 10px; margin: 0; }
+.admin-credentials dt { font-size: var(--font-size-label); font-weight: 650; color: var(--admin-text); }
+.admin-credentials dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; }
+.admin-credentials code { padding: 6px 8px; border: 1px solid var(--admin-border); border-radius: 6px; background: var(--color-surface-subtle); font-size: var(--font-size-control); overflow-wrap: anywhere; user-select: all; }
+.admin-copy { min-height: 44px; }
+/* Two header buttons on Users & Access: let the action group shrink and wrap on narrow screens. */
+.admin-page-actions:has(.admin-heading-actions) { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; }

@@ -551,6 +551,90 @@ else {
       if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/account-mobile.png', fullPage: true });
       assert.ok(state.requests.length > 0);
     }, width);
+    // Dummy users (S3-P004-029).
+    async function openDummyDialog(page) {
+      await page.getByRole('region', { name: usersTable }).waitFor();
+      await page.getByRole('button', { name: 'Create dummy user', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Create dummy user' }); await dialog.waitFor();
+      await dialog.getByText('Clerk users: 52 of 100', { exact: true }).waitFor();
+      return dialog;
+    }
+    for (const width of [1440, 375]) await check('create dummy student: shows Clerk usage, posts the form, shows the password once, then lists the account with a Dummy badge at ' + width, async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users');
+      assert.equal(await page.locator('.admin-dummy-pill').count(), 0);
+      const dialog = await openDummyDialog(page);
+      assert.equal(await dialog.getByRole('radio', { name: 'Student', exact: true }).isChecked(), true);
+      await dialog.getByLabel('Name', { exact: true }).fill('Aina Test');
+      await dialog.getByLabel('Programme', { exact: true }).selectOption({ label: 'DEMO Not official (DEMO_A)' });
+      await dialog.getByLabel('Learning centre', { exact: true }).selectOption({ label: 'Fictional learning centre' });
+      await dialog.getByLabel(reasonLabel).fill('Testing the plan page.');
+      await dialog.getByRole('button', { name: 'Create dummy user', exact: true }).click();
+      await dialog.getByRole('heading', { name: 'Dummy user created', exact: true }).waitFor();
+      await dialog.getByText('This password is shown only once. Copy it now.', { exact: true }).waitFor();
+      await dialog.getByText('aina-test-0a1b+clerk_test@graduate.utm.my', { exact: true }).waitFor();
+      await dialog.getByText('Fixture-Pass-123456', { exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'Copy email', exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'Copy password', exact: true }).waitFor();
+      assert.deepEqual(state.bodies.at(-1), { method: 'POST', path: '/api/admin/dummy-users', body: { role: 'STUDENT', name: 'Aina Test', curriculumId: 1, learningCentreId: 1, reason: 'Testing the plan page.' } });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/dummy-created-mobile.png', fullPage: true });
+      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      assert.equal(await page.getByText('Fixture-Pass-123456').count(), 0);
+      await page.getByRole('link', { name: 'View account →' }).waitFor();
+      // The new account is number 24, on page 2; search for it.
+      await page.getByLabel('Search users', { exact: true }).fill('Aina Test'); await page.getByLabel('Search users', { exact: true }).press('Enter');
+      await page.locator('.admin-dummy-pill').first().waitFor();
+      assert.equal(await page.locator('.admin-dummy-pill').count(), 1);
+    }, width);
+    await check('create dummy coordinator lists programmes, not curricula, and posts programmeId', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users');
+      const dialog = await openDummyDialog(page);
+      await dialog.getByRole('radio', { name: 'Coordinator', exact: true }).check();
+      await dialog.getByLabel('Name', { exact: true }).fill('Lim');
+      await dialog.getByLabel('Programme', { exact: true }).selectOption({ label: 'TEST — Fictional programme' });
+      await dialog.getByLabel('Learning centre', { exact: true }).selectOption({ label: 'Fictional learning centre' });
+      await dialog.getByLabel(reasonLabel).fill('Coordinator test.');
+      await dialog.getByRole('button', { name: 'Create dummy user', exact: true }).click();
+      await dialog.getByRole('heading', { name: 'Dummy user created', exact: true }).waitFor();
+      assert.deepEqual(state.bodies.at(-1).body, { role: 'COORDINATOR', name: 'Lim', programmeId: 1, learningCentreId: 1, reason: 'Coordinator test.' });
+    });
+    for (const code of ['DUMMY_LIMIT_REACHED', 'ACADEMIC_SEMESTER_UNAVAILABLE']) await check('create dummy user keeps the dialog open and shows ' + code + ' inline', async page => {
+      await mock(page, { dummyError: code }); await page.goto(base + '/admin/users');
+      const dialog = await openDummyDialog(page);
+      await dialog.getByLabel('Name', { exact: true }).fill('Aina');
+      await dialog.getByLabel('Programme', { exact: true }).selectOption({ label: 'DEMO Not official (DEMO_A)' });
+      await dialog.getByLabel('Learning centre', { exact: true }).selectOption({ label: 'Fictional learning centre' });
+      await dialog.getByLabel(reasonLabel).fill('Testing.');
+      await dialog.getByRole('button', { name: 'Create dummy user', exact: true }).click();
+      await dialog.getByRole('alert').getByText('Fixture message for ' + code, { exact: true }).waitFor();
+      assert.equal(await dialog.getByRole('heading', { name: 'Dummy user created' }).count(), 0);
+    });
+    await check('reset password is offered only on a dummy account and shows the new password once', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/4');
+      await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Reset password' }).count(), 0);
+      await page.goto(base + '/admin/users');
+      const dialog = await openDummyDialog(page);
+      await dialog.getByLabel('Name', { exact: true }).fill('Aina');
+      await dialog.getByLabel('Programme', { exact: true }).selectOption({ label: 'DEMO Not official (DEMO_A)' });
+      await dialog.getByLabel('Learning centre', { exact: true }).selectOption({ label: 'Fictional learning centre' });
+      await dialog.getByLabel(reasonLabel).fill('Testing.');
+      await dialog.getByRole('button', { name: 'Create dummy user', exact: true }).click();
+      await dialog.getByRole('heading', { name: 'Dummy user created', exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+      await page.getByRole('link', { name: 'View account →' }).click();
+      await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
+      await page.locator('.admin-dummy-pill').first().waitFor();
+      await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+      const confirm = page.getByRole('dialog', { name: 'Reset password' }); await confirm.waitFor();
+      await confirm.getByRole('button', { name: 'Reset password', exact: true }).click();
+      await confirm.getByText('Fixture-New-Pass-12', { exact: true }).waitFor();
+      await confirm.getByText('This password is shown only once. Copy it now.', { exact: true }).waitFor();
+      assert.deepEqual(state.bodies.at(-1), { method: 'POST', path: '/api/admin/users/24/dummy-password', body: {} });
+      await confirm.getByRole('button', { name: 'Done', exact: true }).click();
+      await confirm.waitFor({ state: 'hidden' });
+    });
     await academicUiChecks({ check, mock, base });
     console.log('PASS ' + passed + ' administration browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }

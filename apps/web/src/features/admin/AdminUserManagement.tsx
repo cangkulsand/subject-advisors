@@ -8,7 +8,7 @@ export const roleLabels: Record<AdminRole, string> = { STUDENT: 'Student', COORD
 export function errorText(error: unknown) { return error instanceof AdminApiError ? error.message : 'The change could not be completed. Please retry.'; }
 
 /** A reason field with a live character counter; the counter turns into an error state beyond the limit. */
-function ReasonField({ label, value, onChange, disabled, autoFocus, textareaRef }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; autoFocus?: boolean; textareaRef?: React.Ref<HTMLTextAreaElement> }) {
+export function ReasonField({ label, value, onChange, disabled, autoFocus, textareaRef }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; autoFocus?: boolean; textareaRef?: React.Ref<HTMLTextAreaElement> }) {
   const id = useId(), length = value.trim().length, over = length > ADMIN_REASON_MAX_LENGTH;
   return <div className="admin-field"><label htmlFor={id}>{label}</label>
     <textarea id={id} ref={textareaRef} rows={3} value={value} disabled={disabled} autoFocus={autoFocus} aria-describedby={id + '-count'} aria-invalid={over || undefined} onChange={event => onChange(event.target.value)}/>

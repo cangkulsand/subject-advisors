@@ -1,4 +1,5 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
+import type { CreateDummyUserRequest, CreateDummyUserResponse, DummyCapacity, DummyCredentials } from '../../../../../packages/shared/src/admin/dummy';
 import type { AdminAccount, AdminAccountDetail, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
@@ -45,6 +46,16 @@ function overview(value: unknown): AdminOverview {
   if (!Array.isArray(data.recentEvents)) throw new Error('Invalid administration response');
   for (const event of data.recentEvents) { const row = object(event); text(row.eventId); text(row.action); text(row.occurredAt); if (!['ROLE', 'ACCESS'].includes(String(row.kind))) throw new Error('Invalid administration response'); if (row.role !== null) role(row.role); }
   return data as unknown as AdminOverview;
+}
+/** Dummy users (S3-P004-029). The password is shown once by the caller and never cached here. */
+function credentials(value: unknown): DummyCredentials {
+  const data = object(value);
+  if (!text(data.email).includes('@') || text(data.password).length < 12) throw new Error('Invalid administration response');
+  return { email: String(data.email), password: String(data.password) };
+}
+function capacity(value: unknown): DummyCapacity {
+  const data = object(value); count(data.used); count(data.limit);
+  return { used: Number(data.used), limit: Number(data.limit) };
 }
 function detail(value: unknown): AdminAccountDetail {
   account(value); const data = object(value);
@@ -98,6 +109,9 @@ export interface AdminClient {
   studentProgramme(id: number, signal?: AbortSignal): Promise<AdminStudentProgramme | null>;
   curriculumOptions(signal?: AbortSignal): Promise<AdminCurriculumOption[]>;
   changeProgramme(id: number, input: AdminChangeProgrammeRequest): Promise<AdminProgrammeChange>;
+  dummyCapacity(signal?: AbortSignal): Promise<DummyCapacity>;
+  createDummyUser(input: CreateDummyUserRequest): Promise<CreateDummyUserResponse>;
+  resetDummyPassword(accountId: number): Promise<DummyCredentials>;
 }
 interface RequestInput { method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; body?: unknown }
 export function createAdminClient(getToken: () => Promise<string | null>, baseUrl = ''): AdminClient {
@@ -147,5 +161,8 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     studentProgramme: (accountId, signal) => request('/api/admin/users/' + accountId + '/programme', studentProgramme, signal),
     curriculumOptions: signal => request('/api/admin/curriculum-options', value => { if (!Array.isArray(value)) throw new Error('Invalid administration response'); return value.map(curriculumOption); }, signal),
     changeProgramme: (accountId, input) => request('/api/admin/users/' + accountId + '/programme', programmeChange, undefined, { method: 'PATCH', body: input }),
+    dummyCapacity: signal => request('/api/admin/dummy-users/capacity', capacity, signal),
+    createDummyUser: input => request('/api/admin/dummy-users', value => { const data = object(value); return { account: detail(data.account), credentials: credentials(data.credentials) }; }, undefined, { method: 'POST', body: input }),
+    resetDummyPassword: accountId => request('/api/admin/users/' + accountId + '/dummy-password', credentials, undefined, { method: 'POST', body: {} }),
   };
 }
