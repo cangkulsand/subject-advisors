@@ -26,9 +26,9 @@ const pages: Record<string, { title: string }> = {
 const quickLinks = groups.slice(1).flatMap(group => group.links);
 
 function Overview() {
-  return <><header className="admin-page-heading"><div><h1>Overview</h1><p>Choose a workspace to import academic snapshots, plan class offerings and look back at past semesters.</p></div></header>
+  return <><header className="admin-page-heading"><div><h1>Overview</h1><p>Choose a workspace to plan class offerings from live student data and look back at past semesters.</p></div></header>
     <div className="admin-metrics coordinator-quicklinks">{quickLinks.map(link => <AppLink className="admin-card coordinator-quicklink" href={link.href} key={link.href}><strong>{link.label}</strong><span>Open workspace <span aria-hidden="true">→</span></span></AppLink>)}</div>
-    <p className="coordinator-separation-note">Coordinator planning data is separate from student academic records.</p>
+    <p className="coordinator-separation-note">The forecast reads students' own academic records and never changes them.</p>
   </>;
 }
 

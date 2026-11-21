@@ -52,4 +52,5 @@ subrequest; a `sql.transaction([...])` batch counts once.
   (for example the coordinator API's "Forecasting data is unavailable. Please retry.") show only that.
 - Incident: on 2026-11-18, "Students in the system" snapshots for SECJ (148 students) failed because the learning
   centre was read with one query per student. Fixed by a single `ANY(...)` query; an audit of every coordinator
-  action found no other per-row calls (Generate forecast ≈ 18 subrequests whatever the student count).
+  action found no other per-row calls (Generate forecast ≈ 18 subrequests whatever the student count). The live forecast
+  (S3-P004-032) is about 15 per read, also independent of the student count; View students adds one Clerk call per 100 students.

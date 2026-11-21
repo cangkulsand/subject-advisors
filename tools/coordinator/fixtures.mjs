@@ -135,7 +135,8 @@ const LIVE_KEYS = ['subjectId', 'subjectCode', 'subjectName', 'creditHours', 'cl
 function liveForecast(state) {
   state.liveReads = (state.liveReads ?? 0) + 1;
   const subjects = state.liveEmpty ? [] : liveRun(state).subjects.filter(row => !(state.liveMissing ?? []).includes(row.subjectId)).map(row => Object.fromEntries(LIVE_KEYS.map(key => [key, row[key]])));
-  return ok({ programmeId: scopeOf.programmeId, learningCentreId: scopeOf.learningCentreId, targetSemesterId: scopeOf.targetSemesterId, calculatedAt: generatedAt, studentsInScope: state.liveEmpty ? 0 : 55, subjects });
+  // `liveTargetShift`: the admin moved the current semester after the page loaded, so the server forecasts another semester.
+  return ok({ programmeId: scopeOf.programmeId, learningCentreId: scopeOf.learningCentreId, targetSemesterId: state.liveTargetShift ? 4 : scopeOf.targetSemesterId, calculatedAt: generatedAt, studentsInScope: state.liveEmpty ? 0 : 55, subjects });
 }
 function liveSubjectStudents(state, subjectId) {
   const row = state.liveEmpty ? null : liveRun(state).subjects.find(item => item.subjectId === subjectId);
@@ -190,6 +191,8 @@ export function handle(state, request) {
     // `noAssignments` / `noCurrentSemester` mirror the live DB-backed context (S2-P004-011): no scopes, and no semesters when none is marked current.
     if (state.noAssignments) return ok({ programmes: [], learningCentres: [], targetSemesters: state.noCurrentSemester ? [] : [target], assignedScopes: [], currentSemesterId: state.noCurrentSemester ? null : 1, targetSemesterId: state.noCurrentSemester ? null : 2, curricula: [], subjects: [] });
     if (state.noCurrentSemester) return ok({ programmes, learningCentres, targetSemesters: [], assignedScopes, currentSemesterId: null, targetSemesterId: null, curricula: [], subjects: [] });
+    // `noTargetSemester`: a current semester exists but no next Normal semester is configured.
+    if (state.noTargetSemester) return ok({ programmes, learningCentres, targetSemesters: [], assignedScopes, currentSemesterId: 1, targetSemesterId: null, curricula: [], subjects: [] });
     return ok({ programmes, learningCentres, targetSemesters: [target], semesters: [{ semesterId: 1, academicYear: '2026/2027', semesterNumber: 1, ...(state.history ? { selectionOpensAt: daysFromNow(-100), selectionClosesAt: daysFromNow(-60) } : {}) }, ...(state.history ? [{ semesterId: 4, academicYear: '2025/2026', semesterNumber: 3, selectionOpensAt: daysFromNow(-260), selectionClosesAt: daysFromNow(-220) }] : []), { ...target, ...selectionWindow(state) }, { semesterId: 3, academicYear: '2026/2027', semesterNumber: 3 }], assignedScopes, currentSemesterId: 1, targetSemesterId: 2, curricula: [], subjects: [] });
   }
   if (route === 'forecast-import-template' && url.searchParams.get('format') === 'coordinator') return { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="uc20-import-template-coordinator.csv"' }, text: ['courseCode,subjCode,centerName,stuname,stuMetricNo,eMail,SemesterMohon,grade,status', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,ali@example.com,2023/2024 1,B+,A', 'SECJH,SECJ1013,KUALA LUMPUR,ALI BIN ABU,SX230001ECJHF04,,,EX,A', ''].join('\n') };

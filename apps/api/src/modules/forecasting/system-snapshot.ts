@@ -11,7 +11,7 @@
  */
 import { IMPORT_LIMITS } from '../../../../../packages/shared/src/forecasting/contracts';
 import type { ForecastScope, SystemSnapshotCoverage, ValidationIssue } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { PortalStudentSelection, ProgrammeCatalogue, StoredValidationSummary } from './contracts';
+import type { PortalStudentSelection, StoredValidationSummary } from './contracts';
 import { bad, positive, readJson, sha256Hex } from './http';
 import type { RecordToStore, StudentToStore } from './validation';
 
@@ -57,8 +57,13 @@ export const portalReference = (studentId: number) => 'PORTAL-' + studentId;
  * - A record whose subject is not in the student's curriculum is unmapped and skipped (counted in the coverage).
  * - Recognized credits above the subject's catalogue credits are not trusted and stored as unknown (null) so the engine treats credit evidence as missing.
  */
+/** What the selection needs from the catalogue: credit hours per subject of each curriculum (a `ProgrammeCatalogue` or the engine curricula). */
+export interface SnapshotCatalogue { programmeId: number; curricula: Array<{ curriculumId: number; subjects: Array<{ subjectId: number; creditHours: number }> }> }
+
+/** `fingerprint: false` (live forecast, S3-P004-032) skips the sha256 of the selection, which only a stored snapshot needs; `fingerprint` is then ''. */
 export async function buildSystemSnapshot(
-  selection: PortalStudentSelection, catalogue: ProgrammeCatalogue, learningCentreId: number, centresOf: (studentIds: number[]) => Promise<Map<number, number | null>>,
+  selection: PortalStudentSelection, catalogue: SnapshotCatalogue, learningCentreId: number, centresOf: (studentIds: number[]) => Promise<Map<number, number | null>>,
+  options: { fingerprint?: boolean } = {},
 ): Promise<BuiltSystemSnapshot> {
   const subjectsByCurriculum = new Map(catalogue.curricula.map((curriculum) => [curriculum.curriculumId, new Map(curriculum.subjects.map((subject) => [subject.subjectId, subject.creditHours]))]));
   const excluded = { otherProgramme: selection.otherProgrammeStudents, otherCentre: 0, inactiveAccess: 0 };
@@ -103,6 +108,7 @@ export async function buildSystemSnapshot(
     studentsFound: students.length, studentsWithRecords: students.length - withoutRecords, studentsWithoutRecords: withoutRecords,
     recordsMapped: records.length, recordsUnmapped: unmapped, withdrawnStoredAsFailed: withdrawn, excluded, centreNote: CENTRE_NOTE,
   };
+  if (options.fingerprint === false) return { students, records, coverage, fingerprint: '', matricByReference };
   const stable = records.map((r) => [r.externalReference, r.subjectId, r.subjectStatus, r.semesterId, r.recognizedCredits]).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1);
   const fingerprint = await sha256Hex(JSON.stringify({
     kind: 'system-students', v: 1, programmeId: catalogue.programmeId, learningCentreId,

@@ -81,6 +81,7 @@ describe('live forecast (S3-P004-032)', () => {
     expect(a.breakdown).toMatchObject({ inCurriculum: 3, alreadyPassed: 1, supported: 1, uncertain: 1 });
     expect(storeImport).not.toHaveBeenCalled();
     expect(createRun).not.toHaveBeenCalled();
+    expect(deps.repository.catalogue).not.toHaveBeenCalled(); // the catalogue comes from catalogueInputs only (review: fewer subrequests)
   });
 
   it('rejects an unassigned scope', async () => {

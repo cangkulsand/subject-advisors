@@ -37,13 +37,13 @@ The lecturer said the forecast does not need a snapshot step. The owner chose a 
 | Check | Result |
 | --- | --- |
 | `npm run typecheck`, `npm run lint` | PASS |
-| `npm test` | 1917 passed, 67 skipped |
-| `npm run test:ui:coordinator` | 60 PASS (the updated checks failed on the old page first) |
+| `npm test` | 1918 passed, 67 skipped |
+| `npm run test:ui:coordinator` | 64 PASS (the updated and new checks failed before each change) |
 | `npm run test:ui:admin` | 58 PASS |
 | `npm run test:ui:integration` | 75 PASS (mocked) |
 | Read-only Neon check | `catalogueInputs` returns the same curricula as `engineInputs` for snapshot 2 (SECJ, KL) |
 
-- **Whole-branch review (fresh reviewer, 2026-11-21):** no Critical. One Important fixed: the students dialog is a second live read, so its count could differ from the table if a record changed in between; the dialog now says "Student data changed since this page was calculated. Refresh the page to update the numbers." (UI test RED then GREEN). Minor findings deferred (listed in the owner report).
+- **Whole-branch review (fresh reviewer, 2026-11-21):** no Critical. One Important fixed: the students dialog is a second live read, so its count could differ from the table if a record changed in between; the dialog now says "Student data changed since this page was calculated. Refresh the page to update the numbers." (UI test RED then GREEN). Minor findings then fixed at the owner's request: (1) no next Normal semester shows "No next Normal semester is configured yet…" and no misleading scope prompt (Forecast and Data Imports); (2) if the server's target semester differs from the page's, the page asks for a reload and hides the decisions; (3) the live read skips the snapshot fingerprint and reads the catalogue once (`catalogueInputs`), about 15 subrequests; (4) Overview and separation-note copy, a stale comment and `docs/cloudflare-deployment.md`; (5) no students but earlier decisions shows the note above the decided subjects.
 - **Outcome:** PASS — SELF-REVIEW plus fresh-reviewer pass; human peer review pending.
 
 ## 4. Changelog

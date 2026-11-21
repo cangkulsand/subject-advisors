@@ -594,6 +594,18 @@ else {
       assert.equal(state.bodies.length, 0, 'nothing is written');
     });
 
+    await check('forecast: a scope with no students but earlier decisions shows the note above the decided subjects', async page => {
+      await mock(page, { seed: 'decided', liveEmpty: true }); await page.goto(base + forecastUrl);
+      await page.getByText('No students in this programme and learning centre yet.').waitFor();
+      await page.getByRole('region', { name: 'Subjects table', exact: true }).locator('tr[data-subject="SECJ1013"]').waitFor();
+    });
+
+    await check('forecast: if the semester changed since the page opened, the forecast asks for a reload and hides the decisions', async page => {
+      await mock(page, { seed: 'empty', liveTargetShift: true }); await page.goto(base + forecastUrl);
+      await page.getByRole('alert').filter({ hasText: 'The target semester changed since this page was opened. Reload the page to see the new semester.' }).waitFor();
+      assert.equal(await page.getByRole('region', { name: 'Subjects table', exact: true }).count(), 0, 'no decisions next to another semester');
+    });
+
     await check('forecast: Refresh recalculates the live forecast', async page => {
       const state = await mock(page, { seed: 'empty' }); await page.goto(base + forecastUrl); await forecastReady(page);
       assert.equal(state.liveReads, 1);
@@ -956,7 +968,13 @@ else {
         await page.getByRole('status').filter({ hasText: noSemesterText }).waitFor();
         assert.equal(await page.getByRole('status').filter({ hasText: noAssignmentText }).count(), 0);
         assert.equal(await page.locator('output.coordinator-readonly-value').innerText(), 'Not configured');
+        assert.equal(await page.getByText(/Select a programme and a learning centre to/).count(), 0, 'no misleading scope prompt without a semester');
         await page.screenshot({ path: shots + `${shot}-no-current-semester-desktop.png`, fullPage: true });
+      });
+      await check(`${shot}: no next Normal semester says so instead of asking for a scope`, async page => {
+        await mock(page, { noTargetSemester: true }); await page.goto(base + path + scoped);
+        await page.getByRole('status').filter({ hasText: 'No next Normal semester is configured yet. Ask a system administrator to add it in Academic Semesters.' }).waitFor();
+        assert.equal(await page.getByText(/Select a programme and a learning centre to/).count(), 0);
       });
     }
 

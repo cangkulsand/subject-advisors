@@ -118,6 +118,9 @@ else {
       const quicklinks = page.locator('.coordinator-quicklinks');
       assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Offering Forecast', 'Offering History']);
       assert.equal(await quicklinks.getByText('Planned workspace').count(), 0);
+      const overviewText = await page.locator('main').innerText();
+      assert.ok(!/snapshot/i.test(overviewText), 'the Overview no longer talks about importing snapshots (S3-P004-032)');
+      assert.ok(!overviewText.includes('separate from student academic records'), 'the live forecast reads student records');
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
       const navigation = page.getByRole('navigation', { name: 'Coordinator navigation' });

@@ -232,7 +232,9 @@ function Forecast({ client, scope, scopeFields }: { client: CoordinatorClient; s
   }
   const refresh = () => { studentCache.current.clear(); pickerCache.current.clear(); void forecast.reload(); void decisions.reload(); void audit.refresh(); };
 
-  const rows = live && set ? buildRows(live, set.decisions) : null;
+  // The server forecasts the next Normal semester at the time of the read; decisions use the semester the page opened with.
+  const shifted = live !== undefined && live !== null && live.targetSemesterId !== scope.targetSemesterId;
+  const rows = live && set && !shifted ? buildRows(live, set.decisions) : null;
   const pending = rows ? rows.filter(row => row.status === 'PENDING').length : 0;
   return <>
     <section className="admin-card coordinator-setup" aria-label="Forecast scope">
@@ -246,10 +248,11 @@ function Forecast({ client, scope, scopeFields }: { client: CoordinatorClient; s
     <section className="admin-card" aria-labelledby="coordinator-subjects-heading">
       <div className="admin-card-title"><div><h2 id="coordinator-subjects-heading">Subjects</h2><p className="admin-muted">Eligible students are a forecast, not registration.{set?.editable === false ? " Decisions are locked." : " Choose an action for each subject; it applies at once."}</p></div>
         <IconButton icon="refresh" label="Refresh" onClick={refresh}/></div>
-      <Panel error={forecast.error ?? decisions.error} retry={() => { forecast.retry(); decisions.retry(); }} label="forecast">{rows && live && set && (live.studentsInScope === 0 && rows.length === 0
-        ? <p className="admin-empty">No students in this programme and learning centre yet.</p>
-        : rows.length === 0 ? <p className="admin-empty">No subjects are forecast for this scope.</p>
-        : <SubjectTable client={client} scope={scope} rows={rows} studentCache={studentCache.current} pickerCache={pickerCache.current} editable={set.editable} closed={set.phase === 'CLOSED'} pickCounts={new Map(set.pickCounts.map(item => [item.subjectId, item.pickCount]))} onDecide={(row, status) => void decide(row, status)}/>)}
+      {shifted && <p className="admin-form-error" role="alert">The target semester changed since this page was opened. Reload the page to see the new semester.</p>}
+      <Panel error={forecast.error ?? decisions.error} retry={() => { forecast.retry(); decisions.retry(); }} label="forecast">{rows && live && set && <>
+        {live.studentsInScope === 0 && <p className="admin-empty">No students in this programme and learning centre yet.</p>}
+        {rows.length === 0 ? live.studentsInScope > 0 && <p className="admin-empty">No subjects are forecast for this scope.</p>
+        : <SubjectTable client={client} scope={scope} rows={rows} studentCache={studentCache.current} pickerCache={pickerCache.current} editable={set.editable} closed={set.phase === 'CLOSED'} pickCounts={new Map(set.pickCounts.map(item => [item.subjectId, item.pickCount]))} onDecide={(row, status) => void decide(row, status)}/>}</>}
       </Panel>
     </section>
     <AuditTable audit={audit}/>
@@ -268,7 +271,7 @@ export function ForecastsPage({ client, search }: { client: CoordinatorClient; s
       ? <Forecast key={`${scope.programmeId}-${scope.learningCentreId}`} client={client} scope={scope} scopeFields={fields(context.data)}/>
       : <section className="admin-card coordinator-setup" aria-label="Forecast scope">
         <div className="coordinator-setup-section">{fields(context.data)}</div>
-        {context.data.programmes.length > 0 && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecast.</p></div>}
+        {context.data.programmes.length > 0 && context.data.targetSemesterId != null && <div className="coordinator-setup-section"><p className="admin-muted">Select a programme and a learning centre to see its forecast.</p></div>}
       </section>)}
     </Panel>
   </>;

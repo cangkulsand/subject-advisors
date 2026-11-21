@@ -25,13 +25,14 @@ async function liveEngineRequest(deps: ForecastingDependencies, actor: string, u
   const { target } = await resolveTarget(deps);
   if (!target) throw new ForecastingError('TARGET_SEMESTER_UNAVAILABLE');
   const scope: ForecastScope = { programmeId, learningCentreId, targetSemesterId: target.semesterId };
-  const catalogue = await deps.repository.catalogue(programmeId);
-  if (!catalogue) throw new ForecastingError('SCOPE_NOT_FOUND');
-  const built = await buildSystemSnapshot(await deps.repository.systemStudents(programmeId), catalogue, learningCentreId, (ids) => deps.scopes.studentLearningCentres(ids));
+  const selection = await deps.repository.systemStudents(programmeId);
+  const curriculumIds = [...new Set(selection.students.filter((student) => student.eligible).map((student) => student.curriculumId))].sort((a, b) => a - b);
+  if (curriculumIds.length === 0) return { scope, request: null };
+  // One catalogue read (review): the engine curricula also give the credit hours the student selection needs.
+  const inputs = await deps.runs.catalogueInputs(scope, curriculumIds);
+  const built = await buildSystemSnapshot(selection, { programmeId, curricula: inputs.curricula }, learningCentreId, (ids) => deps.scopes.studentLearningCentres(ids), { fingerprint: false });
   if (built.students.length === 0) return { scope, request: null };
   const students = engineStudentsOf(built);
-  const curriculumIds = [...new Set(students.map((student) => student.curriculumId))].sort((a, b) => a - b);
-  const inputs = await deps.runs.catalogueInputs(scope, curriculumIds);
   return { scope, request: { scope, target: inputs.target, curricula: inputs.curricula, capacityRules: inputs.capacityRules, snapshot: { students, rejectedRowsByStudent: {} } } };
 }
 

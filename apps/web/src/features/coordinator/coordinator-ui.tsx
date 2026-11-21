@@ -122,7 +122,7 @@ function FieldIcon({ name }: { name: keyof typeof fieldIcons }) {
   return <svg className="coordinator-field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{fieldIcons[name]}</svg>;
 }
 
-/** Card-less scope fields (programme and learning centre selects, read-only target semester) for the single setup card on Data Imports and Class Offering Forecast. */
+/** Card-less scope fields (programme and learning centre selects, read-only target semester) for the single setup card on Class Offering Forecast (and the URL-only Data Imports page, S3-P004-032). */
 export function ScopeFields({ context, path, programmeId, learningCentreId, keep }: { context: ForecastContext; path: string; programmeId: number | null; learningCentreId: number | null; keep?: Record<string, string> }) {
   const programmeField = useId(), centreField = useId(), semesterField = useId();
   const { centres, target, go } = useScopeChoices({ context, path, programmeId, keep });
@@ -144,7 +144,7 @@ export function ScopeFields({ context, path, programmeId, learningCentreId, keep
     {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.</p>}
     {context.currentSemesterId == null
       ? <p className="admin-notice" role="status">No current semester is set. Ask a system administrator to set it in Academic Semesters.</p>
-      : context.targetSemesterId == null && <p className="admin-notice" role="status">No target semester is configured yet, so imports are unavailable.</p>}
+      : context.targetSemesterId == null && <p className="admin-notice" role="status">No next Normal semester is configured yet. Ask a system administrator to add it in Academic Semesters.</p>}
   </>;
 }
 

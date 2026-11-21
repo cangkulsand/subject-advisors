@@ -3,6 +3,7 @@ import type { ScopeProvider } from './scope-provider';
 import { testScopeProvider } from './scope-provider.test-support';
 import type { ForecastingDependencies, ForecastingRepository, ImportBatchRow, PortalStudentSelection, ProgrammeCatalogue, StoreImportInput } from './contracts';
 import { handleForecastingRequest } from './routes';
+import { buildSystemSnapshot } from './system-snapshot';
 
 const COORDINATOR = 'user_coord';
 const BASE = 'https://test.invalid/api/coordinator/';
@@ -217,5 +218,17 @@ describe('POST forecast-imports/system-snapshots', () => {
     batches.push(csv as ImportBatchRow);
     const both = await handleForecastingRequest(new Request(BASE + 'forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2', { headers: { Authorization: 'Bearer test-only' } }), deps) as Response;
     expect((await data(both)).items.map((item: { source: string }) => item.source)).toEqual(['CSV', 'SYSTEM']);
+  });
+});
+
+describe('buildSystemSnapshot without a fingerprint (live forecast, S3-P004-032 review)', () => {
+  it('skips the fingerprint but keeps the same students and records', async () => {
+    const centres = async (ids: number[]) => new Map(ids.map((id) => [id, 1]));
+    const full = await buildSystemSnapshot(baseSelection(), catalogue, 1, centres);
+    const live = await buildSystemSnapshot(baseSelection(), catalogue, 1, centres, { fingerprint: false });
+    expect(live.fingerprint).toBe('');
+    expect(full.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(live.students).toEqual(full.students);
+    expect(live.records).toEqual(full.records);
   });
 });
