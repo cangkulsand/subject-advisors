@@ -1,3 +1,4 @@
+import { handleLiveRoute, LIVE_ROUTE } from './live-routes';
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
 import { IMPORT_CSV_HEADER, IMPORT_LIMITS } from '../../../../../packages/shared/src/forecasting/contracts';
 import type {
@@ -282,7 +283,7 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
   const importId = /^forecast-imports\/([1-9]\d*)$/.exec(route);
   const students = /^forecast-imports\/([1-9]\d*)\/students$/.exec(route);
   const subset = /^forecast-imports\/([^/]+)\/subset-acceptances$/.exec(route);
-  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots', 'forecast-imports/combined-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || DECISION_ROUTE.test(route);
+  const known = ['forecast-context', 'forecast-import-template', 'forecast-imports', 'forecast-imports/system-snapshots', 'forecast-imports/combined-snapshots'].includes(route) || importId || students || subset || RUN_ROUTE.test(route) || DECISION_ROUTE.test(route) || LIVE_ROUTE.test(route);
   if (!known) return null;
   try {
     // Coordinator only. The actor is always the verified Clerk user of the session, never a request value.
@@ -290,6 +291,7 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
     const method = request.method;
     if (RUN_ROUTE.test(route)) return await handleRunRoute(route, request, url, deps, actor);
     if (DECISION_ROUTE.test(route)) return await handleDecisionRoute(route, request, url, deps, actor);
+    if (LIVE_ROUTE.test(route)) return await handleLiveRoute(route, request, url, deps, actor, resolveTarget);
     if (route === 'forecast-context') {
       if (method !== 'GET') return methodNotAllowed(['GET']);
       onlyParameters(url, ['programmeId']);

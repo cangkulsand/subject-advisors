@@ -105,7 +105,7 @@ async function detail(forecastRunId: number, deps: ForecastingDependencies, acto
  * so the only live input is the curriculum catalogue; `catalogueMatchesRun` says whether that still equals the run's stored fingerprint.
  */
 /** Adds the live matric number and sign-in email of portal (`PORTAL-<student_id>`) students. A lookup failure keeps the list usable without them. */
-async function withContacts(students: SubjectStudentOutcome[], deps: ForecastingDependencies): Promise<Pick<RunSubjectStudents, 'emailsAvailable' | 'students'>> {
+export async function withContacts(students: SubjectStudentOutcome[], deps: ForecastingDependencies): Promise<Pick<RunSubjectStudents, 'emailsAvailable' | 'students'>> {
   const idOf = (reference: string) => { const match = /^PORTAL-(\d+)$/.exec(reference); return match ? Number(match[1]) : null; };
   const ids = [...new Set(students.map((student) => idOf(student.externalReference)).filter((id): id is number => id !== null))];
   let contacts = new Map<number, PortalContact>(), emailsAvailable = true;
