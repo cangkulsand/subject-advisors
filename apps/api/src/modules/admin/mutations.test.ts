@@ -312,3 +312,53 @@ describe('student programme change (S2-P004-026)', () => {
     expect(await createAdminRepository(vi.fn<AdminQuery>(async () => [])).studentProgramme(7)).toBeNull();
   });
 });
+
+describe('dummy accounts (S3-P004-029)', () => {
+  const student = { role: 'STUDENT' as const, name: 'Aina', curriculumId: 4, learningCentreId: 2, reason: 'Testing' };
+  const coordinator = { role: 'COORDINATOR' as const, name: 'Lim', programmeId: 3, learningCentreId: 2, reason: 'Testing' };
+
+  it('creates a dummy student account and a complete profile in one transaction', async () => {
+    const { repository, calls, transaction } = harness();
+    await repository.createDummyAccount('user_dummy', student, 'DUMMY012345', 'user_admin', 'Testing');
+    expect(transaction).toHaveBeenCalledTimes(1);
+    const sql = sqlOf(calls[0]!);
+    expect(calls[0]![0]!.values).toEqual(['user_admin', 'Testing']);
+    expect(sql[1]).toContain('ADMIN_GUARD:ACCOUNT_EXISTS');
+    expect(sql[2]).toContain('ADMIN_GUARD:ACADEMIC_SEMESTER_UNAVAILABLE');
+    expect(sql[3]).toContain('ADMIN_GUARD:DUMMY_SCOPE_INVALID');
+    expect(calls[0]![3]!.values).toEqual([4, 2]);
+    expect(sql[4]).toMatch(/^INSERT INTO public\.user_access_assignment/);
+    const profile = calls[0]!.find(statement => statement.text.includes('INSERT INTO public.student_profile'))!;
+    expect(profile.text).toContain('is_current');
+    expect(profile.values).toEqual(['user_dummy', 'Aina', 'DUMMY012345', 4, 2, 0, 20]);
+    expect(sql.some(text => text.startsWith('DELETE'))).toBe(false);
+    expect(sql.some(text => text.includes('coordinator_assignment'))).toBe(false);
+  });
+
+  it('creates a dummy coordinator with the COORDINATOR role, no student seed and one assignment', async () => {
+    const { repository, calls } = harness();
+    await repository.createDummyAccount('user_dummy', coordinator, 'unused', 'user_admin', 'Testing');
+    const sql = sqlOf(calls[0]!);
+    expect(sql.some(text => text.includes('ACADEMIC_SEMESTER_UNAVAILABLE'))).toBe(false);
+    expect(sql[2]).toContain('ADMIN_GUARD:DUMMY_SCOPE_INVALID');
+    expect(calls[0]![2]!.values).toEqual([3, 2]);
+    expect(calls[0]!.find(statement => statement.text.includes('INSERT INTO public.user_role_assignment'))!.values[1]).toBe('COORDINATOR');
+    expect(sql.some(text => /^DELETE FROM public\.user_role_assignment WHERE app_role='STUDENT' AND grant_source='LEGACY_INIT'/.test(text))).toBe(true);
+    const assignment = calls[0]!.find(statement => statement.text.includes('INSERT INTO public.coordinator_assignment'))!;
+    expect(assignment.text).toContain('faculty_id');
+    expect(assignment.values).toEqual(['user_dummy', 3, 2]);
+    expect(sql.some(text => text.includes('student_profile'))).toBe(false);
+  });
+
+  it('maps a failed scope guard to DUMMY_SCOPE_INVALID', async () => {
+    const { repository } = harness({ fail: { code: '22P02', message: 'invalid input syntax for type integer: "ADMIN_GUARD:DUMMY_SCOPE_INVALID"' } });
+    await expect(repository.createDummyAccount('user_dummy', student, 'DUMMY012345', 'user_admin', 'Testing')).rejects.toMatchObject({ code: 'DUMMY_SCOPE_INVALID', status: 409 });
+  });
+
+  it('reads the current semester id, or null when none is current', async () => {
+    const some = harness(); some.query.mockResolvedValueOnce([{ semesterId: 24 }]);
+    expect(await some.repository.currentSemesterId()).toBe(24);
+    const none = harness();
+    expect(await none.repository.currentSemesterId()).toBeNull();
+  });
+});

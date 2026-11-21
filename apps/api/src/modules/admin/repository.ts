@@ -145,6 +145,42 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       return { items: rows.map(row => ({ ...row, accountId: integer(row.accountId), occurredAt: timestamp(row.occurredAt) }) as unknown as AdminAuditEvent),
         total: integer(count[0]?.total), page: input.page, pageSize, generatedAt: new Date().toISOString() };
     },
+    async createDummyAccount(clerkUserId, input, matricNo, actor, reason) {
+      if (!clerkUserId.startsWith('user_')) throw new AdminMutationError('INVALID_REQUEST');
+      const account = (role: 'STUDENT' | 'COORDINATOR'): AdminStatement[] => [
+        { text: "INSERT INTO public.user_access_assignment(clerk_user_id,app_role,access_status) VALUES ($1,'STUDENT','ACTIVE')", values: [clerkUserId] },
+        // Same seed handling as createAccount: a coordinator must not keep the LEGACY_INIT STUDENT membership.
+        ...(role === 'COORDINATOR' ? [{ text: grantSql('clerk_user_id=$1'), values: [clerkUserId, 'COORDINATOR', actor, reason] },
+          { text: "DELETE FROM public.user_role_assignment WHERE app_role='STUDENT' AND grant_source='LEGACY_INIT' AND access_assignment_id=(SELECT access_assignment_id FROM public.user_access_assignment WHERE clerk_user_id=$1)",
+            values: [clerkUserId] }] : []),
+      ];
+      const exists = guard('EXISTS (SELECT 1 FROM public.user_access_assignment WHERE clerk_user_id=$1)', [clerkUserId], 'ACCOUNT_EXISTS');
+      const statements: AdminStatement[] = input.role === 'STUDENT' ? [
+        exists,
+        guard('NOT EXISTS (SELECT 1 FROM public.academic_semester WHERE is_current)', [], 'ACADEMIC_SEMESTER_UNAVAILABLE'),
+        guard(`NOT EXISTS (SELECT 1 FROM public.curriculum c JOIN public.programme g USING(programme_id) WHERE c.curriculum_id=$1
+          AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE')
+          OR NOT EXISTS (SELECT 1 FROM public.learning_centre WHERE learning_centre_id=$2 AND is_active)`, [input.curriculumId, input.learningCentreId], 'DUMMY_SCOPE_INVALID'),
+        ...account('STUDENT'),
+        // Complete profile (see createProfileReader): matric, centre, curriculum, current semester and both hour fields.
+        { text: `INSERT INTO public.student_profile(clerk_user_id,student_name,matric_no,curriculum_id,learning_centre_id,current_semester_id,weekly_working_hours,available_study_hours)
+          SELECT $1,$2,$3,$4,$5,s.semester_id,$6,$7 FROM public.academic_semester s WHERE s.is_current`,
+          values: [clerkUserId, input.name, matricNo, input.curriculumId, input.learningCentreId, 0, 20] },
+      ] : [
+        exists,
+        guard(`NOT EXISTS (SELECT 1 FROM public.programme WHERE programme_id=$1 AND faculty_id IS NOT NULL AND coalesce(upper(status),'ACTIVE')='ACTIVE')
+          OR NOT EXISTS (SELECT 1 FROM public.learning_centre WHERE learning_centre_id=$2 AND is_active)`, [input.programmeId, input.learningCentreId], 'DUMMY_SCOPE_INVALID'),
+        ...account('COORDINATOR'),
+        { text: `INSERT INTO public.coordinator_assignment(access_assignment_id,faculty_id,programme_id,learning_centre_id)
+          SELECT a.access_assignment_id,g.faculty_id,g.programme_id,$3 FROM public.user_access_assignment a JOIN public.programme g ON g.programme_id=$2
+          WHERE a.clerk_user_id=$1`, values: [clerkUserId, input.programmeId, input.learningCentreId] },
+      ];
+      return detailFrom(await run(actor, reason, [...statements, ...detail('clerk', clerkUserId)]));
+    },
+    async currentSemesterId() {
+      const rows = await query('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE is_current LIMIT 1', []);
+      return rows[0] ? Number(rows[0].semesterId) : null;
+    },
     async createAccount(clerkUserId, roles, actor, reason, options) {
       if (!clerkUserId.startsWith('user_') || roles.length === 0 || new Set(roles).size !== roles.length) throw new AdminMutationError('INVALID_REQUEST');
       const invitationId = options?.invitationId;

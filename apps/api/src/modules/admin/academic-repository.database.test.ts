@@ -239,4 +239,32 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     await expect(repository.createFaculty({ facultyCode: 'BAD', facultyName: 'Bad', reason }, ' ')).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
     expect(await repository.listFaculties(true)).toEqual([]);
   });
+
+  it('creates a dummy student with a complete profile in the current semester, and a dummy coordinator with one assignment (S3-P004-029)', async () => {
+    const data = await seed();
+    const curriculumId = Number((await client.query("INSERT INTO public.curriculum(programme_id,curriculum_version,total_credit_required) VALUES ($1,'DUMMY',10) RETURNING curriculum_id", [data.programmeId])).rows[0]!.curriculum_id);
+    await expect(accounts.createDummyAccount('user_dummy_none', { role: 'STUDENT', name: 'No semester', curriculumId, learningCentreId: data.centre.learningCentreId, reason }, 'DUMMY000001', actor, reason))
+      .rejects.toMatchObject({ code: 'ACADEMIC_SEMESTER_UNAVAILABLE' });
+    expect(await accounts.currentSemesterId()).toBeNull();
+    const semester = await repository.createAcademicSemester(input, actor);
+    await repository.setCurrentAcademicSemester({ semesterId: semester.semesterId, reason }, actor);
+    expect(await accounts.currentSemesterId()).toBe(semester.semesterId);
+
+    const student = await accounts.createDummyAccount('user_dummy_student', { role: 'STUDENT', name: 'Dummy Aina', curriculumId, learningCentreId: data.centre.learningCentreId, reason }, 'DUMMY012345', actor, reason);
+    expect(student.roles).toEqual(['STUDENT']);
+    expect((await client.query('SELECT student_name,matric_no,curriculum_id,learning_centre_id,current_semester_id,weekly_working_hours,available_study_hours FROM public.student_profile WHERE clerk_user_id=$1', ['user_dummy_student'])).rows[0])
+      .toEqual({ student_name: 'Dummy Aina', matric_no: 'DUMMY012345', curriculum_id: curriculumId, learning_centre_id: data.centre.learningCentreId, current_semester_id: semester.semesterId, weekly_working_hours: 0, available_study_hours: 20 });
+
+    const coordinator = await accounts.createDummyAccount('user_dummy_coord', { role: 'COORDINATOR', name: 'Dummy Lim', programmeId: data.programmeId, learningCentreId: data.centre.learningCentreId, reason }, 'unused', actor, reason);
+    expect(coordinator.roles).toEqual(['COORDINATOR']);
+    expect(await repository.listCoordinatorAssignments({ accountId: coordinator.accountId })).toEqual([expect.objectContaining({ facultyId: data.faculty.facultyId, programmeId: data.programmeId, learningCentreId: data.centre.learningCentreId })]);
+  });
+
+  it('rejects an inactive learning centre for a dummy and writes nothing', async () => {
+    const data = await seed();
+    await repository.updateLearningCentre(data.centre.learningCentreId, { isActive: false, reason }, actor);
+    await expect(accounts.createDummyAccount('user_dummy_inactive', { role: 'COORDINATOR', name: 'X', programmeId: data.programmeId, learningCentreId: data.centre.learningCentreId, reason }, 'unused', actor, reason))
+      .rejects.toMatchObject({ code: 'DUMMY_SCOPE_INVALID' });
+    expect((await client.query('SELECT 1 FROM public.user_access_assignment WHERE clerk_user_id=$1', ['user_dummy_inactive'])).rows).toHaveLength(0);
+  });
 });

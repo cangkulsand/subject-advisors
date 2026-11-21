@@ -37,6 +37,14 @@ export interface AdminRepository {
    * semester picks of not-yet-closed future semesters, keeps academic records, and writes the append-only audit row.
    */
   changeStudentProgramme(accountId: number, curriculumId: number, actor: string, reason: string): Promise<AdminProgrammeChange>;
+  /**
+   * Dummy users (S3-P004-029): one transaction creates the account with its role plus either a complete student profile
+   * (admin current semester, hours 0 and 20) or one coordinator assignment. Guards raise ACADEMIC_SEMESTER_UNAVAILABLE
+   * and DUMMY_SCOPE_INVALID before anything is written.
+   */
+  createDummyAccount(clerkUserId: string, input: import('../../../../../packages/shared/src/admin/dummy').CreateDummyUserRequest, matricNo: string, actor: string, reason: string): Promise<AccountDetailRow>;
+  /** The admin current semester ID, or null when none is current. */
+  currentSemesterId(): Promise<number | null>;
 }
 export interface AdminIdentities {
   search(query: string): Promise<{ ids: string[]; total: number }>;
