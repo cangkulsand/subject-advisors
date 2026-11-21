@@ -47,5 +47,11 @@ export interface AdminIdentities {
   revokeInvitation(clerkInvitationId: string): Promise<void>;
   /** Blocks (Clerk ban: no sign-in, sessions revoked) or unblocks sign-in for a suspended / reactivated account. */
   setSignInBlocked(clerkUserId: string, blocked: boolean): Promise<void>;
+  /** Dummy users (S3-P004-029): a backend-created Clerk user has a verified email. Returns only the new user ID. */
+  createUser(input: { email: string; firstName: string; password: string }): Promise<{ clerkUserId: string }>;
+  setPassword(clerkUserId: string, password: string): Promise<void>;
+  deleteUser(clerkUserId: string): Promise<void>;
+  /** Total users in the Clerk instance (the development instance allows 100). */
+  userCount(): Promise<number>;
 }
 export interface AdminDependencies { auth: AuthDependencies; repository: AdminRepository; identities: AdminIdentities; academicRepository?: import('./academic-contracts').AcademicSetupRepository }

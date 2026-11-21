@@ -51,5 +51,20 @@ export function createAdminIdentities(secretKey: string): AdminIdentities {
       if (blocked) await clerk.users.banUser(clerkUserId);
       else await clerk.users.unbanUser(clerkUserId);
     },
+    async createUser({ email, firstName, password }) {
+      const user = await clerk.users.createUser({ emailAddress: [email], password, firstName });
+      return { clerkUserId: user.id };
+    },
+    async setPassword(clerkUserId, password) {
+      if (!clerkUserId.startsWith('user_')) throw new Error('Not a Clerk user ID');
+      await clerk.users.updateUser(clerkUserId, { password });
+    },
+    async deleteUser(clerkUserId) {
+      if (!clerkUserId.startsWith('user_')) throw new Error('Not a Clerk user ID');
+      await clerk.users.deleteUser(clerkUserId);
+    },
+    async userCount() {
+      return clerk.users.getCount();
+    },
   };
 }

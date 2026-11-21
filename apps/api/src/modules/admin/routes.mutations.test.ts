@@ -30,6 +30,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       findByEmail: vi.fn(async () => ({ clerkUserId: 'user_target', verifiedEmail: 'target@utm.my', emailVerified: true })),
       createInvitation: vi.fn(async () => ({ clerkInvitationId: 'inv_clerk' })), revokeInvitation: vi.fn(async () => undefined),
       setSignInBlocked: vi.fn(async () => undefined),
+      createUser: vi.fn(async () => ({ clerkUserId: 'user_dummy' })), setPassword: vi.fn(async () => undefined), deleteUser: vi.fn(async () => undefined), userCount: vi.fn(async () => 52),
     },
   };
   return deps;

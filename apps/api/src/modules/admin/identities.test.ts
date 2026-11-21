@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const { getUserList, createInvitation, revokeInvitation, banUser, unbanUser } = vi.hoisted(() => ({ getUserList: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn() }));
-vi.mock('@clerk/backend', () => ({ createClerkClient: () => ({ users: { getUserList, banUser, unbanUser }, invitations: { createInvitation, revokeInvitation } }) }));
+const { getUserList, createInvitation, revokeInvitation, banUser, unbanUser, createUser, updateUser, deleteUser, getCount } = vi.hoisted(() => ({ getUserList: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), banUser: vi.fn(), unbanUser: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), getCount: vi.fn() }));
+vi.mock('@clerk/backend', () => ({ createClerkClient: () => ({ users: { getUserList, banUser, unbanUser, createUser, updateUser, deleteUser, getCount }, invitations: { createInvitation, revokeInvitation } }) }));
 import { createAdminIdentities } from './identities';
-beforeEach(() => { getUserList.mockReset(); createInvitation.mockReset(); revokeInvitation.mockReset(); banUser.mockReset(); unbanUser.mockReset(); });
+beforeEach(() => { getUserList.mockReset(); createInvitation.mockReset(); revokeInvitation.mockReset(); banUser.mockReset(); unbanUser.mockReset(); createUser.mockReset(); updateUser.mockReset(); deleteUser.mockReset(); getCount.mockReset(); });
 it('bans on block and unbans on unblock (S3-P004-009), only for Clerk user IDs', async () => {
   const identities = createAdminIdentities('TEST_ONLY');
   await identities.setSignInBlocked('user_a', true);
@@ -63,4 +63,26 @@ it('creates and revokes Clerk invitations without sending metadata', async () =>
   expect(createInvitation.mock.calls[1]![0]).toEqual({ emailAddress: 'plain@utm.my', ignoreExisting: false, notify: true });
   await identities.revokeInvitation('inv_1');
   expect(revokeInvitation).toHaveBeenCalledExactlyOnceWith('inv_1');
+});
+
+it('creates a dummy Clerk user with email, password and first name, and returns only its id (S3-P004-029)', async () => {
+  createUser.mockResolvedValue({ id: 'user_dummy', privateMetadata: { secret: 'MUST_NOT_ESCAPE' } });
+  const result = await createAdminIdentities('TEST_ONLY').createUser({ email: 'a-1234+clerk_test@utm.my', firstName: 'A', password: 'Pw-TEST_ONLY-123' });
+  expect(createUser).toHaveBeenCalledExactlyOnceWith({ emailAddress: ['a-1234+clerk_test@utm.my'], password: 'Pw-TEST_ONLY-123', firstName: 'A' });
+  expect(result).toEqual({ clerkUserId: 'user_dummy' });
+});
+it('sets a password and deletes a user only for Clerk user IDs', async () => {
+  const identities = createAdminIdentities('TEST_ONLY');
+  await identities.setPassword('user_a', 'Pw-TEST_ONLY-123');
+  expect(updateUser).toHaveBeenCalledExactlyOnceWith('user_a', { password: 'Pw-TEST_ONLY-123' });
+  await expect(identities.setPassword('x', 'p')).rejects.toThrow();
+  expect(updateUser).toHaveBeenCalledTimes(1);
+  await identities.deleteUser('user_a');
+  expect(deleteUser).toHaveBeenCalledExactlyOnceWith('user_a');
+  await expect(identities.deleteUser('x')).rejects.toThrow();
+  expect(deleteUser).toHaveBeenCalledTimes(1);
+});
+it('counts provider users', async () => {
+  getCount.mockResolvedValue(52);
+  expect(await createAdminIdentities('TEST_ONLY').userCount()).toBe(52);
 });
