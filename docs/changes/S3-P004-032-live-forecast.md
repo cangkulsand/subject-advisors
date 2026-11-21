@@ -51,4 +51,4 @@ The lecturer said the forecast does not need a snapshot step. The owner chose a 
 - **Type:** Changed.
 - The Class Offering Forecast now shows live student data: it is calculated from the students in the system each time the page opens or Refresh is pressed, with no snapshot step. Data Imports is no longer in the coordinator menu.
 - **Compatibility:** no migration. Existing snapshots, runs and audit rows stay. The run and import endpoints are unchanged and still used by the (URL-only) Data Imports page.
-- **Outstanding:** a signed-in coordinator check on prod; apply the SRS amendment to the .docx and update the UC20/UC23 diagrams.
+- **Outstanding:** a signed-in coordinator check on prod; update the UC20/UC23 diagrams (the SRS amendment is applied as v2.7).

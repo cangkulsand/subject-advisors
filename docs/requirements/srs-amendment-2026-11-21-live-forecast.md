@@ -1,7 +1,7 @@
 # SRS/SDD v2.6 amendment — Live coordinator forecast, no snapshot step (2026-11-21)
 
 - **Source decision:** Product owner (P004), 2026-11-21, after the lecturer said the forecast does not need a snapshot step. Change record: [S3-P004-032](../changes/S3-P004-032-live-forecast.md).
-- **Target document:** `UTMSPACE_SRS_SDD_v2.6 (21 Nov).docx`. Not applied to the .docx yet; apply in the next version.
+- **Target document:** `UTMSPACE_SRS_SDD_v2.6 (21 Nov).docx`. Applied on 2026-11-21 as `UTMSPACE_SRS_SDD_v2.7 (21 Nov).docx` (v2.6 kept unchanged), with a v2.7 revision-history row and an Appendix B entry "Live coordinator forecast (21 November)". v2.7 also updates lines that followed from C1–C10: the UC20 inputs and rule 5, UC23 rules 1–2, the UC20/UC23 diagram notes, the M6 workflow sentence, "stay the same across snapshots" in the P004 subsystem text and the forecast screen sentence. Kept on purpose: the NFRs on keeping snapshots and the ForecastRun data dictionary (the hidden CSV path still uses them).
 - **Reading guide:** each item gives the affected place, the **old** text and the **new** text. Where the old text runs on, only its start is quoted.
 
 ## The decision in one paragraph
