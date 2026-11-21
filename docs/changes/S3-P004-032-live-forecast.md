@@ -38,12 +38,13 @@ The lecturer said the forecast does not need a snapshot step. The owner chose a 
 | --- | --- |
 | `npm run typecheck`, `npm run lint` | PASS |
 | `npm test` | 1917 passed, 67 skipped |
-| `npm run test:ui:coordinator` | 59 PASS (the updated checks failed on the old page first) |
+| `npm run test:ui:coordinator` | 60 PASS (the updated checks failed on the old page first) |
 | `npm run test:ui:admin` | 58 PASS |
 | `npm run test:ui:integration` | 75 PASS (mocked) |
 | Read-only Neon check | `catalogueInputs` returns the same curricula as `engineInputs` for snapshot 2 (SECJ, KL) |
 
-- **Outcome:** PASS — SELF-REVIEW; whole-branch review and human peer review pending.
+- **Whole-branch review (fresh reviewer, 2026-11-21):** no Critical. One Important fixed: the students dialog is a second live read, so its count could differ from the table if a record changed in between; the dialog now says "Student data changed since this page was calculated. Refresh the page to update the numbers." (UI test RED then GREEN). Minor findings deferred (listed in the owner report).
+- **Outcome:** PASS — SELF-REVIEW plus fresh-reviewer pass; human peer review pending.
 
 ## 4. Changelog
 

@@ -40,7 +40,8 @@ function Details({ student }: { student: RunSubjectStudent }) {
   return <>{lines.map(line => <span key={line} className="coordinator-student-details">{line}</span>)}</>;
 }
 
-function Roster({ data }: { data: LiveSubjectStudents }) {
+/** `expectedCounted`: the table's eligible count; the list is a second live read, so a record changed in between shows a note. */
+function Roster({ data, expectedCounted }: { data: LiveSubjectStudents; expectedCounted: number }) {
   const [filter, setFilter] = useState(DEFAULT_FILTER), [search, setSearch] = useState(''), [requested, setPage] = useState(1);
   const term = search.trim().toLowerCase(), filtering = filter !== DEFAULT_FILTER || term !== '';
   const matching = data.students.filter(student => matchesFilter(student, filter)
@@ -50,6 +51,7 @@ function Roster({ data }: { data: LiveSubjectStudents }) {
   const s = data.summary;
   const facts: Array<[string, number, string]> = [['Eligible to take (counted)', s.counted, HELP.counted], ['Near graduation', s.nearGraduation, HELP.nearGraduation], ['Not counted', s.notCounted + s.uncertain, HELP.notCounted]];
   return <>
+    {data.summary.counted !== expectedCounted && <p className="coordinator-warning" role="status">Student data changed since this page was calculated. Refresh the page to update the numbers.</p>}
     <dl className="coordinator-counts" aria-label="Student counts">{facts.map(([label, value, help]) => <div key={label}><dt><Help label={label} text={help}/></dt><dd>{value}</dd></div>)}</dl>
     {!data.emailsAvailable && <p className="coordinator-warning" role="status">Sign-in emails could not be loaded, so portal students without a matric number show their portal reference.</p>}
     <TableToolbar label="Filter students">
@@ -78,19 +80,19 @@ function Roster({ data }: { data: LiveSubjectStudents }) {
  */
 export type StudentListCache = Map<string, LiveSubjectStudents>;
 
-function LoadRoster({ load, cache, cacheKey }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cache: StudentListCache; cacheKey: string }) {
+function LoadRoster({ load, cache, cacheKey, expectedCounted }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cache: StudentListCache; cacheKey: string; expectedCounted: number }) {
   const read = useRead(async signal => {
     const data = await load(signal);
     cache.set(cacheKey, data);
     return data;
   }, 'students|' + cacheKey);
-  return <Panel error={read.error} retry={read.retry} label="students">{read.data && <Roster data={read.data}/>}</Panel>;
+  return <Panel error={read.error} retry={read.retry} label="students">{read.data && <Roster data={read.data} expectedCounted={expectedCounted}/>}</Panel>;
 }
 
 /** Read-only list of the students behind one subject's numbers. Never changes demand. Reopening a subject uses the page's cache. */
-export function SubjectStudentsDialog({ load, cacheKey, subjectCode, cache, onClose }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cacheKey: string; subjectCode: string; cache: StudentListCache; onClose: () => void }) {
+export function SubjectStudentsDialog({ load, cacheKey, subjectCode, expectedCounted, cache, onClose }: { load: (signal: AbortSignal) => Promise<LiveSubjectStudents>; cacheKey: string; subjectCode: string; expectedCounted: number; cache: StudentListCache; onClose: () => void }) {
   const cached = cache.get(cacheKey);
   return <ReadOnlyDialog title={`Students · ${subjectCode}`} onClose={onClose}>
-    {cached ? <Roster data={cached}/> : <LoadRoster load={load} cache={cache} cacheKey={cacheKey}/>}
+    {cached ? <Roster data={cached} expectedCounted={expectedCounted}/> : <LoadRoster load={load} cache={cache} cacheKey={cacheKey} expectedCounted={expectedCounted}/>}
   </ReadOnlyDialog>;
 }

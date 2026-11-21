@@ -630,6 +630,21 @@ else {
       assert.ok(await dialog.isVisible(), 'the first Escape closes only the popover, not the dialog');
     });
 
+    await check('forecast: View students says when student data changed since the page was calculated (S3-P004-032 review)', async page => {
+      const state = await mock(page, { seed: 'run' });
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      state.liveDrift = true; // a student record changed after the table was calculated
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Students · SECJ1013' }); await dialog.waitFor();
+      await dialog.getByText('Student data changed since this page was calculated. Refresh the page to update the numbers.').waitFor();
+      await dialog.getByRole('button', { name: 'Close' }).first().click();
+      state.liveDrift = false;
+      await page.getByRole('button', { name: 'Refresh' }).click(); await forecastReady(page);
+      await page.getByRole('button', { name: 'View students for SECJ1013' }).click();
+      await page.getByRole('dialog', { name: 'Students · SECJ1013' }).getByRole('region').first().waitFor();
+      assert.equal(await page.getByText(/Student data changed since this page was calculated/).count(), 0, 'no note when the numbers match');
+    });
+
     await check('forecast: View students opens a read-only dialog with filters, search and the saved counts', async page => {
       const state = await mock(page, { seed: 'run' });
       await page.goto(base + forecastUrl); await forecastReady(page);

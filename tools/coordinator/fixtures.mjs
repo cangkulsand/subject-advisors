@@ -140,7 +140,8 @@ function liveForecast(state) {
 function liveSubjectStudents(state, subjectId) {
   const row = state.liveEmpty ? null : liveRun(state).subjects.find(item => item.subjectId === subjectId);
   if (!row) return failure(404, 'RUN_SUBJECT_NOT_FOUND', 'The subject is not part of this forecast.');
-  const reply = subjectStudents(state, { forecastRunId: 0 }, row);
+  // `liveDrift`: a record changed between the page load and opening the dialog, so one more student is counted.
+  const reply = subjectStudents(state, { forecastRunId: 0 }, state.liveDrift ? { ...row, supportedEligibleCount: row.supportedEligibleCount + 1 } : row);
   const { forecastRunId, catalogueMatchesRun, ...data } = reply.payload.data; void forecastRunId; void catalogueMatchesRun;
   return ok(data);
 }
