@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { GraduationPlan, PlannedSemester, PlannedSubject, PlanningInput, ScenarioChange, ScenarioChangeKind, SemesterRef } from '../../../../../packages/shared/src/planning/contracts';
 import { checkChange, checkPlacement, placementTargets, type PlacementTarget } from '../../../../../packages/shared/src/planning/placement';
 import { semesterAt, semesterLabel, semesterTypeOf } from '../../../../../packages/shared/src/planning/semesters';
-import { GripIcon, LockIcon, NormalIcon, PinIcon, ShortIcon, WarningIcon } from './icons';
+import { GripIcon, LockIcon, NormalIcon, PinIcon, ShortIcon } from './icons';
 import { CHANGE_LABEL, replacementOptions, subjectNote } from './plan-view';
 import { useSortableLists } from './useSortableList';
 import { DialogHead } from '../../components/dialog/DialogHead';
@@ -117,12 +117,13 @@ function MoveDialog({ subject, current, targets, others, onClose, onConfirm, onO
  * The plan as coloured semester panels with subject cards (S3-P004-010). When editable, cards can be dragged to another
  * semester or moved with "Move…"; every move goes through `checkPlacement`, and only accepted lists reach `onChange`.
  */
-export function PlanBoard({ input, plan, baseline, changes, editable, heading, onChange }: {
+export function PlanBoard({ input, plan, baseline, changes, editable, heading, onChange, onRefuse }: {
   input: PlanningInput; plan: GraduationPlan; baseline: GraduationPlan; changes: ScenarioChange[]; editable: boolean; heading: string;
   onChange: (next: ScenarioChange[]) => void;
+  /** A refused move; the page shows it as a toast so it is seen wherever the student dropped the card (S3-P004-028). */
+  onRefuse: (reason: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const [message, setMessage] = useState('');
   const [moving, setMoving] = useState<PlannedSubject | null>(null);
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
   // After the Move dialog closes, focus goes back to that subject's Move button (in its new semester when it moved).
@@ -138,14 +139,12 @@ export function PlanBoard({ input, plan, baseline, changes, editable, heading, o
 
   const move = (subjectId: number, target: SemesterRef) => {
     const check = checkPlacement(input, changes, subjectId, target);
-    if (!check.ok) { setMessage(check.reason); return; }
-    setMessage('');
+    if (!check.ok) { onRefuse(check.reason); return; }
     onChange(check.changes);
   };
   const tryChange = (change: ScenarioChange) => {
     const check = checkChange(input, changes, change);
-    if (!check.ok) { setMessage(check.reason); return; }
-    setMessage('');
+    if (!check.ok) { onRefuse(check.reason); return; }
     onChange(check.changes);
   };
   useSortableLists(container, canEdit, {
@@ -159,7 +158,6 @@ export function PlanBoard({ input, plan, baseline, changes, editable, heading, o
 
   return <section className="planning-card planning-board" aria-labelledby="planning-timeline-heading">
     <div className="planning-board-head"><h2 id="planning-timeline-heading">{heading}</h2></div>
-    <p className="planning-move-message" role="status">{message && <><WarningIcon />{message}</>}</p>
     <div ref={container} className="planning-years">
       {canEdit && <div className="planning-postpone">
         <div className="planning-cards planning-postpone-zone" data-key={POSTPONE_KEY} aria-label="Postpone one semester"><ClockIcon />Drop here to postpone one semester</div>

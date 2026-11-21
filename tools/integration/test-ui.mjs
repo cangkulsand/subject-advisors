@@ -307,7 +307,8 @@ try{
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await dialog.waitFor({state:'hidden'});
   await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Move DEMB1013',null,{timeout:3000});
   await dragCard(page,'DEMB1013','2026/2027-3');
-  await page.locator('.planning-move-message').getByText('Runs only in Normal semesters.',{exact:true}).waitFor();
+  await page.getByLabel('Notifications',{exact:true}).getByText('Runs only in Normal semesters.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.planning-move-message').count(),0);
   assert.equal(await page.locator('[data-subject="DEMB1013"]').count(),1);assert.equal((state.scenarioWrites??[]).length,0);
  });
  await check('Dragging a card to another semester moves it; dropping it back on its own semester does nothing',async page=>{
@@ -325,6 +326,7 @@ try{
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
   const save=page.locator('.planning-save');await save.getByText('Not saved',{exact:true}).waitFor();
+  await page.getByLabel('Notifications',{exact:true}).getByText('Your last change was not saved. Use Try again at the top of the plan.',{exact:true}).waitFor();
   state.scenarioFail=false;await save.getByRole('button',{name:'Try again',exact:true}).click();await save.getByText('Saved',{exact:true}).waitFor();
   assert.ok(state.scenario);
   await page.getByRole('region',{name:'Your changes',exact:true}).getByRole('button',{name:'Reset to my plan',exact:true}).click();
@@ -505,7 +507,8 @@ try{
   state.plan={...planFixture,baselineVersion:'b'.repeat(64)};
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
-  await page.getByText('This plan view is out of date',{exact:false}).waitFor();
+  await page.locator('.planning-stale').getByText('This plan view is out of date',{exact:false}).waitFor();
+  await page.getByLabel('Notifications',{exact:true}).getByText('This plan view is out of date, so your latest change was not saved.',{exact:false}).waitFor();
   assert.equal(await page.locator('.planning-postpone-zone').count(),0);
   assert.equal(await page.locator('.planning-grip').count(),0);
   assert.equal(await page.getByRole('button',{name:'Try again',exact:true}).count(),0);
@@ -514,11 +517,11 @@ try{
   await page.getByRole('button',{name:'Refresh plan',exact:true}).first().click();
   const confirm=page.getByRole('dialog',{name:'Refresh the plan?'});await confirm.waitFor();
   await confirm.getByRole('button',{name:'Cancel',exact:true}).click();await confirm.waitFor({state:'hidden'});
-  await page.getByText('This plan view is out of date',{exact:false}).waitFor();
+  await page.locator('.planning-stale').getByText('This plan view is out of date',{exact:false}).waitFor();
   await page.getByRole('button',{name:'Refresh plan',exact:true}).first().click();
   await page.getByRole('dialog',{name:'Refresh the plan?'}).getByRole('button',{name:'Refresh plan',exact:true}).click();
   await page.locator('.planning-postpone-zone').waitFor();
-  assert.equal(await page.getByText('This plan view is out of date',{exact:false}).count(),0);
+  assert.equal(await page.locator('.planning-stale').getByText('This plan view is out of date',{exact:false}).count(),0);
   assert.equal(state.scenarioWrites.length,1);
  });
  await check('Comparison reports projected requirements and never fabricates completion',async page=>{

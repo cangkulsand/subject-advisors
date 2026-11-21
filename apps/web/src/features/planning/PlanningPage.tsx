@@ -16,6 +16,8 @@ import '../../app/typography.css';
 import './planning-page.css';
 import { DialogHead } from '../../components/dialog/DialogHead';
 import { IconButton } from '../../components/icon-button/IconButton';
+import { ToastStack } from '../../components/feedback/ToastStack';
+import { useToastNotifications } from '../../components/feedback/useToastNotifications';
 
 const STATUS_LABEL: Record<RequirementProgress['status'], string> = {
   MET: 'Met', PROJECTED: 'Projected', OUTSTANDING: 'Outstanding', UNVERIFIED: 'Cannot verify',
@@ -31,14 +33,12 @@ function PlanNotices({ plan }: { plan: GraduationPlan }) {
 }
 
 /** The what-if changes as a compact list with Remove, and Reset (the changes themselves are made on the board). */
-function ChangesBar({ input, changes, apply, confirmReset }: { input: PlanningInput; changes: ScenarioChange[]; apply: (next: ScenarioChange[] | null) => string | null; confirmReset: (trigger: HTMLElement) => void }) {
-  const [refusal, setRefusal] = useState('');
+function ChangesBar({ input, changes, apply, confirmReset, onRefuse }: { input: PlanningInput; changes: ScenarioChange[]; apply: (next: ScenarioChange[] | null) => string | null; confirmReset: (trigger: HTMLElement) => void; onRefuse: (reason: string) => void }) {
   if (changes.length === 0) return null;
   return <section className="planning-changes-bar" aria-label="Your changes">
     <ul className="planning-changes">{changes.map((change, index) => <li key={index}><span>{describeChange(change, input)}</span>
-      <button type="button" className="planning-chip-remove" aria-label={'Remove: ' + describeChange(change, input)} onClick={() => setRefusal(apply(removeChange(changes, index)) ?? '')}>×</button></li>)}</ul>
+      <button type="button" className="planning-chip-remove" aria-label={'Remove: ' + describeChange(change, input)} onClick={() => { const refusal = apply(removeChange(changes, index)); if (refusal) onRefuse(refusal); }}>×</button></li>)}</ul>
     <button type="button" className="planning-button" onClick={event => confirmReset(event.currentTarget)}>Reset to my plan</button>
-    {refusal && <p className="planning-move-message" role="status"><WarningIcon />{refusal}</p>}
   </section>;
 }
 
@@ -120,6 +120,11 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
   const refreshButtonRef = useRef<HTMLButtonElement>(null);
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
   const [pendingFocus, setPendingFocus] = useState<HTMLElement | null>(null);
+  // Errors are toasts as well as inline state, so the student sees them without scrolling back to the top (S3-P004-028).
+  const { toasts, notify, dismissToast, onToastAnimationEnd } = useToastNotifications();
+  const warn = (reason: string) => notify(reason, 'warning');
+  useEffect(() => { if (status === 'failed' && !outdated) notify('Your last change was not saved. Use Try again at the top of the plan.', 'danger'); }, [status]);
+  useEffect(() => { if (outdated) notify('This plan view is out of date, so your latest change was not saved. Refresh the plan to keep working.', 'warning'); }, [outdated]);
   useEffect(() => {
     if (confirmReset || confirmRefresh || !pendingFocus) return;
     const target = pendingFocus.isConnected ? pendingFocus : refreshButtonRef.current;
@@ -190,11 +195,11 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
           <button type="button" aria-pressed={board === 'plan'} onClick={() => setBoard('plan')}>Semester plan</button>
           <button type="button" aria-pressed={board === 'dependencies'} onClick={() => setBoard('dependencies')}>Dependencies</button>
         </div>
-        {!outdated && <ChangesBar input={input} changes={changes} apply={apply} confirmReset={trigger => { dialogTriggerRef.current = trigger; setConfirmReset(true); }}/>}
+        {!outdated && <ChangesBar input={input} changes={changes} apply={apply} confirmReset={trigger => { dialogTriggerRef.current = trigger; setConfirmReset(true); }} onRefuse={warn}/>}
       </div>}
       {shown && board === 'plan' && shown.semesters.length > 0 && <PlanBoard input={input} plan={shown} baseline={baseline} changes={changes} editable={!outdated && baseline.status !== 'DONE'}
         heading={shown === scenario ? 'Plan with your changes' : 'Your plan'}
-        onChange={next => { apply(next); }}/>}
+        onChange={next => { const refusal = apply(next); if (refusal) warn(refusal); }} onRefuse={warn}/>}
       {shown && board === 'dependencies' && <PlanDependencies input={input} plan={shown} baseline={scenario ? baseline : null}/>}
       {!outdated && scenario && <Comparison input={input} baseline={baseline} scenario={scenario}/>}
       {baseline.bottlenecks.length > 0 && <section className="planning-card" aria-labelledby="planning-bottleneck-heading">
@@ -209,5 +214,6 @@ export function PlanningPage({ api }: { api: PlanningClient }) {
     {confirmRefresh && <ConfirmDialog title="Refresh the plan?" lead="This loads the latest plan and discards your unsaved what-if changes. Cancel keeps them on screen."
       confirm="Refresh plan" onCancel={() => { setConfirmRefresh(false); closeDialog('trigger'); }}
       onConfirm={() => { setConfirmRefresh(false); setRefresh(n => n + 1); closeDialog('refresh'); }}/>}
+    <ToastStack toasts={toasts} onDismiss={dismissToast} onExitAnimationEnd={onToastAnimationEnd}/>
   </section>;
 }
