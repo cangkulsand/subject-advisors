@@ -1,6 +1,6 @@
 # S3-P004-032 — Live coordinator forecast (no snapshot step)
 
-- **Status:** READY_FOR_REVIEW on `feature/live-forecast` (2026-11-21); not merged or deployed (owner: "dont deploy yet")
+- **Status:** Merged to main and pushed to dev and prod (2026-11-21); prod bundle verified; signed-in coordinator check and human peer review pending
 - **Date:** 2026-11-21
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M6 coordinator forecast)
@@ -51,4 +51,4 @@ The lecturer said the forecast does not need a snapshot step. The owner chose a 
 - **Type:** Changed.
 - The Class Offering Forecast now shows live student data: it is calculated from the students in the system each time the page opens or Refresh is pressed, with no snapshot step. Data Imports is no longer in the coordinator menu.
 - **Compatibility:** no migration. Existing snapshots, runs and audit rows stay. The run and import endpoints are unchanged and still used by the (URL-only) Data Imports page.
-- **Outstanding:** whole-branch review; merge and deploy when the owner says so; apply the SRS amendment to the .docx and update the UC20/UC23 diagrams.
+- **Outstanding:** a signed-in coordinator check on prod; apply the SRS amendment to the .docx and update the UC20/UC23 diagrams.
