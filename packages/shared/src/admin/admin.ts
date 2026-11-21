@@ -108,7 +108,7 @@ export function isAdminRole(value: unknown): value is AdminRole {
   return typeof value === 'string' && (ADMIN_ROLES as readonly string[]).includes(value);
 }
 
-function asRecord(body: unknown, allowed: readonly string[]): Record<string, unknown> | string {
+export function asRecord(body: unknown, allowed: readonly string[]): Record<string, unknown> | string {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return 'Request body must be an object.';
   const record = body as Record<string, unknown>;
   const unknown = Object.keys(record).find(key => !allowed.includes(key));
