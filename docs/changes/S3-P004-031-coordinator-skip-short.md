@@ -1,6 +1,6 @@
 # S3-P004-031 — Coordinators forecast the next Normal semester (Short semesters skipped)
 
-- **Status:** Implemented on branch; not merged or deployed
+- **Status:** Merged to main and pushed to dev and prod (2026-11-21); independent review pending
 - **Date:** 2026-11-21
 - **Sprint:** Sprint 3
 - **Owner:** P004 (coordinator forecast)
