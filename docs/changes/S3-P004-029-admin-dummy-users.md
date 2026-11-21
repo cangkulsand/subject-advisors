@@ -1,6 +1,6 @@
 # S3-P004-029 — Admin "Create dummy user" with a one-time password
 
-- **Status:** Implemented on branch; not merged or deployed
+- **Status:** Merged to main and pushed to dev and prod (2026-11-21); live Clerk check pending owner approval; independent review done (fresh reviewer), human review pending
 - **Date:** 2026-11-21
 - **Sprint:** Sprint 3
 - **Owner:** P004 (admin user management)
