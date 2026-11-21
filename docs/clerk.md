@@ -217,3 +217,13 @@ The Clerk Dashboard has already selected application app_3L8qWHdSOTcQ57axExEj4T6
 If this project does not yet use Clerk, add `--app app_3L8qWHdSOTcQ57axExEj4T6USV5` to the appropriate `init` command. If it already uses Clerk, follow "Existing Clerk projects" above and skip `init`. Restore missing keys by linking to this application if needed and running `env pull`; do not replace working keys or switch an existing project from a different application without the user's confirmation.
 
 The user selected Next.js in the Dashboard. In an empty directory, use it instead of asking: pass `--framework next` to `init`. In an existing project, let `init` detect the framework. If it finds a different one, follow the project and mention the mismatch to the user.
+# Dummy users (S3-P004-029)
+
+System admins can create test logins from **Users & Access → Create dummy user** (Student or Coordinator only).
+
+- The server creates the Clerk user with a `+clerk_test` email (`<name>-<4 hex>+clerk_test@graduate.utm.my` for a student, `@utm.my` for a coordinator). Backend-created emails are already verified.
+- The password is generated (20 characters) and shown to the admin **once**. The application never stores or logs it. **Reset password** on a dummy account's page makes a new one.
+- If Clerk asks for a verification code (new device), enter `424242`. This works only for `+clerk_test` emails on a development instance.
+- The development instance allows **100 users**. The dialog shows how many are in use, and creation stops at the limit.
+- Dev and prod share this Clerk instance and the Neon database, so a dummy made on one shows on the other.
+- Removing a dummy: suspend the account (this also bans it in Clerk). Access rows cannot be deleted (see the database audit rules).
