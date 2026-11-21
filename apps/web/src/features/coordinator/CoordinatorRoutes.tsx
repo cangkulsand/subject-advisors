@@ -12,7 +12,7 @@ import { OfferingHistoryPage } from './OfferingHistoryPage';
 
 const groups: StaffNavigationGroup[] = [
   { label: 'Workspace', links: [{ href: '/coordinator', label: 'Overview', icon: 'overview' }] },
-  { label: 'Academic data', links: [{ href: '/coordinator/imports', label: 'Data Imports', icon: 'data' }] },
+  // Data Imports left the menu (S3-P004-032): the forecast reads live student data. The page stays reachable by its URL for the hidden CSV import.
   // One link per group: single-link groups render as plain menu links with no group heading.
   { label: 'Offering Forecast', links: [{ href: '/coordinator/forecasts', label: 'Offering Forecast', icon: 'forecast' }] },
   { label: 'Offering History', links: [{ href: '/coordinator/history', label: 'Offering History', icon: 'history' }] },

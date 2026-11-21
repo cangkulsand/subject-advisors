@@ -116,7 +116,7 @@ else {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const quicklinks = page.locator('.coordinator-quicklinks');
-      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Data Imports', 'Offering Forecast', 'Offering History']);
+      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Offering Forecast', 'Offering History']);
       assert.equal(await quicklinks.getByText('Planned workspace').count(), 0);
       assert.ok(!/\b\d+\b/.test(await quicklinks.innerText()));
       await page.screenshot({ path: '.wrangler/staff-menu-review/coordinator-desktop.png', fullPage: true });
@@ -234,8 +234,8 @@ else {
       await page.keyboard.press('Tab'); await dialog.getByRole('button', { name: 'Close navigation' }).waitFor();
       await page.keyboard.press('Escape'); assert.equal(await dialog.isVisible(), false); assert.equal(await opener.evaluate(element => element === document.activeElement), true);
       await opener.click(); await page.mouse.click(350, 550); assert.equal(await dialog.isVisible(), false);
-      await opener.click(); await dialog.getByRole('link', { name: 'Data Imports', exact: true }).click();
-      await page.getByRole('heading', { name: 'Data Imports', exact: true }).first().waitFor(); assert.equal(await dialog.isVisible(), false);
+      await opener.click(); await dialog.getByRole('link', { name: 'Offering History', exact: true }).click();
+      await page.getByRole('heading', { name: 'Offering History', exact: true }).first().waitFor(); assert.equal(await dialog.isVisible(), false);
     }, 375);
     await check('search, overlapping roles, pagination, account details and audit', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users'); await page.getByText('Fictional Administrator', { exact: true }).waitFor();
