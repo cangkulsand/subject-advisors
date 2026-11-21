@@ -1,7 +1,7 @@
 import type {
   ClassType, ForecastConfigurationStatus, ForecastQualityStatus, UncertaintyReason,
 } from '../../../../../packages/shared/src/forecasting/contracts';
-import type { ForecastSubjectOption } from '../../../../../packages/shared/src/forecasting/contracts';
+import type { ForecastScope, ForecastSubjectOption } from '../../../../../packages/shared/src/forecasting/contracts';
 import { readCurriculumPrerequisiteDetails, summarizeCurriculumPrerequisiteDetails } from '../../../../../packages/shared/src/curriculum-reference';
 import { fingerprint } from '../../../../../packages/shared/src/forecasting/engine/hash';
 import type { EngineCapacityRule, EngineCurriculum, EngineRecord, EngineRuleSnapshot, EngineStudent } from '../../../../../packages/shared/src/forecasting/engine/types';
@@ -50,35 +50,86 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
     return runFrom(row);
   });
 
+  /** Curriculum catalogue, target semester and capacity rules for these curricula of the scope's programme (shared by stored and live forecasts). */
+  const catalogueInputs = async (scope: ForecastScope, curriculumIds: number[]): Promise<Omit<EngineInputRows, 'snapshot'>> => {
+    const [curriculumRows, subjectRows, linkRows, ruleRows, requirementRows, semesterRows, capacityRows] = await Promise.all([
+      query(`SELECT c.curriculum_id, c.curriculum_version, c.total_credit_required FROM public.curriculum c
+        WHERE c.programme_id = $1 AND c.curriculum_id = ANY($2::int[]) ORDER BY c.curriculum_id`,
+      [scope.programmeId, curriculumIds]),
+      query(`SELECT cs.curriculum_subject_id, cs.curriculum_id, s.subject_id, s.subject_code, s.subject_name, s.credit_hours, s.class_type, s.include_in_offering_forecast,
+          to_jsonb(cs)->'prerequisite_details' AS prerequisite_details
+        FROM public.curriculum_subject cs JOIN public.subject s ON s.subject_id = cs.subject_id
+        WHERE cs.curriculum_id = ANY($1::int[]) ORDER BY cs.curriculum_id, s.subject_code`, [curriculumIds]),
+      query(`SELECT p.prerequisite_id, p.curriculum_subject_id, p.required_curriculum_subject_id, p.requirement_type FROM public.subject_prerequisite p
+        JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = p.curriculum_subject_id
+        WHERE cs.curriculum_id = ANY($1::int[]) ORDER BY p.prerequisite_id`, [curriculumIds]),
+      query(`SELECT r.rule_id, r.curriculum_subject_id, r.semester_type, cs.curriculum_id FROM public.subject_semester_rule r
+        JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = r.curriculum_subject_id
+        WHERE cs.curriculum_id = ANY($1::int[]) ORDER BY r.rule_id`, [curriculumIds]),
+      query(`SELECT requirement_id, curriculum_id, requirement_type, required_credits, required_subjects FROM public.curriculum_requirement
+        WHERE curriculum_id = ANY($1::int[]) ORDER BY requirement_id`, [curriculumIds]),
+      query('SELECT semester_id, semester_type, max_subjects, max_credits FROM public.academic_semester WHERE semester_id = $1', [scope.targetSemesterId]),
+      query(`SELECT capacity_rule_id, class_type, minimum_enrollment, break_even_target, normal_maximum, exception_maximum, is_active FROM public.class_capacity_rule
+        WHERE is_active = true ORDER BY capacity_rule_id`, []),
+    ]);
+    const semester = semesterRows[0];
+    if (!semester) throw new ForecastingError('SCOPE_NOT_FOUND');
+
+    const links = linkRows.map((row) => ({
+      prerequisiteId: integer(row.prerequisite_id), curriculumSubjectId: integer(row.curriculum_subject_id),
+      requiredCurriculumSubjectId: integer(row.required_curriculum_subject_id), requirementType: text(row.requirement_type) as 'MANDATORY' | 'RECOMMENDED' | 'COREQUISITE',
+    }));
+    const curricula: EngineCurriculum[] = curriculumRows.map((row) => {
+      const curriculumId = integer(row.curriculum_id);
+      const own = subjectRows.filter((subject) => integer(subject.curriculum_id) === curriculumId);
+      const codes = new Set(own.map((subject) => text(subject.subject_code)));
+      const subjects = own.map((subject): ForecastSubjectOption => {
+        const curriculumSubjectId = integer(subject.curriculum_subject_id);
+        const included = subject.include_in_offering_forecast === true;
+        let conditionalPrerequisites: ForecastSubjectOption['conditionalPrerequisites'] = { status: 'UNAVAILABLE', reason: 'No conditional prerequisite details are configured.' };
+        if (subject.prerequisite_details !== undefined && subject.prerequisite_details !== null) {
+          const details = readCurriculumPrerequisiteDetails(json(subject.prerequisite_details), codes, text(subject.subject_code));
+          // Silently ignoring invalid configuration would understate prerequisites and so overstate demand.
+          if (!details) throw new ForecastingError('CATALOGUE_INVALID');
+          conditionalPrerequisites = { status: 'AVAILABLE', details: summarizeCurriculumPrerequisiteDetails(details) };
+        }
+        return {
+          curriculumSubjectId, curriculumId, subjectId: integer(subject.subject_id), subjectCode: text(subject.subject_code), subjectName: text(subject.subject_name),
+          creditHours: integer(subject.credit_hours), classType: (subject.class_type == null ? null : text(subject.class_type)) as ClassType, includeInOfferingForecast: included,
+          exclusionReason: included ? null : 'Excluded from the offering forecast in the subject catalogue.',
+          prerequisiteLinks: links.filter((link) => link.curriculumSubjectId === curriculumSubjectId), conditionalPrerequisites,
+        };
+      });
+      const subjectSemesterRules = ruleRows.filter((rule) => integer(rule.curriculum_id) === curriculumId)
+        .map((rule) => ({ ruleId: integer(rule.rule_id), curriculumSubjectId: integer(rule.curriculum_subject_id), semesterType: text(rule.semester_type) as 'NORMAL' | 'SHORT' }));
+      const requirements = requirementRows.filter((requirement) => integer(requirement.curriculum_id) === curriculumId).map((requirement) => ({
+        requirementId: integer(requirement.requirement_id), curriculumId, requirementType: text(requirement.requirement_type),
+        requiredCredits: nullableInteger(requirement.required_credits), requiredSubjects: nullableInteger(requirement.required_subjects),
+      }));
+      return {
+        curriculumId, curriculumVersion: text(row.curriculum_version), totalCreditsRequired: nullableInteger(row.total_credit_required),
+        catalogueFingerprint: fingerprint({ subjects, subjectSemesterRules, requirements }), requirements, subjectSemesterRules, subjects,
+      };
+    });
+    const capacityRules: EngineCapacityRule[] = capacityRows.map((row) => ({
+      capacityRuleId: integer(row.capacity_rule_id), scopeKind: 'GLOBAL', classType: text(row.class_type) as 'LECTURE' | 'LAB',
+      minimumEnrollment: integer(row.minimum_enrollment), breakEvenTarget: integer(row.break_even_target), normalMaximum: integer(row.normal_maximum),
+      exceptionMaximum: nullableInteger(row.exception_maximum), isActive: row.is_active === true,
+    }));
+    return {
+      target: { semesterId: integer(semester.semester_id), semesterType: text(semester.semester_type) as 'NORMAL' | 'SHORT', maxSubjects: integer(semester.max_subjects), maxCredits: integer(semester.max_credits) },
+      curricula, capacityRules,
+    };
+}
+
   return {
     engineInputs: (scope, importBatchId) => read(async (): Promise<EngineInputRows> => {
-      const [studentRows, recordRows, curriculumRows, subjectRows, linkRows, ruleRows, requirementRows, semesterRows, capacityRows] = await Promise.all([
+      const [studentRows, recordRows] = await Promise.all([
         query(`SELECT external_reference, student_name, curriculum_id, cohort_status, history_completeness FROM public.imported_student
           WHERE import_batch_id = $1 ORDER BY imported_student_id`, [importBatchId]),
         query(`SELECT st.external_reference, r.subject_id, r.subject_status, r.semester_id, r.recognized_credits FROM public.imported_subject_record r
           JOIN public.imported_student st ON st.imported_student_id = r.imported_student_id WHERE st.import_batch_id = $1 ORDER BY r.import_record_id`, [importBatchId]),
-        query(`SELECT c.curriculum_id, c.curriculum_version, c.total_credit_required FROM public.curriculum c
-          WHERE c.programme_id = $1 AND c.curriculum_id IN (SELECT DISTINCT curriculum_id FROM public.imported_student WHERE import_batch_id = $2) ORDER BY c.curriculum_id`,
-        [scope.programmeId, importBatchId]),
-        query(`SELECT cs.curriculum_subject_id, cs.curriculum_id, s.subject_id, s.subject_code, s.subject_name, s.credit_hours, s.class_type, s.include_in_offering_forecast,
-            to_jsonb(cs)->'prerequisite_details' AS prerequisite_details
-          FROM public.curriculum_subject cs JOIN public.subject s ON s.subject_id = cs.subject_id
-          WHERE cs.curriculum_id IN (SELECT DISTINCT curriculum_id FROM public.imported_student WHERE import_batch_id = $1) ORDER BY cs.curriculum_id, s.subject_code`, [importBatchId]),
-        query(`SELECT p.prerequisite_id, p.curriculum_subject_id, p.required_curriculum_subject_id, p.requirement_type FROM public.subject_prerequisite p
-          JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = p.curriculum_subject_id
-          WHERE cs.curriculum_id IN (SELECT DISTINCT curriculum_id FROM public.imported_student WHERE import_batch_id = $1) ORDER BY p.prerequisite_id`, [importBatchId]),
-        query(`SELECT r.rule_id, r.curriculum_subject_id, r.semester_type, cs.curriculum_id FROM public.subject_semester_rule r
-          JOIN public.curriculum_subject cs ON cs.curriculum_subject_id = r.curriculum_subject_id
-          WHERE cs.curriculum_id IN (SELECT DISTINCT curriculum_id FROM public.imported_student WHERE import_batch_id = $1) ORDER BY r.rule_id`, [importBatchId]),
-        query(`SELECT requirement_id, curriculum_id, requirement_type, required_credits, required_subjects FROM public.curriculum_requirement
-          WHERE curriculum_id IN (SELECT DISTINCT curriculum_id FROM public.imported_student WHERE import_batch_id = $1) ORDER BY requirement_id`, [importBatchId]),
-        query('SELECT semester_id, semester_type, max_subjects, max_credits FROM public.academic_semester WHERE semester_id = $1', [scope.targetSemesterId]),
-        query(`SELECT capacity_rule_id, class_type, minimum_enrollment, break_even_target, normal_maximum, exception_maximum, is_active FROM public.class_capacity_rule
-          WHERE is_active = true ORDER BY capacity_rule_id`, []),
       ]);
-      const semester = semesterRows[0];
-      if (!semester) throw new ForecastingError('SCOPE_NOT_FOUND');
-
       const recordsByStudent = new Map<string, EngineRecord[]>();
       for (const row of recordRows) {
         const list = recordsByStudent.get(text(row.external_reference)) ?? [];
@@ -90,53 +141,10 @@ export function createForecastRunsRepository(query: ForecastingQuery, transactio
         cohortStatus: text(row.cohort_status), historyCompleteness: text(row.history_completeness) as EngineStudent['historyCompleteness'],
         records: recordsByStudent.get(text(row.external_reference)) ?? [],
       }));
-
-      const links = linkRows.map((row) => ({
-        prerequisiteId: integer(row.prerequisite_id), curriculumSubjectId: integer(row.curriculum_subject_id),
-        requiredCurriculumSubjectId: integer(row.required_curriculum_subject_id), requirementType: text(row.requirement_type) as 'MANDATORY' | 'RECOMMENDED' | 'COREQUISITE',
-      }));
-      const curricula: EngineCurriculum[] = curriculumRows.map((row) => {
-        const curriculumId = integer(row.curriculum_id);
-        const own = subjectRows.filter((subject) => integer(subject.curriculum_id) === curriculumId);
-        const codes = new Set(own.map((subject) => text(subject.subject_code)));
-        const subjects = own.map((subject): ForecastSubjectOption => {
-          const curriculumSubjectId = integer(subject.curriculum_subject_id);
-          const included = subject.include_in_offering_forecast === true;
-          let conditionalPrerequisites: ForecastSubjectOption['conditionalPrerequisites'] = { status: 'UNAVAILABLE', reason: 'No conditional prerequisite details are configured.' };
-          if (subject.prerequisite_details !== undefined && subject.prerequisite_details !== null) {
-            const details = readCurriculumPrerequisiteDetails(json(subject.prerequisite_details), codes, text(subject.subject_code));
-            // Silently ignoring invalid configuration would understate prerequisites and so overstate demand.
-            if (!details) throw new ForecastingError('CATALOGUE_INVALID');
-            conditionalPrerequisites = { status: 'AVAILABLE', details: summarizeCurriculumPrerequisiteDetails(details) };
-          }
-          return {
-            curriculumSubjectId, curriculumId, subjectId: integer(subject.subject_id), subjectCode: text(subject.subject_code), subjectName: text(subject.subject_name),
-            creditHours: integer(subject.credit_hours), classType: (subject.class_type == null ? null : text(subject.class_type)) as ClassType, includeInOfferingForecast: included,
-            exclusionReason: included ? null : 'Excluded from the offering forecast in the subject catalogue.',
-            prerequisiteLinks: links.filter((link) => link.curriculumSubjectId === curriculumSubjectId), conditionalPrerequisites,
-          };
-        });
-        const subjectSemesterRules = ruleRows.filter((rule) => integer(rule.curriculum_id) === curriculumId)
-          .map((rule) => ({ ruleId: integer(rule.rule_id), curriculumSubjectId: integer(rule.curriculum_subject_id), semesterType: text(rule.semester_type) as 'NORMAL' | 'SHORT' }));
-        const requirements = requirementRows.filter((requirement) => integer(requirement.curriculum_id) === curriculumId).map((requirement) => ({
-          requirementId: integer(requirement.requirement_id), curriculumId, requirementType: text(requirement.requirement_type),
-          requiredCredits: nullableInteger(requirement.required_credits), requiredSubjects: nullableInteger(requirement.required_subjects),
-        }));
-        return {
-          curriculumId, curriculumVersion: text(row.curriculum_version), totalCreditsRequired: nullableInteger(row.total_credit_required),
-          catalogueFingerprint: fingerprint({ subjects, subjectSemesterRules, requirements }), requirements, subjectSemesterRules, subjects,
-        };
-      });
-      const capacityRules: EngineCapacityRule[] = capacityRows.map((row) => ({
-        capacityRuleId: integer(row.capacity_rule_id), scopeKind: 'GLOBAL', classType: text(row.class_type) as 'LECTURE' | 'LAB',
-        minimumEnrollment: integer(row.minimum_enrollment), breakEvenTarget: integer(row.break_even_target), normalMaximum: integer(row.normal_maximum),
-        exceptionMaximum: nullableInteger(row.exception_maximum), isActive: row.is_active === true,
-      }));
-      return {
-        target: { semesterId: integer(semester.semester_id), semesterType: text(semester.semester_type) as 'NORMAL' | 'SHORT', maxSubjects: integer(semester.max_subjects), maxCredits: integer(semester.max_credits) },
-        snapshot: { students, rejectedRowsByStudent: {} }, curricula, capacityRules,
-      };
+      const curriculumIds = [...new Set(students.map((student) => student.curriculumId))].sort((a, b) => a - b);
+      return { ...(await catalogueInputs(scope, curriculumIds)), snapshot: { students, rejectedRowsByStudent: {} } };
     }),
+    catalogueInputs: (scope, curriculumIds) => read(() => catalogueInputs(scope, curriculumIds)),
 
     findByImportBatch: (importBatchId) => read(async () => {
       const rows = await query(`SELECT ${RUN_COLUMNS} FROM public.forecast_run r WHERE r.import_batch_id = $1 ORDER BY r.version_number DESC LIMIT 1`, [importBatchId]);

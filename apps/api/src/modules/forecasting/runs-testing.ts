@@ -17,6 +17,7 @@ export function fakeRunsRepository(inputs: EngineInputRows) {
 
   const repository: ForecastRunsRepository = {
     engineInputs: async () => inputs,
+    catalogueInputs: async () => ({ target: inputs.target, curricula: inputs.curricula, capacityRules: inputs.capacityRules }),
     findByImportBatch: async (importBatchId) => [...runs].reverse().find((entry) => entry.record.importBatchId === importBatchId)?.record ?? null,
     createRun: async (input) => {
       if (runs.some((entry) => entry.record.importBatchId === input.importBatchId)) throw new ForecastingError('RUN_ALREADY_EXISTS');

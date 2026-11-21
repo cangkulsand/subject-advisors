@@ -87,6 +87,8 @@ export interface NewRunInput {
 
 export interface ForecastRunsRepository {
   engineInputs(scope: ForecastScope, importBatchId: Int32Id): Promise<EngineInputRows>;
+  /** Catalogue, target semester and capacity rules for these curricula (live forecast, S3-P004-032). Same rules as `engineInputs`. */
+  catalogueInputs(scope: ForecastScope, curriculumIds: Int32Id[]): Promise<Omit<EngineInputRows, 'snapshot'>>;
   findByImportBatch(importBatchId: Int32Id): Promise<RunRecord | null>;
   /** One transaction: run (next version in the namespace), demand rows, sections. Aborts with RUN_ALREADY_EXISTS when the batch already has a run. */
   createRun(input: NewRunInput): Promise<RunRecord>;
