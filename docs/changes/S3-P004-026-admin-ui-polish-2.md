@@ -1,6 +1,6 @@
 # S3-P004-026 — Admin UI review, remaining items (icons, Overview tiles, notices, coordinator names, Users table, Current pill, phone tables and top bar, tablet tables); code-review fixes for snapshot removal
 
-- **Status:** Implemented on `feature/admin-ui-polish-2` (2026-11-20); not merged; reviewed (see Reviewer)
+- **Status:** Merged to main and pushed to dev and prod (2026-11-21); prod deploy verified live (bundle matches a local build of the commit); reviewed (see Reviewer)
 - **Date:** 2026-11-20
 - **Sprint:** Sprint 3
 - **Owner:** P004 (admin and shared staff UI)
