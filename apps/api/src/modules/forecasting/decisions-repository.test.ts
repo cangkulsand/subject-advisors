@@ -13,5 +13,7 @@ describe('offering decision audit: System Admin marker (S3-P004-033)', () => {
     const sql = String((query.mock.calls[0] as unknown[])[0]);
     expect(sql).toMatch(/app_role\s*=\s*'SYSTEM_ADMIN'/);
     expect(sql).toMatch(/clerk_user_id\s*=\s*a\.recorded_by/);
+    // A coordinator who still holds an old (unusable) SYSTEM_ADMIN membership is not marked (S3-P004-033 review).
+    expect(sql).toMatch(/NOT EXISTS[\s\S]*app_role\s*=\s*'COORDINATOR'/);
   });
 });

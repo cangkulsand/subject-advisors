@@ -90,8 +90,10 @@ export function createOfferingDecisionsRepository(query: ForecastingQuery, trans
     listAudit: (scope, limit, beforeAuditId) => guarded(async () => {
       const rows = await query(`SELECT a.audit_id, a.subject_id, s.subject_code, s.subject_name, a.before_status, a.after_status, a.import_batch_id, a.affected_picks,
           a.recorded_by, ${isoSql('a.recorded_at')} AS recorded_at,
-          EXISTS (SELECT 1 FROM public.user_access_assignment u JOIN public.user_role_assignment r USING(access_assignment_id)
-            WHERE u.clerk_user_id = a.recorded_by AND r.app_role = 'SYSTEM_ADMIN') AS recorded_by_admin
+          (EXISTS (SELECT 1 FROM public.user_access_assignment u JOIN public.user_role_assignment r USING(access_assignment_id)
+             WHERE u.clerk_user_id = a.recorded_by AND r.app_role = 'SYSTEM_ADMIN')
+           AND NOT EXISTS (SELECT 1 FROM public.user_access_assignment u JOIN public.user_role_assignment r USING(access_assignment_id)
+             WHERE u.clerk_user_id = a.recorded_by AND r.app_role = 'COORDINATOR')) AS recorded_by_admin
         FROM public.offering_decision_audit a JOIN public.subject s ON s.subject_id = a.subject_id
         WHERE a.programme_id = $1::integer AND a.learning_centre_id = $2::integer AND a.semester_id = $3::integer AND ($4::bigint IS NULL OR a.audit_id < $4::bigint)
         ORDER BY a.audit_id DESC LIMIT $5::integer`, [scope.programmeId, scope.learningCentreId, scope.targetSemesterId, beforeAuditId, limit]);
