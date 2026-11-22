@@ -37,7 +37,7 @@ function membershipsOf(account) {
 }
 const detailOf = account => ({ ...account, memberships: membershipsOf(account) });
 const failure = (status, code, message) => ({ status, payload: { error: { code, message } } });
-const ADMIN_DOMAINS = ['utm.my', 'graduate.utm.my', 'gmail.com'];
+const ADMIN_DOMAINS = ['gmail.com'];
 const eligible = (email, roles) => roles.every(role => role === 'SYSTEM_ADMIN' ? ADMIN_DOMAINS.includes(email.split('@')[1]) : email.endsWith('@example.invalid') ? true : role === 'STUDENT' ? email.endsWith('@graduate.utm.my') : email.endsWith('@utm.my') && !email.endsWith('@graduate.utm.my'));
 const CLERK_ONLY = { 'clerk.only@utm.my': 'user_clerk_only' };
 function paged(items, url) {

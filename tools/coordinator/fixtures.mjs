@@ -314,7 +314,7 @@ function decisionRow(state, subjectId) {
   const stored = state.decisions.get(subjectId), [subjectCode, subjectName, creditHours, classType] = decisionCatalogue.get(subjectId);
   return { subjectId, subjectCode, subjectName, creditHours, classType, status: stored.status, decidedBy: 'user_test', decidedAt: stored.decidedAt };
 }
-function decideSubject(state, subjectId, status, importBatchId = 1) {
+function decideSubject(state, subjectId, status, importBatchId = 1, byAdmin = false) {
   const before = state.decisions.get(subjectId)?.status ?? 'PENDING';
   if (before === status) return { before, after: status, affectedPicks: 0 };
   let affectedPicks = 0;
@@ -322,7 +322,7 @@ function decideSubject(state, subjectId, status, importBatchId = 1) {
   const stamp = new Date(Date.parse(generatedAt) + state.nextDecisionAudit * 60000).toISOString();
   if (status === 'PENDING') state.decisions.delete(subjectId); else state.decisions.set(subjectId, { status, decidedAt: stamp });
   const [subjectCode, subjectName] = decisionCatalogue.get(subjectId);
-  state.decisionAudit.unshift({ auditId: state.nextDecisionAudit++, scope: scopeOf, subjectId, subjectCode, subjectName, beforeStatus: before, afterStatus: status, importBatchId, affectedPicks, recordedBy: 'user_test', recordedAt: stamp });
+  state.decisionAudit.unshift({ auditId: state.nextDecisionAudit++, scope: scopeOf, subjectId, subjectCode, subjectName, beforeStatus: before, afterStatus: status, importBatchId, affectedPicks, recordedBy: 'user_test', ...(byAdmin ? { recordedByAdmin: true } : {}), recordedAt: stamp });
   return { before, after: status, affectedPicks };
 }
 function handleDecisions(state, route, method, url, headers, text) {
@@ -359,7 +359,8 @@ function handleDecisions(state, route, method, url, headers, text) {
   const current = state.decisions.get(body.subjectId)?.status ?? 'PENDING';
   if (body.status === body.expectedStatus) return ok({ subjectId: body.subjectId, beforeStatus: current, afterStatus: current, affectedPicks: 0, phase });
   if (current !== body.expectedStatus) return failure(409, 'DECISION_STALE', 'This subject was changed by someone else. Reload to see the current decision.');
-  const result = decideSubject(state, body.subjectId, body.status, body.importBatchId ?? null);
+  // View as Coordinator (S3-P004-033): the API marks a decision recorded by a System Admin.
+  const result = decideSubject(state, body.subjectId, body.status, body.importBatchId ?? null, Boolean(headers['x-view-as']));
   return ok({ subjectId: body.subjectId, beforeStatus: result.before, afterStatus: result.after, affectedPicks: result.affectedPicks, phase });
 }
 

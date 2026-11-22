@@ -30,17 +30,20 @@ export function createOfferingClient(getToken: () => Promise<string | null>, api
       credentials: 'omit', cache: 'no-store',
     });
     assertSession(expectedSession);
-    if (response.status === 401 || response.status === 403) clearAccountCache();
     // A successful PUT may have committed even if its response cannot be decoded.
     if (response.ok && init.method === 'PUT') clearAcademicCache();
     let body: unknown;
     try { body = await response.json(); }
     catch {
+      if (response.status === 401 || response.status === 403) clearAccountCache();
       if (response.status === 401) throw new OfferingApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again to continue.');
       if (response.status === 403) throw new OfferingApiError(403, 'ACCESS_DENIED', 'You do not have access to this student information. Check your account access, then retry.');
       throw new Error('The offerings response is unavailable. Please retry.');
     }
     assertSession(expectedSession);
+    // A read-only refusal in View as Student (S3-P004-033) is not an access change: keep the account and the page.
+    const refusedCode = typeof body === 'object' && body !== null && 'error' in body ? (body.error as { code?: unknown } | null)?.code : undefined;
+    if (response.status === 401 || response.status === 403 && refusedCode !== 'VIEW_AS_READ_ONLY') clearAccountCache();
     if (response.status === 401 || response.status === 403) {
       if (typeof body === 'object' && body !== null && !Array.isArray(body) &&
           'error' in body && typeof body.error === 'object' && body.error !== null &&

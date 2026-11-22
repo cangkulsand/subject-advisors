@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { AppLink } from '../../app/navigation';
 import { LogoutButton } from '../auth';
 import { RoleSwitcher } from '../auth/RoleSwitcher';
+import { ViewAsBanner } from '../auth/ViewAsBanner';
 import '../../app/typography.css';
 import './admin.css';
 
@@ -48,9 +49,9 @@ function StaffNavigation({ groups, path, label, onNavigate }: { groups: StaffNav
   </nav>;
 }
 
-export function StaffNavigationShell({ path, title, workspace, roleLabel, home, navLabel, groups, children, variant = 'admin' }: {
+export function StaffNavigationShell({ path, title, workspace, roleLabel, home, navLabel, groups, children, variant = 'admin', actions }: {
   path: string; title: string; workspace: string; roleLabel: string; home: string; navLabel: string;
-  groups: StaffNavigationGroup[]; children: ReactNode; variant?: 'admin' | 'coordinator';
+  groups: StaffNavigationGroup[]; children: ReactNode; variant?: 'admin' | 'coordinator'; actions?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -71,10 +72,12 @@ export function StaffNavigationShell({ path, title, workspace, roleLabel, home, 
       if (event.target === event.currentTarget && (event.clientX > bounds.right || event.clientY > bounds.bottom || event.clientX < bounds.left || event.clientY < bounds.top)) close();
     }}>
       <button className="admin-drawer-close" type="button" onClick={close} aria-label="Close navigation">×</button>{brand}<StaffNavigation groups={groups} path={path} label={navLabel} onNavigate={close}/>
+      {actions && <div className="admin-drawer-actions">{actions}</div>}
     </dialog>
     <div className="admin-main">
+      <ViewAsBanner/>
       <header className="admin-topbar"><div className="admin-topbar-title"><button ref={opener} type="button" className="admin-menu-button" aria-label="Open navigation" aria-haspopup="dialog" aria-controls="staff-mobile-menu" onClick={() => dialog.current?.showModal()}>☰</button><span className="admin-admin-badge">{roleLabel}</span></div>
-        <div className="admin-topbar-actions"><RoleSwitcher/><LogoutButton/></div>
+        <div className="admin-topbar-actions">{actions && <span className="admin-topbar-extra">{actions}</span>}<RoleSwitcher/><LogoutButton/></div>
       </header>
       <main id="staff-content" tabIndex={-1} className="admin-content" aria-label={title}>{children}</main>
     </div>

@@ -397,6 +397,30 @@ else {
       await page.screenshot({ path: shots + 'forecast-decisions-desktop.png', fullPage: true });
     });
 
+    await check('View as Coordinator (S3-P004-033): banner, every call carries the view, and an admin decision shows (System Admin)', async page => {
+      await page.addInitScript(() => sessionStorage.setItem('sa.viewAs', JSON.stringify({ role: 'COORDINATOR', programmeId: 5, learningCentreId: 1, label: 'SECJ, UTMSPACE Kuala Lumpur' })));
+      const state = await mock(page, { seed: 'import' });
+      const sent = [];
+      page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) sent.push(request.headers()['x-view-as'] ?? null); });
+      await page.goto(base + forecastUrl); await forecastReady(page);
+      const banner = page.locator('.view-as-banner');
+      assert.equal((await banner.innerText()).replace(/\s+/g, ' ').trim(), 'Viewing as coordinator — SECJ, UTMSPACE Kuala Lumpur Exit view');
+      await pickAction(page, 'SECJ1013', 'Approved');
+      await page.getByText('SECJ1013 approved.').waitFor();
+      const post = state.bodies.filter(item => item.path === '/api/coordinator/offering-decisions').at(-1);
+      assert.equal(post.headers['x-view-as'], 'COORDINATOR;programme=5;centre=1');
+      assert.ok(sent.length > 0 && sent.every(value => value === 'COORDINATOR;programme=5;centre=1'), 'every API call carries the view: ' + JSON.stringify(sent));
+      const first = page.getByRole('region', { name: 'Audit history table' }).locator('tbody tr').first();
+      await first.getByText('Pending → Approved').waitFor();
+      assert.match(await first.innerText(), /user_test \(System Admin\)/);
+    });
+    await check('View as Coordinator banner fits at 375px', async page => {
+      await page.addInitScript(() => sessionStorage.setItem('sa.viewAs', JSON.stringify({ role: 'COORDINATOR', programmeId: 5, learningCentreId: 1, label: 'SECJ, UTMSPACE Kuala Lumpur' })));
+      await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
+      await page.locator('.view-as-banner').waitFor();
+      assert.ok(await noOverflow(page));
+      await page.screenshot({ path: shots + 'view-as-coordinator-375.png' });
+    }, 375);
     await check('forecast: choosing Approved, Removed and Pending takes effect at once with a toast and an audit row, no dialog, no reason', async page => {
       const state = await mock(page, { seed: 'import' }); await page.goto(base + forecastUrl); await forecastReady(page);
       const posts = () => state.bodies.filter(item => item.path === '/api/coordinator/offering-decisions');

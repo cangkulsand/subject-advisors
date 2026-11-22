@@ -12,3 +12,12 @@
 .auth-email-notice p { margin: 0; }
 .auth-email-notice .auth-email-notice-title { margin-bottom: .25rem; font-weight: 600; }
 .auth-email-notice strong { color: var(--color-focus, #6b1d2f); }
+
+/* System Admin "View as" banner (S3-P004-033). */
+.view-as-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 16px; background: #fff4dc; color: #4d2f00; border-bottom: 1px solid #d9a441; font-size: var(--font-size-body); font-weight: 600; line-height: 1.5; }
+.view-as-banner span { min-width: 0; overflow-wrap: anywhere; }
+.view-as-banner .view-as-exit { flex: none; min-height: 36px; padding: 6px 14px; border: 1px solid #4d2f00; border-radius: 8px; background: #ffffff; color: #4d2f00; font: inherit; font-weight: 650; cursor: pointer; }
+.view-as-banner .view-as-exit:focus-visible { outline: 3px solid #4d2f00; outline-offset: 2px; }
+.student-dark .view-as-banner { background: #3a2800; color: #ffe7b0; border-bottom-color: #8a6420; }
+.student-dark .view-as-banner .view-as-exit { background: #241900; color: #ffe7b0; border-color: #ffe7b0; }
+.student-dark .view-as-banner .view-as-exit:focus-visible { outline-color: #ffe7b0; }

@@ -31,7 +31,10 @@ async function mock(page,state={}){
  await page.route(/\/api\//,async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.startsWith('/api/admin/')){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:adminFixtureResponse(new URL(route.request().url()))})});return;}
-  (state.requests??=[]).push({path,method:route.request().method()});
+  (state.requests??=[]).push({path,method:route.request().method(),viewAs:route.request().headers()['x-view-as']??null});
+  // View as Student (S3-P004-033): the API answers as the viewed student and refuses every write.
+  if(state.viewAs&&path==='/api/me'){await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:{clerkUserId:'user_viewed',appRole:'STUDENT',roles:['SYSTEM_ADMIN','STUDENT'],availableRoles:['SYSTEM_ADMIN','STUDENT'],studentProfileState:'COMPLETE',accessStatus:'ACTIVE',profileState:'COMPLETE',landingPath:'/student',viewAs:{role:'STUDENT',studentId:14,adminClerkUserId:'user_test',studentName:'Fictional Student'}}})});return;}
+  if(state.viewAs&&!['GET','HEAD'].includes(route.request().method())){(state.refused??=[]).push(path);await route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:{code:'VIEW_AS_READ_ONLY',message:'Read only while viewing as a student.'}})});return;}
   if(path==='/api/p001-sprint2/progress'){if(state.progressFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({data:state.progress??progressFixture})});return;}
   if(path==='/api/planning/scenario'){const method=route.request().method();(state.scenarioWrites??=[]);
    if(method==='PUT'){const body=route.request().postDataJSON();state.scenarioWrites.push({method,body});if(state.holdSave)await new Promise(resolve=>{state.releaseSave=resolve;});if(state.scenarioFail){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{code:'SPRINT2_UNAVAILABLE',message:'Please retry later.'}})});return;}if(body.baselineVersion!==undefined&&body.baselineVersion!==(state.plan?.baselineVersion??planFixture.baselineVersion)){await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:{code:'PLANNING_BASELINE_CHANGED',message:'Your plan changed since you opened this page. Refresh the plan to continue.'}})});return;}state.scenario={changes:body.changes,savedAt:'2026-11-17T02:00:00.000Z'};}
@@ -180,6 +183,24 @@ try{
   await page.getByRole('alert').filter({hasText:'Could not save your confirmations.'}).waitFor();assert.equal(await fees.isChecked(),false);
   state.graduationSaveFail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('alert').waitFor({state:'detached'});assert.equal(await fees.isChecked(),true);
  },width);
+ for(const dark of [false,true])await check('View as Student (S3-P004-033): read-only banner, every call carries the view, a refused save is explained'+(dark?' (dark)':''),async page=>{
+  await page.addInitScript(()=>sessionStorage.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:14,label:'Fictional Student'})));
+  const state={viewAs:true};await mock(page,state);await page.goto(base+'/student/graduation');await page.getByText('Not yet eligible',{exact:true}).waitFor();
+  if(dark){await page.getByRole('button',{name:'Switch to dark mode',exact:true}).click();await page.locator('.student-dark').waitFor();}
+  const banner=page.locator('.view-as-banner');assert.equal((await banner.innerText()).replace(/\s+/g,' ').trim(),'Viewing as student — Fictional Student (read only) Exit view');
+  assert.ok(state.requests.length>0&&state.requests.every(request=>request.viewAs==='STUDENT;student=14'),'every call carries the view');
+  await page.getByLabel('I have my MUET certificate',{exact:true}).check();
+  await page.getByRole('alert').filter({hasText:'Read only while viewing as a student.'}).waitFor();
+  assert.deepEqual(state.refused,['/api/graduation-check/confirmations']);
+  await assertReadable(page,'view as student'+(dark?' dark':''));
+ },1440);
+ await check('View as Student banner fits at 375px',async page=>{
+  await page.addInitScript(()=>sessionStorage.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:14,label:'Fictional Student'})));
+  await mock(page,{viewAs:true});await page.goto(base+'/student/graduation');await page.getByText('Not yet eligible',{exact:true}).waitFor();await page.locator('.view-as-banner').waitFor();
+  const wide=await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,5).map(el=>el.className||el.tagName));
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflowing: '+JSON.stringify(wide));
+  await shot(page,'view-as-student-375');
+ },375);
  await check('Graduation check shows eligible and cannot-assess states',async page=>{
   await mock(page,{graduation:{...gradFixture,status:'ELIGIBLE',earnedCredits:120,remainingCredits:0,creditsMet:true,missing:[],feesClearedConfirmedAt:'2026-11-15T02:00:00.000Z',muetConfirmedAt:'2026-11-15T02:00:00.000Z'}});await page.goto(base+'/student/graduation');
   await page.getByText('Eligible to graduate',{exact:true}).waitFor();assert.equal(await page.getByLabel('I have my MUET certificate',{exact:true}).isChecked(),true);
