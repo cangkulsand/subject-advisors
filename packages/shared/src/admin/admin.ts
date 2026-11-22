@@ -1,8 +1,8 @@
 export const ADMIN_ROLES = ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'] as const;
 export type AdminRole = typeof ADMIN_ROLES[number];
 /** Exact (case-insensitive) email domains that may hold SYSTEM_ADMIN. The single source for API, runtime policy and UI. */
-export const SYSTEM_ADMIN_EMAIL_DOMAINS = ['utm.my', 'graduate.utm.my', 'gmail.com'] as const;
-export const SYSTEM_ADMIN_EMAIL_RULE = 'System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com';
+export const SYSTEM_ADMIN_EMAIL_DOMAINS = ['gmail.com'] as const;
+export const SYSTEM_ADMIN_EMAIL_RULE = 'System Administrator: verified @gmail.com';
 export function isSystemAdminEmailDomain(address: string): boolean {
   const parts = address.trim().split('@');
   if (parts.length !== 2 || !parts[0] || /\s/.test(parts[0])) return false;
@@ -32,6 +32,8 @@ export interface AdminMembership {
   protectedOwner: boolean;
   reason: string;
   grantedAt: string;
+  /** False when the account's verified email cannot hold this role (S3-P004-033); absent when Clerk was unavailable. */
+  usable?: boolean;
 }
 export interface AdminAccountDetail extends AdminAccount { memberships: AdminMembership[] }
 export interface AdminAuditEvent {

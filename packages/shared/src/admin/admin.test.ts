@@ -14,13 +14,13 @@ describe('normaliseReason', () => {
 });
 
 describe('isSystemAdminEmailDomain', () => {
-  it('accepts exactly utm.my, graduate.utm.my and gmail.com, case-insensitively', () => {
-    for (const address of ['a@utm.my', 'a@graduate.utm.my', 'a@gmail.com', 'A@GMAIL.COM', ' a@Gmail.Com ']) expect(isSystemAdminEmailDomain(address)).toBe(true);
+  it('accepts exactly gmail.com, case-insensitively (S3-P004-033)', () => {
+    for (const address of ['a@gmail.com', 'A@GMAIL.COM', ' a@Gmail.Com ']) expect(isSystemAdminEmailDomain(address)).toBe(true);
   });
   it('rejects subdomains, lookalikes and malformed addresses', () => {
-    for (const address of ['a@sub.gmail.com', 'a@evil-gmail.com', 'a@gmail.com.evil.io', 'a@utm.my.evil', 'a@mail.utm.my', 'a@gmail.com@x.io', '@gmail.com', 'gmail.com', 'a b@gmail.com', '']) expect(isSystemAdminEmailDomain(address)).toBe(false);
+    for (const address of ['a@utm.my', 'a@graduate.utm.my', 'a@sub.gmail.com', 'a@evil-gmail.com', 'a@gmail.com.evil.io', 'a@utm.my.evil', 'a@mail.utm.my', 'a@gmail.com@x.io', '@gmail.com', 'gmail.com', 'a b@gmail.com', '']) expect(isSystemAdminEmailDomain(address)).toBe(false);
   });
-  it('keeps the single source list', () => { expect([...SYSTEM_ADMIN_EMAIL_DOMAINS]).toEqual(['utm.my', 'graduate.utm.my', 'gmail.com']); });
+  it('keeps the single source list', () => { expect([...SYSTEM_ADMIN_EMAIL_DOMAINS]).toEqual(['gmail.com']); });
 });
 
 describe('normaliseEmail', () => {

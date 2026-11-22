@@ -16,7 +16,7 @@ export function requireActive(assignment: AccessAssignment): void {
   }
 }
 
-/** Domain eligibility never creates a role membership. */
+/** One email domain per role, no exceptions (S3-P004-033). Domain eligibility never creates a role membership. */
 export function eligibleRoles(identity: VerifiedIdentity, assignment: AccessAssignment): AppRole[] {
   if (!identity.primaryEmail?.verified) {
     throw new AuthError(403, 'EMAIL_UNVERIFIED', 'Verify your primary email with Clerk before continuing.');
@@ -24,6 +24,5 @@ export function eligibleRoles(identity: VerifiedIdentity, assignment: AccessAssi
   const student = /^[^@\s]+@graduate\.utm\.my$/i.test(identity.primaryEmail.address);
   const coordinator = /^[^@\s]+@utm\.my$/i.test(identity.primaryEmail.address);
   return assignment.roles.filter(role => role === 'SYSTEM_ADMIN' && isSystemAdminEmailDomain(identity.primaryEmail!.address) ||
-    role === 'STUDENT' && student || role === 'COORDINATOR' &&
-    (coordinator || student && assignment.coordinatorStudentException === true && assignment.protectedOwner === true));
+    role === 'STUDENT' && student || role === 'COORDINATOR' && coordinator);
 }

@@ -8,7 +8,7 @@ vi.mock('@neondatabase/serverless', () => ({ neon: () => ({ query: mocks.query, 
 vi.mock('./identities', () => ({ createAdminIdentities: () => ({ lookup: mocks.identity }) }));
 const env = { DATABASE_URL: 'postgresql://unused.invalid/test', CLERK_SECRET_KEY: 'test_only' } as AuthBindings;
 function auth(roles: AccessAssignment['roles'] = ['SYSTEM_ADMIN']): AuthDependencies {
-  return { verify: vi.fn(async () => ({ clerkUserId: 'user_verified', sessionId: 's', primaryEmail: { address: 'test@utm.my', verified: true } })),
+  return { verify: vi.fn(async () => ({ clerkUserId: 'user_verified', sessionId: 's', primaryEmail: { address: 'test@gmail.com', verified: true } })),
     access: { find: vi.fn(async (): Promise<AccessAssignment> => ({ clerkUserId: 'user_verified', appRole: roles![0]!, roles, accessStatus: 'ACTIVE' })), initializeStudent: vi.fn() } };
 }
 const request = (path: string, method = 'GET', body?: object) => new Request('https://test.invalid/api/admin/' + path, {

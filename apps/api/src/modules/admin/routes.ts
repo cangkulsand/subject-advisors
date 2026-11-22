@@ -82,9 +82,16 @@ function validated<T>(result: AdminValidation<T>): T {
 function mutationResponse(error: AdminMutationError): Response {
   return authJson({ error: { code: error.code, message: error.message } }, error.status);
 }
+/** `usable` (S3-P004-033): can the account's verified email hold this role? Unset when Clerk could not be read. */
+function withUsable(memberships: AccountDetailRow['memberships'], identity: { email: string | null; emailVerified: boolean; state: string }) {
+  if (identity.state !== 'available') return memberships;
+  const email = identity.email ? { address: identity.email, verified: identity.emailVerified } : null;
+  return memberships.map(membership => ({ ...membership, usable: checkRoleEligibility(email, [membership.role]).eligible }));
+}
+
 async function detail(account: AccountDetailRow, deps: AdminDependencies) {
   const [row] = await enrich([account], deps);
-  return { ...row, memberships: account.memberships };
+  return { ...row!, memberships: withUsable(account.memberships, row!.identity) };
 }
 
 export async function handleAdminRequest(request: Request, deps: AdminDependencies): Promise<Response | null> {
@@ -290,8 +297,7 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       parameters(url, []);
       const result = await deps.repository.account(positive(match[1]!, 'account ID'));
       if (!result) throw new AuthError(404, 'ACCOUNT_NOT_FOUND', 'This application account was not found.');
-      const [account] = await enrich([result], deps);
-      return authJson({ data: { ...account, memberships: result.memberships } });
+      return authJson({ data: await detail(result, deps) });
     }
     if (url.pathname === '/api/admin/audit') {
       parameters(url, ['page', 'accountId', 'kind', 'from', 'to']);

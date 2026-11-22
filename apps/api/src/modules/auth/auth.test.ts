@@ -83,8 +83,8 @@ describe('P004 authorization and endpoints', () => {
     expect(f.deps.access.initializeStudent).not.toHaveBeenCalled();
     expect(f.records.get(f.identity.clerkUserId)?.accessStatus).toBe('SUSPENDED');
   });
-  it.each([['COORDINATOR', '/coordinator'], ['SYSTEM_ADMIN', '/admin']] as const)('preserves approved %s assignments', async (role, path) => {
-    const f = fixture(); f.identity.primaryEmail = { address: 'approved@utm.my', verified: true };
+  it.each([['COORDINATOR', '/coordinator', 'approved@utm.my'], ['SYSTEM_ADMIN', '/admin', 'approved@gmail.com']] as const)('preserves approved %s assignments', async (role, path, address) => {
+    const f = fixture(); f.identity.primaryEmail = { address, verified: true };
     f.records.set(f.identity.clerkUserId, { clerkUserId: f.identity.clerkUserId, appRole: role, roles: [role], accessStatus: 'ACTIVE' });
     const res = await handleAuthRequest(f.request(), f.deps);
     expect(await res?.json()).toMatchObject({ data: { appRole: role, landingPath: path } });

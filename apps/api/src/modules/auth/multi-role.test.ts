@@ -10,14 +10,21 @@ function fixture(roles: AccessAssignment['roles'] = ['STUDENT','COORDINATOR','SY
   return {identity,assignment,deps,request:new Request('https://app.test/api/private')};
 }
 describe('explicit multi-role authorization',()=>{
-  it.each(['STUDENT','COORDINATOR','SYSTEM_ADMIN'] as const)('permits the protected graduate owner in the granted %s role',async role=>{
-    const f=fixture();expect(await authorize(f.request,f.deps,{roles:[role],requireProfile:role==='STUDENT'})).toMatchObject({appRole:role,availableRoles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']});
+  it('gives a graduate account only STUDENT, even with the old owner exception flags (S3-P004-033)',async()=>{
+    const f=fixture();expect(await authorize(f.request,f.deps,{roles:['STUDENT'],requireProfile:true})).toMatchObject({appRole:'STUDENT',availableRoles:['STUDENT']});
+    for(const role of ['COORDINATOR','SYSTEM_ADMIN'] as const)await expect(authorize(f.request,f.deps,{roles:[role]})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
+  });
+  it('gives a utm.my account only COORDINATOR and a gmail account only SYSTEM_ADMIN',async()=>{
+    const f=fixture();f.identity.primaryEmail!.address='staff@utm.my';
+    expect((await authorize(f.request,f.deps)).availableRoles).toEqual(['COORDINATOR']);
+    f.identity.primaryEmail!.address='admin@gmail.com';
+    expect((await authorize(f.request,f.deps)).availableRoles).toEqual(['SYSTEM_ADMIN']);
   });
   it('does not turn a student domain or a requested role into a privilege grant',async()=>{
     const f=fixture(['STUDENT']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;
     for(const role of ['COORDINATOR','SYSTEM_ADMIN'] as const)await expect(authorize(f.request,f.deps,{roles:[role]})).rejects.toMatchObject({code:'ROLE_DENIED'});
   });
-  it('requires an exact verified coordinator domain or the protected owner exception',async()=>{
+  it('requires an exact verified coordinator domain',async()=>{
     const f=fixture(['COORDINATOR']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;
     await expect(authorize(f.request,f.deps,{roles:['COORDINATOR']})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
     f.identity.primaryEmail!.address='approved@utm.my';expect((await authorize(f.request,f.deps)).availableRoles).toEqual(['COORDINATOR']);
@@ -30,7 +37,9 @@ describe('explicit multi-role authorization',()=>{
   });
   it('keeps staff views usable when the student profile is unavailable',async()=>{
     const f=fixture();f.deps.profiles!.stateFor=vi.fn(async()=> 'UNAVAILABLE' as const);
-    expect(await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).toMatchObject({profileState:'NOT_APPLICABLE',studentProfileState:'UNAVAILABLE'});
+    f.identity.primaryEmail!.address='admin@gmail.com';
+    expect(await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).toMatchObject({profileState:'NOT_APPLICABLE',studentProfileState:'NOT_APPLICABLE'});
+    f.identity.primaryEmail!.address='owner@graduate.utm.my';
     await expect(authorize(f.request,f.deps,{roles:['STUDENT'],requireProfile:true})).rejects.toMatchObject({code:'PROFILE_UNAVAILABLE'});
   });
   it('checks student eligibility only for student access',async()=>{
@@ -38,11 +47,11 @@ describe('explicit multi-role authorization',()=>{
     expect((await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).appRole).toBe('SYSTEM_ADMIN');
     await expect(authorize(f.request,f.deps,{roles:['STUDENT']})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
   });
-  it.each(['a@utm.my','a@graduate.utm.my','a@gmail.com','A@GMAIL.COM'])('honours SYSTEM_ADMIN for %s',async address=>{
+  it.each(['a@gmail.com','A@GMAIL.COM'])('honours SYSTEM_ADMIN for %s',async address=>{
     const f=fixture(['SYSTEM_ADMIN']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;f.identity.primaryEmail!.address=address;
     expect(await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).toMatchObject({availableRoles:['SYSTEM_ADMIN'],landingPath:'/admin'});
   });
-  it.each(['a@example.com','a@sub.gmail.com','a@evil-gmail.com','a@gmail.com.evil.io','a@utm.my.evil'])('does not honour SYSTEM_ADMIN for %s',async address=>{
+  it.each(['a@utm.my','a@graduate.utm.my','a@example.com','a@sub.gmail.com','a@evil-gmail.com','a@gmail.com.evil.io','a@utm.my.evil'])('does not honour SYSTEM_ADMIN for %s',async address=>{
     const f=fixture(['SYSTEM_ADMIN']);f.assignment.protectedOwner=false;f.assignment.coordinatorStudentException=false;f.identity.primaryEmail!.address=address;
     await expect(authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).rejects.toMatchObject({code:'EMAIL_DOMAIN_DENIED'});
   });
@@ -51,8 +60,8 @@ describe('explicit multi-role authorization',()=>{
     expect((await authorize(f.request,f.deps)).availableRoles).toEqual(['SYSTEM_ADMIN']);
   });
   it('honors current grants, global suspension and revocation on every API call',async()=>{
-    const f=fixture();await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']});
-    f.assignment.roles=['STUDENT'];await expect(authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).rejects.toMatchObject({code:'ROLE_DENIED'});
+    const f=fixture();f.identity.primaryEmail!.address='admin@gmail.com';await authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']});
+    f.assignment.roles=['STUDENT'];f.identity.primaryEmail!.address='owner@graduate.utm.my';await expect(authorize(f.request,f.deps,{roles:['SYSTEM_ADMIN']})).rejects.toMatchObject({code:'ROLE_DENIED'});
     f.assignment.accessStatus='SUSPENDED';await expect(authorize(f.request,f.deps,{roles:['STUDENT']})).rejects.toMatchObject({code:'ACCOUNT_SUSPENDED'});
     expect(f.deps.access.find).toHaveBeenCalledTimes(3);
   });
