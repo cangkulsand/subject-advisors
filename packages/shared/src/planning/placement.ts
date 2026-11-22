@@ -203,7 +203,11 @@ export function checkChange(input: PlanningInput, changes: ScenarioChange[], cha
   return result;
 }
 
-export interface PlacementTarget { semester: SemesterRef; label: string; ok: boolean; reason: string | null }
+export interface PlacementTarget {
+  semester: SemesterRef; label: string; ok: boolean; reason: string | null;
+  /** The semester is of a type the subject runs in (Normal or Short); the Move dialog lists only these. */
+  fits: boolean;
+}
 
 /** Every semester from the first planned one to one after the plan's last, with whether the subject may move there. */
 export function placementTargets(input: PlanningInput, plan: GraduationPlan, changes: ScenarioChange[], curriculumSubjectId: number): PlacementTarget[] {
@@ -214,10 +218,12 @@ export function placementTargets(input: PlanningInput, plan: GraduationPlan, cha
     if (index !== null && index > latest) latest = index;
   }
   const length = Math.min(60, Math.max(plan.semesters.length + 1, latest + 1));
+  const subject = input.subjects.find(s => s.curriculumSubjectId === curriculumSubjectId);
+  const types = subject ? allowedSemesterTypes(subject) : [];
   return Array.from({ length }, (_, index) => {
     const semester = semesterAt(input.start, index);
     const check = checkPlacement(input, changes, curriculumSubjectId, semester);
-    return { semester, label: labelOf(semester, index), ok: check.ok, reason: check.ok ? null : check.reason };
+    return { semester, label: labelOf(semester, index), ok: check.ok, reason: check.ok ? null : check.reason, fits: types.includes(semesterTypeOf(semester.semesterNo)) };
   });
 }
 

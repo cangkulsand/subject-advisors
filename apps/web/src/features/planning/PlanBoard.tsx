@@ -82,33 +82,39 @@ function otherChanges(input: PlanningInput, baseline: GraduationPlan, subject: P
   return [...simple, ...replace];
 }
 
-function MoveDialog({ subject, current, targets, others, onClose, onConfirm, onOther }: { subject: PlannedSubject; current: string | null; targets: PlacementTarget[]; others: OtherChange[]; onClose: () => void; onConfirm: (target: SemesterRef) => void; onOther: (change: ScenarioChange) => void }) {
+/**
+ * Move… (S3-P004-034): one click on a semester moves the subject there, and one click on a what-if applies it. Only
+ * semesters of a type the subject runs in are listed (a Normal subject never sees Short semesters), in the board's
+ * semester colours; semesters of that type it cannot go to are folded away with their reasons.
+ */
+function MoveDialog({ subject, current, targets, others, onClose, onConfirm, onOther }: { subject: PlannedSubject; current: PlannedSemester | null; targets: PlacementTarget[]; others: OtherChange[]; onClose: () => void; onConfirm: (target: SemesterRef) => void; onOther: (change: ScenarioChange) => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [choice, setChoice] = useState<string | null>(null);
   useEffect(() => { const dialog = ref.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
-  const chosen = targets.find(t => keyOf(t.semester) === choice && t.ok);
-  const other = others.find(o => 'other:' + o.key === choice);
+  const listed = targets.filter(t => t.fits && (current === null || keyOf(t.semester) !== keyOf(current)));
+  const open = listed.filter(t => t.ok);
+  const closed = listed.filter(t => !t.ok);
   return <dialog ref={ref} className="planning-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }}>
     <DialogHead onClose={onClose}><h3 id={titleId}>Move {subject.subjectCode}</h3></DialogHead>
-    <p className="planning-dialog-lead">{subject.subjectName}{current ? <> — now in <strong>{current}</strong></> : ''}. Choose the semester to take it in; the rest of your plan is rearranged around it.</p>
-    <fieldset className="planning-targets"><legend>Semester</legend>
-      {targets.map(target => <label key={keyOf(target.semester)} className={'planning-target' + (target.ok ? '' : ' planning-target--off')}>
-        <input type="radio" name="planning-target" value={keyOf(target.semester)} disabled={!target.ok} checked={choice === keyOf(target.semester)} onChange={() => setChoice(keyOf(target.semester))}
-          aria-describedby={target.reason ? `${titleId}-reason-${keyOf(target.semester)}` : undefined} />
-        <span className="planning-target-text"><span>{target.label}</span>{target.reason && <span className="planning-target-reason" id={`${titleId}-reason-${keyOf(target.semester)}`}>{target.reason}</span>}</span>
-      </label>)}
-    </fieldset>
-    {others.length > 0 && <fieldset className="planning-targets"><legend>Or try</legend>
-      {others.map(o => <label key={o.key} className="planning-target">
-        <input type="radio" name="planning-target" value={'other:' + o.key} checked={choice === 'other:' + o.key} onChange={() => setChoice('other:' + o.key)} />
-        <span className="planning-target-text"><span>{o.label}</span></span>
-      </label>)}
-    </fieldset>}
+    <p className="planning-dialog-lead">{subject.subjectName}{current && <><br />Now in <strong>{current.label}</strong></>}</p>
+    <div className="planning-dialog-group" role="group" aria-labelledby={titleId + '-to'}>
+      <h4 id={titleId + '-to'}>Move to</h4>
+      {open.length > 0
+        ? <div className="planning-target-grid">{open.map(target => <button key={keyOf(target.semester)} type="button"
+          className={'planning-target planning-target--n' + target.semester.semesterNo} data-semester-no={target.semester.semesterNo}
+          onClick={() => onConfirm(target.semester)}>{target.label}</button>)}</div>
+        : <p className="planning-dialog-note">This subject can&apos;t move to another semester right now. You can still try a what-if below.</p>}
+      {closed.length > 0 && <details className="planning-unavailable-list">
+        <summary>{closed.length} {closed.length === 1 ? 'semester' : 'semesters'} not available</summary>
+        <ul>{closed.map(target => <li key={keyOf(target.semester)} className="planning-unavailable"><strong>{target.label}</strong><span>{target.reason}</span></li>)}</ul>
+      </details>}
+    </div>
+    {others.length > 0 && <div className="planning-dialog-group" role="group" aria-labelledby={titleId + '-if'}>
+      <h4 id={titleId + '-if'}>What if…</h4>
+      <div className="planning-whatif-list">{others.map(o => <button key={o.key} type="button" className="planning-whatif" onClick={() => onOther(o.change)}>{o.label}</button>)}</div>
+    </div>}
     <div className="planning-dialog-actions">
       <button type="button" className="planning-button" onClick={onClose}>Cancel</button>
-      <button type="button" className="planning-button planning-button--primary" disabled={!chosen && !other}
-        onClick={() => { if (chosen) onConfirm(chosen.semester); else if (other) onOther(other.change); }}>{other ? 'Apply' : 'Move here'}</button>
     </div>
   </dialog>;
 }
@@ -168,7 +174,7 @@ export function PlanBoard({ input, plan, baseline, changes, editable, heading, o
           blocked={blocked.has(keyOf(panel.semester))} onMove={setMoving} />)}</ol>
       </section>)}
     </div>
-    {moving && <MoveDialog subject={moving} current={plan.semesters.find(s => s.subjects.some(x => x.curriculumSubjectId === moving.curriculumSubjectId && !x.failedAttempt))?.label ?? null}
+    {moving && <MoveDialog subject={moving} current={plan.semesters.find(s => s.subjects.some(x => x.curriculumSubjectId === moving.curriculumSubjectId && !x.failedAttempt)) ?? null}
       targets={placementTargets(input, plan, changes, moving.curriculumSubjectId)} others={otherChanges(input, baseline, moving)}
       onClose={() => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); }}
       onConfirm={target => { setReturnFocus({ code: moving.subjectCode }); setMoving(null); move(moving.curriculumSubjectId, target); }}

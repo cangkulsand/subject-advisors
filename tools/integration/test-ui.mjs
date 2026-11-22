@@ -209,8 +209,7 @@ try{
  async function whatIfOption(page,code,option){
   await page.getByRole('button',{name:'Move '+code,exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move '+code});await dialog.waitFor();
-  await dialog.getByRole('group',{name:'Or try'}).getByRole('radio',{name:option,exact:true}).check();
-  await dialog.getByRole('button',{name:'Apply',exact:true}).click();await dialog.waitFor({state:'hidden'});
+  await dialog.getByRole('group',{name:'What if…'}).getByRole('button',{name:option,exact:true}).click();await dialog.waitFor({state:'hidden'});
  }
  async function dragToPostpone(page,code){
   const grip=page.locator('[data-subject="'+code+'"]:not(.planning-failed) .planning-grip').first();await grip.scrollIntoViewIfNeeded();
@@ -236,16 +235,16 @@ try{
   await page.getByRole('heading',{name:'Plan with your changes',exact:true}).waitFor();
   await page.getByRole('button',{name:'Move DEML1112',exact:true}).click();
   const moveDialog=page.getByRole('dialog',{name:'Move DEML1112'});
-  assert.deepEqual(await moveDialog.getByRole('group',{name:'Or try'}).getByRole('radio').evaluateAll(items=>items.map(item=>item.closest('label').innerText.trim())),['Postpone one semester','Fail it','Withdraw']);
+  assert.deepEqual(await moveDialog.getByRole('group',{name:'What if…'}).getByRole('button').allInnerTexts(),['Postpone one semester','Fail it','Withdraw']);
   await moveDialog.getByRole('button',{name:'Cancel',exact:true}).click();await moveDialog.waitFor({state:'hidden'});
   await whatIfOption(page,'DEMB1013','Fail it');
   await page.locator('.planning-semester').first().locator('.planning-failed[data-subject="DEMB1013"]').waitFor();
   await page.getByText('Failed in this what-if: retaken later',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Move DEME1013',exact:true}).click();
   const replaceDialog=page.getByRole('dialog',{name:'Move DEME1013'});
-  const replaceOptions=await replaceDialog.getByRole('group',{name:'Or try'}).getByRole('radio').evaluateAll(items=>items.map(item=>item.closest('label').innerText.trim()));
+  const replaceOptions=await replaceDialog.getByRole('group',{name:'What if…'}).getByRole('button').allInnerTexts();
   assert.deepEqual(replaceOptions.filter(text=>text.startsWith('Replace')),['Replace with Fictional DEME2013 (DEME2013)','Replace with Fictional DEME3013 (DEME3013)']);
-  await replaceDialog.getByRole('radio',{name:'Replace with Fictional DEME2013 (DEME2013)',exact:true}).check();await replaceDialog.getByRole('button',{name:'Apply',exact:true}).click();
+  await replaceDialog.getByRole('group',{name:'What if…'}).getByRole('button',{name:'Replace with Fictional DEME2013 (DEME2013)',exact:true}).click();
   await page.locator('.planning-semester [data-subject="DEME2013"]').first().waitFor();
   assert.equal(await changes.getByRole('listitem').count(),3);
   await changes.getByRole('button',{name:'Remove: Postpone DEML1112 one semester',exact:true}).click();assert.equal(await changes.getByRole('listitem').count(),2);
@@ -281,11 +280,39 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await shot(page,'plan-board-'+width);
  },width);
+ await check('Move… lists only semesters of the subject type, in the board colours, one click to move',async page=>{
+  await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
+  const labels=async code=>{
+   await page.getByRole('button',{name:'Move '+code,exact:true}).click();
+   const dialog=page.getByRole('dialog',{name:'Move '+code});await dialog.waitFor();
+   const texts=await dialog.getByRole('group',{name:'Move to'}).getByRole('button').allInnerTexts();
+   const blocked=await dialog.locator('.planning-unavailable').allInnerTexts();
+   assert.equal(await dialog.getByText('Runs only in',{exact:false}).count(),0,code+' shows no semester-type reason');
+   const now=await dialog.locator('.planning-dialog-lead strong').innerText();
+   assert.ok(!texts.includes(now),code+' does not offer its current semester');
+   return {dialog,texts,blocked};
+  };
+  const normal=await labels('DEMB1013');
+  assert.ok(normal.texts.length>0);
+  assert.ok([...normal.texts,...normal.blocked].every(t=>!t.includes('Short Semester')),'a Normal subject sees only Normal semesters');
+  const colours=await normal.dialog.getByRole('group',{name:'Move to'}).getByRole('button').evaluateAll(list=>list.map(b=>[b.dataset.semesterNo,getComputedStyle(b).backgroundColor]));
+  const tint={1:'rgb(232, 242, 241)',2:'rgb(239, 236, 246)'};
+  for(const [no,colour] of colours) assert.equal(colour,tint[no],'semester '+no+' button uses the board colour');
+  await normal.dialog.locator('details').evaluate(d=>{d.open=true;});await shotTop(page,'move-dialog-normal');
+  await assertReadable(page,'move dialog');
+  await normal.dialog.getByRole('button',{name:'Cancel',exact:true}).click();await normal.dialog.waitFor({state:'hidden'});
+  const short=await labels('DEML1112');
+  assert.ok(short.texts.length>0);
+  assert.ok([...short.texts,...short.blocked].every(t=>t.includes('Short Semester')),'a Short subject sees only Short semesters');
+  assert.ok(await short.dialog.getByRole('group',{name:'Move to'}).getByRole('button').evaluateAll(list=>list.every(b=>getComputedStyle(b).backgroundColor==='rgb(248, 240, 225)')));
+  await shotTop(page,'move-dialog-short');
+  await short.dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ });
  await check('Move… pins a subject, re-plans, saves and survives a reload',async page=>{
   const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.waitFor();
-  await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
+  await dialog.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 2',exact:true}).click();
   const card=panel(page,'2027/2028-2').locator('[data-subject="DEMB1013"]');await card.waitFor();await card.getByText('Placed here by you',{exact:true}).waitFor();
   await page.locator('.planning-save').getByText('Saved',{exact:true}).waitFor();
   await page.waitForFunction(()=>document.activeElement?.closest('[data-subject]')?.closest('.planning-semester')?.dataset.semester==='2027/2028-2',null,{timeout:3000});
@@ -299,12 +326,8 @@ try{
   const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});
-  await dialog.getByText('now in',{exact:false}).waitFor();
-  const blocked=dialog.getByRole('radio',{name:'2026/2027 – Semester 3 (Short Semester)',exact:false});
-  assert.ok(await blocked.isDisabled());
-  const describedBy=await blocked.getAttribute('aria-describedby');assert.ok(describedBy);
-  await dialog.getByText('Runs only in Normal semesters.',{exact:true}).first().waitFor();
-  assert.equal(await dialog.locator('[id="'+describedBy+'"]').innerText(),'Runs only in Normal semesters.');
+  await dialog.getByText('Now in',{exact:false}).waitFor();
+  assert.equal(await dialog.getByText('2026/2027 – Semester 3 (Short Semester)',{exact:false}).count(),0,'a Normal subject is not offered a Short semester');
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await dialog.waitFor({state:'hidden'});
   await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Move DEMB1013',null,{timeout:3000});
   await dragCard(page,'DEMB1013','2026/2027-3');
@@ -325,7 +348,7 @@ try{
  await check('Reset clears the saved what-if; a failed save can be retried',async page=>{
   const state=await mock(page,{scenarioFail:true});await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 2',exact:true}).click();
   const save=page.locator('.planning-save');await save.getByText('Not saved',{exact:true}).waitFor();
   await page.getByLabel('Notifications',{exact:true}).getByText('Your last change was not saved. Use Try again at the top of the plan.',{exact:true}).waitFor();
   state.scenarioFail=false;await save.getByRole('button',{name:'Try again',exact:true}).click();await save.getByText('Saved',{exact:true}).waitFor();
@@ -507,7 +530,7 @@ try{
   const state=await mock(page);await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   state.plan={...planFixture,baselineVersion:'b'.repeat(64)};
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 2',exact:true}).click();
   await page.locator('.planning-stale').getByText('This plan view is out of date',{exact:false}).waitFor();
   await page.getByLabel('Notifications',{exact:true}).getByText('This plan view is out of date, so your latest change was not saved.',{exact:false}).waitFor();
   assert.equal(await page.locator('.planning-postpone-zone').count(),0);
@@ -552,7 +575,7 @@ try{
   assert.equal(await deps.locator('.pathway-node.is-changed').count(),0);
   await page.getByRole('button',{name:'Semester plan',exact:true}).click();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 2',exact:true}).click();
   await page.locator('.planning-save').getByText('Saved',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Dependencies',exact:true}).click();
   await page.locator('.pathway-node.is-changed').first().waitFor();
@@ -574,10 +597,10 @@ try{
  await check('A queued save is discarded when the page unmounts',async page=>{
   const state=await mock(page,{holdSave:true});await page.goto(base+'/student/plan');await page.getByRole('group',{name:'Plan view'}).waitFor();
   await page.getByRole('button',{name:'Move DEMB1013',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('radio',{name:'2027/2028 – Semester 2',exact:true}).check();await dialog.getByRole('button',{name:'Move here',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Move DEMB1013'});await dialog.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 2',exact:true}).click();
   await page.waitForTimeout(300);
   await page.getByRole('button',{name:'Move DEMA1013',exact:true}).click();
-  const dialog2=page.getByRole('dialog',{name:'Move DEMA1013'});await dialog2.getByRole('radio',{name:'2027/2028 – Semester 1',exact:true}).check();await dialog2.getByRole('button',{name:'Move here',exact:true}).click();
+  const dialog2=page.getByRole('dialog',{name:'Move DEMA1013'});await dialog2.getByRole('group',{name:'Move to'}).getByRole('button',{name:'2027/2028 – Semester 1',exact:true}).click();
   await clickStudentLink(page,'Graduation check');await page.waitForURL('**/student/graduation');
   if(state.releaseSave)state.releaseSave();state.holdSave=false;await page.waitForTimeout(300);
   assert.equal(state.scenarioWrites.length,1);

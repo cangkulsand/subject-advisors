@@ -156,13 +156,25 @@
 .planning-dialog::backdrop { background: rgb(0 0 0 / .35); }
 .planning-dialog h3 { margin: 0; font-size: 19px; color: var(--pl-heading); }
 .planning-dialog-lead { margin: 6px 0 0; color: var(--pl-muted); }
-.planning-targets { border: 0; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
-.planning-targets legend { font-size: var(--font-size-label); font-weight: 600; color: var(--pl-heading); margin-bottom: 6px; }
-.planning-target { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--pl-outline); border-radius: 8px; padding: 10px 12px; cursor: pointer; color: var(--pl-heading); }
-.planning-target input { margin-top: .25em; }
-.planning-target--off { cursor: not-allowed; color: var(--pl-muted); background: var(--pl-subtle); }
-.planning-target-text { display: grid; gap: 2px; }
-.planning-target-reason { font-size: var(--font-size-label); color: var(--pl-muted); }
+.planning-dialog-group { margin-top: 16px; }
+.planning-dialog-group h4 { margin: 0 0 8px; font-size: var(--font-size-label); font-weight: 600; color: var(--pl-heading); }
+.planning-dialog-note { margin: 0; color: var(--pl-muted); }
+.planning-target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.planning-target { --sem-accent: var(--plan-sem-1-accent); --sem-tint: var(--plan-sem-1-tint);
+  min-height: 44px; padding: 10px 12px; border: 1px solid var(--pl-outline); border-left: 4px solid var(--sem-accent); border-radius: 8px;
+  background: var(--sem-tint); color: var(--pl-heading); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.planning-target--n2 { --sem-accent: var(--plan-sem-2-accent); --sem-tint: var(--plan-sem-2-tint); }
+.planning-target--n3 { --sem-accent: var(--plan-sem-3-accent); --sem-tint: var(--plan-sem-3-tint); }
+.planning-target:hover { border-color: var(--sem-accent); }
+.planning-target:focus-visible, .planning-whatif:focus-visible { outline: 2px solid var(--sem-accent, var(--pl-heading)); outline-offset: 2px; }
+.planning-unavailable-list { margin-top: 10px; }
+.planning-unavailable-list summary { cursor: pointer; color: var(--pl-muted); font-size: var(--font-size-label); }
+.planning-unavailable-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.planning-unavailable { display: grid; gap: 2px; padding: 8px 12px; border: 1px dashed var(--pl-outline); border-radius: 8px; background: transparent; color: var(--pl-muted); font-size: var(--font-size-label); }
+.planning-unavailable strong { color: var(--pl-body); font-weight: 600; }
+.planning-whatif-list { display: grid; gap: 6px; }
+.planning-whatif { min-height: 44px; padding: 10px 12px; border: 1px solid var(--pl-outline); border-radius: 8px; background: var(--pl-surface); color: var(--pl-heading); font: inherit; text-align: left; cursor: pointer; }
+.planning-whatif:hover { background: var(--pl-subtle); }
 .planning-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .planning-button:disabled { opacity: .5; cursor: not-allowed; }
 

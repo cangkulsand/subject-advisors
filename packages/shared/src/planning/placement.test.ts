@@ -129,6 +129,16 @@ describe('placementTargets', () => {
     expect(targets[1]).toMatchObject({ label: '2026/2027 – Semester 3 (Short Semester)', ok: false, reason: 'Runs only in Normal semesters.' });
     expect(targets.length).toBe(planBaseline(input()).semesters.length + 1);
   });
+
+  it('marks which semesters are of a type the subject runs in', () => {
+    const normal = placementTargets(input(), planBaseline(input()), [], 4);
+    expect(normal.filter(t => t.fits).every(t => t.semester.semesterNo !== 3)).toBe(true);
+    expect(normal.filter(t => !t.fits).map(t => t.semester.semesterNo)).toEqual(normal.filter(t => t.semester.semesterNo === 3).map(() => 3));
+    const short = placementTargets(input(), planBaseline(input()), [], 8);
+    expect(short.filter(t => t.fits).every(t => t.semester.semesterNo === 3)).toBe(true);
+    const both = placementTargets(input({ subjects: subjects.map(x => x.curriculumSubjectId === 4 ? { ...x, semesterTypes: ['NORMAL', 'SHORT'] } : x) }), planBaseline(input()), [], 4);
+    expect(both.every(t => t.fits)).toBe(true);
+  });
 });
 
 describe('review fixes', () => {
