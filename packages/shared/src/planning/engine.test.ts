@@ -91,6 +91,7 @@ describe('planBaseline', () => {
     const plan = planBaseline(input({ approvedFirst: [4] }));
     expect(codesBySemester(plan)[0]).toEqual(['SECB1013']);
     expect(plan.assumptions.join(' ')).toContain('approved');
+    expect(plan.assumptions.join(' ')).toContain('Projects and industrial training need no approval.');
   });
   it('respects subject and credit limits', () => {
     const plan = planBaseline(input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 1, maxCredits: 10 }] }));

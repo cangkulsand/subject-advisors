@@ -24,6 +24,7 @@ Out of scope: the student Semester offerings page and the coordinator forecast.
   - the subject query reads `s.include_in_offering_forecast`, and `PlanningRows.subjects` gains `inOfferingForecast`;
   - `approvedFirst` adds every subject with `inOfferingForecast` false to the approved subjects. It stays `null` when the coordinator has no decisions for the next semester, which already allows everything.
 - Drag and drop, "Move…" and the automatic plan all read `approvedFirst`, so all three now allow these subjects.
+- `packages/shared/src/planning/engine.ts`: the plan note for the first semester now reads "<semester> uses only the subjects your coordinator approved. Projects and industrial training need no approval."
 
 ## 3. Verification
 
