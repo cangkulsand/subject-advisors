@@ -15,7 +15,7 @@ function deps():Sprint2Dependencies{return {
  repository:{progress:vi.fn(async()=>source()),catalogue:vi.fn(async()=>({curricula:[],subjects:[]})),curriculum:vi.fn(async()=>({revision:rev,data:structuredClone(curriculum)})),subject:vi.fn(),dependency:vi.fn(),removeDependency:vi.fn()}
 };}
 function request(path:string,method='GET',body?:unknown){return new Request('https://example.test/api/p001-sprint2'+path,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});}
-function admin(d:Sprint2Dependencies){d.auth.access.find=vi.fn(async()=>({clerkUserId:'student_a',appRole:'SYSTEM_ADMIN' as const,accessStatus:'ACTIVE' as const,roles:['SYSTEM_ADMIN' as const]}));return d;}
+function admin(d:Sprint2Dependencies){d.auth.verify=vi.fn(async()=>({clerkUserId:'student_a',sessionId:'test',primaryEmail:{address:'demo@gmail.com',verified:true}}));d.auth.access.find=vi.fn(async()=>({clerkUserId:'student_a',appRole:'SYSTEM_ADMIN' as const,accessStatus:'ACTIVE' as const,roles:['SYSTEM_ADMIN' as const]}));return d;}
 const newSubject={revision:rev,code:'DEMO4',name:'Not official',credits:2,category:'ELECTIVE',compulsory:false,semesterTypes:['SHORT'],confirmSharedChanges:false};
 describe('UC05 academic progress',()=>{
  it('shows an initial state without claiming official completion',()=>{const p=calculateProgress(source());expect(p.noHistory).toBe(true);expect(p.earnedCredits).toBe(0);expect(p.remainingCredits).toBe(10);expect(p.outstandingCompulsory).toBe(2);expect(p).not.toHaveProperty('graduationEligible');});
