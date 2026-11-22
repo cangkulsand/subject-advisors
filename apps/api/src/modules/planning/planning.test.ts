@@ -11,9 +11,9 @@ const semesters: PlanningRows['semesters'] = [
 const rows = (extra: Partial<PlanningRows> = {}): PlanningRows => ({
   profile: { curriculumId: 1, programmeId: 5, learningCentreId: 2, programmeName: 'Software Engineering', curriculumVersion: '2024', totalCredits: 120 },
   subjects: [
-    { curriculumSubjectId: 11, subjectId: 101, subjectCode: 'SECJ1013', subjectName: 'Programming Technique I', creditHours: 3, category: 'Core', compulsory: true },
-    { curriculumSubjectId: 12, subjectId: 102, subjectCode: 'SECJ1023', subjectName: 'Programming Technique II', creditHours: 3, category: 'Core', compulsory: true },
-    { curriculumSubjectId: 13, subjectId: 103, subjectCode: 'UHLB1112', subjectName: 'English 1', creditHours: 2, category: 'University Compulsory', compulsory: true },
+    { curriculumSubjectId: 11, subjectId: 101, subjectCode: 'SECJ1013', subjectName: 'Programming Technique I', creditHours: 3, category: 'Core', compulsory: true, inOfferingForecast: true },
+    { curriculumSubjectId: 12, subjectId: 102, subjectCode: 'SECJ1023', subjectName: 'Programming Technique II', creditHours: 3, category: 'Core', compulsory: true, inOfferingForecast: true },
+    { curriculumSubjectId: 13, subjectId: 103, subjectCode: 'UHLB1112', subjectName: 'English 1', creditHours: 2, category: 'University Compulsory', compulsory: true, inOfferingForecast: true },
   ],
   rules: [{ curriculumSubjectId: 11, semesterType: 'NORMAL' }, { curriculumSubjectId: 13, semesterType: 'SHORT' }, { curriculumSubjectId: 13, semesterType: 'SHORT' }],
   prerequisites: [{ curriculumSubjectId: 12, requiredCurriculumSubjectId: 11 }],
@@ -73,6 +73,12 @@ describe('toPlanningInput', () => {
     const input = toPlanningInput(rows({ records: [{ subjectId: 102, status: 'EXEMPTED', recognizedCredits: 9, remarks: null }] }));
     expect(input.passed).toEqual([]);
   });
+  it('allows subjects outside the offering forecast (projects, industrial training) without a coordinator decision', () => {
+    const project = { curriculumSubjectId: 14, subjectId: 104, subjectCode: 'SECJ3032', subjectName: 'Software Engineering Project I', creditHours: 2, category: 'Core', compulsory: true, inOfferingForecast: false };
+    expect(toPlanningInput(rows({ subjects: [...rows().subjects, project] })).approvedFirst).toEqual([12, 14]);
+    expect(toPlanningInput(rows({ subjects: [...rows().subjects, project], decisions: [] })).approvedFirst).toBeNull();
+  });
+
   it('plans from the computed next semester when the admin has not created it yet, without coordinator decisions', () => {
     const input = toPlanningInput(rows({ semesters: [semesters[0]!] }));
     expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: null });
@@ -92,11 +98,11 @@ describe('createPlanningRepository', () => {
       if (text.includes('FROM public.student_profile sp')) return [{ curriculum_id: 1, learning_centre_id: 2, programme_id: 5, curriculum_version: '2024', total_credit_required: 120, programme_name: 'SE' }];
       if (text.includes('FROM public.academic_semester')) return [{ semester_id: 3, academic_year: '2026/2027', semester_no: 1, max_subjects: 3, max_credits: 10, is_current: true }, { semester_id: 4, academic_year: '2026/2027', semester_no: 2, max_subjects: 3, max_credits: 10, is_current: false }];
       if (text.includes('FROM public.offering_decision')) return [{ subject_id: 101, status: 'APPROVED' }];
-      if (text.includes('FROM public.curriculum_subject cs JOIN public.subject')) return [{ curriculum_subject_id: 11, subject_id: 101, subject_code: 'SECJ1013', subject_name: 'PT1', credit_hours: 3, subject_category: 'Core', is_compulsory: 1 }];
+      if (text.includes('FROM public.curriculum_subject cs JOIN public.subject')) return [{ curriculum_subject_id: 11, subject_id: 101, subject_code: 'SECJ1013', subject_name: 'PT1', credit_hours: 3, subject_category: 'Core', is_compulsory: 1, include_in_offering_forecast: true }, { curriculum_subject_id: 14, subject_id: 104, subject_code: 'SECJ4118', subject_name: 'Industrial Training', credit_hours: 8, subject_category: 'Core', is_compulsory: 1, include_in_offering_forecast: false }];
       return [];
     });
     const input = await createPlanningRepository({ query, transaction: vi.fn() }).load('student_a');
-    expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: [11], subjects: [{ subjectCode: 'SECJ1013', compulsory: true }] });
+    expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: [11, 14], subjects: [{ subjectCode: 'SECJ1013', compulsory: true }, { subjectCode: 'SECJ4118' }] });
     expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM public.offering_decision'), [5, 2, 4]);
   });
   it('reads mandatory and co-requisite links with one parameterized query', async () => {

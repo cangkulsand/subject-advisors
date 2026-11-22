@@ -5,7 +5,9 @@ import type { Database } from '../p001-sprint2/repository';
 /** Raw rows the planning input is built from (one student). Exported for tests. */
 export interface PlanningRows {
   profile: { curriculumId: number; programmeId: number; learningCentreId: number; programmeName: string; curriculumVersion: string; totalCredits: number | null };
-  subjects: { curriculumSubjectId: number; subjectId: number; subjectCode: string; subjectName: string; creditHours: number; category: string; compulsory: boolean }[];
+  subjects: { curriculumSubjectId: number; subjectId: number; subjectCode: string; subjectName: string; creditHours: number; category: string; compulsory: boolean;
+    /** `subject.include_in_offering_forecast`: false for subjects a coordinator never decides on (projects, industrial training). */
+    inOfferingForecast: boolean }[];
   rules: { curriculumSubjectId: number; semesterType: string }[];
   prerequisites: { curriculumSubjectId: number; requiredCurriculumSubjectId: number; requirementType?: string }[];
   records: { subjectId: number; status: string; recognizedCredits: number; remarks: string | null }[];
@@ -79,8 +81,11 @@ export function toPlanningInput(rows: PlanningRows): PlanningInput {
   });
   const start = startSemester(rows.semesters);
   const curriculumBySubject = new Map(rows.subjects.map(s => [s.subjectId, s.curriculumSubjectId]));
+  // Subjects outside the offering forecast (projects, industrial training) cannot be approved by a coordinator and need
+  // no approval, so they are always allowed in the first semester.
   const approvedFirst = start?.semesterId != null && rows.decisions.length
-    ? rows.decisions.filter(d => d.status === 'APPROVED').map(d => curriculumBySubject.get(d.subjectId)).filter((id): id is number => id !== undefined)
+    ? [...rows.decisions.filter(d => d.status === 'APPROVED').map(d => curriculumBySubject.get(d.subjectId)).filter((id): id is number => id !== undefined),
+      ...rows.subjects.filter(s => !s.inOfferingForecast).map(s => s.curriculumSubjectId)]
     : null;
   return {
     programmeName: rows.profile.programmeName,
@@ -115,7 +120,7 @@ export function createPlanningRepository(db: Database): PlanningRepository {
         db.query(
           `SELECT cs.curriculum_subject_id, s.subject_id, s.subject_code,
                   COALESCE(to_jsonb(cs)->>'display_name', s.subject_name) AS subject_name, s.credit_hours,
-                  cs.subject_category, cs.is_compulsory
+                  cs.subject_category, cs.is_compulsory, s.include_in_offering_forecast
            FROM public.curriculum_subject cs JOIN public.subject s ON s.subject_id = cs.subject_id
            WHERE cs.curriculum_id = $1 ORDER BY s.subject_code`, [curriculumId]),
         db.query(
@@ -152,6 +157,7 @@ export function createPlanningRepository(db: Database): PlanningRepository {
         subjects: subjects.map(r => ({
           curriculumSubjectId: Number(r.curriculum_subject_id), subjectId: Number(r.subject_id), subjectCode: String(r.subject_code),
           subjectName: String(r.subject_name), creditHours: Number(r.credit_hours), category: String(r.subject_category ?? ''), compulsory: Number(r.is_compulsory) === 1,
+          inOfferingForecast: r.include_in_offering_forecast !== false,
         })),
         rules: rules.map(r => ({ curriculumSubjectId: Number(r.curriculum_subject_id), semesterType: String(r.semester_type) })),
         prerequisites: prerequisites.map(r => ({ curriculumSubjectId: Number(r.curriculum_subject_id), requiredCurriculumSubjectId: Number(r.required_curriculum_subject_id), requirementType: String(r.requirement_type) })),
