@@ -77,6 +77,11 @@
       "version": "0014",
       "file": "0014_import_snapshot_removal.sql",
       "description": "Coordinators remove (hide) an accepted student data snapshot; one immutable removal row, snapshots stay frozen"
+    },
+    {
+      "version": "0015",
+      "file": "0015_owner_to_gmail.sql",
+      "description": "Protected owner moves to the gmail System Admin; graduate account keeps STUDENT only (one email domain per role)"
     }
   ],
   "historicalExcluded": [

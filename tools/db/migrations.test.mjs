@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -237,4 +237,14 @@ test('0014 follows 0013, adds only the immutable snapshot removal table and leav
  assert.match(code,/REVOKE ALL ON public\.academic_import_batch_removal FROM PUBLIC/);
  const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0014']);
+});
+test('0015 follows 0014, is pinned to the two owner Clerk IDs and only moves the owner flag and revokes the graduate staff roles',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0014','0015']);
+ const code=entries.at(-1).sql.replace(/--.*$/gm,'');
+ assert.match(code,/user_3L9068HIQmPtA3AzFTo6bBpRAyO/);assert.match(code,/user_3MPgmlCxY4NFIuYgPaypFquJ0l6/);
+ assert.doesNotMatch(code,/CREATE\s|DROP\s|TRUNCATE|ALTER\s+TABLE\s+(?!public\.user_role_assignment\s+(?:DISABLE|ENABLE)\s+TRIGGER\s+user_role_audit_guard)/i);
+ assert.equal([...code.matchAll(/DISABLE TRIGGER/g)].length,1);assert.equal([...code.matchAll(/ENABLE TRIGGER/g)].length,1);
+ assert.ok(code.indexOf('ENABLE TRIGGER')<code.indexOf('DELETE FROM'),'the revoke runs with the owner lock enabled');
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0015']);
 });
