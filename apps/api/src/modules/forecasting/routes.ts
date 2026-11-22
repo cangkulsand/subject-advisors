@@ -1,3 +1,4 @@
+import { viewAsScopeProvider } from './scope-provider';
 import { handleLiveRoute, LIVE_ROUTE } from './live-routes';
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
 import { IMPORT_CSV_HEADER, IMPORT_LIMITS } from '../../../../../packages/shared/src/forecasting/contracts';
@@ -287,7 +288,13 @@ export async function handleForecastingRequest(request: Request, deps: Forecasti
   if (!known) return null;
   try {
     // Coordinator only. The actor is always the verified Clerk user of the session, never a request value.
-    const actor = (await authorize(request, deps.auth, { roles: ['COORDINATOR'] })).clerkUserId;
+    const me = await authorize(request, deps.auth, { roles: ['COORDINATOR'] });
+    const actor = me.clerkUserId;
+    // View as Coordinator (S3-P004-033): the admin is pinned to the chosen scope; writes keep the admin as actor.
+    if (me.viewAs?.role === 'COORDINATOR') {
+      const scope = deps.scopes.scopeFor ? await deps.scopes.scopeFor(me.viewAs.programmeId, me.viewAs.learningCentreId) : null;
+      deps = { ...deps, scopes: viewAsScopeProvider(deps.scopes, scope) };
+    }
     const method = request.method;
     if (RUN_ROUTE.test(route)) return await handleRunRoute(route, request, url, deps, actor);
     if (DECISION_ROUTE.test(route)) return await handleDecisionRoute(route, request, url, deps, actor);

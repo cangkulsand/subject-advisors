@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ProgrammeFaculty, LearningCentre } from '../../../../../packages/shared/src/admin/academic-setup';
 import type { CoordinatorAssignment } from '../../../../../packages/shared/src/forecasting/confirmed-offerings';
 import { IMPORT_ALIASES } from '../../config/import-aliases';
-import { createDbScopeProvider, type ScopeSource } from './scope-provider';
+import { createDbScopeProvider, viewAsScopeProvider, type ScopeSource } from './scope-provider';
+import { testScopeProvider } from './scope-provider.test-support';
 
 const programmes: ProgrammeFaculty[] = [
   { programmeId: 5, programmeCode: 'SECJ', programmeName: 'Software Engineering', level: null, isActive: true, facultyId: 1, faculty: null, departmentId: null, department: null },
@@ -67,5 +68,31 @@ describe('DB scope provider', () => {
   });
   it('keeps the import aliases', async () => {
     expect(await createDbScopeProvider(source([]), async () => new Map()).importAliases()).toBe(IMPORT_ALIASES);
+  });
+});
+
+describe('View as Coordinator scope (S3-P004-033)', () => {
+  const inactive: ProgrammeFaculty = { ...programmes[0]!, programmeId: 9, programmeCode: 'OLD', isActive: false };
+  const noFaculty: ProgrammeFaculty = { ...programmes[0]!, programmeId: 11, programmeCode: 'NOFAC', facultyId: null };
+  const reader = () => ({ ...source([]), listProgrammeFaculties: vi.fn(async () => [...programmes, inactive, noFaculty]) });
+  it('finds an active programme with a faculty at an active centre', async () => {
+    const provider = createDbScopeProvider(reader(), async () => new Map());
+    expect(await provider.scopeFor!(5, 2)).toEqual({ programme: { programmeId: 5, programmeCode: 'SECJ', programmeName: 'Software Engineering' }, centre: { learningCentreId: 2, centreCode: 'JB', centreName: 'UTMSPACE Johor Bahru' } });
+  });
+  it.each([[9, 2, 'inactive programme'], [11, 2, 'programme without a faculty'], [5, 3, 'inactive centre'], [99, 2, 'unknown programme'], [5, 99, 'unknown centre']])('returns null for %i x %i (%s)', async (p, c) => {
+    expect(await createDbScopeProvider(reader(), async () => new Map()).scopeFor!(p, c)).toBeNull();
+  });
+  it('pins listScopes and isScopeAssigned to the one chosen scope, whoever asks', async () => {
+    const chosen = (await testScopeProvider.scopeFor!(5, 2))!;
+    const provider = viewAsScopeProvider(testScopeProvider, chosen);
+    expect(await provider.listScopes('user_admin')).toEqual([chosen]);
+    expect(await provider.isScopeAssigned('user_admin', 5, 2)).toBe(true);
+    expect(await provider.isScopeAssigned('user_admin', 5, 1)).toBe(false);
+    expect(await provider.currentSemesterId()).toBe(1);
+  });
+  it('assigns nothing when the chosen scope does not exist', async () => {
+    const provider = viewAsScopeProvider(testScopeProvider, null);
+    expect(await provider.listScopes('user_admin')).toEqual([]);
+    expect(await provider.isScopeAssigned('user_admin', 5, 2)).toBe(false);
   });
 });
