@@ -1,3 +1,4 @@
+import { viewAsHeaders } from './view-as-header';
 import type { Me, ApiResult } from './contracts';
 export class AuthApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string) { super(message); }
@@ -41,7 +42,7 @@ export async function loadAccount(
     if (!token) throw new AuthApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Please sign in again.');
     const response = await fetch(apiBaseUrl.replace(/\/$/, '') + (initialize ? '/api/me/initialize' : '/api/me'), {
       method: initialize ? 'POST' : 'GET',
-      headers: { Authorization: 'Bearer ' + token },
+      headers: { Authorization: 'Bearer ' + token, ...viewAsHeaders() },
       credentials: 'omit', cache: 'no-store', signal: controller.signal,
     });
     const body: ApiResult<Me> = await response.json();

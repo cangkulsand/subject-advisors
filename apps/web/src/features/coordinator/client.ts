@@ -1,3 +1,4 @@
+import { viewAsHeaders } from '../auth/view-as-header';
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import type { LiveForecast, LiveSubjectStudents } from '../../../../../packages/shared/src/forecasting/live';
 import type {
@@ -139,7 +140,7 @@ export function createCoordinatorClient(getToken: () => Promise<string | null>, 
       const token = await getToken(); assertSession();
       if (controller.signal.aborted) throw controller.signal.reason;
       if (!token) { clearAccountCache(); throw new CoordinatorApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again.'); }
-      const response = await fetch(base + path, { method: init.method, headers: { Authorization: 'Bearer ' + token, ...init.headers }, body: init.body, credentials: 'omit', cache: 'no-store', signal: controller.signal });
+      const response = await fetch(base + path, { method: init.method, headers: { Authorization: 'Bearer ' + token, ...viewAsHeaders(), ...init.headers }, body: init.body, credentials: 'omit', cache: 'no-store', signal: controller.signal });
       assertSession();
       if ([401, 403].includes(response.status)) clearAccountCache();
       const etag = unquote(response.headers.get('ETag')), disposition = response.headers.get('Content-Disposition');

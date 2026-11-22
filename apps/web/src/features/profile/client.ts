@@ -1,3 +1,4 @@
+import { viewAsHeaders } from '../auth/view-as-header';
 import { accountSessionStamp, clearAccountCache, profileSavedForSession } from '../auth/account-cache';
 import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache, dropAcademicEntry } from './data-cache';
 export class AcademicApiError extends Error {
@@ -22,7 +23,7 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
       if (!token) { clearAccountCache(); throw new AcademicApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Please sign in again.'); }
       const response = await fetch(base + path, {
         method, signal: cacheable ? undefined : options.signal,
-        headers: { Authorization: 'Bearer ' + token, ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        headers: { Authorization: 'Bearer ' + token, ...viewAsHeaders(), ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: options.body === undefined ? undefined : JSON.stringify(options.body), credentials: 'omit', cache: 'no-store',
       });
       assertSession();

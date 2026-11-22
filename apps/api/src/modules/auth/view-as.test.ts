@@ -50,7 +50,7 @@ describe('authorize with a view-as context (S3-P004-033)', () => {
   it('acts as coordinator with the admin as actor and the chosen scope', async () => {
     const f = fixture();
     const me = await authorize(request('COORDINATOR;programme=3;centre=7', 'POST'), f.deps, { roles: ['COORDINATOR'] });
-    expect(me).toMatchObject({ clerkUserId: ADMIN, appRole: 'COORDINATOR', availableRoles: ['SYSTEM_ADMIN', 'COORDINATOR'], landingPath: '/coordinator',
+    expect(me).toMatchObject({ clerkUserId: ADMIN, appRole: 'COORDINATOR', roles: ['SYSTEM_ADMIN', 'COORDINATOR'], availableRoles: ['SYSTEM_ADMIN', 'COORDINATOR'], landingPath: '/coordinator',
       viewAs: { role: 'COORDINATOR', programmeId: 3, learningCentreId: 7, adminClerkUserId: ADMIN } });
   });
   it('refuses a coordinator context on a route that does not take coordinators', async () => {
@@ -61,7 +61,7 @@ describe('authorize with a view-as context (S3-P004-033)', () => {
     const f = fixture();
     for (const method of ['GET', 'HEAD']) {
       const me = await authorize(request('STUDENT;student=42', method), f.deps, { roles: ['STUDENT'], requireProfile: true });
-      expect(me).toMatchObject({ clerkUserId: STUDENT, appRole: 'STUDENT', roles: ['STUDENT'], availableRoles: ['SYSTEM_ADMIN', 'STUDENT'], profileState: 'COMPLETE', landingPath: '/student',
+      expect(me).toMatchObject({ clerkUserId: STUDENT, appRole: 'STUDENT', roles: ['SYSTEM_ADMIN', 'STUDENT'], availableRoles: ['SYSTEM_ADMIN', 'STUDENT'], profileState: 'COMPLETE', landingPath: '/student',
         viewAs: { role: 'STUDENT', studentId: 42, adminClerkUserId: ADMIN, studentName: 'Aina' } });
     }
   });

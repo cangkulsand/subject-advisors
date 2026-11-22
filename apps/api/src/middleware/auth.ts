@@ -60,7 +60,7 @@ export async function authorize(
 /**
  * View as (S3-P004-033). Only an ACTIVE account whose verified email makes SYSTEM_ADMIN usable may send the context.
  * Coordinator: the admin's own identity, pinned to the chosen scope by the coordinator routes. Student: the chosen
- * student's identity, read-only.
+ * student's identity, read-only. `roles` lists SYSTEM_ADMIN plus the viewed role so the web account shape stays valid.
  */
 async function viewAsMe(request: Request, deps: AuthDependencies, options: { roles?: readonly AppRole[] },
   admin: { clerkUserId: string; accessStatus: Me['accessStatus']; availableRoles: AppRole[] }, viewAs: ViewAs): Promise<Me> {
@@ -69,7 +69,7 @@ async function viewAsMe(request: Request, deps: AuthDependencies, options: { rol
   const log = { event: 'view_as', admin: admin.clerkUserId, ...viewAs, method: request.method, path: new URL(request.url).pathname };
   if (viewAs.role === 'COORDINATOR') {
     console.info(JSON.stringify(log));
-    return { clerkUserId: admin.clerkUserId, appRole: 'COORDINATOR', accessStatus: 'ACTIVE', roles: ['SYSTEM_ADMIN'], availableRoles: ['SYSTEM_ADMIN', 'COORDINATOR'],
+    return { clerkUserId: admin.clerkUserId, appRole: 'COORDINATOR', accessStatus: 'ACTIVE', roles: ['SYSTEM_ADMIN', 'COORDINATOR'], availableRoles: ['SYSTEM_ADMIN', 'COORDINATOR'],
       studentProfileState: 'NOT_APPLICABLE', profileState: 'NOT_APPLICABLE', landingPath: '/coordinator', viewAs: { ...viewAs, adminClerkUserId: admin.clerkUserId } };
   }
   if (!isReadMethod(request.method)) throw new AuthError(403, 'VIEW_AS_READ_ONLY', 'Read only while viewing as a student.');
@@ -79,7 +79,7 @@ async function viewAsMe(request: Request, deps: AuthDependencies, options: { rol
   if (state === 'UNAVAILABLE') throw new AuthError(503, 'PROFILE_UNAVAILABLE', 'Profile integration is unavailable. Please retry later.');
   if (state !== 'COMPLETE') throw new AuthError(403, 'VIEW_AS_PROFILE_INCOMPLETE', 'This student has not set up their profile yet.');
   console.info(JSON.stringify(log));
-  return { clerkUserId: student.clerkUserId, appRole: 'STUDENT', accessStatus: 'ACTIVE', roles: ['STUDENT'], availableRoles: ['SYSTEM_ADMIN', 'STUDENT'],
+  return { clerkUserId: student.clerkUserId, appRole: 'STUDENT', accessStatus: 'ACTIVE', roles: ['SYSTEM_ADMIN', 'STUDENT'], availableRoles: ['SYSTEM_ADMIN', 'STUDENT'],
     studentProfileState: 'COMPLETE', profileState: 'COMPLETE', landingPath: '/student',
     viewAs: { ...viewAs, adminClerkUserId: admin.clerkUserId, studentName: student.studentName } };
 }

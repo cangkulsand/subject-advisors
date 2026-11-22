@@ -1,3 +1,4 @@
+import { viewAsHeaders } from '../auth/view-as-header';
 import type { OfferingsClient } from '../../../../../packages/shared/src/offerings/offerings';
 import { ACADEMIC_CACHE_TTL, cachedAcademicRead, clearAcademicCache } from '../profile/data-cache';
 import { AcademicApiError, createAcademicClient } from '../profile/client';
@@ -25,7 +26,7 @@ export function createOfferingClient(getToken: () => Promise<string | null>, api
     assertSession(expectedSession);
     if (!token) { clearAccountCache(); throw new OfferingApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Sign in again to continue.'); }
     const response = await fetch(base + path, {
-      ...init, headers: { ...init.headers, Authorization: 'Bearer ' + token },
+      ...init, headers: { ...init.headers, ...viewAsHeaders(), Authorization: 'Bearer ' + token },
       credentials: 'omit', cache: 'no-store',
     });
     assertSession(expectedSession);
