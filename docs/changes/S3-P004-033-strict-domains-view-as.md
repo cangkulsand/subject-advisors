@@ -1,6 +1,6 @@
 # S3-P004-033 — One email domain per role, owner on gmail, and System Admin "View as"
 
-- **Status:** Implemented on `feature/strict-domains-view-as`; final review done; migration 0015 applied to Neon on 2026-11-24; not merged or deployed
+- **Status:** Merged to `main` (d0222b4); migration 0015 applied to Neon on 2026-11-24; not yet deployed to dev or prod
 - **Date:** 2026-11-22
 - **Sprint:** Sprint 3
 - **Owner:** P004 (access, admin)
@@ -33,13 +33,13 @@ The owner wants one clear rule per role and an administrator who can see and hel
 | --- | --- |
 | `npm run typecheck` | PASS |
 | `npm run lint` | PASS |
-| `npm test` | 1968 passed, 67 skipped |
+| `npm test` | 1968 passed, 67 skipped (merged main: 1972 passed, 67 skipped) |
 | `node --test tools/auth/role-provisioning.test.mjs` | 7 PASS |
 | `npm run test:db-tooling` | 29 PASS |
 | `node tools/admin/test-academic-database.mjs` | 0015 owner transfer: 6 PASS. The suite still stops on the pre-existing "allows NULL and mixed-case active programme status…" repository test, which fails on `main` too |
 | `npm run test:ui:admin` | 62 PASS (5 new View as checks, 375px included) |
 | `npm run test:ui:coordinator` | 65 PASS (view-as banner, header on every call, "(System Admin)" in history, 375px) |
-| `npm run test:ui:integration` | 78 PASS (student read-only view, light and dark, 375px) |
+| `npm run test:ui:integration` | 78 PASS (merged main: 79) (student read-only view, light and dark, 375px) |
 
 Migration 0015 applied to Neon on 2026-11-24 with the repo runner (`applyMigrations`, checksums of 0000–0014 verified): account 2671 (gmail) is now the protected owner, account 1 keeps STUDENT only, owner lock trigger enabled again. Not done: no live Clerk sign-in check.
 
