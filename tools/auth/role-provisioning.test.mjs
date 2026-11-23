@@ -1,18 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verifyGrantIdentity, inspectGrant, provisionRoles } from './role-provisioning.mjs';
-const user={id:'user_fixture',primaryEmailAddressId:'email_fixture',emailAddresses:[{id:'email_fixture',emailAddress:'owner@graduate.utm.my',verification:{status:'verified'}}]};
-const input={userId:user.id,expectedEmail:'owner@graduate.utm.my',roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN'],actor:'operator_fixture',reason:'Explicit owner bootstrap fixture.',owner:true};
+const user={id:'user_fixture',primaryEmailAddressId:'email_fixture',emailAddresses:[{id:'email_fixture',emailAddress:'owner@gmail.com',verification:{status:'verified'}}]};
+const input={userId:user.id,expectedEmail:'owner@gmail.com',roles:['SYSTEM_ADMIN'],actor:'operator_fixture',reason:'Explicit owner bootstrap fixture.',owner:true};
+const withEmail=(address)=>({...user,emailAddresses:[{...user.emailAddresses[0],emailAddress:address}]});
 test('owner bootstrap validates exact Clerk ID and verified primary email',()=>{
-  assert.equal(verifyGrantIdentity(user,input).coordinatorPolicy,'OWNER_STUDENT_COORDINATOR');
+  assert.equal(verifyGrantIdentity(user,input).coordinatorPolicy,'ROLE_DOMAIN');
   assert.throws(()=>verifyGrantIdentity(user,{...input,userId:'user_impostor'}));
-  assert.throws(()=>verifyGrantIdentity(user,{...input,expectedEmail:'other@graduate.utm.my'}));
+  assert.throws(()=>verifyGrantIdentity(user,{...input,expectedEmail:'other@gmail.com'}));
   assert.throws(()=>verifyGrantIdentity({...user,banned:true},input));
   assert.throws(()=>verifyGrantIdentity({...user,emailAddresses:[{...user.emailAddresses[0],verification:{status:'unverified'}}]},input));
 });
-test('domains alone cannot grant staff roles and owner requires all explicit roles',()=>{
-  assert.throws(()=>verifyGrantIdentity(user,{...input,owner:false}));
-  assert.throws(()=>verifyGrantIdentity(user,{...input,roles:['SYSTEM_ADMIN']}));
+test('one email domain per role; the owner is a gmail System Admin only (S3-P004-033)',()=>{
+  assert.throws(()=>verifyGrantIdentity(user,{...input,roles:['SYSTEM_ADMIN','STUDENT']}));
+  assert.throws(()=>verifyGrantIdentity(user,{...input,roles:['SYSTEM_ADMIN','COORDINATOR']}));
+  const graduate=withEmail('owner@graduate.utm.my');
+  assert.throws(()=>verifyGrantIdentity(graduate,{...input,expectedEmail:'owner@graduate.utm.my',roles:['STUDENT','COORDINATOR','SYSTEM_ADMIN']}));
+  assert.throws(()=>verifyGrantIdentity(graduate,{...input,expectedEmail:'owner@graduate.utm.my',owner:false,roles:['COORDINATOR']}));
+  assert.throws(()=>verifyGrantIdentity(withEmail('a@utm.my'),{...input,expectedEmail:'a@utm.my',owner:false,roles:['SYSTEM_ADMIN']}));
+  assert.equal(verifyGrantIdentity(graduate,{...input,expectedEmail:'owner@graduate.utm.my',owner:false,roles:['STUDENT']}).coordinatorPolicy,'ROLE_DOMAIN');
   assert.throws(()=>verifyGrantIdentity(user,{...input,roles:['OWNER']}));
   assert.throws(()=>verifyGrantIdentity(user,{...input,actor:''}));
   const staff={...user,emailAddresses:[{...user.emailAddresses[0],emailAddress:'approved@utm.my'}]};

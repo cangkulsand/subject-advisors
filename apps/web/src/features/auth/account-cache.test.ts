@@ -85,3 +85,36 @@ it('rejects an obsolete role refresh after access is invalidated in the same ses
  clearAccountCache(false);finish(Response.json({data:me}));
  await expect(pending).rejects.toMatchObject({code:'SESSION_CHANGED'});expect(readAccountCache(session)).toBeUndefined();
 });
+
+it('keeps a view-as account apart from the admin account and accepts it for the admin session (S3-P004-033)',async()=>{
+ const admin:Me={clerkUserId:'user_test',appRole:'SYSTEM_ADMIN',roles:['SYSTEM_ADMIN'],availableRoles:['SYSTEM_ADMIN'],studentProfileState:'NOT_APPLICABLE',accessStatus:'ACTIVE',profileState:'NOT_APPLICABLE',landingPath:'/admin'};
+ const viewed:Me={clerkUserId:'user_student',appRole:'STUDENT',roles:['SYSTEM_ADMIN','STUDENT'],availableRoles:['SYSTEM_ADMIN','STUDENT'],studentProfileState:'COMPLETE',accessStatus:'ACTIVE',profileState:'COMPLETE',landingPath:'/student',
+  viewAs:{role:'STUDENT',studentId:42,adminClerkUserId:'user_test',studentName:'Aina'}};
+ respond(admin);expect((await loadSessionAccount(session,async()=>'TEST_TOKEN')).appRole).toBe('SYSTEM_ADMIN');
+ store.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:42,label:'Aina'}));
+ const fetcher=respond(viewed);
+ expect(await loadSessionAccount(session,async()=>'TEST_TOKEN')).toMatchObject({appRole:'STUDENT',viewAs:{studentId:42}});
+ expect(fetcher).toHaveBeenCalledTimes(1);
+ store.removeItem('sa.viewAs');
+ expect(readAccountCache(session)?.appRole).toBe('SYSTEM_ADMIN');
+});
+it('rejects a view-as account that names another admin',async()=>{
+ const viewed:Me={clerkUserId:'user_student',appRole:'STUDENT',roles:['SYSTEM_ADMIN','STUDENT'],availableRoles:['SYSTEM_ADMIN','STUDENT'],studentProfileState:'COMPLETE',accessStatus:'ACTIVE',profileState:'COMPLETE',landingPath:'/student',
+  viewAs:{role:'STUDENT',studentId:42,adminClerkUserId:'user_other'}};
+ store.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:42,label:'Aina'}));respond(viewed);
+ await expect(loadSessionAccount(session,async()=>'TEST_TOKEN')).rejects.toMatchObject({code:'INVALID_ACCOUNT_RESPONSE'});
+});
+
+it('signing out or another user on the tab drops the view-as context (S3-P004-033 review)',()=>{
+ store.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:42,label:'Aina'}));
+ keepAccountSession(session);expect(store.getItem('sa.viewAs')).not.toBeNull();
+ keepAccountSession({userId:'user_other',sessionId:'session_b'});expect(store.getItem('sa.viewAs')).toBeNull();
+ store.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:42,label:'Aina'}));
+ keepAccountSession(null);expect(store.getItem('sa.viewAs')).toBeNull();
+});
+it('refreshes roles for an admin in View as Student (S3-P004-033 review)',async()=>{
+ const viewed:Me={clerkUserId:'user_student',appRole:'STUDENT',roles:['SYSTEM_ADMIN','STUDENT'],availableRoles:['SYSTEM_ADMIN','STUDENT'],studentProfileState:'COMPLETE',accessStatus:'ACTIVE',profileState:'COMPLETE',landingPath:'/student',
+  viewAs:{role:'STUDENT',studentId:42,adminClerkUserId:'user_test',studentName:'Aina'}};
+ store.setItem('sa.viewAs',JSON.stringify({role:'STUDENT',studentId:42,label:'Aina'}));respond(viewed);
+ expect((await refreshAccountRoles(session,async()=>'TEST_TOKEN')).viewAs).toMatchObject({studentId:42});
+});

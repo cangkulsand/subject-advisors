@@ -360,7 +360,7 @@ else {
       await submitAdd(dialog, { email: 'student@graduate.utm.my', role: 'Coordinator', label: 'Add user' });
       await dialog.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
       assert.equal(await dialog.isVisible(), true);
-      await dialog.getByText('System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com', { exact: false }).waitFor();
+      await dialog.getByText('System Administrator: verified @gmail.com', { exact: false }).waitFor();
       await submitAdd(dialog, { email: 'friend@gmail.com', role: 'Coordinator', label: 'Add user' });
       await dialog.getByRole('alert').filter({ hasText: 'The verified email address is not eligible for the requested role.' }).waitFor();
       await submitAdd(dialog, { email: 'nobody@utm.my', role: 'Coordinator', label: 'Add user' });
@@ -441,7 +441,7 @@ else {
       state.mutationError = { status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'The verified email address is not eligible for the requested role.' }; // server-side refusal; eligibility itself is covered by unit tests
       await add.selectOption('SYSTEM_ADMIN'); await page.getByRole('button', { name: 'Add role', exact: true }).click();
       const dialog = page.getByRole('dialog'); await dialog.getByRole('heading', { name: 'Add System Admin role' }).waitFor();
-      await dialog.getByText('System Administrator: verified @utm.my, @graduate.utm.my or @gmail.com').waitFor();
+      await dialog.getByText('System Administrator: verified @gmail.com').waitFor();
       await dialog.getByLabel(reasonLabel).fill('Fictional: needs administrator access.'); await dialog.getByRole('button', { name: 'Add role' }).click();
       await dialog.getByRole('alert').filter({ hasText: 'not eligible' }).waitFor();
       assert.equal(await dialog.isVisible(), true);
@@ -637,6 +637,64 @@ else {
       assert.deepEqual(state.bodies.at(-1), { method: 'POST', path: '/api/admin/users/24/dummy-password', body: {} });
       await confirm.getByRole('button', { name: 'Done', exact: true }).click();
       await confirm.waitFor({ state: 'hidden' });
+    });
+    // View as (S3-P004-033).
+    const viewAsStored = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('sa.viewAs') ?? 'null'));
+    for (const width of [1440, 375]) await check('View as Coordinator: choose a programme and centre, start the view at ' + width, async page => {
+      await mock(page); await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
+      if (width < 761) { await page.getByRole('button', { name: 'Open navigation' }).click(); await page.getByRole('dialog', { name: 'Administration menu' }).getByRole('button', { name: 'View as', exact: true }).click(); }
+      else await page.getByRole('button', { name: 'View as', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'View as' }); await dialog.waitFor();
+      await dialog.getByRole('button', { name: 'Start view' }).click();
+      await dialog.getByText('Choose a programme and a learning centre.').waitFor();
+      await dialog.getByLabel('Programme').selectOption({ label: 'TEST — Fictional programme' });
+      await dialog.getByLabel('Learning centre').selectOption({ label: 'Fictional learning centre' });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow');
+      if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/view-as-mobile.png' });
+      await dialog.getByRole('button', { name: 'Start view' }).click();
+      await page.waitForURL(/\/coordinator$/);
+      assert.deepEqual(await viewAsStored(page), { role: 'COORDINATOR', programmeId: 1, learningCentreId: 1, label: 'TEST, Fictional learning centre' });
+    }, width);
+    await check('View as Student: search, a student without a profile cannot be viewed, one with a profile starts a read-only view', async page => {
+      const state = await mock(page); await page.goto(base + '/admin'); await page.getByRole('heading', { name: 'Assigned roles' }).waitFor();
+      await page.getByRole('button', { name: 'View as', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'View as' }); await dialog.waitFor();
+      await dialog.getByRole('radio', { name: 'Student' }).check();
+      await dialog.getByLabel('Find a student').fill('Fictional Account');
+      await dialog.getByRole('button', { name: 'Search', exact: true }).click();
+      const list = dialog.getByRole('list', { name: 'Students' }); await list.waitFor();
+      const search = state.requests.find(request => request.path === '/api/admin/users' && request.search.includes('q='));
+      assert.match(search.search, /role=STUDENT/); assert.match(search.search, /status=ACTIVE/);
+      await list.getByRole('button', { name: 'View as Fictional Account 6', exact: true }).click();
+      await list.getByText('Profile not set up yet').waitFor();
+      assert.equal(await viewAsStored(page), null, 'no view without a profile');
+      await list.getByRole('button', { name: 'View as Fictional Account 4', exact: true }).click();
+      await page.waitForURL(/\/student$/);
+      assert.deepEqual(await viewAsStored(page), { role: 'STUDENT', studentId: 14, label: 'Fictional Account 4' });
+    });
+    await check('View as banner: shows the view on admin pages and Exit view returns to admin without it', async page => {
+      await page.addInitScript(() => sessionStorage.setItem('sa.viewAs', JSON.stringify({ role: 'COORDINATOR', programmeId: 1, learningCentreId: 1, label: 'TEST, Fictional learning centre' })));
+      const state = await mock(page); await page.goto(base + '/admin/users');
+      const banner = page.locator('.view-as-banner'); await banner.waitFor();
+      assert.equal((await banner.innerText()).replace(/\s+/g, ' ').trim(), 'Viewing as coordinator — TEST, Fictional learning centre Exit view');
+      assert.ok(state.requests.filter(request => request.path.startsWith('/api/admin')).length > 0);
+      await page.evaluate(() => sessionStorage.removeItem('sa.viewAs'));
+      await page.addInitScript(() => sessionStorage.removeItem('sa.viewAs'));
+      await page.goto(base + '/admin/users');
+      await page.getByRole('heading', { name: 'Users & Access' }).first().waitFor();
+      assert.equal(await page.locator('.view-as-banner').count(), 0);
+    });
+    await check('View as banner: Exit view clears the view and opens the admin overview', async page => {
+      await page.evaluate(() => 0);
+      await mock(page); await page.goto(base + '/admin/users');
+      await page.evaluate(() => sessionStorage.setItem('sa.viewAs', JSON.stringify({ role: 'STUDENT', studentId: 14, label: 'Fictional Account 4' })));
+      await page.goto(base + '/admin/users');
+      const banner = page.locator('.view-as-banner'); await banner.waitFor();
+      assert.match(await banner.innerText(), /Viewing as student — Fictional Account 4 \(read only\)/);
+      await banner.getByRole('button', { name: 'Exit view' }).click();
+      await page.waitForURL(/\/admin$/);
+      assert.equal(await viewAsStored(page), null);
+      assert.equal(await page.locator('.view-as-banner').count(), 0);
     });
     await academicUiChecks({ check, mock, base });
     console.log('PASS ' + passed + ' administration browser checks');

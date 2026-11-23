@@ -185,7 +185,7 @@ function AuditTable({ audit }: { audit: ReturnType<typeof usePagedList<OfferingD
       <><div className="admin-table-scroll coordinator-table" role="region" aria-label="Audit history table" tabIndex={0}>
         <table><thead><tr><th scope="col">When</th><th scope="col">Change</th><th scope="col">Subject</th><th scope="col">By</th><th scope="col">Snapshot</th></tr></thead>
           <tbody>{audit.items.map(entry => <tr key={entry.auditId}><td>{when(entry.recordedAt)}</td><td>{statusLabels[entry.beforeStatus]} → {statusLabels[entry.afterStatus]}</td>
-            <th scope="row"><strong>{entry.subjectName}</strong><span className="coordinator-subject-code">{entry.subjectCode}</span></th><td className="admin-actor">{entry.recordedBy}</td>
+            <th scope="row"><strong>{entry.subjectName}</strong><span className="coordinator-subject-code">{entry.subjectCode}</span></th><td className="admin-actor">{entry.recordedBy}{entry.recordedByAdmin ? ' (System Admin)' : ''}</td>
             <td>{entry.importBatchId ? `Snapshot #${entry.importBatchId}` : '—'}</td></tr>)}</tbody></table></div>
         {audit.loadMoreError && <p className="admin-form-error" role="alert">{audit.loadMoreError}</p>}
         <LoadMore cursor={audit.cursor} busy={audit.loadingMore} onMore={() => void audit.more()} label="Load older entries"/></>)}

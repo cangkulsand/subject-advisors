@@ -8,10 +8,13 @@ export function verifyGrantIdentity(user, request) {
   if (!request.actor?.trim() || !request.reason?.trim()) throw new ProvisionError('A trusted operator actor and reason are required.');
   const student = /^[^@\s]+@graduate\.utm\.my$/i.test(primary.emailAddress);
   const coordinator = /^[^@\s]+@utm\.my$/i.test(primary.emailAddress);
-  if (request.owner && (!student || knownRoles.some(role => !request.roles.includes(role)))) throw new ProvisionError('Protected owner bootstrap requires the verified graduate identity and all three explicit roles.');
+  const admin = /^[^@\s]+@gmail\.com$/i.test(primary.emailAddress);
+  // One email domain per role, no exceptions (S3-P004-033). The owner is a gmail System Administrator only.
+  if (request.owner && (!admin || request.roles.length !== 1 || request.roles[0] !== 'SYSTEM_ADMIN')) throw new ProvisionError('Protected owner bootstrap requires a verified gmail.com identity and the SYSTEM_ADMIN role only.');
   if (request.roles.includes('STUDENT') && !student) throw new ProvisionError('Student grants require the exact graduate.utm.my domain.');
-  if (request.roles.includes('COORDINATOR') && !coordinator && !(request.owner && student)) throw new ProvisionError('Coordinator grants require utm.my or the explicit protected owner bootstrap.');
-  return { ...request, coordinatorPolicy: request.owner ? 'OWNER_STUDENT_COORDINATOR' : 'ROLE_DOMAIN' };
+  if (request.roles.includes('COORDINATOR') && !coordinator) throw new ProvisionError('Coordinator grants require the exact utm.my domain.');
+  if (request.roles.includes('SYSTEM_ADMIN') && !admin) throw new ProvisionError('System Administrator grants require the exact gmail.com domain.');
+  return { ...request, coordinatorPolicy: 'ROLE_DOMAIN' };
 }
 export async function inspectGrant(client, request) {
   const accountLock = request.requireExistingStudent ? ' FOR UPDATE' : '';
@@ -47,7 +50,6 @@ export async function provisionRoles(client, request, apply = false) {
           (SELECT 1 FROM user_role_assignment WHERE access_assignment_id=$1 AND app_role=$2::varchar)`,
       [account.access_assignment_id,role,policy,Boolean(request.owner && role === 'SYSTEM_ADMIN'),request.actor,request.reason]);
       if (request.owner && role === 'SYSTEM_ADMIN') await client.query("UPDATE user_role_assignment SET protected_owner=true WHERE access_assignment_id=$1 AND app_role='SYSTEM_ADMIN' AND NOT protected_owner", [account.access_assignment_id]);
-      if (request.owner && role === 'COORDINATOR') await client.query("UPDATE user_role_assignment SET email_policy='OWNER_STUDENT_COORDINATOR' WHERE access_assignment_id=$1 AND app_role='COORDINATOR' AND email_policy<>'OWNER_STUDENT_COORDINATOR'", [account.access_assignment_id]);
     }
     // A newly provisioned staff account must not keep the compatibility seed role.
     if (inserted.rows.length && !request.roles.includes('STUDENT')) await client.query("DELETE FROM user_role_assignment WHERE access_assignment_id=$1 AND app_role='STUDENT'", [account.access_assignment_id]);

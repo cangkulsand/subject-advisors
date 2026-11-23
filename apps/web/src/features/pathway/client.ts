@@ -1,3 +1,4 @@
+import { viewAsHeaders } from '../auth/view-as-header';
 import type { PathwayApiResult, PathwayGraph } from './contracts';
 
 export class PathwayApiError extends Error {
@@ -12,7 +13,7 @@ export async function loadPathwayGraph(
   const token = await getToken();
   if (!token) throw new PathwayApiError(401, 'SESSION_REQUIRED', 'Your session has ended. Please sign in again.');
   const response = await fetch(apiBaseUrl.replace(/\/$/, '') + '/api/pathway/graph', {
-    headers: { Authorization: 'Bearer ' + token },
+    headers: { Authorization: 'Bearer ' + token, ...viewAsHeaders() },
     credentials: 'omit', cache: 'no-store', signal,
   });
   const body: PathwayApiResult = await response.json();

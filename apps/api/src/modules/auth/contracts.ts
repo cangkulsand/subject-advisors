@@ -1,3 +1,4 @@
+import type { ViewAsContext } from './view-as';
 export type AppRole = 'STUDENT' | 'COORDINATOR' | 'SYSTEM_ADMIN';
 export type AccessStatus = 'ACTIVE' | 'SUSPENDED';
 export type ProfileState = 'COMPLETE' | 'SETUP_REQUIRED' | 'UNAVAILABLE' | 'NOT_APPLICABLE';
@@ -15,6 +16,8 @@ export interface Me extends AccessAssignment {
   studentProfileState: ProfileState;
   profileState: ProfileState;
   landingPath: '/student/setup' | '/student' | '/coordinator' | '/admin';
+  /** Present only while a System Admin views as a coordinator or student (S3-P004-033). */
+  viewAs?: ViewAsContext;
 }
 export type ApiResult<T> = { data: T } | { error: { code: string; message: string } };
 /** Constructed only from Clerk's verified session and current Backend API user. */
@@ -27,6 +30,8 @@ export interface AccessRepository {
   find(clerkUserId: string): Promise<AccessAssignment | null>;
   /** Insert STUDENT/ACTIVE if absent; never modify an existing assignment. */
   initializeStudent(clerkUserId: string): Promise<AccessAssignment>;
+  /** View as Student (S3-P004-033): the Clerk user and name behind a student profile; null when there is none. */
+  studentClerkUserId?(studentId: number): Promise<{ clerkUserId: string; studentName: string } | null>;
 }
 /** P001 implements this using the verified user ID and a valid profile/curriculum. */
 export interface ProfileReader {

@@ -571,3 +571,29 @@ describe('coordinator export format (S2-P004-010)', () => {
     expect(body.data.targetSemesters.map((s: { semesterId: number }) => s.semesterId)).toEqual([4]);
   });
 });
+
+describe('System Admin View as Coordinator (S3-P004-033)', () => {
+  const asAdmin = (deps: ForecastingDependencies) => {
+    deps.auth.verify = vi.fn(async () => ({ clerkUserId: 'user_admin', sessionId: 's', primaryEmail: { address: 'admin@gmail.com', verified: true } }));
+    deps.auth.access.find = vi.fn(async (id: string) => ({ clerkUserId: id, appRole: 'SYSTEM_ADMIN' as const, roles: ['SYSTEM_ADMIN' as const], accessStatus: 'ACTIVE' as const }));
+    return deps;
+  };
+  const viewAs = (programme: number, centre: number) => ({ 'X-View-As': `COORDINATOR;programme=${programme};centre=${centre}` });
+  it('lists exactly the chosen programme and centre', async () => {
+    const deps = asAdmin(fixture().deps);
+    const body = await (await send(deps, 'forecast-context', { method: 'GET', headers: viewAs(5, 2) })).json();
+    expect(body.data.programmes.map((p: { programmeId: number }) => p.programmeId)).toEqual([5]);
+    expect(body.data.learningCentres.map((c: { learningCentreId: number }) => c.learningCentreId)).toEqual([2]);
+    expect(body.data.assignedScopes).toEqual([{ programmeId: 5, learningCentreId: 2 }]);
+  });
+  it('refuses a scope outside the chosen one and a chosen scope that does not exist', async () => {
+    const deps = asAdmin(fixture().deps);
+    expect((await send(deps, 'forecast-imports?programmeId=5&learningCentreId=1&targetSemesterId=2', { method: 'GET', headers: viewAs(5, 2) })).status).toBe(403);
+    const unknown = await (await send(deps, 'forecast-context', { method: 'GET', headers: viewAs(99, 2) })).json();
+    expect(unknown.data.programmes).toEqual([]);
+  });
+  it('still refuses an admin without the view-as context', async () => {
+    const response = await send(asAdmin(fixture().deps), 'forecast-context', { method: 'GET' });
+    expect(response.status).toBe(403);
+  });
+});

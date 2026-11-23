@@ -24,6 +24,19 @@ export interface ScopeProvider {
   studentLearningCentres(studentIds: number[]): Promise<Map<number, number | null>>;
   /** Coordinator-export vocabulary (S2-P004-010): export programme code -> system programme_code, centre name -> system centre code. */
   importAliases(): Promise<ImportAliases>;
+  /** View as Coordinator (S3-P004-033): the programme x centre option when both are active (programme with a faculty); else null. */
+  scopeFor?(programmeId: number, learningCentreId: number): Promise<ScopeOption | null>;
+}
+
+/** View as Coordinator (S3-P004-033): the admin is "assigned" exactly the chosen scope, nothing from coordinator_assignment. */
+export function viewAsScopeProvider(base: ScopeProvider, scope: ScopeOption | null): ScopeProvider {
+  return {
+    ...base,
+    async listScopes() { return scope ? [scope] : []; },
+    async isScopeAssigned(_clerkUserId, programmeId, learningCentreId) {
+      return scope !== null && scope.programme.programmeId === programmeId && scope.centre.learningCentreId === learningCentreId;
+    },
+  };
 }
 
 export type ScopeSource = AcademicScopeReader & Pick<AcademicSetupRepository, 'listProgrammeFaculties'>;
@@ -53,5 +66,15 @@ export function createDbScopeProvider(source: ScopeSource, studentCentres: (stud
     currentSemesterId: () => source.currentSemesterId(),
     studentLearningCentres: (studentIds) => studentCentres(studentIds),
     async importAliases() { return IMPORT_ALIASES; },
+    async scopeFor(programmeId, learningCentreId) {
+      const [centres, programmes] = await Promise.all([source.listActiveLearningCentres(), source.listProgrammeFaculties()]);
+      const programme = programmes.find((p) => p.programmeId === programmeId && p.isActive && p.facultyId != null && p.faculty?.isActive !== false);
+      const centre = centres.find((c) => c.learningCentreId === learningCentreId && c.isActive);
+      if (!programme || !centre) return null;
+      return {
+        programme: { programmeId: programme.programmeId, programmeCode: programme.programmeCode, programmeName: programme.programmeName },
+        centre: { learningCentreId: centre.learningCentreId, centreCode: centre.centreCode, centreName: centre.centreName },
+      };
+    },
   };
 }

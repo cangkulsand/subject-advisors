@@ -21,7 +21,7 @@ const assignmentInput = { accountId: 12, facultyId: 8, programmeId: 9, learningC
 function fixture(): AcademicSetupDependencies {
   return {
     auth: {
-      verify: vi.fn(async () => ({ clerkUserId: ACTOR, sessionId: 'session_test', primaryEmail: { address: 'test@utm.my', verified: true } })),
+      verify: vi.fn(async () => ({ clerkUserId: ACTOR, sessionId: 'session_test', primaryEmail: { address: 'test@gmail.com', verified: true } })),
       access: {
         find: vi.fn(async (): Promise<AccessAssignment> => ({ clerkUserId: ACTOR, appRole: 'SYSTEM_ADMIN', roles: ['SYSTEM_ADMIN'], accessStatus: 'ACTIVE' })),
         initializeStudent: vi.fn(),
@@ -194,7 +194,7 @@ describe('academic API boundaries', () => {
     vi.mocked(deps.auth.access.find).mockResolvedValue({ clerkUserId: 'user_other', appRole: 'SYSTEM_ADMIN', roles: ['SYSTEM_ADMIN'], accessStatus: 'ACTIVE' });
     expect((await send(deps, '/semesters')).status).toBe(503); noCalls(deps);
     const unverified = fixture();
-    vi.mocked(unverified.auth.verify).mockResolvedValue({ clerkUserId: ACTOR, sessionId: 'test', primaryEmail: { address: 'admin@utm.my', verified: false } });
+    vi.mocked(unverified.auth.verify).mockResolvedValue({ clerkUserId: ACTOR, sessionId: 'test', primaryEmail: { address: 'admin@gmail.com', verified: false } });
     expect((await send(unverified, '/semesters')).status).toBe(403); noCalls(unverified);
   });
   it('returns null outside owned prefix and safe 404 within owned prefix', async () => {

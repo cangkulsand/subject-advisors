@@ -1,6 +1,7 @@
 import type { Me } from './contracts';
 import { AuthApiError, loadAccount } from './client';
 import { clearAcademicCache, keepAcademicSession } from '../profile/data-cache';
+import { VIEW_AS_STORAGE_KEY, viewAsValue } from './view-as-header';
 
 export interface AccountSession { userId: string; sessionId: string; apiBaseUrl?: string }
 const prefix = 'subject-advisors.account.v3:';
@@ -11,12 +12,15 @@ const memory = new Map<string, Me>();
 const pending = new Map<string, Promise<Me>>();
 let generation = 0;
 let activeSession: string | undefined;
-function key(session: AccountSession) { return prefix + JSON.stringify([session.userId, session.sessionId, (session.apiBaseUrl ?? '').replace(/\/+$/, '')]); }
+// The active view-as context (S3-P004-033) is part of the key, so the admin's own account and a viewed one never mix.
+function key(session: AccountSession) { const view = viewAsValue(); return prefix + JSON.stringify([session.userId, session.sessionId, (session.apiBaseUrl ?? '').replace(/\/+$/, ''), ...(view ? [view] : [])]); }
 function storage(): Storage | undefined { try { return typeof window === 'undefined' ? undefined : window.sessionStorage; } catch { return undefined; } }
 function valid(value: unknown, userId: string): value is Me {
   if (!value || typeof value !== 'object') return false;
   const me = value as Me;
-  if (me.clerkUserId !== userId || me.accessStatus !== 'ACTIVE') return false;
+  // In View as Student the account is the student's; it must name this session's admin (S3-P004-033).
+  if ((me.viewAs ? me.viewAs.adminClerkUserId : me.clerkUserId) !== userId || me.accessStatus !== 'ACTIVE') return false;
+  if (me.viewAs && (me.viewAs.role !== me.appRole || !me.roles.includes('SYSTEM_ADMIN'))) return false;
   const allowed = ['STUDENT','COORDINATOR','SYSTEM_ADMIN'];
   if (!Array.isArray(me.roles) || !me.roles.length || me.roles.some(role => !allowed.includes(role)) || new Set(me.roles).size !== me.roles.length ||
       !Array.isArray(me.availableRoles) || !me.availableRoles.length || me.availableRoles.some(role => !me.roles.includes(role)) ||
@@ -28,7 +32,8 @@ function valid(value: unknown, userId: string): value is Me {
 }
 function snapshot(me: Me): Me {
   return { clerkUserId: me.clerkUserId, appRole: me.appRole, roles: [...me.roles], availableRoles: [...me.availableRoles],
-    studentProfileState: me.studentProfileState, accessStatus: me.accessStatus, profileState: me.profileState, landingPath: me.landingPath };
+    studentProfileState: me.studentProfileState, accessStatus: me.accessStatus, profileState: me.profileState, landingPath: me.landingPath,
+    ...(me.viewAs ? { viewAs: { ...me.viewAs } } : {}) };
 }
 export function readAccountCache(session: AccountSession): Me | undefined {
   const id = key(session), cached = memory.get(id);
@@ -50,9 +55,12 @@ export function clearAccountCache(notifyListeners = true) {
   if (notifyListeners) notify();
 }
 /** Prune only other users/sessions; retain this session across document navigations. */
+/** Signing out, or another Clerk user on this tab, ends any View as (S3-P004-033). */
+function dropViewAs() { try { storage()?.removeItem(VIEW_AS_STORAGE_KEY); } catch { /* storage may be disabled */ } }
 export function keepAccountSession(session: AccountSession | null) {
-  if (!session) { activeSession=undefined; clearAccountCache(false); return; }
+  if (!session) { activeSession=undefined; dropViewAs(); clearAccountCache(false); return; }
   const identity=JSON.stringify([session.userId,session.sessionId]);
+  if(activeSession!==undefined&&JSON.parse(activeSession)[0]!==session.userId)dropViewAs();
   if(activeSession!==identity){keepAcademicSession(identity);if(activeSession!==undefined){generation++;pending.clear();}activeSession=identity;}
   const belongs = (id: string) => { try { const parts: unknown = JSON.parse(id.slice(prefix.length)); return Array.isArray(parts) && parts[0] === session.userId && parts[1] === session.sessionId; } catch { return false; } };
   for (const id of memory.keys()) if (!belongs(id)) memory.delete(id);
@@ -75,7 +83,7 @@ export async function refreshAccountRoles(session: AccountSession, getToken: () 
   const version = generation;
   if (stamp !== JSON.stringify([session.userId,session.sessionId])) throw new AuthApiError(401,'SESSION_CHANGED','Your account changed. Please sign in again.');
   const me = await loadSessionAccount(session, getToken, false, true);
-  if (version !== generation || stamp !== accountSessionStamp() || me.clerkUserId !== session.userId) throw new AuthApiError(401,'SESSION_CHANGED','Your account access changed. Please retry.');
+  if (version !== generation || stamp !== accountSessionStamp() || (me.viewAs?.adminClerkUserId ?? me.clerkUserId) !== session.userId) throw new AuthApiError(401,'SESSION_CHANGED','Your account access changed. Please retry.');
   notify('access-refreshed');
   return me;
 }

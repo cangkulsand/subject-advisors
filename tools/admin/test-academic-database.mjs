@@ -1,5 +1,6 @@
 // Disposable loopback PostgreSQL only. Never reads .dev.vars or DATABASE_URL.
 import assert from 'node:assert/strict';
+import { runOwnerTransferChecks } from '../db/owner-transfer-check.mjs';
 import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -50,6 +51,7 @@ try{
       file+': '+JSON.stringify(rows.filter(row=>row.status!=='PASS')));
     console.log('PASS '+file+' ('+rows.length+' assertions)');
   }
+  for(const name of await runOwnerTransferChecks(db,await readFile('db/migrations/0015_owner_to_gmail.sql','utf8')))console.log('PASS 0015 owner transfer: '+name);
   const repositoryTests=spawnSync(process.execPath,['node_modules/vitest/vitest.mjs','run','--config','vitest.auth.config.ts',
     'apps/api/src/modules/admin/academic-repository.database.test.ts'],{
     encoding:'utf8',windowsHide:true,timeout:120000,

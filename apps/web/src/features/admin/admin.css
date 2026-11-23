@@ -494,3 +494,18 @@
 .admin-copy { min-height: 44px; }
 /* Two header buttons on Users & Access: let the action group shrink and wrap on narrow screens. */
 .admin-page-actions:has(.admin-heading-actions) { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; }
+
+/* View as (S3-P004-033) */
+.admin-view-as-section { display: grid; gap: 14px; }
+.admin-view-as-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.admin-view-as-search .admin-field { flex: 1 1 220px; }
+.admin-view-as-results { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; max-height: 320px; overflow-y: auto; }
+.admin-view-as-results li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--admin-border); border-radius: 10px; }
+.admin-view-as-results li > span:first-child { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.admin-shell button.admin-view-as-button { white-space: nowrap; }
+.admin-drawer-actions { display: none; padding: 12px 16px; border-top: 1px solid var(--color-nav-divider); }
+@media (max-width: 760px) {
+  .admin-topbar-extra { display: none; }
+  .admin-drawer-actions { display: block; }
+  .admin-drawer-actions button.admin-view-as-button { width: 100%; color: var(--staff-nav-indicator); border-color: var(--staff-nav-indicator); }
+}

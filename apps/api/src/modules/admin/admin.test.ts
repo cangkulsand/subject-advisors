@@ -10,7 +10,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
   const event = { eventId: 'role:1', accountId: 1, actor: 'user_operator', target: 'user_fixture', kind: 'ROLE' as const, action: 'GRANT', role: 'STUDENT' as const, before: null, after: 'ROLE_DOMAIN', reason: 'Private account context', occurredAt: date };
   const page = { items: [event], total: 1, page: 1, pageSize: 20, generatedAt: date };
   const deps: AdminDependencies = {
-    auth: { verify: vi.fn(async () => ({ clerkUserId: 'user_fixture', sessionId: 'session_test', primaryEmail: { address: 'fixture@graduate.utm.my', verified: true } })),
+    auth: { verify: vi.fn(async () => ({ clerkUserId: 'user_fixture', sessionId: 'session_test', primaryEmail: { address: 'fixture@gmail.com', verified: true } })),
       access: { find: vi.fn(async () => ({ ...account, appRole: roles[0]! })), initializeStudent: vi.fn() }, profiles: { stateFor: vi.fn(async () => 'SETUP_REQUIRED' as const) } },
     repository: { overview: vi.fn(async () => ({ generatedAt: date, accounts: { total: 1, active: 1, suspended: 0 }, roles: { STUDENT: 0, COORDINATOR: 0, SYSTEM_ADMIN: 1 }, configuration: { programmes: 1, curricula: 1, subjects: 4, semesters: 3 } })),
       accounts: vi.fn(async () => ({ ...page, items: [account] })), account: vi.fn(async () => ({ ...account, memberships: [] })), audit: vi.fn(async () => page),
@@ -52,6 +52,19 @@ describe('read-only administration authorization and privacy', () => {
     const deps = fixture(); deps.identities.lookup = vi.fn(async () => { throw new Error('provider secret details'); });
     const response = await handleAdminRequest(request('/api/admin/users'), deps); expect(response?.status).toBe(200);
     expect(await response!.text()).toContain('unavailable'); expect(deps.identities.lookup).toHaveBeenCalledWith(['user_fixture']);
+  });
+  it('marks a membership the account email cannot use (S3-P004-033)', async () => {
+    const deps = fixture();
+    const membership = (role: 'STUDENT' | 'SYSTEM_ADMIN') => ({ role, emailPolicy: 'ROLE_DOMAIN', source: 'OPERATOR', protectedOwner: false, reason: 'r', grantedAt: '2026-11-01T00:00:00.000Z' });
+    const base = (await deps.repository.account(1))!; deps.repository.account = vi.fn(async () => ({ ...base, memberships: [membership('STUDENT'), membership('SYSTEM_ADMIN')] })) as never;
+    const body = await (await handleAdminRequest(request('/api/admin/users/9'), deps))!.json() as { data: { memberships: { role: string; usable?: boolean }[] } };
+    expect(body.data.memberships.map(m => [m.role, m.usable])).toEqual([['STUDENT', true], ['SYSTEM_ADMIN', false]]);
+  });
+  it('leaves usable unset when the identity provider is unavailable', async () => {
+    const deps = fixture(); deps.identities.lookup = vi.fn(async () => { throw new Error('down'); });
+    const base = (await deps.repository.account(1))!; deps.repository.account = vi.fn(async () => ({ ...base, memberships: [{ role: 'SYSTEM_ADMIN', emailPolicy: 'ROLE_DOMAIN', source: 'OPERATOR', protectedOwner: false, reason: 'r', grantedAt: '2026-11-01T00:00:00.000Z' }] })) as never;
+    const body = await (await handleAdminRequest(request('/api/admin/users/9'), deps))!.json() as { data: { memberships: { usable?: boolean }[] } };
+    expect(body.data.memberships[0]!.usable).toBeUndefined();
   });
   it('rejects overly broad identity searches instead of truncating silently', async () => {
     const deps = fixture(); deps.identities.search = vi.fn(async () => ({ ids: [], total: 101 }));

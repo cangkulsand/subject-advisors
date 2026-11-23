@@ -5,6 +5,7 @@ import type { StudentArea } from './StudentRoutes';
 import './typography.css';
 import './student-shell.css';
 import { RoleSwitcher } from '../features/auth/RoleSwitcher';
+import { ViewAsBanner } from '../features/auth/ViewAsBanner';
 // Academic progress and Recommendations are hidden from the menu (S3-P004-023); their routes still work.
 const links = [
   { area: 'profile', href: '/student/profile', label: 'Academic profile', icon: 'user' },
@@ -90,6 +91,7 @@ export function StudentShell({ area, title, children }: { area: StudentArea; tit
     </aside>
     {mobile && open && <button className="student-sidebar-backdrop" type="button" tabIndex={-1} aria-label="Dismiss navigation" onClick={() => setOpen(false)}/>}
     <div className="student-main-column">
+      <ViewAsBanner/>
       <header ref={headerRef} className="student-topbar">
         <div className="student-header-row">
           <button ref={toggleRef} className="student-icon-button student-menu-toggle" type="button" aria-label={mobile ? open ? 'Close navigation' : 'Open navigation' : 'Toggle sidebar'} aria-controls="student-sidebar" aria-expanded={mobile ? open : expanded} onClick={() => mobile ? setOpen(!open) : setExpanded(!expanded)}><Icon name={open ? 'close' : 'menu'}/></button>

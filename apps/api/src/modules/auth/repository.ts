@@ -36,6 +36,12 @@ export function createAccessRepository(query: SqlQuery): AccessRepository {
      WHERE a.clerk_user_id=$1 GROUP BY a.access_assignment_id`, [userId]));
   return {
     find,
+    async studentClerkUserId(studentId) {
+      const rows = await query('SELECT clerk_user_id, student_name FROM student_profile WHERE student_id=$1 AND clerk_user_id IS NOT NULL', [String(studentId)]);
+      if (!Array.isArray(rows)) throw new Error('Invalid student query result');
+      const row = rows[0] as { clerk_user_id?: unknown; student_name?: unknown } | undefined;
+      return row && typeof row.clerk_user_id === 'string' ? { clerkUserId: row.clerk_user_id, studentName: String(row.student_name ?? '') } : null;
+    },
     async initializeStudent(userId) {
       // Unique constraint serializes concurrent inserts. DO NOTHING preserves all existing assignments.
       await query(

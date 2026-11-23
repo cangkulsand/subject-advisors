@@ -11,6 +11,13 @@ describe('auth client', () => {
     }));
     expect(fetcher.mock.calls[0]?.[1]).not.toHaveProperty('body');
   });
+  it('sends the view-as context when a view is active (S3-P004-033)', async () => {
+    vi.stubGlobal('window', { sessionStorage: { getItem: () => JSON.stringify({ role: 'COORDINATOR', programmeId: 5, learningCentreId: 2, label: 'x' }) } });
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ data: { appRole: 'COORDINATOR' } }));
+    vi.stubGlobal('fetch', fetcher);
+    await loadAccount(async () => 'test-only', 'https://api.test/');
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ headers: { Authorization: 'Bearer test-only', 'X-View-As': 'COORDINATOR;programme=5;centre=2' } });
+  });
   it('does not fetch after session expiry', async () => {
     const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
     await expect(loadAccount(async () => null)).rejects.toMatchObject({ status: 401 });

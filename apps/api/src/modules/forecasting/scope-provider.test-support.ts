@@ -23,6 +23,10 @@ export const testScopeProvider: ScopeProvider = {
   async currentSemesterId() { return 1; },
   async studentLearningCentres(studentIds) { return new Map(studentIds.map((id) => [id, 1])); },
   async importAliases() { return IMPORT_ALIASES; },
+  async scopeFor(programmeId, learningCentreId) {
+    const programme = TEST_PROGRAMMES.find((p) => p.programmeId === programmeId), centre = TEST_CENTRES.find((c) => c.learningCentreId === learningCentreId);
+    return programme && centre ? { programme, centre } : null;
+  },
 };
 
 /** Fixture provider assigned only to the given programme x centre pairs; everything else live-matches the pairs. */

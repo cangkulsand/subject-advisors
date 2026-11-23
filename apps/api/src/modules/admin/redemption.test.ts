@@ -41,12 +41,10 @@ describe('invitation redemption at first sign-in', () => {
     expect(me.roles).toEqual(['SYSTEM_ADMIN']); expect(me.availableRoles).toEqual(['SYSTEM_ADMIN']); expect(me.landingPath).toBe('/admin');
     expect(f.initializeStudent).not.toHaveBeenCalled();
   });
-  it('redeems an invited graduate.utm.my SYSTEM_ADMIN with only the invited role and no student account', async () => {
+  it('does not redeem a graduate.utm.my SYSTEM_ADMIN invitation and falls back to student registration (S3-P004-033)', async () => {
     const f = setup({ invitation: invitation({ email: 'friend@graduate.utm.my', roles: ['SYSTEM_ADMIN'] }), email: { address: 'friend@graduate.utm.my', verified: true } });
-    const me = await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true });
-    expect(me.roles).toEqual(['SYSTEM_ADMIN']); expect(f.initializeStudent).not.toHaveBeenCalled();
-    await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true });
-    expect(f.repository.createAccount).toHaveBeenCalledTimes(1);
+    await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true }).catch(() => undefined);
+    expect(f.repository.createAccount).not.toHaveBeenCalled();
   });
   it('denies an uninvited gmail.com user (no self-signup)', async () => {
     const f = setup({ invitation: null, email: { address: 'stranger@gmail.com', verified: true } });

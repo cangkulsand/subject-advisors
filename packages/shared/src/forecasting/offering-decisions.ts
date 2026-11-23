@@ -58,6 +58,8 @@ export interface OfferingDecisionAuditEntry {
   importBatchId: Int32Id | null;
   affectedPicks: number;
   recordedBy: string;
+  /** The recorder holds SYSTEM_ADMIN (a decision made in View as Coordinator, S3-P004-033). */
+  recordedByAdmin?: boolean;
   recordedAt: string;
 }
 

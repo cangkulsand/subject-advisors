@@ -13,7 +13,7 @@ const programme = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001',
 function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTEM_ADMIN']) {
   const deps: AdminDependencies = {
     auth: {
-      verify: vi.fn(async () => ({ clerkUserId: ADMIN, sessionId: 'session_test', primaryEmail: { address: 'admin@utm.my', verified: true } })),
+      verify: vi.fn(async () => ({ clerkUserId: ADMIN, sessionId: 'session_test', primaryEmail: { address: 'admin@gmail.com', verified: true } })),
       access: { find: vi.fn(async (id: string) => id === ADMIN ? { clerkUserId: ADMIN, appRole: roles[0]!, roles, accessStatus: 'ACTIVE' as const } : null), initializeStudent: vi.fn() },
     },
     repository: {
@@ -139,7 +139,7 @@ describe('POST /api/admin/users rules (D5)', () => {
     const unverified = fixture(); unverified.identities.findByEmail = vi.fn(async () => ({ clerkUserId: 'user_target', verifiedEmail: 'target@utm.my', emailVerified: false }));
     const first = await send(unverified, '/api/admin/users', 'POST', body);
     expect(first.status).toBe(422); expect((await first.json()).error.code).toBe('ROLE_NOT_ELIGIBLE');
-    for (const [address, roles] of [['target@gmail.com', ['COORDINATOR']], ['target@graduate.utm.my', ['COORDINATOR']], ['target@utm.my', ['STUDENT']], ['target@gmail.com', ['STUDENT']], ['target@example.com', ['SYSTEM_ADMIN']], ['target@sub.gmail.com', ['SYSTEM_ADMIN']]] as const) {
+    for (const [address, roles] of [['target@gmail.com', ['COORDINATOR']], ['target@graduate.utm.my', ['COORDINATOR']], ['target@utm.my', ['STUDENT']], ['target@gmail.com', ['STUDENT']], ['target@example.com', ['SYSTEM_ADMIN']], ['target@sub.gmail.com', ['SYSTEM_ADMIN']], ['target@utm.my', ['SYSTEM_ADMIN']], ['target@graduate.utm.my', ['SYSTEM_ADMIN']]] as const) {
       const deps = fixture(); deps.identities.findByEmail = vi.fn(async () => ({ clerkUserId: 'user_target', verifiedEmail: address, emailVerified: true }));
       const response = await send(deps, '/api/admin/users', 'POST', { email: address, roles, reason });
       expect(response.status).toBe(422);
@@ -247,7 +247,7 @@ describe('invitations', () => {
     expect(deps.repository.attachClerkInvitation).toHaveBeenCalledWith(invitation.id, 'inv_clerk', ADMIN);
   });
   it('rejects roles the invited email domain cannot hold before creating anything', async () => {
-    for (const [email, roles] of [['x@gmail.com', ['COORDINATOR']], ['x@gmail.com', ['STUDENT']], ['x@example.com', ['SYSTEM_ADMIN']], ['x@evil-gmail.com', ['SYSTEM_ADMIN']], ['x@utm.my', ['STUDENT']]] as const) {
+    for (const [email, roles] of [['x@gmail.com', ['COORDINATOR']], ['x@gmail.com', ['STUDENT']], ['x@example.com', ['SYSTEM_ADMIN']], ['x@evil-gmail.com', ['SYSTEM_ADMIN']], ['x@utm.my', ['STUDENT']], ['x@utm.my', ['SYSTEM_ADMIN']], ['x@graduate.utm.my', ['SYSTEM_ADMIN']]] as const) {
       const deps = fixture(); const response = await send(deps, '/api/admin/invitations', 'POST', { email, roles, reason });
       expect(response.status).toBe(422); expect((await response.json()).error.code).toBe('ROLE_NOT_ELIGIBLE');
       expect(deps.repository.createInvitation).not.toHaveBeenCalled();
