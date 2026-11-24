@@ -10,9 +10,9 @@
       "403": { "description": "Unassigned or suspended account, unverified primary email, or no domain-eligible granted role" },
       "503": { "description": "Identity, role store, migration or provider unavailable; access fails closed" }
     } } },
-    "/api/me/initialize": { "post": { "operationId": "initializeStudentAccount", "summary": "Initialize a new eligible student only", "description": "Empty body only. A verified graduate.utm.my primary email can create STUDENT access once. Existing role grants and suspension are preserved. This endpoint never grants staff roles.", "responses": {
+    "/api/me/initialize": { "post": { "operationId": "initializeStudentAccount", "summary": "Initialize a new eligible student only", "description": "Empty body only. A verified graduate.utm.my primary email can create STUDENT access once; a pending administrator invitation for the verified email is redeemed first. Existing role grants and suspension are preserved. A verified @utm.my or @gmail.com email with no account and no invitation gets 403 ROLE_PENDING and nothing is created; a System Administrator then gives the role (S3-P004-036). This endpoint never grants staff roles by itself.", "responses": {
       "200": { "description": "Current active account", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountEnvelope" } } } },
-      "400": { "description": "Request body supplied" }, "401": { "description": "Invalid session" }, "403": { "description": "Registration or account access denied" }, "503": { "description": "Dependency unavailable" }
+      "400": { "description": "Request body supplied" }, "401": { "description": "Invalid session" }, "403": { "description": "Registration or account access denied, or ROLE_PENDING: staff signed up and wait for a System Administrator to give a role" }, "503": { "description": "Dependency unavailable" }
     } } }
   },
   "components": {

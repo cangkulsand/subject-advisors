@@ -126,6 +126,11 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       ]);
       return { items: rows.map(accountRow), total: integer(count[0]?.total), page: input.page, pageSize: 20, generatedAt: new Date().toISOString() };
     },
+    async existingClerkUserIds(clerkUserIds) {
+      if (!clerkUserIds.length) return new Set<string>();
+      const rows = await query('SELECT clerk_user_id FROM public.user_access_assignment WHERE clerk_user_id=ANY($1::varchar[])', [clerkUserIds]);
+      return new Set(rows.map(row => String(row.clerk_user_id)));
+    },
     async account(id) {
       const rows = await query(`SELECT ${accountColumns} FROM public.user_access_assignment a LEFT JOIN public.user_role_assignment r USING(access_assignment_id)
         WHERE a.access_assignment_id=$1 GROUP BY a.access_assignment_id`, [id]);

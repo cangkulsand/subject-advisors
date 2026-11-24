@@ -1,5 +1,5 @@
 import type { AuthDependencies } from '../auth/contracts';
-import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAccount, AdminAuditEvent, AdminAuditQuery, AdminMembership, AdminOverview, AdminPage, AdminUsersQuery, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminRole, AdminStatus } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAccount, AdminAuditEvent, AdminAuditQuery, AdminMembership, AdminOverview, AdminPage, AdminUsersQuery, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminRole, AdminStatus, AdminWaitingUser } from '../../../../../packages/shared/src/admin/admin';
 export type AccountRow = Omit<AdminAccount, 'identity'>;
 export type AccountDetailRow = AccountRow & { memberships: AdminMembership[] };
 export interface AdminInvitationQuery { page: number; status?: AdminInvitationStatus | '' }
@@ -45,6 +45,8 @@ export interface AdminRepository {
   createDummyAccount(clerkUserId: string, input: import('../../../../../packages/shared/src/admin/dummy').CreateDummyUserRequest, matricNo: string, actor: string, reason: string): Promise<AccountDetailRow>;
   /** The admin current semester ID, or null when none is current. */
   currentSemesterId(): Promise<number | null>;
+  /** Which of these Clerk user IDs already have an application account (S3-P004-036). */
+  existingClerkUserIds(clerkUserIds: string[]): Promise<Set<string>>;
 }
 export interface AdminIdentities {
   search(query: string): Promise<{ ids: string[]; total: number }>;
@@ -61,5 +63,10 @@ export interface AdminIdentities {
   deleteUser(clerkUserId: string): Promise<void>;
   /** Total users in the Clerk instance (the development instance allows 100). */
   userCount(): Promise<number>;
+  /**
+   * Sign-in accounts whose VERIFIED primary email is on a staff domain (S3-P004-036), newest first. Reads at most
+   * STAFF_SIGNUP_SCAN users; truncated is true when more exist. Says nothing about application accounts.
+   */
+  listStaffSignups(): Promise<{ items: AdminWaitingUser[]; truncated: boolean }>;
 }
 export interface AdminDependencies { auth: AuthDependencies; repository: AdminRepository; identities: AdminIdentities; academicRepository?: import('./academic-contracts').AcademicSetupRepository }

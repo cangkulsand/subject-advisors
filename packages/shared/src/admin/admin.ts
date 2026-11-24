@@ -78,6 +78,16 @@ export interface AdminCreateInvitationRequest { email: string; roles: AdminRole[
 export interface AdminGrantRoleRequest { role: AdminRole; reason: string }
 export interface AdminRevokeRoleRequest { reason: string }
 export interface AdminChangeAccessRequest { status: AdminStatus; reason: string }
+/** A staff-domain sign-in account with no application account yet (S3-P004-036). */
+export interface AdminWaitingUser {
+  clerkUserId: string;
+  name: string | null;
+  email: string;
+  /** The one role the verified email domain allows: @utm.my COORDINATOR, the admin domain SYSTEM_ADMIN. */
+  role: Exclude<AdminRole, 'STUDENT'>;
+  signedUpAt: string;
+}
+export interface AdminWaitingUsers { items: AdminWaitingUser[]; truncated: boolean; generatedAt: string }
 export interface AdminInvitation {
   id: string;
   email: string;

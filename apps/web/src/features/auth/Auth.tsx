@@ -1,4 +1,4 @@
-import { ClerkProvider, SignIn, SignUp, useAuth, useClerk } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AuthRedirect } from './navigation';
 import { AuthApiError } from './client';
@@ -33,6 +33,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       ? <aside className="auth-email-notice" role="note" aria-labelledby="auth-email-notice-title">
           <p id="auth-email-notice-title" className="auth-email-notice-title">Student email required</p>
           <p>Sign up with your UTM student email ending in <strong>@graduate.utm.my</strong> (for example, name@graduate.utm.my). Other email addresses cannot be used for a student account.</p>
+          <p>UTM staff can sign up with their <strong>@utm.my</strong> email. You can use the app once a System Administrator gives your account a role.</p>
         </aside>
       : <p>Students use a verified @graduate.utm.my email. Approved staff sign in with their assigned account.</p>}
     {mode === 'sign-up'
@@ -99,6 +100,7 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
     if (error instanceof AuthApiError && error.code === 'ACCESS_NOT_ASSIGNED' && !complete) {
       return <AuthRedirect to="/auth/complete" />;
     }
+    if (error instanceof AuthApiError && error.code === 'ROLE_PENDING') return <WaitingForAccess onRetry={() => setAttempt(n => n + 1)} />;
     return <section className="auth-panel">
       <p role="alert">{error instanceof AuthApiError ? error.message : 'Unable to reach account services. Please retry.'}</p>
       {error instanceof AuthApiError && error.status === 401 && <p>Your session cannot be used. Sign out, then sign in again.</p>}
@@ -117,6 +119,19 @@ export function AuthGate({ children, roles, requireProfile = false, complete = f
   }
   if (accountSessionStamp() !== JSON.stringify([userId, sessionId])) return <p role="status">Checking account access...</p>;
   return <AccountApiBaseContext.Provider value={apiBaseUrl}><AccountContext.Provider value={me}>{children}</AccountContext.Provider></AccountApiBaseContext.Provider>;
+}
+
+/** Staff who signed up without an invitation (S3-P004-036): signed in, but no role until an administrator gives one. */
+function WaitingForAccess({ onRetry }: { onRetry: () => void }) {
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress;
+  return <main className="auth-panel auth-waiting" aria-labelledby="auth-waiting-title">
+    <h1 id="auth-waiting-title">Waiting for access</h1>
+    <p role="status">You are signed in{email ? <> as <strong>{email}</strong></> : null}, but your account does not have a role yet.</p>
+    <p>A System Administrator gives staff accounts their role. Once that is done, choose <strong>Check again</strong> or sign in later to open your workspace.</p>
+    <button type="button" onClick={onRetry}>Check again</button>
+    <LogoutButton />
+  </main>;
 }
 
 export function AuthDependencyPlaceholder({ area }: { area: 'setup' | 'student' | 'coordinator' | 'admin' }) {

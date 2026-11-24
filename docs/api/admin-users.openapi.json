@@ -1511,6 +1511,103 @@
           }
         }
       }
+    },
+    "/api/admin/waiting-users": {
+      "get": {
+        "operationId": "listWaitingUsers",
+        "summary": "Staff who signed up without an invitation and wait for a role (S3-P004-036)",
+        "description": "Clerk sign-in accounts whose verified primary email is on @utm.my or @gmail.com and that have no application account, newest first. Reads at most the newest 500 sign-ins; truncated is true when more exist. No query parameters. Give a role with POST /api/admin/users.",
+        "responses": {
+          "200": {
+            "description": "Waiting users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "truncated",
+                        "generatedAt"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/WaitingUser"
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported query parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method other than GET",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "WAITING_USERS_UNAVAILABLE (sign-in service) or database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2234,6 +2331,44 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/DummyCredentials"
+          }
+        }
+      },
+      "WaitingUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clerkUserId",
+          "name",
+          "email",
+          "role",
+          "signedUpAt"
+        ],
+        "properties": {
+          "clerkUserId": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "description": "Verified primary email, lower case"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "COORDINATOR",
+              "SYSTEM_ADMIN"
+            ],
+            "description": "The one role the email domain allows (@utm.my COORDINATOR, @gmail.com SYSTEM_ADMIN)"
+          },
+          "signedUpAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

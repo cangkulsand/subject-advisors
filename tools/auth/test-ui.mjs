@@ -87,6 +87,22 @@ try {
     await page.getByRole('button', { name: 'Retry', exact: true }).waitFor();
     assert.equal(await page.getByText('Private content', { exact: true }).count(), 0);
   });
+  await check('staff signed up without a role see Waiting for access, Check again reloads the account (S3-P004-036)', async page => {
+    await respond(page, { code: 'ROLE_PENDING', message: 'Your account is waiting for a System Administrator to give it a role.' }, 403);
+    await page.goto(base + '/test?scenario=complete&test-email=lecturer@utm.my');
+    await page.getByRole('heading', { name: 'Waiting for access', exact: true }).waitFor();
+    await page.getByRole('status').filter({ hasText: 'lecturer@utm.my' }).waitFor();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).waitFor();
+    assert.equal(await page.getByText('Private content', { exact: true }).count(), 0);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    await page.unroute(apiRoute);
+    await respond(page, { ...account, appRole: 'COORDINATOR', roles: ['COORDINATOR'], availableRoles: ['COORDINATOR'], studentProfileState: 'NOT_APPLICABLE', profileState: 'NOT_APPLICABLE', landingPath: '/coordinator' });
+    await page.getByRole('button', { name: 'Check again', exact: true }).click();
+    // The harness page only renders for STUDENT, so the reloaded coordinator account shows its own workspace link.
+    await page.getByRole('link', { name: 'Go to your account', exact: true }).waitFor();
+    assert.equal(await page.getByRole('link', { name: 'Go to your account', exact: true }).getAttribute('href'), '/coordinator');
+    assert.equal(await page.getByRole('heading', { name: 'Waiting for access', exact: true }).count(), 0);
+  });
   await check('service failure supports retry and keyboard use', async page => {
     await respond(page, { code: 'AUTH_UNAVAILABLE', message: 'Please retry.' }, 503);
     await page.goto(base + '/test?scenario=offline');

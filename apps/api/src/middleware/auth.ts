@@ -1,6 +1,6 @@
 import type { AppRole, AuthDependencies, Me } from '../modules/auth/contracts';
 import { AuthError } from '../modules/auth/errors';
-import { eligibleRoles, requireActive, requireStudentEmail } from '../modules/auth/policy';
+import { eligibleRoles, requireActive, requireStudentEmail, staffSignupRole } from '../modules/auth/policy';
 import { isReadMethod, parseViewAs, VIEW_AS_HEADER, type ViewAs } from '../modules/auth/view-as';
 /** Call before every protected handler, including setup and privileged routes. */
 export async function authorize(
@@ -16,6 +16,10 @@ export async function authorize(
     // An administrator invitation for the verified email takes precedence; otherwise behaviour is unchanged.
     if (deps.invitations) assignment = await deps.invitations.redeem(identity);
     if (!assignment) {
+      // Staff may sign up on their own; nothing is created until a System Administrator grants a role (S3-P004-036).
+      if (staffSignupRole(identity.primaryEmail)) {
+        throw new AuthError(403, 'ROLE_PENDING', 'Your account is waiting for a System Administrator to give it a role.');
+      }
       requireStudentEmail(identity);
       assignment = await deps.access.initializeStudent(identity.clerkUserId);
     }

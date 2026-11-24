@@ -9,7 +9,7 @@ import { CreateDummyUserDialog, ResetDummyPasswordDialog } from './DummyUserDial
 import type { AcademicSetupClient } from './academic-client';
 import { isDummyEmail } from '../../../../../packages/shared/src/admin/dummy';
 import { ADMIN_ROLES, SYSTEM_ADMIN_EMAIL_RULE } from '../../../../../packages/shared/src/admin/admin';
-import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminAuditQuery, AdminInvitation, AdminInvitationStatus, AdminPage, AdminRole, AdminUsersQuery, AdminWaitingUser } from '../../../../../packages/shared/src/admin/admin';
 import { IconButton, PagerButtons } from '../../components/icon-button/IconButton';
 
 const invitationLabels: Record<AdminInvitationStatus, string> = { PENDING: 'Pending', ACCEPTED: 'Accepted', REVOKED: 'Revoked', EXPIRED: 'Expired' };
@@ -80,14 +80,18 @@ export function AdminUsersPage({ client, academic, search }: { client: AdminClie
   const [filters, setFilters] = useState<AdminUsersQuery>({ page: 1, q: '', role: ['STUDENT', 'COORDINATOR', 'SYSTEM_ADMIN'].includes(parameters.get('role') ?? '') ? parameters.get('role') as AdminRole : '', status: ['ACTIVE', 'SUSPENDED'].includes(parameters.get('status') ?? '') ? parameters.get('status') as 'ACTIVE' | 'SUSPENDED' : '' });
   const [invited, setInvited] = useState(false), [invitationFilter, setInvitationFilter] = useState<{ page: number; status: AdminInvitationStatus | '' }>({ page: 1, status: 'PENDING' });
   const [term, setTerm] = useState('');
-  const [changes, setChanges] = useState(0), [notice, setNotice] = useState<{ text: string; accountId?: number }>(), [adding, setAdding] = useState(false), [dummy, setDummy] = useState(false), [target, setTarget] = useState<AdminInvitation>();
+  const [changes, setChanges] = useState(0), [notice, setNotice] = useState<{ text: string; accountId?: number }>(), [adding, setAdding] = useState<boolean | AdminWaitingUser>(false), [dummy, setDummy] = useState(false), [target, setTarget] = useState<AdminInvitation>();
   const showInvitations = invited || !filters.status, invitationQuery = invited ? invitationFilter : { page: 1, status: 'PENDING' as const };
   const accounts = useRead(signal => invited ? Promise.resolve(null) : client.users(filters, signal), 'users:' + changes + ':' + invited + ':' + JSON.stringify(filters));
   const invitations = useRead(signal => showInvitations ? client.listInvitations(invitationQuery, signal) : Promise.resolve(null), 'invitations:' + changes + ':' + showInvitations + ':' + JSON.stringify(invitationQuery));
-  const retry = () => { accounts.retry(); invitations.retry(); };
+  // Staff who signed up without an invitation (S3-P004-036); shown in the All view like pending invitations.
+  const showWaiting = !invited && !filters.status;
+  const waiting = useRead(signal => showWaiting ? client.waitingUsers(signal) : Promise.resolve(null), 'waiting:' + changes + ':' + showWaiting);
+  const retry = () => { accounts.retry(); invitations.retry(); waiting.retry(); };
   const needle = filters.q.toLowerCase();
   const invitationRows = (invitations.data?.items ?? []).filter(item => (!needle || item.email.toLowerCase().includes(needle)) && (!filters.role || item.roles.includes(filters.role)));
-  const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined;
+  const waitingRows = (waiting.data?.items ?? []).filter(item => (!needle || item.email.includes(needle) || (item.name ?? '').toLowerCase().includes(needle)) && (!filters.role || item.role === filters.role));
+  const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined && (waiting.data !== undefined || waiting.error !== undefined);
   const reset = () => { setTerm(''); setInvited(false); setInvitationFilter({ page: 1, status: 'PENDING' }); setFilters({ page: 1, q: '', role: '', status: '' }); retry(); };
   return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations. Invitations are valid for 7 days." refresh={retry}
       action={<div className="admin-heading-actions">{academic && <button type="button" className="admin-icon-button" aria-haspopup="dialog" onClick={() => setDummy(true)}>Create dummy user</button>}<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>}/>
@@ -105,7 +109,14 @@ export function AdminUsersPage({ client, academic, search }: { client: AdminClie
       </TableToolbar>
       <Panel error={accounts.error ?? invitations.error} retry={retry}>{loaded && <>
         {accountRows.some(item => item.identity.state !== 'available') && <p className="admin-notice" role="status">Some Clerk identity details are unavailable. Application roles and access status are shown below.</p>}
-        {!invitationRows.length && !accountRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll admin-stack" role="region" aria-label="Users and invitations table" tabIndex={0}><table ref={usersTable}><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
+        {waiting.error && <p className="admin-notice" role="status">Staff waiting for a role could not be listed: {waiting.error}</p>}
+        {waiting.data?.truncated && <p className="admin-notice" role="status">Only the newest 500 sign-ins were checked for staff waiting for a role.</p>}
+        {!invitationRows.length && !accountRows.length && !waitingRows.length ? <div className="admin-empty"><h2>No accounts found</h2><p>Try a different search or reset your filters.</p><button type="button" onClick={reset}>Reset filters</button></div> : <div className="admin-table-scroll admin-stack" role="region" aria-label="Users and invitations table" tabIndex={0}><table ref={usersTable}><thead><tr><th>Account</th><th>Roles</th><th>Status</th><th>Updated</th><th><span className="admin-sr-only">Actions</span></th></tr></thead>
+          {!!waitingRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Waiting for a role ({waitingRows.length})</th></tr>{waitingRows.map(item => <tr key={item.clerkUserId}>
+            <td className="admin-wrap" data-label="Account"><div className="admin-identity"><strong>{item.name ?? item.email}</strong>{item.name && <span>{item.email}</span>}<span className="admin-pill admin-waiting-tag">Signed up, no role</span></div></td><td data-label="Roles"><span className="admin-muted">None yet</span></td><td data-label="Status"><span className="admin-pill admin-invite-pending">Waiting</span></td>
+            <td data-label="Updated"><span>Signed up <time dateTime={item.signedUpAt} title={when(item.signedUpAt)}>{day(item.signedUpAt)}</time></span></td>
+            <td data-label=""><button type="button" className="admin-row-action" aria-haspopup="dialog" onClick={() => setAdding(item)}>Assign role<span className="admin-sr-only"> to {item.email}</span></button></td>
+          </tr>)}</tbody>}
           {!!invitationRows.length && <tbody><tr className="admin-group-row"><th colSpan={5} scope="colgroup">Invitations ({invitationRows.length})</th></tr>{invitationRows.map(item => <tr key={item.id}>
             <td className="admin-wrap" data-label="Account"><div className="admin-identity"><strong>{item.email}</strong><span className="admin-pill admin-invite-tag">Invitation</span></div></td><td data-label="Roles"><RolePills roles={item.roles}/></td><td data-label="Status"><span className={`admin-pill admin-invite-${item.status.toLowerCase()}`}>{invitationLabels[item.status]}</span></td>
             <td className="admin-invite-dates" data-label="Updated"><span>Invited <time dateTime={item.createdAt} title={when(item.createdAt)}>{day(item.createdAt)}</time></span><span>Expires <time dateTime={item.expiresAt}>{when(item.expiresAt)}</time></span></td>
@@ -120,7 +131,7 @@ export function AdminUsersPage({ client, academic, search }: { client: AdminClie
       </>}</Panel>
     </section>
     {dummy && academic && <CreateDummyUserDialog client={client} academic={academic} onClose={() => setDummy(false)} onCreated={done => { setDummy(false); setNotice(done); setChanges(value => value + 1); }}/>}
-    {adding && <AddUserDialog client={client} onClose={() => setAdding(false)} onAdded={done => { setAdding(false); setNotice(done); setChanges(value => value + 1); }}/>}
+    {adding && <AddUserDialog client={client} initial={adding === true ? undefined : { email: adding.email, roles: [adding.role] }} onClose={() => setAdding(false)} onAdded={done => { setAdding(false); setNotice(done); setChanges(value => value + 1); }}/>}
     {target && <ReasonDialog title="Revoke invitation" confirmLabel="Revoke invitation" danger onCancel={() => setTarget(undefined)}
       description={<p>The invitation for <strong>{target.email}</strong> will stop working. You can send a new invitation later.</p>}
       onSubmit={async reason => { await client.revokeInvitation(target.id, { reason }); setTarget(undefined); setNotice({ text: `Invitation for ${target.email} revoked.` }); setChanges(value => value + 1); }}/>}

@@ -86,3 +86,26 @@ it('counts provider users', async () => {
   getCount.mockResolvedValue(52);
   expect(await createAdminIdentities('TEST_ONLY').userCount()).toBe(52);
 });
+
+it('lists only verified staff-domain sign-ups, newest first, without metadata (S3-P004-036)', async () => {
+  const at = (id: string, primary: string, verified: boolean, createdAt: number) => ({ ...user(id, primary, verified), firstName: 'Fictional', lastName: id, username: null, createdAt });
+  getUserList.mockResolvedValueOnce({ data: [
+    at('user_c', 'Lecturer@UTM.my', true, 3), at('user_s', 'pupil@graduate.utm.my', true, 2), at('user_g', 'helper@gmail.com', true, 1),
+    at('user_u', 'pending@utm.my', false, 4), at('user_x', 'staff@utm.my.attacker.test', true, 5), at('user_o', 'other@example.invalid', true, 6),
+  ], totalCount: 6 });
+  const result = await createAdminIdentities('TEST_ONLY').listStaffSignups();
+  expect(getUserList).toHaveBeenCalledExactlyOnceWith({ limit: 100, offset: 0, orderBy: '-created_at' });
+  expect(result).toEqual({ truncated: false, items: [
+    { clerkUserId: 'user_c', name: 'Fictional user_c', email: 'lecturer@utm.my', role: 'COORDINATOR', signedUpAt: new Date(3).toISOString() },
+    { clerkUserId: 'user_g', name: 'Fictional user_g', email: 'helper@gmail.com', role: 'SYSTEM_ADMIN', signedUpAt: new Date(1).toISOString() },
+  ] });
+  expect(JSON.stringify(result)).not.toContain('MUST_NOT_ESCAPE');
+});
+it('pages through sign-ups and stops at the scan bound (S3-P004-036)', async () => {
+  const page = (offset: number) => ({ data: Array.from({ length: 100 }, (_, i) => ({ ...user('user_' + (offset + i), 'p' + (offset + i) + '@graduate.utm.my', true), createdAt: 1 })), totalCount: 900 });
+  getUserList.mockImplementation(async ({ offset }: { offset: number }) => page(offset));
+  const result = await createAdminIdentities('TEST_ONLY').listStaffSignups();
+  expect(getUserList).toHaveBeenCalledTimes(5);
+  expect(getUserList).toHaveBeenLastCalledWith({ limit: 100, offset: 400, orderBy: '-created_at' });
+  expect(result).toEqual({ items: [], truncated: true });
+});
