@@ -26,3 +26,13 @@ export function eligibleRoles(identity: VerifiedIdentity, assignment: AccessAssi
   return assignment.roles.filter(role => role === 'SYSTEM_ADMIN' && isSystemAdminEmailDomain(identity.primaryEmail!.address) ||
     role === 'STUDENT' && student || role === 'COORDINATOR' && coordinator);
 }
+
+/**
+ * Staff self sign-up (S3-P004-036): the one role a verified staff-domain email could be given, or null.
+ * Never grants anything; first sign-in uses it only to say the account is waiting for an administrator.
+ */
+export function staffSignupRole(email: VerifiedIdentity['primaryEmail']): Exclude<AppRole, 'STUDENT'> | null {
+  if (!email?.verified) return null;
+  if (/^[^@\s]+@utm\.my$/i.test(email.address)) return 'COORDINATOR';
+  return isSystemAdminEmailDomain(email.address) ? 'SYSTEM_ADMIN' : null;
+}

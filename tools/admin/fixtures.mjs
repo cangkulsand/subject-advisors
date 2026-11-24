@@ -15,6 +15,10 @@ const events = accounts.slice(0, 6).map((account, i) => ({
   before: i === 2 ? 'ACTIVE' : null, after: i === 2 ? 'SUSPENDED' : 'ROLE_DOMAIN',
   reason: 'Fictional test event. <script>window.untrustedExecuted=true</script>', occurredAt: generatedAt,
 }));
+const waitingUsers = [
+  { clerkUserId: 'user_fictional_waiting_1', name: 'Fictional Lecturer', email: 'lecturer.new@utm.my', role: 'COORDINATOR', signedUpAt: '2026-11-24T02:00:00.000Z' },
+  { clerkUserId: 'user_fictional_waiting_2', name: null, email: 'helper.new@gmail.com', role: 'SYSTEM_ADMIN', signedUpAt: '2026-11-23T02:00:00.000Z' },
+];
 const invitations = [
   { id: '00000000-0000-4000-8000-000000000001', email: 'pending.one@utm.my', roles: ['COORDINATOR'], status: 'PENDING', invitedBy: 'user_fictional_operator', reason: 'Fictional invitation.', createdAt: generatedAt, expiresAt: '2026-11-04T10:00:00.000Z', acceptedAt: null },
   { id: '00000000-0000-4000-8000-000000000002', email: 'pending.two@graduate.utm.my', roles: ['STUDENT'], status: 'PENDING', invitedBy: 'user_fictional_operator', reason: 'Fictional invitation.', createdAt: generatedAt, expiresAt: '2026-11-04T10:00:00.000Z', acceptedAt: null },
@@ -76,6 +80,11 @@ export function fixtureResponse(url, state = {}) {
     return profile ? programmeOf(profile) : null;
   }
   if (url.pathname === '/api/admin/curriculum-options') return curricula;
+  // Staff who signed up without an invitation (S3-P004-036); once added they have an account and leave the list.
+  if (url.pathname === '/api/admin/waiting-users') {
+    const taken = new Set(store(state).accounts.map(item => item.identity.email));
+    return { items: state.empty ? [] : waitingUsers.filter(item => !taken.has(item.email)), truncated: false, generatedAt };
+  }
   // Dummy users (S3-P004-029).
   if (url.pathname === '/api/admin/dummy-users/capacity') return { used: state.dummyUsed ?? 52, limit: 100 };
   if (url.pathname === '/api/admin/invitations') {

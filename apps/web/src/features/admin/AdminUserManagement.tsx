@@ -66,9 +66,10 @@ function RoleChecks({ roles, onChange, disabled }: { roles: AdminRole[]; onChang
 }
 
 type Mode = 'existing' | 'invite';
-export function AddUserDialog({ client, onClose, onAdded }: { client: AdminClient; onClose: () => void; onAdded: (done: { text: string; accountId?: number }) => void }) {
+/** `initial` prefills Add existing user for a waiting staff sign-up (S3-P004-036); the administrator still reviews it and gives a reason. */
+export function AddUserDialog({ client, onClose, onAdded, initial }: { client: AdminClient; onClose: () => void; onAdded: (done: { text: string; accountId?: number }) => void; initial?: { email: string; roles: AdminRole[] } }) {
   const [mode, setMode] = useState<Mode>('existing');
-  const [email, setEmail] = useState(''), [roles, setRoles] = useState<AdminRole[]>([]), [reason, setReason] = useState('');
+  const [email, setEmail] = useState(initial?.email ?? ''), [roles, setRoles] = useState<AdminRole[]>(initial?.roles ?? []), [reason, setReason] = useState('');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null), emailField = useRef<HTMLInputElement>(null), inFlight = useRef(false), mounted = useRef(true), succeeded = useRef(false);
   const modeName = useId(), titleId = useId();

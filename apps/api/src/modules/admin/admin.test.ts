@@ -15,9 +15,9 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
     repository: { overview: vi.fn(async () => ({ generatedAt: date, accounts: { total: 1, active: 1, suspended: 0 }, roles: { STUDENT: 0, COORDINATOR: 0, SYSTEM_ADMIN: 1 }, configuration: { programmes: 1, curricula: 1, subjects: 4, semesters: 3 } })),
       accounts: vi.fn(async () => ({ ...page, items: [account] })), account: vi.fn(async () => ({ ...account, memberships: [] })), audit: vi.fn(async () => page),
       createAccount: vi.fn(), grantRole: vi.fn(), revokeRole: vi.fn(), setAccessStatus: vi.fn(), createInvitation: vi.fn(), attachClerkInvitation: vi.fn(),
-      listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn(), studentProgramme: vi.fn(), curriculumOptions: vi.fn(), changeStudentProgramme: vi.fn(), createDummyAccount: vi.fn(), currentSemesterId: vi.fn() },
+      listInvitations: vi.fn(), revokeInvitation: vi.fn(), findPendingInvitationByEmail: vi.fn(), clerkInvitationIdOf: vi.fn(), expireInvitations: vi.fn(), acceptInvitation: vi.fn(), studentProgramme: vi.fn(), curriculumOptions: vi.fn(), changeStudentProgramme: vi.fn(), createDummyAccount: vi.fn(), currentSemesterId: vi.fn(), existingClerkUserIds: vi.fn(async () => new Set<string>()) },
     identities: { search: vi.fn(async () => ({ ids: ['user_fixture'], total: 1 })), lookup: vi.fn(async () => new Map([['user_fixture', { state: 'available' as const, name: 'Fictional Account', email: 'fixture@graduate.utm.my', emailVerified: true }]])),
-      findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), setSignInBlocked: vi.fn(), createUser: vi.fn(), setPassword: vi.fn(), deleteUser: vi.fn(), userCount: vi.fn() },
+      findByEmail: vi.fn(), createInvitation: vi.fn(), revokeInvitation: vi.fn(), setSignInBlocked: vi.fn(), createUser: vi.fn(), setPassword: vi.fn(), deleteUser: vi.fn(), userCount: vi.fn(), listStaffSignups: vi.fn(async () => ({ items: [], truncated: false })) },
   };
   return deps;
 }
@@ -101,4 +101,41 @@ it('parses read-only SQL, binds hostile search strings and distinguishes role/ac
   expect(queries.every(item => !item.sql.includes(hostile))).toBe(true);
   expect(queries.some(item => JSON.stringify(item.values).includes('user_fixture'))).toBe(true);
   expect(queries.every(item => !/student_profile|academic_record|semester_offering/.test(item.sql))).toBe(true);
+});
+
+describe('waiting staff sign-ups (S3-P004-036)', () => {
+  const waiting = (id: string, role: 'COORDINATOR' | 'SYSTEM_ADMIN') => ({ clerkUserId: id, name: 'Fictional ' + id, email: id + (role === 'COORDINATOR' ? '@utm.my' : '@gmail.com'), role, signedUpAt: date });
+  it('lists staff-domain sign-ins that have no application account yet', async () => {
+    const deps = fixture();
+    deps.identities.listStaffSignups = vi.fn(async () => ({ items: [waiting('user_new', 'COORDINATOR'), waiting('user_has', 'COORDINATOR'), waiting('user_admin', 'SYSTEM_ADMIN')], truncated: false }));
+    deps.repository.existingClerkUserIds = vi.fn(async () => new Set(['user_has']));
+    const response = await handleAdminRequest(request('/api/admin/waiting-users'), deps);
+    expect(response?.status).toBe(200); expect(response?.headers.get('cache-control')).toContain('no-store');
+    const body = await response!.json() as { data: { items: { clerkUserId: string }[]; truncated: boolean } };
+    expect(body.data.items.map(item => item.clerkUserId)).toEqual(['user_new', 'user_admin']); expect(body.data.truncated).toBe(false);
+    expect(deps.repository.existingClerkUserIds).toHaveBeenCalledExactlyOnceWith(['user_new', 'user_has', 'user_admin']);
+  });
+  it.each(['STUDENT', 'COORDINATOR'] as const)('refuses %s', async role => {
+    const deps = fixture([role]);
+    expect((await handleAdminRequest(request('/api/admin/waiting-users'), deps))?.status).toBe(403);
+    expect(deps.identities.listStaffSignups).not.toHaveBeenCalled();
+  });
+  it('allows only GET and no query parameters', async () => {
+    expect((await handleAdminRequest(request('/api/admin/waiting-users', 'POST'), fixture()))?.status).toBe(405);
+    expect((await handleAdminRequest(request('/api/admin/waiting-users?page=2'), fixture()))?.status).toBe(400);
+  });
+  it('reports the sign-in service as unavailable without leaking provider errors', async () => {
+    const deps = fixture(); deps.identities.listStaffSignups = vi.fn(async () => { throw new Error('clerk secret detail'); });
+    const response = await handleAdminRequest(request('/api/admin/waiting-users'), deps);
+    expect(response?.status).toBe(503); const body = await response!.text();
+    expect(body).toContain('WAITING_USERS_UNAVAILABLE'); expect(body).not.toContain('clerk secret');
+  });
+});
+it('checks existing accounts with one bound read-only query and none for an empty list (S3-P004-036)', async () => {
+  const queries: { sql: string; values: unknown[] }[] = [];
+  const repository = createAdminRepository(async (sql, values) => { await parse(sql); queries.push({ sql, values }); return [{ clerk_user_id: 'user_has' }]; });
+  expect(await repository.existingClerkUserIds([])).toEqual(new Set()); expect(queries).toHaveLength(0);
+  expect(await repository.existingClerkUserIds(['user_has', 'user_new'])).toEqual(new Set(['user_has']));
+  expect(queries).toHaveLength(1); expect(queries[0]!.values).toEqual([['user_has', 'user_new']]);
+  expect(/(INSERT|UPDATE|DELETE)/.test(queries[0]!.sql)).toBe(false);
 });

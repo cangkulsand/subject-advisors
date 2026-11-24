@@ -174,6 +174,16 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       const input = validated(validateChangeProgrammeRequest(await readJson(request)));
       return authJson({ data: await deps.repository.changeStudentProgramme(accountId, input.curriculumId, actor, input.reason) });
     }
+    if (url.pathname === '/api/admin/waiting-users') {
+      // Staff who signed up without an invitation and wait for a role (S3-P004-036). Granting uses POST /api/admin/users.
+      const denied = allow('GET'); if (denied) return denied;
+      parameters(url, []);
+      let signups: Awaited<ReturnType<AdminDependencies['identities']['listStaffSignups']>>;
+      try { signups = await deps.identities.listStaffSignups(); }
+      catch { throw new AuthError(503, 'WAITING_USERS_UNAVAILABLE', 'The sign-in service could not list waiting users. Please retry.'); }
+      const existing = signups.items.length ? await deps.repository.existingClerkUserIds(signups.items.map(item => item.clerkUserId)) : new Set<string>();
+      return authJson({ data: { items: signups.items.filter(item => !existing.has(item.clerkUserId)), truncated: signups.truncated, generatedAt: new Date().toISOString() } });
+    }
     if (url.pathname === '/api/admin/curriculum-options') {
       const denied = allow('GET'); if (denied) return denied;
       parameters(url, []);

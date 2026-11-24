@@ -24,14 +24,14 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       expireInvitations: vi.fn(), acceptInvitation: vi.fn(),
       studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
       changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
-      createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24),
+      createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24), existingClerkUserIds: vi.fn(async () => new Set<string>()),
     },
     identities: {
       search: vi.fn(), lookup: vi.fn(async () => new Map([['user_target', { state: 'available' as const, name: 'Target', email: 'target@utm.my', emailVerified: true }]])),
       findByEmail: vi.fn(async () => ({ clerkUserId: 'user_target', verifiedEmail: 'target@utm.my', emailVerified: true })),
       createInvitation: vi.fn(async () => ({ clerkInvitationId: 'inv_clerk' })), revokeInvitation: vi.fn(async () => undefined),
       setSignInBlocked: vi.fn(async () => undefined),
-      createUser: vi.fn(async () => ({ clerkUserId: 'user_dummy' })), setPassword: vi.fn(async () => undefined), deleteUser: vi.fn(async () => undefined), userCount: vi.fn(async () => 52),
+      createUser: vi.fn(async () => ({ clerkUserId: 'user_dummy' })), setPassword: vi.fn(async () => undefined), deleteUser: vi.fn(async () => undefined), userCount: vi.fn(async () => 52), listStaffSignups: vi.fn(async () => ({ items: [], truncated: false })),
     },
   };
   return deps;

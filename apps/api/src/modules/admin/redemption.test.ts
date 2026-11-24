@@ -46,15 +46,22 @@ describe('invitation redemption at first sign-in', () => {
     await authorize(new Request('https://api.test/api/me/initialize', { method: 'POST' }), f.deps, { initialize: true }).catch(() => undefined);
     expect(f.repository.createAccount).not.toHaveBeenCalled();
   });
-  it('denies an uninvited gmail.com user (no self-signup)', async () => {
-    const f = setup({ invitation: null, email: { address: 'stranger@gmail.com', verified: true } });
-    await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code: 'EMAIL_DOMAIN_DENIED' });
+  it.each(['stranger@gmail.com', 'Lecturer@UTM.my'])('lets an uninvited %s sign up and wait for a role, creating nothing (S3-P004-036)', async address => {
+    const f = setup({ invitation: null, email: { address, verified: true } });
+    await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ status: 403, code: 'ROLE_PENDING' });
     expect(f.repository.createAccount).not.toHaveBeenCalled(); expect(f.initializeStudent).not.toHaveBeenCalled();
+  });
+  it('still refuses other domains and unverified staff emails (S3-P004-036)', async () => {
+    for (const [email, code] of [[{ address: 'someone@example.test', verified: true }, 'EMAIL_DOMAIN_DENIED'], [{ address: 'staff@utm.my.attacker.test', verified: true }, 'EMAIL_DOMAIN_DENIED'], [{ address: 'staff@utm.my', verified: false }, 'EMAIL_UNVERIFIED']] as const) {
+      const f = setup({ invitation: null, email: { ...email } });
+      await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code });
+      expect(f.initializeStudent).not.toHaveBeenCalled();
+    }
   });
   it('does not let a gmail.com invitation grant COORDINATOR or STUDENT', async () => {
     for (const roles of [['COORDINATOR'], ['STUDENT']] as const) {
       const f = setup({ invitation: invitation({ email: 'friend@gmail.com', roles: [...roles] }), email: { address: 'friend@gmail.com', verified: true } });
-      await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code: 'EMAIL_DOMAIN_DENIED' });
+      await expect(authorize(new Request('https://api.test/x', { method: 'POST' }), f.deps, { initialize: true })).rejects.toMatchObject({ code: 'ROLE_PENDING' });
       expect(f.repository.createAccount).not.toHaveBeenCalled();
     }
   });

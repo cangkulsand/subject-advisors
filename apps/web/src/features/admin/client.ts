@@ -1,6 +1,6 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import type { CreateDummyUserRequest, CreateDummyUserResponse, DummyCapacity, DummyCredentials } from '../../../../../packages/shared/src/admin/dummy';
-import type { AdminAccount, AdminAccountDetail, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery, AdminWaitingUser, AdminWaitingUsers } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -71,6 +71,19 @@ function invitation(value: unknown): AdminInvitation {
   if (item.acceptedAt !== null) text(item.acceptedAt);
   return item as unknown as AdminInvitation;
 }
+function waitingUser(value: unknown): AdminWaitingUser {
+  const item = object(value);
+  text(item.clerkUserId); text(item.email); text(item.signedUpAt);
+  if (item.name !== null) text(item.name);
+  if (item.role !== 'COORDINATOR' && item.role !== 'SYSTEM_ADMIN') throw new Error('Invalid administration response');
+  return item as unknown as AdminWaitingUser;
+}
+function waitingUsers(value: unknown): AdminWaitingUsers {
+  const data = object(value);
+  if (!Array.isArray(data.items) || typeof data.truncated !== 'boolean') throw new Error('Invalid administration response');
+  text(data.generatedAt);
+  return { items: data.items.map(waitingUser), truncated: data.truncated, generatedAt: data.generatedAt as string };
+}
 function id(value: unknown): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) throw new Error('Invalid administration response'); return value; }
 function curriculumOption(value: unknown): AdminCurriculumOption {
   const item = object(value); id(item.curriculumId); id(item.programmeId); text(item.curriculumVersion); text(item.programmeCode); text(item.programmeName);
@@ -112,6 +125,8 @@ export interface AdminClient {
   dummyCapacity(signal?: AbortSignal): Promise<DummyCapacity>;
   createDummyUser(input: CreateDummyUserRequest): Promise<CreateDummyUserResponse>;
   resetDummyPassword(accountId: number): Promise<DummyCredentials>;
+  /** Staff who signed up without an invitation and have no application account yet (S3-P004-036). */
+  waitingUsers(signal?: AbortSignal): Promise<AdminWaitingUsers>;
 }
 interface RequestInput { method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; body?: unknown }
 export function createAdminClient(getToken: () => Promise<string | null>, baseUrl = ''): AdminClient {
@@ -164,5 +179,6 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     dummyCapacity: signal => request('/api/admin/dummy-users/capacity', capacity, signal),
     createDummyUser: input => request('/api/admin/dummy-users', value => { const data = object(value); return { account: detail(data.account), credentials: credentials(data.credentials) }; }, undefined, { method: 'POST', body: input }),
     resetDummyPassword: accountId => request('/api/admin/users/' + accountId + '/dummy-password', credentials, undefined, { method: 'POST', body: {} }),
+    waitingUsers: signal => request('/api/admin/waiting-users', waitingUsers, signal),
   };
 }

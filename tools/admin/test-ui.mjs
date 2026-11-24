@@ -400,6 +400,30 @@ else {
       await chooseFilter(page, 'Invitation status', 'All statuses');
       await table.getByText('Invitations (4)', { exact: true }).waitFor(); await table.getByText('accepted@utm.my').waitFor();
     });
+    await check('waiting staff sign-ups: listed in All, filtered, Assign role prefills Add user and removes the row (S3-P004-036)', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users');
+      const table = page.getByRole('region', { name: usersTable }); await table.getByText('Waiting for a role (2)', { exact: true }).waitFor();
+      const row = table.getByRole('row').filter({ hasText: 'lecturer.new@utm.my' });
+      assert.ok((await row.innerText()).includes('Fictional Lecturer')); assert.ok((await row.innerText()).includes('Waiting'));
+      await chooseFilter(page, 'Role', 'System Admin'); await table.getByText('Waiting for a role (1)', { exact: true }).waitFor();
+      assert.equal(await table.getByText('lecturer.new@utm.my').count(), 0);
+      await chooseFilter(page, 'Role', 'All roles'); await tabAccess(page, 'Active'); await table.getByText(/^Accounts \(/).waitFor();
+      assert.equal(await table.getByText(/^Waiting for a role/).count(), 0);
+      await tabAccess(page, 'All'); await table.getByText('Waiting for a role (2)', { exact: true }).waitFor();
+      await table.getByRole('button', { name: 'Assign role to lecturer.new@utm.my' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Add user' }); await dialog.waitFor();
+      assert.equal(await dialog.getByRole('radio', { name: 'Add existing user' }).isChecked(), true);
+      assert.equal(await dialog.getByLabel('Email address').inputValue(), 'lecturer.new@utm.my');
+      assert.equal(await dialog.getByRole('checkbox', { name: 'Coordinator' }).isChecked(), true);
+      assert.equal(await dialog.getByRole('checkbox', { name: 'Student' }).isChecked(), false);
+      await dialog.getByLabel('Reason (recorded in the audit log)').fill('Lecturer for Computing');
+      await dialog.getByRole('button', { name: 'Add user', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Account added for lecturer.new@utm.my.' }).waitFor();
+      await table.getByText('Waiting for a role (1)', { exact: true }).waitFor();
+      assert.deepEqual(state.bodies.at(-1), { method: 'POST', path: '/api/admin/users', body: { email: 'lecturer.new@utm.my', roles: ['COORDINATOR'], reason: 'Lecturer for Computing' } });
+      await page.setViewportSize({ width: 375, height: 800 }); await table.getByText('Waiting for a role (1)', { exact: true }).waitFor();
+      await page.screenshot({ path: '.wrangler/admin-review/waiting-users-375.png', fullPage: true });
+    });
     await check('send invitation: CLERK_USER_EXISTS, success, then revoke with an in-page reason', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users'); const dialog = await openAddDialog(page);
       await dialog.getByRole('radio', { name: 'Send invitation' }).check();

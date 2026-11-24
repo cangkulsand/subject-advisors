@@ -98,3 +98,13 @@ it('dummy users: reads capacity, POSTs a create and a reset, and rejects malform
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { email: 'x', password: '' } })));
   await expect(createAdminClient(async () => 'TEST_ONLY').resetDummyPassword(24)).rejects.toThrow('Invalid administration response');
 });
+it('reads staff waiting for a role and rejects a student role or malformed rows (S3-P004-036)', async () => {
+  const row = { clerkUserId: 'user_wait', name: null, email: 'lecturer@utm.my', role: 'COORDINATOR', signedUpAt: '2026-11-24T00:00:00Z' };
+  const fetcher = vi.fn(async () => Response.json({ data: { items: [row], truncated: false, generatedAt: '2026-11-24T00:00:00Z' } })); vi.stubGlobal('fetch', fetcher);
+  expect(await createAdminClient(async () => 'TEST_ONLY').waitingUsers()).toEqual({ items: [row], truncated: false, generatedAt: '2026-11-24T00:00:00Z' });
+  expect(fetcher).toHaveBeenCalledWith('/api/admin/waiting-users', expect.objectContaining({ method: 'GET' }));
+  for (const bad of [{ ...row, role: 'STUDENT' }, { ...row, email: null }]) {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { items: [bad], truncated: false, generatedAt: '2026-11-24T00:00:00Z' } })));
+    await expect(createAdminClient(async () => 'TEST_ONLY').waitingUsers()).rejects.toThrow();
+  }
+});

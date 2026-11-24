@@ -8,6 +8,7 @@ export const useAuth = () => ({
   isLoaded: useContext(LoadedContext) && scenario !== 'loading', isSignedIn: scenario !== 'signed-out',
   userId: testParams.get('test-user') ?? 'user_test', sessionId: testParams.get('test-session') ?? 'sess_test', getToken,
 });
+export const useUser = () => ({ isLoaded: true, user: scenario === 'signed-out' ? null : { primaryEmailAddress: { emailAddress: testParams.get('test-email') ?? 'fixture@example.invalid' } } });
 export const useClerk = () => ({
   signOut: async (options?: { redirectUrl?: string }) => {
     document.body.dataset.signOutRedirectUrl = options?.redirectUrl ?? '';

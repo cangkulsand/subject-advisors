@@ -1,6 +1,10 @@
 import { createClerkClient } from '@clerk/backend';
 import type { AdminIdentities } from './contracts';
-import type { AdminIdentity } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminIdentity, AdminWaitingUser } from '../../../../../packages/shared/src/admin/admin';
+import { staffSignupRole } from '../auth/policy';
+
+/** Most sign-in accounts read for the waiting list (S3-P004-036): five Clerk pages of 100. */
+export const STAFF_SIGNUP_SCAN = 500;
 
 /** Only the minimal primary identity is projected; never return Clerk metadata or credentials. */
 export function createAdminIdentities(secretKey: string): AdminIdentities {
@@ -65,6 +69,26 @@ export function createAdminIdentities(secretKey: string): AdminIdentities {
     },
     async userCount() {
       return clerk.users.getCount();
+    },
+    async listStaffSignups() {
+      // Clerk cannot filter by email domain, and a "utm.my" text search also returns every graduate.utm.my student,
+      // so read whole pages and match the verified primary email's domain exactly.
+      const items: AdminWaitingUser[] = [];
+      let offset = 0, total = 0;
+      do {
+        const response = await clerk.users.getUserList({ limit: 100, offset, orderBy: '-created_at' });
+        total = response.totalCount;
+        for (const user of response.data) {
+          const primary = user.emailAddresses.find(item => item.id === user.primaryEmailAddressId);
+          if (!primary) continue;
+          const role = staffSignupRole({ address: primary.emailAddress, verified: primary.verification?.status === 'verified' });
+          if (role) items.push({ clerkUserId: user.id, name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || null,
+            email: primary.emailAddress.toLowerCase(), role, signedUpAt: new Date(user.createdAt).toISOString() });
+        }
+        offset += 100;
+        if (!response.data.length) break;
+      } while (offset < total && offset < STAFF_SIGNUP_SCAN);
+      return { items, truncated: total > STAFF_SIGNUP_SCAN };
     },
   };
 }

@@ -257,6 +257,7 @@
 .admin-users-card .admin-card-title p { margin: 4px 0 0; }
 .admin-group-row th { text-align: left; padding: 10px 14px; background: var(--color-surface-subtle); color: var(--color-heading); font-size: var(--font-size-table); font-weight: 700; letter-spacing: .02em; }
 .admin-invite-tag { color: #3730a3; background: #eef2ff; margin-top: 4px; }
+.admin-waiting-tag { color: #92400e; background: #fffbeb; margin-top: 4px; }
 .admin-invite-dates { display: grid; gap: 2px; font-size: var(--font-size-table); }
 .admin-invite-dates > span { white-space: nowrap; }
 .admin-reason-dialog { --dialog-pad: 24px; }
