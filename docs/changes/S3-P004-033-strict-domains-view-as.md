@@ -1,6 +1,6 @@
 # S3-P004-033 — One email domain per role, owner on gmail, and System Admin "View as"
 
-- **Status:** Merged to `main` (d0222b4); migration 0015 applied to Neon on 2026-11-24; not yet deployed to dev or prod
+- **Status:** Deployed to dev and prod (596cdf3) on 2026-11-24; migration 0015 applied to Neon the same day
 - **Date:** 2026-11-22
 - **Sprint:** Sprint 3
 - **Owner:** P004 (access, admin)
