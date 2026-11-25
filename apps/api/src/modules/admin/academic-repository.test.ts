@@ -6,7 +6,12 @@ import type { AdminStatement } from './repository';
 describe('academic SQL boundary', () => {
   it.each([
     ['23505', 'coordinator_assignment_one_live_scope_idx', 'ASSIGNMENT_ACTIVE'],
-    ['23505', 'faculty_faculty_code_key', 'CONFLICT'], ['23503', '', 'NOT_FOUND'],
+    ['23505', 'faculty_faculty_code_key', 'FACULTY_CODE_TAKEN'],
+    ['23505', 'department_department_code_key', 'DEPARTMENT_CODE_TAKEN'],
+    ['23505', 'programme_programme_code_key', 'PROGRAMME_CODE_TAKEN'],
+    ['23505', 'learning_centre_centre_code_key', 'CENTRE_CODE_TAKEN'],
+    ['23505', 'curriculum_rule_1', 'CURRICULUM_VERSION_TAKEN'],
+    ['23505', 'some_other_key', 'CONFLICT'], ['23503', '', 'NOT_FOUND'],
     ['23514', '', 'INVALID_REQUEST'], ['23502', '', 'INVALID_REQUEST'],
     ['22001', '', 'INVALID_REQUEST'], ['22003', '', 'INVALID_REQUEST'],
     ['22007', '', 'INVALID_REQUEST'], ['22008', '', 'INVALID_REQUEST'], ['22P02', '', 'INVALID_REQUEST'],
@@ -65,7 +70,11 @@ describe('academic SQL boundary', () => {
   });
   it('maps the department move guard marker and unique department code', () => {
     expect(mapAcademicDatabaseError({ code: '23514', message: 'ACADEMIC_SETUP:DEPARTMENT_HAS_PROGRAMMES' })).toMatchObject({ code: 'DEPARTMENT_HAS_PROGRAMMES', status: 409 });
-    expect(mapAcademicDatabaseError({ code: '23505', constraint: 'department_department_code_key' }).code).toBe('CONFLICT');
+    expect(mapAcademicDatabaseError({ code: '23505', constraint: 'department_department_code_key' }).code).toBe('DEPARTMENT_CODE_TAKEN');
+  });
+  it('reused codes read as plain language (S3-P004-038)', () => {
+    expect(mapAcademicDatabaseError({ code: '23505', constraint: 'programme_programme_code_key' })).toMatchObject({ status: 409, message: 'Another programme already uses this code. Choose a different code.' });
+    expect(mapAcademicDatabaseError({ code: '23505', constraint: 'curriculum_rule_1' })).toMatchObject({ status: 409, message: 'This programme already has a curriculum with this version. Choose a different version.' });
   });
   it('submits the void current setter and readback in the same transaction after context', async () => {
     const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [{ db_set_current_semester: null }], [{ semesterId: 4, academicYear: '2026/2027', semesterNo: 2, semesterType: 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: true }]]);
