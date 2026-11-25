@@ -159,6 +159,19 @@
 .admin-programme-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .admin-intakes { list-style: none; margin: 0; padding: 0; font-variant-numeric: tabular-nums; }
 .admin-intakes span { white-space: nowrap; } /* "2022 intake:" stays together; a narrow column breaks only before the count */
+/* Academic Structure (S3-P004-038): breadcrumb path, the open record's summary, and programmes with no department. */
+.admin-breadcrumb ol { display: flex; flex-wrap: wrap; gap: 4px 8px; list-style: none; margin: 0 0 18px; padding: 0; font-size: var(--font-size-control); }
+.admin-breadcrumb li + li::before { content: "›"; margin-inline-end: 8px; color: var(--color-muted-text); }
+.admin-breadcrumb [aria-current="page"] { font-weight: 600; color: var(--color-heading); }
+.admin-structure-summary-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; border-bottom: 1px solid var(--color-surface-subtle); padding-bottom: 18px; margin-bottom: 18px; }
+.admin-structure-summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px 24px; margin: 0; }
+.admin-structure-summary dt { color: var(--color-muted-text); font-size: var(--font-size-label); }
+.admin-structure-summary dd { margin: 4px 0 0; font-size: var(--font-size-control); overflow-wrap: anywhere; }
+.admin-orphans { border: 1px solid var(--color-outline); border-radius: 9px; padding: 14px 18px; margin-bottom: 18px; }
+.admin-orphans p { margin: 0 0 10px; font-size: var(--font-size-control); }
+.admin-orphans ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.admin-orphans li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--font-size-control); }
+@media (max-width: 600px) { .admin-structure-summary { grid-template-columns: minmax(0, 1fr); } }
 .admin-memberships { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-top: 20px; }
 .admin-memberships article { border: 1px solid var(--color-outline); border-radius: 9px; padding: 18px; }
 .admin-memberships dl { display: grid; gap: 15px; margin-bottom: 0; }

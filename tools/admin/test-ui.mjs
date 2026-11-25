@@ -59,6 +59,7 @@ else {
   const tabAccess = (page, name) => page.getByRole('group', { name: 'Access', exact: true }).getByRole('button', { name, exact: true }).click();
   const chooseFilter = async (page, group, option) => { await page.getByRole('search', { name: 'Search and filter users' }).locator('button[aria-haspopup="menu"]').click(); await page.getByRole('group', { name: group, exact: true }).getByRole('menuitemradio', { name: option, exact: true }).click(); };
   async function check(name, body, width = 1440) {
+    if (process.env.ADMIN_CHECK && !name.includes(process.env.ADMIN_CHECK)) return;
     const page = await browser.newPage({ viewport: { width, height: 960 } }); const errors = []; page.setDefaultTimeout(10000);
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => { for (const name of ['alert', 'confirm', 'prompt']) window[name] = () => { throw new Error('window.' + name + ' must not be used'); }; });
@@ -315,12 +316,12 @@ else {
     }, width);
     await check('tables fit the content area at 1024px with no sideways scroll (S3-P004-025)', async page => {
       await mock(page); await page.setViewportSize({ width: 1024, height: 800 });
-      for (const path of ['users', 'users/1', 'learning-centres', 'faculties', 'departments', 'programmes', 'coordinator-assignments', 'semesters']) {
+      for (const path of ['users', 'users/1', 'learning-centres', 'faculties', 'faculties/1', 'faculties/1/departments/1', 'faculties/1/departments/1/programmes/1', 'coordinator-assignments', 'semesters']) {
         await page.goto(base + '/admin/' + path); await page.locator('.admin-table-scroll table').first().waitFor();
         await page.waitForLoadState('networkidle');
         for (const region of await page.locator('.admin-table-scroll').all()) assert.ok(await region.evaluate(el => el.scrollWidth <= el.clientWidth), path + ' table scrolls sideways at 1024px');
       }
-      await page.goto(base + '/admin/programmes'); await page.locator('table').first().waitFor(); await page.screenshot({ path: '.wrangler/admin-review/programmes-1024.png', fullPage: true });
+      await page.goto(base + '/admin/faculties/1/departments/1/programmes/1'); await page.locator('table').first().waitFor(); await page.screenshot({ path: '.wrangler/admin-review/programmes-1024.png', fullPage: true });
     });
     const reasonLabel = 'Reason (recorded in the audit log)';
     const usersTable = 'Users and invitations table';
