@@ -5,7 +5,7 @@ import { AppLink, navigateApp } from '../../app/navigation';
 import { SetupCard, SetupTable, StatusPill, useSetupRead } from './academic-ui';
 import { curriculumIntakeLines } from './intake-labels';
 import {
-  countLabel, curriculumCount, departmentCount, parseStructurePath, programmeCount, resolveStructure, structurePath,
+  countLabel, curriculumCount, departmentCount, orphanProgrammes, parseStructurePath, programmeCount, resolveStructure, structurePath,
   type ResolvedStructure, type StructureAddress, type StructureData,
 } from './academic-structure';
 import { StructureDialogs, type StructureDialog } from './StructureDialogs';
@@ -33,9 +33,9 @@ function Breadcrumb({ crumbs }: { crumbs: Crumb[] }) {
 }
 
 /** The open record: code, name and status with its own Edit and Deactivate/Reactivate. */
-function Summary({ code, name, active, onEdit, onToggle }: { code: string; name: string; active: boolean; onEdit: () => void; onToggle: () => void }) {
+function Summary({ code, name, active, onEdit, onToggle, children }: { code: string; name: string; active: boolean; onEdit: () => void; onToggle: () => void; children?: ReactNode }) {
   return <div className="admin-structure-summary-row"><dl className="admin-structure-summary"><div><dt>Code</dt><dd>{code}</dd></div><div><dt>Name</dt><dd>{name}</dd></div><div><dt>Status</dt><dd><StatusPill active={active}/></dd></div></dl>
-    <div className="admin-setup-actions"><button aria-label={'Edit ' + code} onClick={onEdit}>Edit</button><button aria-label={(active ? 'Deactivate ' : 'Reactivate ') + code} onClick={onToggle}>{active ? 'Deactivate' : 'Reactivate'}</button></div></div>;
+    <RowActions code={code} active={active} onEdit={onEdit} onToggle={onToggle}>{children}</RowActions></div>;
 }
 
 function RowActions({ code, active, onEdit, onToggle, children }: { code: string; active: boolean; onEdit: () => void; onToggle: () => void; children?: ReactNode }) {
@@ -76,9 +76,9 @@ export function AcademicStructurePage({ client, pathname }: { client: AcademicSe
         break;
       case 'faculties':
         action = addButton('Add faculty', { kind: 'add-faculty' });
-        body = !data.faculties.length ? <p>No faculties configured.</p> : <SetupTable label="Faculties" headings={['Code', 'Name', 'Departments', 'Status', 'Actions']}>{data.faculties.map(row => <tr key={row.facultyId}>
+        body = <><Orphans programmes={orphanProgrammes(data)} open={setDialog}/>{!data.faculties.length ? <p>No faculties configured.</p> : <SetupTable label="Faculties" headings={['Code', 'Name', 'Departments', 'Status', 'Actions']}>{data.faculties.map(row => <tr key={row.facultyId}>
           <td>{link({ level: 'faculty', facultyId: row.facultyId }, row.facultyCode)}</td><td>{row.facultyName}</td><td>{countLabel(departmentCount(row.facultyId, data), 'department', 'departments')}</td><td><StatusPill active={row.isActive}/></td>
-          <td><RowActions code={row.facultyCode} active={row.isActive} onEdit={() => setDialog({ kind: 'edit-faculty', row })} onToggle={() => setDialog({ kind: 'toggle-faculty', row })}/></td></tr>)}</SetupTable>;
+          <td><RowActions code={row.facultyCode} active={row.isActive} onEdit={() => setDialog({ kind: 'edit-faculty', row })} onToggle={() => setDialog({ kind: 'toggle-faculty', row })}/></td></tr>)}</SetupTable>}</>;
         break;
       case 'faculty': {
         const { faculty, departments } = resolved;
@@ -102,7 +102,7 @@ export function AcademicStructurePage({ client, pathname }: { client: AcademicSe
           {inactiveNote('department', 'programmes', department.isActive)}
           {!programmes.length ? <p>No programmes in this department yet.</p> : <SetupTable label="Programmes" headings={['Code', 'Name', 'Curricula', 'Status', 'Actions']}>{programmes.map(row => <tr key={row.programmeId}>
             <td>{link({ level: 'programme', facultyId: faculty.facultyId, departmentId: department.departmentId, programmeId: row.programmeId }, row.programmeCode)}</td><td>{row.programmeName}</td><td>{countLabel(curriculumCount(row.programmeId, data), 'curriculum', 'curricula')}</td><td><StatusPill active={row.isActive}/></td>
-            <td><RowActions code={row.programmeCode} active={row.isActive} onEdit={() => setDialog({ kind: 'edit-programme', row })} onToggle={() => setDialog({ kind: 'toggle-programme', row })}/></td></tr>)}</SetupTable>}
+            <td><RowActions code={row.programmeCode} active={row.isActive} onEdit={() => setDialog({ kind: 'edit-programme', row })} onToggle={() => setDialog({ kind: 'toggle-programme', row })}><MoveButton code={row.programmeCode} onClick={() => setDialog({ kind: 'move-programme', row })}/></RowActions></td></tr>)}</SetupTable>}
         </>;
         break;
       }
@@ -111,7 +111,7 @@ export function AcademicStructurePage({ client, pathname }: { client: AcademicSe
         description = descriptions.programme(resolved);
         action = addButton('Add curriculum', { kind: 'add-curriculum', programmeId: programme.programmeId }, programme.isActive);
         body = <>
-          <Summary code={programme.programmeCode} name={programme.programmeName} active={programme.isActive} onEdit={() => setDialog({ kind: 'edit-programme', row: programme })} onToggle={() => setDialog({ kind: 'toggle-programme', row: programme })}/>
+          <Summary code={programme.programmeCode} name={programme.programmeName} active={programme.isActive} onEdit={() => setDialog({ kind: 'edit-programme', row: programme })} onToggle={() => setDialog({ kind: 'toggle-programme', row: programme })}><MoveButton code={programme.programmeCode} onClick={() => setDialog({ kind: 'move-programme', row: programme })}/></Summary>
           {inactiveNote('programme', 'curricula', programme.isActive)}
           {!curricula.length ? <p>No curricula for this programme yet.</p> : <CurriculaTable code={programme.programmeCode} curricula={curricula} open={setDialog}/>}
         </>;
@@ -125,6 +125,17 @@ export function AcademicStructurePage({ client, pathname }: { client: AcademicSe
     {body}
     {dialog && data && <StructureDialogs dialog={dialog} client={client} data={data} address={address} onClose={() => setDialog(null)} onSaved={onSaved}/>}
   </SetupCard>;
+}
+
+function MoveButton({ code, onClick }: { code: string; onClick: () => void }) { return <button aria-label={'Move ' + code} onClick={onClick}>Move</button>; }
+
+/** Programmes with no department cannot be reached through the structure, so the Faculties page lists them with a Move action. */
+function Orphans({ programmes, open }: { programmes: C.ProgrammeFaculty[]; open: (dialog: StructureDialog) => void }) {
+  if (!programmes.length) return null;
+  const text = programmes.length === 1 ? '1 programme has no department. Move it into a department so it appears in the structure.'
+    : programmes.length + ' programmes have no department. Move each one into a department so it appears in the structure.';
+  return <section className="admin-orphans" aria-label="Programmes with no department"><p>{text}</p><ul>{programmes.map(row => <li key={row.programmeId}>
+    <span>{row.programmeCode} · {row.programmeName}</span><MoveButton code={row.programmeCode} onClick={() => open({ kind: 'move-programme', row })}/></li>)}</ul></section>;
 }
 
 function CurriculaTable({ code, curricula, open }: { code: string; curricula: C.Curriculum[]; open: (dialog: StructureDialog) => void }) {

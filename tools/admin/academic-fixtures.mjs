@@ -26,9 +26,9 @@ export function academicResponse(url, state) {
   if (path === 'coordinator-assignments') return data.assignments;
   return undefined;
 }
-// Mirrors the real API catalogue message for CONFLICT (academic-errors.ts).
-const conflictMessage = 'The change conflicts with the current state. Reload and retry.';
 const failure = (status, code, message) => ({ status, payload: { error: { code, message } } });
+// Mirrors the real API messages for a reused code (academic-errors.ts, S3-P004-038).
+const taken = (code, noun) => failure(409, code, 'Another ' + noun + ' already uses this code. Choose a different code.');
 export function academicMutation(method, url, body, state, accounts) {
   if (!url.pathname.startsWith(prefix)) return undefined;
   if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 500) return failure(400, 'INVALID_REQUEST', 'A reason is required.');
@@ -36,20 +36,20 @@ export function academicMutation(method, url, body, state, accounts) {
   const success = (row, status = 200) => ({ status, payload: { data: row } });
   if (path === 'learning-centres' || path === 'faculties') {
     const isCentre = path === 'learning-centres', rows = isCentre ? data.centres : data.faculties, key = isCentre ? 'learningCentreId' : 'facultyId', code = isCentre ? 'centreCode' : 'facultyCode', name = isCentre ? 'centreName' : 'facultyName';
-    if (rows.some(r => r[code] === body[code] && r[key] !== id)) return failure(409, 'CONFLICT', 'Code already exists.');
+    if (rows.some(r => r[code] === body[code] && r[key] !== id)) return isCentre ? taken('CENTRE_CODE_TAKEN', 'learning centre') : taken('FACULTY_CODE_TAKEN', 'faculty');
     if (method === 'POST' && !rawId) { const row = { [key]: Math.max(0, ...rows.map(r => r[key])) + 1, [code]: body[code], [name]: body[name], isActive: true }; rows.push(row); return success(row, 201); }
     const row = rows.find(r => r[key] === id); if (!row) return failure(404, 'NOT_FOUND', 'Record not found.');
     if (method === 'PATCH') { for (const k of [code, name, 'isActive']) if (k in body) row[k] = body[k]; return success(row); }
   }
   if (path === 'departments') {
     if (method === 'POST' && !rawId) {
-      if (data.departments.some(d => d.departmentCode === body.departmentCode)) return failure(409, 'CONFLICT', 'Code already exists.');
+      if (data.departments.some(d => d.departmentCode === body.departmentCode)) return taken('DEPARTMENT_CODE_TAKEN', 'department');
       if (!data.faculties.some(x => x.facultyId === body.facultyId && x.isActive)) return failure(409, 'REFERENCE_INACTIVE', 'Faculty is inactive.');
       const row = { departmentId: Math.max(0, ...data.departments.map(d => d.departmentId)) + 1, departmentCode: body.departmentCode, departmentName: body.departmentName, facultyId: body.facultyId, isActive: true }; data.departments.push(row); return success(row, 201);
     }
     const row = data.departments.find(d => d.departmentId === id); if (!row) return failure(404, 'NOT_FOUND', 'Department not found.');
     if (method === 'PATCH') {
-      if (data.departments.some(d => d.departmentCode === body.departmentCode && d.departmentId !== id)) return failure(409, 'CONFLICT', 'Code already exists.');
+      if (data.departments.some(d => d.departmentCode === body.departmentCode && d.departmentId !== id)) return taken('DEPARTMENT_CODE_TAKEN', 'department');
       if ('facultyId' in body && body.facultyId !== row.facultyId && data.programmes.some(p => p.departmentId === id)) return failure(409, 'DEPARTMENT_HAS_PROGRAMMES', 'A department with programmes cannot move to another faculty. Reassign its programmes first.');
       for (const k of ['departmentCode', 'departmentName', 'facultyId', 'isActive']) if (k in body) row[k] = body[k]; return success(row);
     }
@@ -57,14 +57,14 @@ export function academicMutation(method, url, body, state, accounts) {
   if (path === 'programmes' && !action) {
     const duplicate = code => data.programmes.some(p => p.programmeCode === code && p.programmeId !== id);
     if (method === 'POST' && !rawId) {
-      if (duplicate(body.programmeCode)) return failure(409, 'CONFLICT', conflictMessage);
+      if (duplicate(body.programmeCode)) return taken('PROGRAMME_CODE_TAKEN', 'programme');
       const dept = data.departments.find(d => d.departmentId === body.departmentId); if (!dept) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
       if (!dept.isActive) return failure(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.');
       const row = { programmeId: Math.max(0, ...data.programmes.map(p => p.programmeId)) + 1, programmeCode: body.programmeCode, programmeName: body.programmeName, level: body.level ?? null, isActive: true, facultyId: dept.facultyId, departmentId: dept.departmentId }; data.programmes.push(row); return success(programme(row, data), 201);
     }
     const row = data.programmes.find(p => p.programmeId === id); if (!row) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
     if (method === 'PATCH') {
-      if ('programmeCode' in body && duplicate(body.programmeCode)) return failure(409, 'CONFLICT', conflictMessage);
+      if ('programmeCode' in body && duplicate(body.programmeCode)) return taken('PROGRAMME_CODE_TAKEN', 'programme');
       for (const k of ['programmeCode', 'programmeName', 'level', 'isActive']) if (k in body) row[k] = body[k]; return success(programme(row, data));
     }
   }
@@ -72,7 +72,7 @@ export function academicMutation(method, url, body, state, accounts) {
     if (method === 'POST' && !rawId) {
       const owner = data.programmes.find(p => p.programmeId === body.programmeId); if (!owner) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');
       if (!owner.isActive) return failure(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.');
-      if (data.curricula.some(c => c.programmeId === body.programmeId && c.curriculumVersion === body.curriculumVersion)) return failure(409, 'CONFLICT', conflictMessage);
+      if (data.curricula.some(c => c.programmeId === body.programmeId && c.curriculumVersion === body.curriculumVersion)) return failure(409, 'CURRICULUM_VERSION_TAKEN', 'This programme already has a curriculum with this version. Choose a different version.');
       const row = { curriculumId: Math.max(0, ...data.curricula.map(c => c.curriculumId)) + 1, programmeId: body.programmeId, curriculumVersion: body.curriculumVersion, totalCreditRequired: body.totalCreditRequired, effectiveYear: body.effectiveYear ?? null, isActive: true, subjectCount: 0, intakes: [] }; data.curricula.push(row); return success(row, 201);
     }
     const row = data.curricula.find(c => c.curriculumId === id); if (!row) return failure(404, 'NOT_FOUND', 'The requested academic setup record was not found.');

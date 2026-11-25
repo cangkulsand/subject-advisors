@@ -144,6 +144,70 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.equal(await nav.getByRole('link', { name: 'Academic Structure', exact: true }).getAttribute('aria-current'), 'page');
     assert.equal(await page.getByRole('heading', { name: 'Academic Structure', exact: true, level: 1 }).count(), 1);
   });
+  await check('academic structure: move a programme between departments, plain message when a coordinator assignment blocks it (S3-P004-038)', async page => {
+    const state = await mock(page), data = academicStore(state); const { region } = structure(page);
+    data.departments.push({ departmentId: 3, departmentCode: 'OLDD', departmentName: 'Fictional inactive department', facultyId: 1, isActive: false });
+    data.faculties.push({ facultyId: 3, facultyCode: 'OLDF', facultyName: 'Fictional inactive faculty', isActive: false });
+    data.departments.push({ departmentId: 4, departmentCode: 'ORPH', departmentName: 'Fictional department of an inactive faculty', facultyId: 3, isActive: true });
+    await page.goto(base + '/admin/faculties/1/departments/1'); await region('Programmes').waitFor();
+    await page.getByRole('button', { name: 'Move TEST', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Move programme · TEST', exact: true }); await dialog.waitFor();
+    assert.deepEqual(await dialog.getByLabel('Department', { exact: true }).locator('option').allInnerTexts(), ['Choose…', 'Fictional other department · Fictional other faculty']);
+    await dialog.getByLabel('Department', { exact: true }).selectOption('2'); await dialog.getByText('Faculty will be set to Fictional other faculty.').waitFor();
+    await save(dialog);
+    await dialog.getByRole('alert').filter({ hasText: 'TEST has an active coordinator assignment. End it in Coordinator Assignments before moving the programme to another faculty.' }).waitFor();
+    data.assignments[0].endedAt = '2026-11-02T00:00:00Z'; await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    await page.getByText('Moved TEST to Fictional other department.', { exact: true }).waitFor();
+    assert.equal(await region('Programmes').count() + await page.getByText('No programmes in this department yet.', { exact: true }).count(), 1);
+    assert.equal(await page.getByRole('link', { name: 'TEST', exact: true }).count(), 1); // only the faculty crumb
+    assert.equal(data.programmes[0].departmentId, 2); assert.deepEqual(state.bodies.at(-1).body, { departmentId: 2, reason });
+    // Moving the open programme from its own page follows it to its new address.
+    await page.goto(base + '/admin/faculties/2/departments/2/programmes/1'); await page.getByRole('button', { name: 'Move TEST', exact: true }).click();
+    await dialog.getByLabel('Department', { exact: true }).selectOption('1'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    await page.waitForURL(base + '/admin/faculties/1/departments/1/programmes/1');
+  });
+  await check('academic structure: programmes with no department are listed on the root and can be moved in (S3-P004-038)', async page => {
+    await mock(page); const { region } = structure(page); await page.goto(base + '/admin/faculties');
+    const orphans = page.getByRole('region', { name: 'Programmes with no department', exact: true });
+    await orphans.getByText('1 programme has no department. Move it into a department so it appears in the structure.', { exact: true }).waitFor();
+    await orphans.getByText('LEGACY · Fictional legacy programme', { exact: true }).waitFor();
+    await orphans.getByRole('button', { name: 'Move LEGACY', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Move programme · LEGACY', exact: true }); await dialog.getByLabel('Department', { exact: true }).selectOption('1'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
+    await page.getByText('Moved LEGACY to Fictional department.', { exact: true }).waitFor();
+    assert.equal(await orphans.count(), 0);
+    await page.goto(base + '/admin/faculties/1/departments/1'); await region('Programmes').getByRole('link', { name: 'LEGACY', exact: true }).waitFor();
+  });
+  await check('academic structure: reused codes give plain messages before sending, own code is not a duplicate, server fallback (S3-P004-038)', async page => {
+    const state = await mock(page); await page.goto(base + '/admin/faculties/1');
+    const posts = () => (state.bodies ?? []).filter(b => b.method === 'POST').length;
+    await page.getByRole('button', { name: 'Add department', exact: true }).click(); const add = page.getByRole('dialog', { name: 'Add department', exact: true });
+    await add.getByLabel('Department code').fill('DOTHER'); await add.getByLabel('Department name').fill('Fictional duplicate'); await save(add);
+    await add.getByRole('alert').filter({ hasText: 'DOTHER is already used by Fictional other department. Choose a different code.' }).waitFor(); assert.equal(posts(), 0);
+    await add.getByLabel('Department code').fill('dother'); await save(add); await add.waitFor({ state: 'hidden' }); assert.equal(posts(), 1);
+    await page.getByRole('button', { name: 'Edit DEPT', exact: true }).click(); const edit = page.getByRole('dialog', { name: 'Edit department', exact: true });
+    await edit.getByLabel('Department name').fill('Fictional renamed department'); await save(edit); await edit.waitFor({ state: 'hidden' });
+    await page.goto(base + '/admin/faculties');
+    await page.getByRole('button', { name: 'Add faculty', exact: true }).click(); const faculty = page.getByRole('dialog', { name: 'Add faculty', exact: true });
+    await faculty.getByLabel('Faculty code').fill(' OTHER '); await faculty.getByLabel('Faculty name').fill('Fictional duplicate'); await save(faculty);
+    await faculty.getByRole('alert').filter({ hasText: 'OTHER is already used by Fictional other faculty. Choose a different code.' }).waitFor(); await page.keyboard.press('Escape');
+    await page.goto(base + '/admin/faculties/1/departments/1');
+    await page.getByRole('button', { name: 'Add programme', exact: true }).click(); const programme = page.getByRole('dialog', { name: 'Add programme', exact: true });
+    await programme.getByLabel('Programme code').fill('LEGACY'); await programme.getByLabel('Programme name').fill('Fictional duplicate'); await save(programme);
+    await programme.getByRole('alert').filter({ hasText: 'LEGACY is already used by Fictional legacy programme. Choose a different code.' }).waitFor();
+    state.mutationError = { status: 409, code: 'PROGRAMME_CODE_TAKEN', message: 'Another programme already uses this code. Choose a different code.' };
+    await programme.getByLabel('Programme code').fill('NEWP'); await save(programme);
+    await programme.getByRole('alert').filter({ hasText: 'Another programme already uses this code. Choose a different code.' }).waitFor(); delete state.mutationError; await page.keyboard.press('Escape');
+    await page.goto(base + '/admin/faculties/1/departments/1/programmes/1');
+    await page.getByRole('button', { name: 'Add curriculum', exact: true }).click(); const curriculum = page.getByRole('dialog', { name: 'Add curriculum', exact: true });
+    await curriculum.getByLabel('Version').fill('2026'); await curriculum.getByLabel('Total credits').fill('130'); await save(curriculum);
+    await curriculum.getByRole('alert').filter({ hasText: 'This programme already has curriculum version 2026. Choose a different version.' }).waitFor(); await page.keyboard.press('Escape');
+    await page.goto(base + '/admin/learning-centres');
+    await page.getByRole('button', { name: 'Add learning centre', exact: true }).click(); const centre = page.getByRole('dialog', { name: 'Add learning centre', exact: true });
+    await centre.getByLabel('Centre code').fill('TEST'); await centre.getByLabel('Centre name').fill('Fictional duplicate'); await save(centre);
+    await centre.getByRole('alert').filter({ hasText: 'TEST is already used by Fictional learning centre. Choose a different code.' }).waitFor();
+    assert.equal(posts(), 2); // 'dother', and NEWP refused by the server; no duplicate was sent
+    await page.keyboard.press('Escape'); await centre.waitFor({ state: 'hidden' });
+  });
   for (const width of [1440, 375]) await check('programmes: Students by intake column lists each intake year, not set and no students at ' + width + ' (S3-P004-037)', async page => {
     const state = await mock(page); await page.setViewportSize({ width, height: 900 }); await page.goto(base + '/admin/faculties/1/departments/1/programmes/1');
     const table = page.getByRole('region', { name: 'Curriculums', exact: true }); await table.waitFor();
