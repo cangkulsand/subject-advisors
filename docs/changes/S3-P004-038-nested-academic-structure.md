@@ -1,6 +1,6 @@
 # S3-P004-038 — Nested academic structure screens
 
-- **Status:** READY_FOR_REVIEW (branch `feature/nested-setup`; not merged or deployed)
+- **Status:** Merged to `main` (f7bb50d) on 2026-11-26; deployed to dev and prod 2026-11-26; no migration
 - **Date:** 2026-11-26
 - **Sprint:** Sprint 3
 - **Owner:** P004, building P001's (Aisa) review item; to be handed over to Aisa
@@ -117,4 +117,4 @@ records under the selected parent and replace technical duplicate-code errors wi
   - **Menu:** it has one Academic Structure link instead of three.
   - **API:** 5 new 409 error codes replace `CONFLICT` for reused codes.
   - **Unchanged:** no migration.
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-26)
