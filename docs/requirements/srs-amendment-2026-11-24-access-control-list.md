@@ -49,7 +49,7 @@ Students and coordinators cannot assign or change any role.
 | --- | --- |
 | **View** | Own profile, own academic records, degree progress, graduation check, graduation plan, pathway, recommendations, and the semester offerings their coordinator approved for their programme and learning centre |
 | **Edit** | Own profile fields; own academic records; own semester picks while the admin-set selection window is open; own plan (what-if scenario) |
-| **Locked after first save** | Programme (`PROFILE_PROGRAMME_LOCKED`, change only through a System Administrator); learning centre while the selection window is open until the admin moves the semester forward (S2-P004-023) |
+| **Locked after first save** | Programme (`PROFILE_PROGRAMME_LOCKED`) and intake year (`PROFILE_INTAKE_LOCKED`, S3-P004-037), changed only through a System Administrator; learning centre while the selection window is open until the admin moves the semester forward (S2-P004-023) |
 | **Approve** | Nothing. Graduation check confirmation is the student's own statement, not an approval |
 | **Recover** | Nothing beyond re-entering own data |
 
@@ -89,6 +89,7 @@ All student endpoints are scoped to the signed-in identity; a browser-supplied s
 | Role removed by mistake | Grant the role again with a reason; both the revoke and the grant stay in the audit | System Administrator | In force |
 | Student cannot sign in (lost access to Clerk) | Clerk account recovery for the same email; the application account is matched by Clerk user ID and keeps its data | Student, through Clerk | In force |
 | Wrong programme chosen at registration | Programme change with a reason (A2); records kept; future picks removed and counted | System Administrator | In force |
+| Wrong intake year | Change intake year with a reason on the account page; audited (`student_intake`); the curriculum is not changed (S3-P004-037) | System Administrator | In force |
 | Learning centre, faculty, department, programme or curriculum deactivated by mistake | Set active again with a reason; nothing is hard-deleted | System Administrator | In force |
 | Coordinator assignment ended by mistake | Create a new assignment for the same scope; the ended row stays as history | System Administrator | In force |
 | Offering decision made by mistake | Change the decision again; each change is a new audit row | Coordinator, or System Administrator through View as | In force |
