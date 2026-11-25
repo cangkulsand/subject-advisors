@@ -1,6 +1,6 @@
 # S3-P004-037 — Intake year separate from the curriculum effective year
 
-- **Status:** READY_FOR_REVIEW (branch `feature/intake-year`; migration 0016 not applied; not merged or deployed)
+- **Status:** Merged to `main` on 2026-11-26; migration 0016 applied to Neon 2026-11-26; deployed to dev and prod
 - **Date:** 2026-11-25
 - **Sprint:** Sprint 3
 - **Owner:** P004, delivering P001's (Aisa) review item; P001 should review the profile changes
@@ -44,7 +44,8 @@ reading the year from the matric number; batch correction; coordinator screens.
 | `npm run test:ui:integration` | 81 PASS (setup at 375px, light and dark) |
 | `node tools/p001/test-ui.mjs` | 7 new intake checks pass; the script stops at the pre-existing "saved grade editing … focus returns to the details opener" check, which fails the same way on `main` (checked 2026-11-25) |
 
-- Not run: real-database tests of the new SQL (no database connection during development); covered by parse and binding tests.
+- Neon, 2026-11-26 (owner approved): `migrate` applied 0016; `verify` 60 checks PASS, including both `020_student_intake_year` checks. Backfill: SECJ "1" (2020) 149 students intake 2020; SECRH "V1" (2022) 225 students intake 2022; no student without an intake year.
+- Found by `verify` on Neon and fixed: the column-count guards in `db/checks/001_schema_verification.sql` and `004_profile_current_semester.sql` did not count `intake_year` (student_profile now 14 columns). Parse tests could not catch this.
 - **Outcome:** PASS — SELF-REVIEW; peer review pending (P001 for the profile).
 
 ## 4. Rollout
@@ -59,5 +60,5 @@ reading the year from the matric number; batch correction; coordinator screens.
 - **Date:** 2026-11-25 · **Type:** Added / Changed · **Owner:** P004 (for P001)
 - **Actual changes:** students record their intake year and the curriculum follows it; admins see students per intake on each curriculum and correct an intake year with an audited reason; curricula without subjects are no longer offered at setup.
 - **Compatibility/impact:** migration 0016 (additive, must precede the deploy); `PUT /api/profile` requires `intakeYear`; new `PATCH /api/admin/users/{id}/intake`; new error codes `INVALID_INTAKE_YEAR`, `PROFILE_INTAKE_LOCKED`, `UNCHANGED`.
-- **Outstanding:** apply 0016; batch correction of programme and intake (separate review item).
-- **Status:** READY_FOR_REVIEW
+- **Outstanding:** batch correction of programme and intake (separate review item); P001 peer review of the profile page.
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-26)
