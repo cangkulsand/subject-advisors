@@ -1,6 +1,6 @@
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import type { CreateDummyUserRequest, CreateDummyUserResponse, DummyCapacity, DummyCredentials } from '../../../../../packages/shared/src/admin/dummy';
-import type { AdminAccount, AdminAccountDetail, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery, AdminWaitingUser, AdminWaitingUsers } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminChangeIntakeYearRequest, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery, AdminWaitingUser, AdminWaitingUsers } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -92,6 +92,7 @@ function curriculumOption(value: unknown): AdminCurriculumOption {
 function studentProgramme(value: unknown): AdminStudentProgramme | null {
   if (value === null) return null;
   const item = object(value); id(item.studentId); text(item.studentName); if (item.matricNo !== null) text(item.matricNo);
+  if (item.intakeYear !== null) id(item.intakeYear);
   curriculumOption(value);
   return item as unknown as AdminStudentProgramme;
 }
@@ -122,6 +123,8 @@ export interface AdminClient {
   studentProgramme(id: number, signal?: AbortSignal): Promise<AdminStudentProgramme | null>;
   curriculumOptions(signal?: AbortSignal): Promise<AdminCurriculumOption[]>;
   changeProgramme(id: number, input: AdminChangeProgrammeRequest): Promise<AdminProgrammeChange>;
+  /** Corrects the student's intake year (S3-P004-037); returns the student programme with the new intake year. */
+  changeIntakeYear(id: number, input: AdminChangeIntakeYearRequest): Promise<AdminStudentProgramme>;
   dummyCapacity(signal?: AbortSignal): Promise<DummyCapacity>;
   createDummyUser(input: CreateDummyUserRequest): Promise<CreateDummyUserResponse>;
   resetDummyPassword(accountId: number): Promise<DummyCredentials>;
@@ -176,6 +179,7 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     studentProgramme: (accountId, signal) => request('/api/admin/users/' + accountId + '/programme', studentProgramme, signal),
     curriculumOptions: signal => request('/api/admin/curriculum-options', value => { if (!Array.isArray(value)) throw new Error('Invalid administration response'); return value.map(curriculumOption); }, signal),
     changeProgramme: (accountId, input) => request('/api/admin/users/' + accountId + '/programme', programmeChange, undefined, { method: 'PATCH', body: input }),
+    changeIntakeYear: (accountId, input) => request('/api/admin/users/' + accountId + '/intake', value => { const programme = studentProgramme(value); if (!programme) throw new Error('Invalid administration response'); return programme; }, undefined, { method: 'PATCH', body: input }),
     dummyCapacity: signal => request('/api/admin/dummy-users/capacity', capacity, signal),
     createDummyUser: input => request('/api/admin/dummy-users', value => { const data = object(value); return { account: detail(data.account), credentials: credentials(data.credentials) }; }, undefined, { method: 'POST', body: input }),
     resetDummyPassword: accountId => request('/api/admin/users/' + accountId + '/dummy-password', credentials, undefined, { method: 'POST', body: {} }),

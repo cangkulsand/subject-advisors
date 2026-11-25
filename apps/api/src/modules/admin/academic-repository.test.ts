@@ -104,14 +104,14 @@ describe('academic SQL boundary', () => {
     await expect(repository.createProgramme({ programmeCode: 'P', programmeName: 'N', level: null, departmentId: 99, reason: 'Add' }, 'user_verified')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
   it('lists curricula mapping NULL status to active and the count to a number', async () => {
-    const query = vi.fn().mockResolvedValue([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: '3' }]);
+    const query = vi.fn().mockResolvedValue([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: '3', intakes: [] }]);
     const repository = createAcademicSetupRepository(query, vi.fn());
-    expect(await repository.listCurricula()).toEqual([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: 3 }]);
+    expect(await repository.listCurricula()).toEqual([{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: 3, intakes: [] }]);
     expect(query.mock.calls[0]![0]).toContain("coalesce(upper(c.status),'ACTIVE')='ACTIVE'");
     expect(query.mock.calls[0]![0]).toContain('ORDER BY p.programme_code');
   });
   it('creates and updates curricula with bound values and status translation', async () => {
-    const row = { curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 0 };
+    const row = { curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 0, intakes: [] };
     const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [row]]);
     const repository = createAcademicSetupRepository(vi.fn(), transaction);
     await repository.createCurriculum({ programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, reason: 'Add' }, 'user_verified');
@@ -121,5 +121,32 @@ describe('academic SQL boundary', () => {
     const update = transaction.mock.calls[1]![0][1]!;
     expect(update.text.split(' RETURNING ')[0]).toBe('UPDATE public.curriculum SET total_credit_required=$2, status=$3 WHERE curriculum_id=$1');
     expect(update.values).toEqual([4, 0, 'INACTIVE']);
+  });
+  it('counts students per intake year on each curriculum, year descending with not set last (S3-P004-037)', async () => {
+    const intakes = [{ intakeYear: 2023, students: 4 }, { intakeYear: 2022, students: 225 }, { intakeYear: null, students: 3 }];
+    const query = vi.fn().mockResolvedValue([{ curriculumId: 3, programmeId: 9, curriculumVersion: 'V1', totalCreditRequired: 131, effectiveYear: 2022, isActive: true, subjectCount: 79, intakes },
+      { curriculumId: 8, programmeId: 9, curriculumVersion: 'V2', totalCreditRequired: 120, effectiveYear: 2026, isActive: false, subjectCount: 0, intakes: '[{"intakeYear":2026,"students":"2"}]' },
+      { curriculumId: 9, programmeId: 9, curriculumVersion: 'V3', totalCreditRequired: 120, effectiveYear: null, isActive: true, subjectCount: 0, intakes: null }]);
+    const repository = createAcademicSetupRepository(query, vi.fn());
+    const rows = await repository.listCurricula();
+    expect(rows.map(row => row.intakes)).toEqual([intakes, [{ intakeYear: 2026, students: 2 }], []]);
+    const sql = String(query.mock.calls[0]![0]).replace(/\s+/g, ' ');
+    expect(sql).toContain('FROM public.student_profile sp WHERE sp.curriculum_id=c.curriculum_id GROUP BY sp.intake_year');
+    expect(sql).toContain('ORDER BY i.intake_year DESC NULLS LAST');
+    expect(sql).toContain("'[]'::jsonb) AS \"intakes\"");
+    const { parse } = await import('libpg-query');
+    await parse(String(query.mock.calls[0]![0]));
+  });
+  it('rejects a malformed intake row from the database', async () => {
+    const query = vi.fn().mockResolvedValue([{ curriculumId: 3, programmeId: 9, curriculumVersion: 'V1', totalCreditRequired: 131, effectiveYear: 2022, isActive: true, subjectCount: 79, intakes: [{ intakeYear: 'x', students: 1 }] }]);
+    await expect(createAcademicSetupRepository(query, vi.fn()).listCurricula()).rejects.toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE' });
+  });
+  it('create and update responses carry the intakes too (a new curriculum has none)', async () => {
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], [{ curriculumId: 4, programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, isActive: true, subjectCount: 0, intakes: [] }]]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    expect((await repository.createCurriculum({ programmeId: 9, curriculumVersion: '2026', totalCreditRequired: 120, effectiveYear: 2026, reason: 'Add' }, 'user_verified')).intakes).toEqual([]);
+    expect(transaction.mock.calls[0]![0][1]!.text).toContain('AS "intakes"');
+    await repository.updateCurriculum(4, { isActive: false, reason: 'Edit' }, 'user_verified');
+    expect(transaction.mock.calls[1]![0][2]!.text).toContain('AS "intakes"');
   });
 });

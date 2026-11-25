@@ -30,8 +30,9 @@ const curricula = [
   { curriculumId: 1, curriculumVersion: 'DEMO_A', programmeId: 1, programmeCode: 'DEMO', programmeName: 'DEMO Not official' },
   { curriculumId: 2, curriculumVersion: 'DEMO_B', programmeId: 2, programmeCode: 'OTHER', programmeName: 'DEMO Other programme' },
 ];
-const studentProfiles = { 4: { studentId: 14, studentName: 'Fictional Account 4', matricNo: 'A22EC0004', curriculumId: 1, picks: 3 }, 5: { studentId: 15, studentName: 'Fictional Account 5', matricNo: null, curriculumId: 2, picks: 0 } };
-const programmeOf = profile => { const option = curricula.find(item => item.curriculumId === profile.curriculumId); return { studentId: profile.studentId, studentName: profile.studentName, matricNo: profile.matricNo, ...option }; };
+// Intake year (S3-P004-037): account 4 has 2022, account 5 has none recorded yet.
+const studentProfiles = { 4: { studentId: 14, studentName: 'Fictional Account 4', matricNo: 'A22EC0004', curriculumId: 1, picks: 3, intakeYear: 2022 }, 5: { studentId: 15, studentName: 'Fictional Account 5', matricNo: null, curriculumId: 2, picks: 0, intakeYear: null } };
+const programmeOf = profile => { const option = curricula.find(item => item.curriculumId === profile.curriculumId); return { studentId: profile.studentId, studentName: profile.studentName, matricNo: profile.matricNo, ...option, intakeYear: profile.intakeYear }; };
 /** Per-session mutable copy so one browser check never leaks edits into another. */
 function store(state) {
   return state.store ??= { accounts: structuredClone(accounts), invitations: structuredClone(invitations), events: structuredClone(events), nextId: accounts.length + 1, profiles: structuredClone(studentProfiles) };
@@ -153,6 +154,15 @@ export function fixtureMutation(method, url, body, state = {}) {
     if (profile.curriculumId === body.curriculumId) return failure(409, 'PROGRAMME_UNCHANGED', 'The student is already on this programme.');
     const removedPicks = profile.picks; profile.curriculumId = body.curriculumId; profile.picks = 0;
     return { status: 200, payload: { data: { programme: programmeOf(profile), removedPicks } } };
+  }
+  const intakeRoute = /^\/api\/admin\/users\/(\d+)\/intake$/.exec(url.pathname);
+  if (method === 'PATCH' && intakeRoute) {
+    const profile = data.profiles[Number(intakeRoute[1])];
+    if (!profile) return failure(404, 'STUDENT_PROFILE_NOT_FOUND', 'This account has no student profile yet.');
+    if (!Number.isInteger(body.intakeYear) || body.intakeYear < 1990 || body.intakeYear > 2200) return failure(400, 'INVALID_REQUEST', 'Enter an intake year between 1990 and 2200.');
+    if (profile.intakeYear === body.intakeYear) return failure(409, 'UNCHANGED', 'The intake year is already set to this year.');
+    profile.intakeYear = body.intakeYear;
+    return { status: 200, payload: { data: programmeOf(profile) } };
   }
   const route = /^\/api\/admin\/users\/(\d+)\/(roles|access)(?:\/([A-Z_]+))?$/.exec(url.pathname);
   if (!route) return null;

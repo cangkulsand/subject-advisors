@@ -29,12 +29,14 @@ const events = `SELECT 'role:' || l.user_role_audit_log_id AS "eventId", l.acces
   FROM public.user_access_audit_log l JOIN public.user_access_assignment a USING(access_assignment_id)`;
 
 const programmeColumns = `p.student_id AS "studentId", p.student_name AS "studentName", p.matric_no AS "matricNo", p.curriculum_id AS "curriculumId",
-  c.curriculum_version AS "curriculumVersion", g.programme_id AS "programmeId", g.programme_code AS "programmeCode", g.programme_name AS "programmeName"`;
+  c.curriculum_version AS "curriculumVersion", g.programme_id AS "programmeId", g.programme_code AS "programmeCode", g.programme_name AS "programmeName",
+  p.intake_year AS "intakeYear"`;
 const programmeFrom = `public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
   JOIN public.curriculum c ON c.curriculum_id=p.curriculum_id JOIN public.programme g ON g.programme_id=c.programme_id`;
 function programmeRow(row: Record<string, unknown>): AdminStudentProgramme {
   return { studentId: integer(row.studentId), studentName: String(row.studentName), matricNo: row.matricNo == null ? null : String(row.matricNo), curriculumId: integer(row.curriculumId),
-    curriculumVersion: String(row.curriculumVersion), programmeId: integer(row.programmeId), programmeCode: String(row.programmeCode), programmeName: String(row.programmeName) };
+    curriculumVersion: String(row.curriculumVersion), programmeId: integer(row.programmeId), programmeCode: String(row.programmeCode), programmeName: String(row.programmeName),
+    intakeYear: row.intakeYear == null ? null : integer(row.intakeYear) };
 }
 const membershipColumns = `app_role AS role, email_policy AS "emailPolicy", grant_source AS source,
   protected_owner AS "protectedOwner", grant_reason AS reason, created_at AS "grantedAt"`;
@@ -318,6 +320,28 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       const removed = results[1]?.[0], programme = results[2]?.[0];
       if (!removed || !programme) throw new AdminMutationError('MUTATION_FAILED');
       return { programme: programmeRow(programme), removedPicks: integer(removed.removedPicks) };
+    },
+    async changeStudentIntakeYear(accountId, intakeYear, actor, reason): Promise<AdminStudentProgramme> {
+      const profileOf = `SELECT p.student_id, p.intake_year FROM public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
+        WHERE a.access_assignment_id=$1`;
+      // Lock first so the guards and the write see one state; the update and its audit row are a single statement.
+      // The before value comes from the locked CTE snapshot. curriculum_id is never written.
+      const results = await run(actor, reason, [
+        { text: `${profileOf} FOR UPDATE OF p`, values: [accountId] },
+        guard(noAccount('$1'), [accountId], 'NOT_FOUND'),
+        guard(`NOT EXISTS (${profileOf})`, [accountId], 'STUDENT_PROFILE_NOT_FOUND'),
+        guard(`EXISTS (${profileOf} AND p.intake_year IS NOT DISTINCT FROM $2::smallint)`, [accountId, intakeYear], 'UNCHANGED'),
+        { text: `WITH target AS (${profileOf} FOR UPDATE OF p),
+          changed AS (UPDATE public.student_profile s SET intake_year=$2::smallint FROM target t WHERE s.student_id=t.student_id
+            RETURNING s.student_id, t.intake_year AS before_year, s.intake_year AS after_year)
+          INSERT INTO public.academic_setup_audit_log(entity_type,entity_id,action,actor,reason,before_data,after_data)
+          SELECT 'student_intake', student_id, 'CHANGE_INTAKE_YEAR', btrim(current_setting('app.access_actor',true)), btrim(current_setting('app.access_reason',true)),
+            jsonb_build_object('intakeYear', before_year), jsonb_build_object('intakeYear', after_year) FROM changed RETURNING audit_id AS "auditId"`, values: [accountId, intakeYear] },
+        { text: `SELECT ${programmeColumns} FROM ${programmeFrom} WHERE a.access_assignment_id=$1`, values: [accountId] },
+      ]);
+      const audited = results[4]?.[0], programme = results[5]?.[0];
+      if (!audited || !programme) throw new AdminMutationError('MUTATION_FAILED');
+      return programmeRow(programme);
     },
     async acceptInvitation(invitationId, accountId, actor) {
       const results = await run(actor, 'Invitation accepted', [{

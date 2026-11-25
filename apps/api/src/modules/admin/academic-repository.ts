@@ -23,7 +23,10 @@ const programmeSelect = `SELECT p.programme_id AS "programmeId", p.programme_cod
   LEFT JOIN public.department d ON d.department_id=p.department_id`;
 const curriculumColumns = `c.curriculum_id AS "curriculumId", c.programme_id AS "programmeId", c.curriculum_version AS "curriculumVersion",
   c.total_credit_required AS "totalCreditRequired", c.effective_year AS "effectiveYear", coalesce(upper(c.status),'ACTIVE')='ACTIVE' AS "isActive",
-  (SELECT count(*) FROM public.curriculum_subject cs WHERE cs.curriculum_id=c.curriculum_id)::int AS "subjectCount"`;
+  (SELECT count(*) FROM public.curriculum_subject cs WHERE cs.curriculum_id=c.curriculum_id)::int AS "subjectCount",
+  coalesce((SELECT jsonb_agg(jsonb_build_object('intakeYear', i.intake_year, 'students', i.students) ORDER BY i.intake_year DESC NULLS LAST)
+    FROM (SELECT sp.intake_year, count(*)::int AS students FROM public.student_profile sp WHERE sp.curriculum_id=c.curriculum_id GROUP BY sp.intake_year) i),
+    '[]'::jsonb) AS "intakes"`;
 const programmeFields = { programmeCode: 'programme_code', programmeName: 'programme_name', level: 'level', status: 'status' };
 const curriculumFields = { curriculumVersion: 'curriculum_version', totalCreditRequired: 'total_credit_required', effectiveYear: 'effective_year', status: 'status' };
 const withStatus = <T extends { isActive?: boolean }>(input: T): object => {
@@ -49,8 +52,18 @@ const department = (r: Row): C.Department => ({ departmentId: Number(r.departmen
 const programme = (r: Row): C.ProgrammeFaculty => ({ programmeId: Number(r.programmeId), programmeCode: String(r.programmeCode), programmeName: String(r.programmeName), level: r.level == null ? null : String(r.level), isActive: r.programmeIsActive === true, facultyId: r.facultyId == null ? null : Number(r.facultyId), faculty: r.facultyId == null ? null : faculty(r),
   departmentId: r.departmentId == null ? null : Number(r.departmentId),
   department: r.departmentId == null ? null : department({ departmentId: r.departmentId, departmentCode: r.departmentCode, departmentName: r.departmentName, facultyId: r.departmentFacultyId, isActive: r.departmentIsActive }) });
+/** Students per intake year (S3-P004-037). The driver may hand jsonb back parsed or as text; anything else is a broken row. */
+function intakes(value: unknown): C.CurriculumIntake[] {
+  const list: unknown = typeof value === 'string' ? JSON.parse(value) : value ?? [];
+  if (!Array.isArray(list)) throw new Error('Invalid curriculum intakes');
+  return list.map(item => {
+    const entry = item as Row | null, year = entry?.intakeYear, students = Number(entry?.students);
+    if (!entry || (year !== null && !Number.isInteger(year)) || !Number.isSafeInteger(students) || students < 0) throw new Error('Invalid curriculum intakes');
+    return { intakeYear: year === null ? null : Number(year), students };
+  });
+}
 const curriculum = (r: Row): C.Curriculum => ({ curriculumId: Number(r.curriculumId), programmeId: Number(r.programmeId), curriculumVersion: String(r.curriculumVersion), totalCreditRequired: Number(r.totalCreditRequired),
-  effectiveYear: r.effectiveYear == null ? null : Number(r.effectiveYear), isActive: r.isActive === true, subjectCount: Number(r.subjectCount) });
+  effectiveYear: r.effectiveYear == null ? null : Number(r.effectiveYear), isActive: r.isActive === true, subjectCount: Number(r.subjectCount), intakes: intakes(r.intakes) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
 const timestamp = (v: unknown) => (v instanceof Date ? v : new Date(String(v))).toISOString();
 const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });

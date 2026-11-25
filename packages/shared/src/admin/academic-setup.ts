@@ -46,9 +46,13 @@ export interface CreateDepartmentRequest { departmentCode: string; departmentNam
 export interface UpdateDepartmentRequest { departmentCode?: string; departmentName?: string; facultyId?: number; isActive?: boolean; reason: string }
 /** Assigning a department also sets the programme faculty to the department's faculty; null clears both when the programme had a department. */
 export interface SetProgrammeDepartmentRequest { departmentId: number | null; reason: string }
+/** Students on one curriculum with one intake year (S3-P004-037); intakeYear null means "not set". */
+export interface CurriculumIntake { intakeYear: number | null; students: number }
 export interface Curriculum {
   curriculumId: number; programmeId: number; curriculumVersion: string; totalCreditRequired: number;
   effectiveYear: number | null; isActive: boolean; subjectCount: number;
+  /** Students per intake year, year descending, not set last; empty when no student follows it. Create and update responses carry it too. */
+  intakes: CurriculumIntake[];
 }
 export interface CreateProgrammeRequest { programmeCode: string; programmeName: string; level: string | null; departmentId: number; reason: string }
 export interface UpdateProgrammeRequest { programmeCode?: string; programmeName?: string; level?: string | null; isActive?: boolean; reason: string }

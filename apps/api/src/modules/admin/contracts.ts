@@ -38,6 +38,12 @@ export interface AdminRepository {
    */
   changeStudentProgramme(accountId: number, curriculumId: number, actor: string, reason: string): Promise<AdminProgrammeChange>;
   /**
+   * Corrects the student's intake year (S3-P004-037) in one transaction: locks the profile, rejects an unchanged value
+   * (UNCHANGED), updates student_profile.intake_year and writes the append-only academic_setup_audit_log row
+   * (student_intake / CHANGE_INTAKE_YEAR). Never changes the curriculum. Returns the student programme read back.
+   */
+  changeStudentIntakeYear(accountId: number, intakeYear: number, actor: string, reason: string): Promise<AdminStudentProgramme>;
+  /**
    * Dummy users (S3-P004-029): one transaction creates the account with its role plus either a complete student profile
    * (admin current semester, hours 0 and 20) or one coordinator assignment. Guards raise ACADEMIC_SEMESTER_UNAVAILABLE
    * and DUMMY_SCOPE_INVALID before anything is written.

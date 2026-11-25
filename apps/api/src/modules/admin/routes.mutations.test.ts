@@ -9,7 +9,7 @@ const ADMIN = 'user_admin';
 const account = { accountId: 5, clerkUserId: 'user_target', roles: ['COORDINATOR' as const], accessStatus: 'ACTIVE' as const, protectedOwner: false, createdAt: date, updatedAt: date, memberships: [] };
 const invitation = { id: '2f1c0f0e-0000-4000-8000-000000000001', email: 'new@utm.my', roles: ['COORDINATOR' as const], status: 'PENDING' as const, invitedBy: ADMIN, reason: 'Join', createdAt: date, expiresAt: '2026-11-08T10:00:00.000Z', acceptedAt: null };
 
-const programme = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 1, curriculumVersion: 'V1', programmeId: 7, programmeCode: 'OLD', programmeName: 'Old programme' };
+const programme = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 1, curriculumVersion: 'V1', programmeId: 7, programmeCode: 'OLD', programmeName: 'Old programme', intakeYear: 2022 };
 function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTEM_ADMIN']) {
   const deps: AdminDependencies = {
     auth: {
@@ -24,6 +24,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       expireInvitations: vi.fn(), acceptInvitation: vi.fn(),
       studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
       changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
+      changeStudentIntakeYear: vi.fn(async () => ({ ...programme, intakeYear: 2023 })),
       createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24), existingClerkUserIds: vi.fn(async () => new Set<string>()),
     },
     identities: {
@@ -50,6 +51,7 @@ const routes: { name: string; path: string; method: string; body: unknown; statu
   { name: 'revoke role', path: '/api/admin/users/5/roles/COORDINATOR', method: 'DELETE', body: { reason }, status: 200, repo: 'revokeRole' },
   { name: 'change access', path: '/api/admin/users/5/access', method: 'PATCH', body: { status: 'SUSPENDED', reason }, status: 200, repo: 'setAccessStatus' },
   { name: 'change student programme', path: '/api/admin/users/5/programme', method: 'PATCH', body: { curriculumId: 2, reason }, status: 200, repo: 'changeStudentProgramme' },
+  { name: 'change student intake year', path: '/api/admin/users/5/intake', method: 'PATCH', body: { intakeYear: 2023, reason }, status: 200, repo: 'changeStudentIntakeYear' },
   { name: 'create invitation', path: '/api/admin/invitations', method: 'POST', body: { email: 'new@utm.my', roles: ['COORDINATOR'], reason }, status: 201, repo: 'createInvitation' },
   { name: 'revoke invitation', path: '/api/admin/invitations/2f1c0f0e-0000-4000-8000-000000000001', method: 'DELETE', body: { reason }, status: 200, repo: 'revokeInvitation' },
   { name: 'create dummy user', path: '/api/admin/dummy-users', method: 'POST', body: { role: 'STUDENT', name: 'Aina', curriculumId: 2, learningCentreId: 3, reason }, status: 201, repo: 'createDummyAccount' },
@@ -382,6 +384,47 @@ describe('student programme (S2-P004-026)', () => {
       expect((await send(denied, '/api/admin/curriculum-options', 'GET')).status).toBe(403);
       expect((await send(denied, '/api/admin/users/5/programme', 'GET')).status).toBe(403);
       expect(denied.repository.curriculumOptions).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe('student intake year (S3-P004-037)', () => {
+  it('changes the intake year as the authorized admin and returns the student programme', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/users/5/intake', 'PATCH', { intakeYear: 2023, reason: ' ' + reason + ' ' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { ...programme, intakeYear: 2023 } });
+    expect(mocked(deps, 'changeStudentIntakeYear')).toHaveBeenCalledWith(5, 2023, ADMIN, reason);
+    expect(mocked(deps, 'changeStudentProgramme')).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ intakeYear: 2023 }], [{ intakeYear: 2023, reason: '   ' }], [{ intakeYear: 2023, reason: 'x'.repeat(501) }], [{ reason }],
+    [{ intakeYear: '2023', reason }], [{ intakeYear: 1989, reason }], [{ intakeYear: 2201, reason }], [{ intakeYear: 2022.5, reason }],
+    [{ intakeYear: null, reason }], [{ intakeYear: 2023, curriculumId: 2, reason }],
+  ])('rejects the invalid body %j without changing anything', async body => {
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/users/5/intake', 'PATCH', body)).status).toBe(400);
+    expect(mocked(deps, 'changeStudentIntakeYear')).not.toHaveBeenCalled();
+  });
+  it('rejects GET, POST, PUT and DELETE with 405 and an Allow header', async () => {
+    const deps = fixture();
+    for (const method of ['GET', 'POST', 'DELETE', 'PUT']) {
+      const response = await send(deps, '/api/admin/users/5/intake', method, method === 'GET' ? undefined : { intakeYear: 2023, reason });
+      expect(response.status).toBe(405);
+      expect(response.headers.get('allow')).toBe('PATCH');
+    }
+    expect(mocked(deps, 'changeStudentIntakeYear')).not.toHaveBeenCalled();
+  });
+  it('maps no account, no profile and unchanged to their status and stable code', async () => {
+    const expected = { NOT_FOUND: 404, STUDENT_PROFILE_NOT_FOUND: 404, UNCHANGED: 409 } as const;
+    for (const [code, status] of Object.entries(expected) as [keyof typeof expected, number][]) {
+      const deps = fixture();
+      mocked(deps, 'changeStudentIntakeYear').mockRejectedValue(new AdminMutationError(code));
+      const response = await send(deps, '/api/admin/users/5/intake', 'PATCH', { intakeYear: 2023, reason });
+      expect(response.status).toBe(status);
+      const body = await response.json() as { error: { code: string; message: string } };
+      expect(body.error.code).toBe(code);
+      if (code === 'UNCHANGED') expect(body.error.message).toBe('The intake year is already set to this year.');
     }
   });
 });
