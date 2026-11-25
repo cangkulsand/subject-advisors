@@ -1,6 +1,6 @@
 # S3-P004-036 — Staff sign up without an invitation and wait for a role
 
-- **Status:** READY_FOR_REVIEW (branch `feature/staff-waiting-access`, not merged or deployed)
+- **Status:** Merged to `main` (d84707e) and deployed to prod on 2026-11-25 (dev not deployed); peer review pending
 - **Date:** 2026-11-24
 - **Sprint:** Sprint 3
 - **Owner:** P004 (M0 authentication, M7 administration)
@@ -90,5 +90,5 @@ development Clerk instance allows 100 users, so waiting sign-ups count against i
 - **Actual changes:** Staff on `@utm.my` / `@gmail.com` can sign up without an invitation and see Waiting for access. Admins see them under Waiting for a role and assign the role with a reason.
 - **Compatibility/impact:** new error code `ROLE_PENDING` (403) on `POST /api/me/initialize`; new `GET /api/admin/waiting-users`. No migration, no environment change. Waiting sign-ups count towards the 100-user limit of the Clerk development instance.
 - **Outstanding:** live Clerk check on dev; optional email to admins when someone is waiting (not built).
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED (prod 2026-11-25)
 

@@ -1,6 +1,6 @@
 # S3-P004-035 — Access Control List and recovery permissions (requirements)
 
-- **Status:** READY_FOR_REVIEW (docs only; SRS .docx not yet updated)
+- **Status:** Merged to `main` (d84707e) on 2026-11-25; docs only; SRS .docx not yet updated
 - **Date:** 2026-11-24
 - **Sprint:** Sprint 3
 - **Owner:** P004 (access, admin)
