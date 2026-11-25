@@ -22,7 +22,7 @@ lists every curriculum of every programme. Dr. Adila also asked that a reused co
 ## Non-goals
 
 - **No database or migration change:** the data is already a hierarchy (`department.faculty_id`, `programme.department_id`/`faculty_id`, `curriculum.programme_id`).
-- **Curriculum subjects:** the Curriculum & Prerequisites screen (`/admin/curriculum`, P001's `p001-sprint2` code) is unchanged; each curriculum row links to it as today.
+- **Curriculum subjects:** the Subjects & Prerequisites screen (menu label; page title "Curriculum & Prerequisites", `/admin/curriculum`, P001's `p001-sprint2` code) is unchanged; each curriculum row links to it as today.
 - **Other pages unchanged:** Learning Centres, Coordinator Assignments and Academic Semesters are not part of the hierarchy.
 - **Out of scope:** coordinator faculty scope (Idham's item) and subject removal (Harraz's item).
 
@@ -66,6 +66,12 @@ All lists come from the existing endpoints (`faculties`, `departments`, `program
 **Moving records:**
 - **Department to another faculty:** the department's Edit keeps its Faculty field. The existing rule still applies: a department with programmes cannot move (`DEPARTMENT_HAS_PROGRAMMES`).
 - **Programme to another department:** the existing **Department** action is renamed **Move**. Choosing "None" is removed, because a programme without a department would drop out of the hierarchy. Every programme has a department today.
+  - **API unchanged (builder's call, settled after the builder check):** removing "None" is a browser-only change. `PATCH /programmes/{id}/department` still accepts `departmentId: null` (shared validator and repository). The orphan notice below covers a programme cleared through the API.
+  - **Choices offered:** active departments whose faculty is also active. An inactive faculty makes the database reject the move with `REFERENCE_INACTIVE`, so its departments are not offered.
+  - **Known failure, plain wording (browser only, no new API code):**
+    - **The block:** moving to a department in another faculty changes `programme.faculty_id`. The database blocks that while the programme has a live coordinator assignment, and returns `ASSIGNMENT_ACTIVE`.
+    - **The wording:** in the Move dialog that error reads "<code> has an active coordinator assignment. End it in Coordinator Assignments before moving the programme to another faculty."
+    - **Other errors:** shown as today.
 - **After a move:** if the moved record's own page is open, go to its new address. If it was moved from the parent's list, show "Moved SECJ to <new parent name>." and the row leaves the list.
 
 **Inactive records:**
@@ -93,11 +99,10 @@ All lists come from the existing endpoints (`faculties`, `departments`, `program
 - **Shared codes:** added to `ACADEMIC_SETUP_ERROR_CODES` and to `docs/api/admin-academic-setup.openapi.json`.
 
 **Browser, before sending:**
-- **Scope of the check:** the Save handler checks the loaded lists, inactive records included, case-insensitively, as the database does. Faculty, department, programme and centre codes are unique across the whole table; a curriculum version only within its programme.
+- **Scope of the check:** the Save handler checks the loaded lists, inactive records included, by exact match after trimming, as the database does: the `UNIQUE` columns are case-sensitive, so "fc" and "FC" are different codes. Faculty, department, programme and centre codes are unique across the whole table; a curriculum version only within its programme.
 - **When it matches another record**, the form shows, for example, "FC is already used by Faculty of Computing (inactive). Choose a different code." and nothing is sent.
 - **Fallback:** the server message covers a race.
 
-The builder checks whether the unique constraints are case-sensitive. If they are, the browser check is exact-match too.
 
 ### Tests
 
@@ -116,6 +121,12 @@ The builder checks whether the unique constraints are case-sensitive. If they ar
 - **README:** a row.
 - **API docs:** the OpenAPI error codes.
 - **Handover:** a short note to Aisa in the change record.
+
+## Calls settled after the builder check
+
+- **Table toolbar not needed:** the AGENTS.md table-toolbar rule covers tables with search, filter or sort controls. These levels have none, because choosing a parent is navigation. The three current setup pages don't use the toolbar either.
+- **Exact-match duplicate check:** codes are compared exactly after trimming, because the unique columns are case-sensitive.
+- **Move:** the API still accepts a null department; Move offers only active departments in active faculties; the coordinator-assignment block gets a plain message in the browser.
 
 ## Left to the builder
 
