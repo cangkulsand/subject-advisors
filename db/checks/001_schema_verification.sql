@@ -17,7 +17,7 @@ FOR t IN SELECT * FROM jsonb_array_elements(expected) LOOP
  -- The frozen 171 source attributes remain intact. Registered additive columns are
  -- one student_profile field (0003), exactly two curriculum_subject fields (0005) and the 16 nullable UC20 columns of 0007.
  IF actual_count<>(jsonb_array_length(t->'columns')
-   + CASE WHEN t->>'table'='student_profile' THEN 4 ELSE 0 END -- current_semester_id (0003), learning_centre_id (0009), fees_cleared_confirmed_at and muet_confirmed_at (0013)
+   + CASE WHEN t->>'table'='student_profile' THEN 5 ELSE 0 END -- current_semester_id (0003), learning_centre_id (0009), fees_cleared_confirmed_at and muet_confirmed_at (0013), intake_year (0016)
    + CASE WHEN t->>'table'='academic_semester' THEN 2 ELSE 0 END -- selection_opens_at, selection_closes_at (0009)
    + CASE WHEN t->>'table'='curriculum_subject' THEN 2 ELSE 0 END
    + CASE t->>'table' WHEN 'academic_import_batch' THEN 6 WHEN 'imported_student' THEN 2 WHEN 'imported_subject_record' THEN 1

@@ -1220,6 +1220,131 @@
         }
       }
     },
+    "/api/admin/users/{id}/intake": {
+      "patch": {
+        "operationId": "changeStudentIntakeYear",
+        "summary": "Correct a student's intake year (admin only)",
+        "description": "Students set their intake year once, when they create their profile (or once later if it was never recorded). This corrects it. In ONE transaction the profile row is locked, an unchanged value is rejected, student_profile.intake_year is updated and an append-only row is written to academic_setup_audit_log (entity_type student_intake, entity_id student_id, action CHANGE_INTAKE_YEAR, actor, reason, before_data {intakeYear} and after_data {intakeYear}). The curriculum is never changed; use PATCH /api/admin/users/{id}/programme for that. intakeYear is an integer 1990-2200; reason is trimmed, 1-500 characters. S3-P004-037.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeIntakeYearRequest"
+              },
+              "example": {
+                "intakeYear": 2023,
+                "reason": "Admitted a year later than recorded"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The student programme with the new intake year",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProgrammeEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, body over 16 KB, unknown field, invalid id or a failed validator (intakeYear an integer 1990-2200; the reason is required, 1-500 characters)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stable codes: NOT_FOUND, STUDENT_PROFILE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only PATCH is supported (Allow: PATCH)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stable code: UNCHANGED (the intake year is already this value)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type is not application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable (no internal text is returned)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/curriculum-options": {
       "get": {
         "operationId": "listCurriculumOptions",
@@ -2041,6 +2166,7 @@
           "STUDENT_PROFILE_NOT_FOUND",
           "CURRICULUM_UNAVAILABLE",
           "PROGRAMME_UNCHANGED",
+          "UNCHANGED",
           "ACCOUNT_NOT_FOUND",
           "ACADEMIC_SEMESTER_UNAVAILABLE",
           "DUMMY_LIMIT_REACHED",
@@ -2089,7 +2215,8 @@
           "curriculumVersion",
           "programmeId",
           "programmeCode",
-          "programmeName"
+          "programmeName",
+          "intakeYear"
         ],
         "additionalProperties": false,
         "properties": {
@@ -2122,6 +2249,13 @@
           },
           "programmeName": {
             "type": "string"
+          },
+          "intakeYear": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The student's intake year; null when not recorded yet. S3-P004-037."
           }
         }
       },
@@ -2156,6 +2290,24 @@
             "minimum": 1,
             "maximum": 2147483647,
             "description": "Active curriculum (programme + version) from GET /api/admin/curriculum-options"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          }
+        }
+      },
+      "ChangeIntakeYearRequest": {
+        "type": "object",
+        "required": [
+          "intakeYear",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "intakeYear": {
+            "type": "integer",
+            "minimum": 1990,
+            "maximum": 2200
           },
           "reason": {
             "$ref": "#/components/schemas/Reason"

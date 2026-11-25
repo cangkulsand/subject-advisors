@@ -192,6 +192,8 @@ export interface AdminStudentProgramme {
   programmeId: number;
   programmeCode: string;
   programmeName: string;
+  /** The student's intake year (S3-P004-037); null when not recorded yet. */
+  intakeYear: number | null;
 }
 /** An active curriculum (programme + version) an administrator may assign. */
 export interface AdminCurriculumOption { curriculumId: number; curriculumVersion: string; programmeId: number; programmeCode: string; programmeName: string }
@@ -206,4 +208,22 @@ export function validateChangeProgrammeRequest(body: unknown): AdminValidation<A
   const reason = normaliseReason(record.reason);
   if (!reason) return { ok: false, error: `Reason is required (1-${ADMIN_REASON_MAX_LENGTH} characters).` };
   return { ok: true, value: { curriculumId: id, reason } };
+}
+
+// ---- Student intake year correction (S3-P004-037) ----
+/** Same range as the student_profile_intake_year_range CHECK (migration 0016). */
+export const ADMIN_INTAKE_YEAR_MIN = 1990;
+export const ADMIN_INTAKE_YEAR_MAX = 2200;
+export interface AdminChangeIntakeYearRequest { intakeYear: number; reason: string }
+
+export function validateChangeIntakeYearRequest(body: unknown): AdminValidation<AdminChangeIntakeYearRequest> {
+  const record = asRecord(body, ['intakeYear', 'reason']);
+  if (typeof record === 'string') return { ok: false, error: record };
+  const year = record.intakeYear;
+  if (typeof year !== 'number' || !Number.isInteger(year) || year < ADMIN_INTAKE_YEAR_MIN || year > ADMIN_INTAKE_YEAR_MAX) {
+    return { ok: false, error: `Enter an intake year between ${ADMIN_INTAKE_YEAR_MIN} and ${ADMIN_INTAKE_YEAR_MAX}.` };
+  }
+  const reason = normaliseReason(record.reason);
+  if (!reason) return { ok: false, error: `Reason is required (1-${ADMIN_REASON_MAX_LENGTH} characters).` };
+  return { ok: true, value: { intakeYear: year, reason } };
 }

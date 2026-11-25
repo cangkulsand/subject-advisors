@@ -59,7 +59,7 @@ it('rejects a malformed mutation response and parses API errors into AdminApiErr
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' } }, { status: 422 })));
   await expect(createAdminClient(async () => 'TEST_ONLY').grantRole(5, { role: 'SYSTEM_ADMIN', reason: 'Why' })).rejects.toMatchObject({ name: 'Error', status: 422, code: 'ROLE_NOT_ELIGIBLE', message: 'Not eligible.' });
 });
-const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' };
+const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme', intakeYear: 2022 };
 it('reads the student programme and curriculum options and validates the rows', async () => {
   const fetcher = vi.fn(async () => Response.json({ data: programmeRow })); vi.stubGlobal('fetch', fetcher);
   expect(await createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).toEqual(programmeRow);
@@ -81,6 +81,23 @@ it('changeProgramme PATCHes the curriculum with a reason and decodes the removed
   await expect(createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).rejects.toThrow('Invalid administration response');
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'PROGRAMME_UNCHANGED', message: 'The student is already on this programme.' } }, { status: 409 })));
   await expect(createAdminClient(async () => 'TEST_ONLY').changeProgramme(5, { curriculumId: 2, reason: 'Why' })).rejects.toMatchObject({ status: 409, code: 'PROGRAMME_UNCHANGED' });
+});
+it('studentProgramme decodes the intake year: a year, null, or rejected when malformed (S3-P004-037)', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { ...programmeRow, intakeYear: null } })));
+  expect(await createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).toEqual({ ...programmeRow, intakeYear: null });
+  for (const intakeYear of ['2022', 2022.5, undefined, 0]) {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { ...programmeRow, intakeYear } })));
+    await expect(createAdminClient(async () => 'TEST_ONLY').studentProgramme(5)).rejects.toThrow('Invalid administration response');
+  }
+});
+it('changeIntakeYear PATCHes the intake year with a reason and decodes the student programme (S3-P004-037)', async () => {
+  const fetcher = vi.fn(async () => Response.json({ data: { ...programmeRow, intakeYear: 2023 } })); vi.stubGlobal('fetch', fetcher);
+  expect(await createAdminClient(async () => 'TEST_ONLY').changeIntakeYear(5, { intakeYear: 2023, reason: 'Why' })).toEqual({ ...programmeRow, intakeYear: 2023 });
+  expect(fetcher).toHaveBeenCalledWith('/api/admin/users/5/intake', expect.objectContaining({ method: 'PATCH', headers: { Authorization: 'Bearer TEST_ONLY', 'Content-Type': 'application/json' }, body: JSON.stringify({ intakeYear: 2023, reason: 'Why' }) }));
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: null })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').changeIntakeYear(5, { intakeYear: 2023, reason: 'Why' })).rejects.toThrow('Invalid administration response');
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'UNCHANGED', message: 'The intake year is already set to this year.' } }, { status: 409 })));
+  await expect(createAdminClient(async () => 'TEST_ONLY').changeIntakeYear(5, { intakeYear: 2023, reason: 'Why' })).rejects.toMatchObject({ status: 409, code: 'UNCHANGED', message: 'The intake year is already set to this year.' });
 });
 it('dummy users: reads capacity, POSTs a create and a reset, and rejects malformed credentials (S3-P004-029)', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: { used: 52, limit: 100 } })));

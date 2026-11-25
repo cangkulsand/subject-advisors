@@ -91,6 +91,24 @@ export async function academicUiChecks({ check, mock, base }) {
     await programmeRow.getByText('Fictional other faculty', { exact: true }).waitFor();
     await page.screenshot({ path: '.wrangler/admin-review/academic-programme-departments-desktop.png', fullPage: true });
   });
+  for (const width of [1440, 375]) await check('programmes: Students by intake column lists each intake year, not set and no students at ' + width + ' (S3-P004-037)', async page => {
+    const state = await mock(page); await page.setViewportSize({ width, height: 900 }); await page.goto(base + '/admin/programmes');
+    const table = page.getByRole('region', { name: 'Curriculums', exact: true }); await table.waitFor();
+    if (width === 1440) assert.ok((await table.getByRole('columnheader').allInnerTexts()).includes('Students by intake'));
+    const first = table.getByRole('row').filter({ has: page.getByRole('button', { name: 'Edit TEST 2026', exact: true }) });
+    assert.deepEqual(await first.locator('.admin-intakes li').allInnerTexts(), ['2027 intake: 12', '2026 intake: 225', 'Not set: 3']);
+    assert.equal(await first.locator('td[data-label="Students by intake"]').count(), 1);
+    // A new curriculum has no students yet.
+    await page.getByRole('button', { name: 'Add curriculum', exact: true }).click(); const add = page.getByRole('dialog', { name: 'Add curriculum', exact: true }); await add.waitFor();
+    await add.getByLabel('Programme', { exact: true }).selectOption('1'); await add.getByLabel('Version').fill('2028'); await add.getByLabel('Total credits').fill('130');
+    await save(add); await add.waitFor({ state: 'hidden' });
+    const created = table.getByRole('row').filter({ has: page.getByRole('button', { name: 'Edit TEST 2028', exact: true }) });
+    assert.deepEqual(await created.locator('.admin-intakes li').allInnerTexts(), ['No students']);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal page scroll at ' + width);
+    assert.ok(state.requests.some(request => request.path === '/api/admin/academic-setup/curricula'));
+    await table.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: '.wrangler/admin-review/academic-programmes-intakes-' + width + '.png', fullPage: true });
+  }, width);
   await check('programmes: create/edit/deactivate programme, legacy row, curriculum create/edit/deactivate, inactive-programme and duplicate errors, subjects link', async page => {
     const state = await mock(page), data = academicStore(state); await page.goto(base + '/admin/programmes');
     await page.getByRole('button', { name: 'Add programme', exact: true }).click();

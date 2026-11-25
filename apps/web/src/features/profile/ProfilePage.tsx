@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Profile, ProfileOptions } from '../../../../api/src/modules/profile/contracts';
 import { AcademicApiError, type AcademicClient, errorMessage } from './client';
-import { resolveProgrammeCurriculum } from './programme-resolution';
+import { curriculumOptionText, intakeYears, resolveIntakeCurriculum, savedIntakeSummary } from './programme-resolution';
 import { navigateApp, registerUnsavedChanges } from '../../app/navigation';
 import '../../app/typography.css';
 import './profile.css';
-const empty = { studentName: '', matricNo: '', learningCentreId: '', curriculumId: '', weeklyWorkingHours: '', availableStudyHours: '' };
+const empty = { studentName: '', matricNo: '', learningCentreId: '', curriculumId: '', intakeYear: '', weeklyWorkingHours: '', availableStudyHours: '' };
 type Draft = typeof empty;
 function draftOf(p: Profile | null): Draft {
   return p ? { studentName: p.studentName, matricNo: p.matricNo ?? '', learningCentreId: p.learningCentreId === null ? '' : String(p.learningCentreId), curriculumId: String(p.curriculumId),
+    intakeYear: p.intakeYear === null ? '' : String(p.intakeYear),
     weeklyWorkingHours: p.weeklyWorkingHours === null ? '' : String(p.weeklyWorkingHours),
     availableStudyHours: p.availableStudyHours === null ? '' : String(p.availableStudyHours) } : { ...empty };
 }
@@ -25,6 +26,8 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
   const [savedSemesterId, setSavedSemesterId] = useState<number | null>(null), [staleSavedSemester, setStaleSavedSemester] = useState(false);
   // Once a profile exists the programme is fixed; only the admin changes it (S2-P004-026). Holds the saved programme text, null before setup.
   const [savedProgramme, setSavedProgramme] = useState<string | null>(null);
+  // The saved profile behind the read-only intake and curriculum line (S3-P004-037); null before setup.
+  const [saved, setSaved] = useState<Profile | null>(null);
   const [error, setError] = useState(''), [success, setSuccess] = useState(''), [periodNotice, setPeriodNotice] = useState('');
   const alert = useRef<HTMLParagraphElement>(null), unsaved = useRef(false);
   useEffect(() => {
@@ -35,7 +38,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
         const value = draftOf(profile); setDraft(value); setInitial(value); setOptions(choices);
         const savedPeriodId = profile?.currentSemesterId ?? null;
         setSavedSemesterId(savedPeriodId); setStaleSavedSemester(Boolean(savedPeriodId !== null && savedPeriodId !== choices.currentSemester?.semesterId));
-        setLocked(profile?.learningCentreLocked === true); setSavedProgramme(profile ? programmeText(profile) : null);
+        setLocked(profile?.learningCentreLocked === true); setSavedProgramme(profile ? programmeText(profile) : null); setSaved(profile);
         const savedProgramme = String(choices.curricula.find(c => c.curriculumId === profile?.curriculumId)?.programmeId ?? '');
         setProgramme(savedProgramme); setInitialProgramme(savedProgramme); setLoaded(true);
       }).catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); });
@@ -64,16 +67,16 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     } finally { setRefreshingPeriod(false); }
   }
   async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (saving || refreshingPeriod || !options.currentSemester || !resolvedCurriculumId) return; setSaving(true); setError(''); setSuccess(''); setPeriodNotice('');
+    event.preventDefault(); if (saving || refreshingPeriod || !options.currentSemester || !resolvedCurriculumId || !draft.intakeYear) return; setSaving(true); setError(''); setSuccess(''); setPeriodNotice('');
     try {
       const profile = await api<Profile>('/api/profile', { method: 'PUT', body: {
-        studentName: draft.studentName.trim(), matricNo: draft.matricNo.replace(/\s+/g, '').toUpperCase(), learningCentreId: Number(draft.learningCentreId), curriculumId: resolvedCurriculumId,
+        studentName: draft.studentName.trim(), matricNo: draft.matricNo.replace(/\s+/g, '').toUpperCase(), learningCentreId: Number(draft.learningCentreId), curriculumId: resolvedCurriculumId, intakeYear: Number(draft.intakeYear),
         currentSemesterId: options.currentSemester.semesterId,
         weeklyWorkingHours: Number(draft.weeklyWorkingHours), availableStudyHours: Number(draft.availableStudyHours),
       } });
       const value = draftOf(profile);
       const savedProgramme = String(options.curricula.find(c => c.curriculumId === profile.curriculumId)?.programmeId ?? '');
-      unsaved.current = false; setLocked(profile.learningCentreLocked); setSavedProgramme(programmeText(profile)); setDraft(value); setInitial(value); setProgramme(savedProgramme); setInitialProgramme(savedProgramme);
+      unsaved.current = false; setLocked(profile.learningCentreLocked); setSavedProgramme(programmeText(profile)); setSaved(profile); setDraft(value); setInitial(value); setProgramme(savedProgramme); setInitialProgramme(savedProgramme);
       setSavedSemesterId(profile.currentSemesterId); setStaleSavedSemester(false); setSuccess('Profile saved.');
       if (setup) onSetupComplete();
     } catch (reason) {
@@ -85,15 +88,17 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     } finally { setSaving(false); }
   }
   const programmes = [...new Map(options.curricula.map(c => [c.programmeId, c])).values()];
-  const savedCurriculumId = programme === initialProgramme && initialProgramme && initial.curriculumId ? Number(initial.curriculumId) : undefined;
+  // New profile: the intake year picks the curriculum; a tie asks the student (S3-P004-037).
+  const resolution = savedProgramme === null ? resolveIntakeCurriculum(options.curricula, programme, draft.intakeYear, draft.curriculumId) : null;
   // A saved profile keeps its own curriculum, even if that configuration is no longer offered to new students.
-  const resolvedCurriculumId = savedProgramme !== null && initial.curriculumId ? Number(initial.curriculumId) : resolveProgrammeCurriculum(options.curricula, programme, savedCurriculumId);
-  function selectProgramme(value: string) {
-    setProgramme(value);
-    const preferred = value === initialProgramme && initialProgramme && initial.curriculumId ? Number(initial.curriculumId) : undefined;
-    const curriculumId = resolveProgrammeCurriculum(options.curricula, value, preferred);
-    field('curriculumId', curriculumId === null ? '' : String(curriculumId));
-  }
+  const resolvedCurriculumId = savedProgramme !== null ? (initial.curriculumId ? Number(initial.curriculumId) : null)
+    : resolution?.kind === 'single' ? resolution.curriculum.curriculumId : resolution?.kind === 'choose' ? resolution.selected?.curriculumId ?? null : null;
+  // The intake year is chosen at setup, or once on a saved profile that has none; after that only the admin changes it.
+  const intakeEditable = savedProgramme === null || !initial.intakeYear;
+  const years = intakeYears(new Date());
+  // Changing programme or intake year clears a manual curriculum choice.
+  function selectProgramme(value: string) { setProgramme(value); field('curriculumId', ''); }
+  function selectIntake(value: string) { setDraft(old => ({ ...old, intakeYear: value, curriculumId: savedProgramme === null ? '' : old.curriculumId })); setSuccess(''); setPeriodNotice(''); }
   return <section className="p001" aria-label="Academic profile">
     <header><p className="p001-eyebrow">Academic records</p><h1>{setup ? 'Complete your academic profile' : 'Your academic profile'}</h1>
       <p>{savedProgramme === null ? 'Choose your programme and tell us' : 'Tell us'} about your weekly work and study availability.</p></header>
@@ -113,15 +118,24 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
             <option value="">Select a programme</option>{programmes.map(c => <option key={c.programmeId} value={c.programmeId}>{c.programmeCode} — {c.programmeName}</option>)}
           </select></label>
           : <label>Programme<input name="programme" readOnly value={savedProgramme} aria-describedby="profile-programme-help" /></label>}
+        {saved && savedProgramme !== null && <label>Intake and curriculum<input name="intakeCurriculum" readOnly value={savedIntakeSummary(saved, options.curricula)} aria-describedby="profile-programme-help" /></label>}
+        {intakeEditable && <label>Intake year<select aria-label="Intake year" required value={draft.intakeYear} aria-describedby={savedProgramme === null ? undefined : 'profile-intake-help'} onChange={e => selectIntake(e.target.value)}>
+          <option value="">Select your intake year</option>{years.map(year => <option key={year} value={year}>{year}</option>)}
+        </select></label>}
+        {resolution?.kind === 'choose' && <label>Curriculum<select aria-label="Curriculum" required aria-describedby="profile-curriculum-help" value={resolution.selected ? String(resolution.selected.curriculumId) : ''} onChange={e => field('curriculumId', e.target.value)}>
+          <option value="">Select a curriculum</option>{resolution.options.map(c => <option key={c.curriculumId} value={c.curriculumId}>{curriculumOptionText(c)}</option>)}
+        </select></label>}
         <label>Learning centre<select aria-label="Learning centre" required disabled={locked} aria-describedby={locked ? 'profile-centre-help' : undefined} value={draft.learningCentreId} onChange={e => field('learningCentreId', e.target.value)}>
           <option value="">Select a learning centre</option>{options.learningCentres.map(c => <option key={c.learningCentreId} value={c.learningCentreId}>{c.centreName}</option>)}
         </select></label>
         </div>
+        {savedProgramme !== null && intakeEditable && <p className="p001-help" id="profile-intake-help">Your intake year is not set. Choose it once; only the admin can change it after you save.</p>}
+        {resolution?.kind === 'single' && <p className="p001-curriculum" role="status">Curriculum: {curriculumOptionText(resolution.curriculum)}</p>}
+        {resolution?.kind === 'choose' && <p className="p001-help" id="profile-curriculum-help">Choose the curriculum you were admitted under. Only the admin can change it after you save.</p>}
         {locked && <p className="p001-help" id="profile-centre-help">Locked while subject selection for the next semester is open. It unlocks when the next semester starts.</p>}
         <p className="p001-help" id="profile-matric-help">Your university matric number, for example A22EC0001. Coordinators use it to identify you when they plan class offerings.</p>
         {savedProgramme !== null && <p className="p001-help" id="profile-programme-help">Your programme is set. Contact the admin to change it.</p>}
-        {savedProgramme === null && programme && !resolvedCurriculumId && <p className="p001-help" role="status">This programme has multiple active configurations. Ask the maintainer to resolve the programme setup before saving.</p>}
-        <p className="p001-help">Your institutional email is managed through your account. You choose your programme once, when you set up your profile.</p>
+        <p className="p001-help">Your institutional email is managed through your account. You choose your programme and intake year once, when you set up your profile.</p>
       </fieldset>
       <fieldset disabled={saving || refreshingPeriod}><legend>Current academic period</legend><div className="p001-grid">
         <label className="p001-current-period-field">Academic year<span className="p001-readonly-control"><input aria-label="Academic year" aria-describedby="p001-current-period-help" value={options.currentSemester?.academicYear ?? ''} placeholder="Not configured" readOnly /><svg aria-hidden="true" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="9" rx="2"/><path d="M6.5 9V6a3.5 3.5 0 0 1 7 0v3"/></svg></span></label>
@@ -138,7 +152,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
         <label>Weekly working hours<input type="number" inputMode="numeric" min={0} max={2147483647} step={1} required value={draft.weeklyWorkingHours} onChange={e => field('weeklyWorkingHours', e.target.value)} /></label>
         <label>Available study hours per week<input type="number" inputMode="numeric" min={0} max={2147483647} step={1} required value={draft.availableStudyHours} onChange={e => field('availableStudyHours', e.target.value)} /></label>
       </div><p className="p001-help">Enter whole hours. Use zero when you have no work or study hours available.</p></fieldset>
-      <div className="p001-actions"><button className="p001-primary" type="submit" disabled={saving || refreshingPeriod || !options.currentSemester || !resolvedCurriculumId || !draft.learningCentreId}>{saving ? 'Saving…' : 'Save profile'}</button>
+      <div className="p001-actions"><button className="p001-primary" type="submit" disabled={saving || refreshingPeriod || !options.currentSemester || !resolvedCurriculumId || !draft.intakeYear || !draft.learningCentreId}>{saving ? 'Saving…' : 'Save profile'}</button>
         <button className="p001-cancel" type="button" disabled={saving || refreshingPeriod || !dirty} onClick={() => { setDraft({ ...initial }); setProgramme(initialProgramme); setError(''); setSuccess('Unsaved changes cancelled.'); }}>Cancel changes</button>
         {dirty && <span className="p001-help">Unsaved changes</span>}</div>
       {success && <p role="status" className="p001-success">{success}</p>}

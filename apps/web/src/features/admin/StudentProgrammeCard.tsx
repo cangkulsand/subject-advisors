@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { AdminApiError, type AdminClient } from './client';
 import { ReasonDialog } from './AdminUserManagement';
-import type { AdminCurriculumOption, AdminStudentProgramme } from '../../../../../packages/shared/src/admin/admin';
+import { ADMIN_INTAKE_YEAR_MAX, ADMIN_INTAKE_YEAR_MIN, type AdminCurriculumOption, type AdminStudentProgramme } from '../../../../../packages/shared/src/admin/admin';
+import { intakeYearChangeNotice, intakeYearLabel } from './intake-labels';
 
 /** "Programme changed; 3 subject picks removed." (S2-P004-026). */
 export function programmeChangeNotice(removedPicks: number) {
@@ -31,9 +32,25 @@ function ChangeProgrammeDialog({ client, current, onCancel, onSubmit }: { client
     onCancel={onCancel} onSubmit={reason => onSubmit(Number(choice), reason)}/>;
 }
 
+/** Admin correction of the intake year (S3-P004-037). The curriculum stays as it is. */
+function ChangeIntakeYearDialog({ current, onCancel, onSubmit }: { current: number | null; onCancel: () => void; onSubmit: (intakeYear: number, reason: string) => Promise<void> }) {
+  const [year, setYear] = useState(current === null ? '' : String(current));
+  const inputId = useId(), helpId = useId();
+  const value = /^\d{4}$/.test(year.trim()) ? Number(year.trim()) : NaN;
+  const inRange = Number.isInteger(value) && value >= ADMIN_INTAKE_YEAR_MIN && value <= ADMIN_INTAKE_YEAR_MAX;
+  const description = <>
+    <p>Correct the year this student was admitted. The curriculum is not changed; use Change programme for that.</p>
+    <div className="admin-field"><label htmlFor={inputId}>New intake year</label>
+      <input id={inputId} type="number" inputMode="numeric" min={ADMIN_INTAKE_YEAR_MIN} max={ADMIN_INTAKE_YEAR_MAX} step={1} value={year} aria-describedby={helpId} onChange={event => setYear(event.target.value)}/>
+      <span id={helpId} className="admin-muted">Current: {intakeYearLabel(current)}. Enter a year from {ADMIN_INTAKE_YEAR_MIN} to {ADMIN_INTAKE_YEAR_MAX}.</span></div>
+  </>;
+  return <ReasonDialog title="Change intake year" description={description} confirmLabel="Change intake year" disabled={!inRange || value === current}
+    onCancel={onCancel} onSubmit={reason => onSubmit(value, reason)}/>;
+}
+
 /** Student programme of an account that has a student profile, with the admin-only "Change programme" action. Renders nothing for other accounts. */
 export function StudentProgrammeCard({ client, accountId, version, onChanged }: { client: AdminClient; accountId: number; version: number; onChanged: (text: string) => void }) {
-  const [programme, setProgramme] = useState<AdminStudentProgramme | null>(), [loaded, setLoaded] = useState(false), [error, setError] = useState(''), [attempt, setAttempt] = useState(0), [changing, setChanging] = useState(false);
+  const [programme, setProgramme] = useState<AdminStudentProgramme | null>(), [loaded, setLoaded] = useState(false), [error, setError] = useState(''), [attempt, setAttempt] = useState(0), [changing, setChanging] = useState<'programme' | 'intake' | null>(null);
   useEffect(() => {
     const controller = new AbortController(); setLoaded(false); setError('');
     client.studentProgramme(accountId, controller.signal).then(value => { if (!controller.signal.aborted) { setProgramme(value); setLoaded(true); } },
@@ -44,14 +61,23 @@ export function StudentProgrammeCard({ client, accountId, version, onChanged }: 
   if (!loaded || !programme) return null;
   async function change(curriculumId: number, reason: string) {
     const result = await client.changeProgramme(accountId, { curriculumId, reason });
-    setProgramme(result.programme); setChanging(false); onChanged(programmeChangeNotice(result.removedPicks));
+    setProgramme(result.programme); setChanging(null); onChanged(programmeChangeNotice(result.removedPicks));
+  }
+  async function changeIntake(intakeYear: number, reason: string) {
+    const result = await client.changeIntakeYear(accountId, { intakeYear, reason });
+    setProgramme(result); setChanging(null); onChanged(intakeYearChangeNotice(intakeYear));
   }
   return <section className="admin-card" aria-label="Student programme"><h2>Student programme</h2>
-    <p className="admin-muted">Students choose their programme once, when they set up their profile. Only a System Administrator changes it afterwards; every change is recorded in the audit log with its reason.</p>
+    <p className="admin-muted">Students choose their programme and intake year once, when they set up their profile. Only a System Administrator changes them afterwards; every change is recorded in the audit log with its reason.</p>
     <dl className="admin-account-facts"><div><dt>Student</dt><dd>{programme.studentName}{programme.matricNo ? ` (${programme.matricNo})` : ''}</dd></div>
       <div><dt>Programme</dt><dd>{programme.programmeCode} — {programme.programmeName}</dd></div>
-      <div><dt>Curriculum version</dt><dd>{programme.curriculumVersion}</dd></div></dl>
-    <button type="button" className="admin-secondary" onClick={() => setChanging(true)}>Change programme</button>
-    {changing && <ChangeProgrammeDialog client={client} current={programme} onCancel={() => setChanging(false)} onSubmit={change}/>}
+      <div><dt>Curriculum version</dt><dd>{programme.curriculumVersion}</dd></div>
+      <div><dt>Intake year</dt><dd>{intakeYearLabel(programme.intakeYear)}</dd></div></dl>
+    <div className="admin-programme-actions">
+      <button type="button" className="admin-secondary" onClick={() => setChanging('programme')}>Change programme</button>
+      <button type="button" className="admin-secondary" onClick={() => setChanging('intake')}>Change intake year</button>
+    </div>
+    {changing === 'programme' && <ChangeProgrammeDialog client={client} current={programme} onCancel={() => setChanging(null)} onSubmit={change}/>}
+    {changing === 'intake' && <ChangeIntakeYearDialog current={programme.intakeYear} onCancel={() => setChanging(null)} onSubmit={changeIntake}/>}
   </section>;
 }

@@ -82,6 +82,11 @@
       "version": "0015",
       "file": "0015_owner_to_gmail.sql",
       "description": "Protected owner moves to the gmail System Admin; graduate account keeps STUDENT only (one email domain per role)"
+    },
+    {
+      "version": "0016",
+      "file": "0016_student_intake_year.sql",
+      "description": "Student intake year on student_profile (nullable, 1990-2200), backfilled from the curriculum effective year"
     }
   ],
   "historicalExcluded": [

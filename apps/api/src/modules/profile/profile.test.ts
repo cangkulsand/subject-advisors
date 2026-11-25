@@ -8,8 +8,8 @@ import { AuthError } from '../auth/errors';
 import type { Profile, ProfileRepository } from './contracts';
 import type { AccessAssignment } from '../auth/contracts';
 
-const input = { studentName: 'Demo student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12 };
-const profile: Profile = { ...input, learningCentreLocked: false, studentId: 1, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
+const input = { studentName: 'Demo student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 1, currentSemesterId: 201, weeklyWorkingHours: 0, availableStudyHours: 12, intakeYear: 2024 };
+const profile: Profile = { ...input, intakeYear: 2024, learningCentreLocked: false, studentId: 1, programmeCode: 'DEMO', programmeName: 'Not official', curriculumVersion: 'DEMO', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' };
 const record = { subjectId: 1, semesterId: null, status: 'EXEMPTED', recognizedCredits: 0, remarks: 'DEMO credit-free exemption' };
 const cacheBindings: CacheBindings = {
   REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
@@ -45,6 +45,14 @@ describe('P001 strict input validation', () => {
     for (const learningCentreId of [undefined, null, 0, -1, 1.5, '1']) expect(() => profileInput({ ...input, learningCentreId })).toThrow('Learning centre must be a positive integer ID.');
     expect(profileInput({ ...input, learningCentreId: 2 }).learningCentreId).toBe(2);
   });
+  it('profileInput requires a whole intake year (S3-P004-037)', () => {
+    for (const intakeYear of [undefined, null, '2024', 2024.5, NaN, 1989, 2201]) {
+      expect(() => profileInput({ ...input, intakeYear })).toThrow('Select your intake year.');
+      try { profileInput({ ...input, intakeYear }); } catch (error) { expect(error).toMatchObject({ status: 400, code: 'INVALID_INTAKE_YEAR' }); }
+    }
+    expect(profileInput({ ...input, intakeYear: 2022 }).intakeYear).toBe(2022);
+  });
+  it('rejects an unsupported field next to the intake year', () => expect(() => profileInput({ ...input, intake: 2024 })).toThrow('The request contains unsupported fields.'));
   it('requires a matric number of 4 to 30 letters or digits', () => {
     for (const matricNo of [undefined, null, '', '   ', 'A2', 'A22-EC-0001', 'X'.repeat(31), 12345]) expect(() => profileInput({ ...input, matricNo })).toThrow(/Matric number/);
     expect(profileInput({ ...input, matricNo: 'SX230001ECJHF04' }).matricNo).toBe('SX230001ECJHF04');

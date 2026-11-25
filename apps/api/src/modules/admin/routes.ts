@@ -1,5 +1,5 @@
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
-import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest, validateChangeProgrammeRequest } from '../../../../../packages/shared/src/admin/admin';
+import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest, validateChangeProgrammeRequest, validateChangeIntakeYearRequest } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminIdentity, AdminInvitationStatus, AdminUsersQuery, AdminAuditQuery, AdminValidation } from '../../../../../packages/shared/src/admin/admin';
 import type { AccountDetailRow, AccountRow, AdminDependencies } from './contracts';
 import { AdminMutationError } from './errors';
@@ -173,6 +173,15 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       }
       const input = validated(validateChangeProgrammeRequest(await readJson(request)));
       return authJson({ data: await deps.repository.changeStudentProgramme(accountId, input.curriculumId, actor, input.reason) });
+    }
+    const intakeRoute = /^\/api\/admin\/users\/([1-9]\d*)\/intake$/.exec(url.pathname);
+    if (intakeRoute) {
+      // Admin correction of a student's intake year (S3-P004-037); the curriculum is never changed here.
+      const denied = allow('PATCH'); if (denied) return denied;
+      parameters(url, []);
+      const accountId = positive(intakeRoute[1]!, 'account ID');
+      const input = validated(validateChangeIntakeYearRequest(await readJson(request)));
+      return authJson({ data: await deps.repository.changeStudentIntakeYear(accountId, input.intakeYear, actor, input.reason) });
     }
     if (url.pathname === '/api/admin/waiting-users') {
       // Staff who signed up without an invitation and wait for a role (S3-P004-036). Granting uses POST /api/admin/users.

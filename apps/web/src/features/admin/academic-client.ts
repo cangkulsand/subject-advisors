@@ -27,6 +27,11 @@ function curriculum(v: unknown): Contract.Curriculum {
   const item = row<Contract.Curriculum>(v, ['curriculumId', 'programmeId'], ['curriculumVersion'], ['isActive']);
   if (typeof item.totalCreditRequired !== 'number' || !Number.isInteger(item.totalCreditRequired) || typeof item.subjectCount !== 'number' || !Number.isInteger(item.subjectCount)) return invalid();
   if (item.effectiveYear !== null && typeof item.effectiveYear !== 'number') return invalid();
+  if (!Array.isArray(item.intakes)) return invalid();
+  for (const entry of item.intakes as unknown[]) {
+    const intake = object(entry);
+    if ((intake.intakeYear !== null && !Number.isInteger(intake.intakeYear)) || !Number.isSafeInteger(intake.students) || (intake.students as number) < 0) return invalid();
+  }
   return item;
 }
 function semester(v: unknown): Contract.AcademicSemester {

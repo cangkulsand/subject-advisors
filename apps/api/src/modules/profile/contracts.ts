@@ -7,8 +7,10 @@ export interface ProfileInput {
   currentSemesterId: number;
   weeklyWorkingHours: number;
   availableStudyHours: number;
+  /** Intake year (S3-P004-037): chosen with the programme when the profile is created; the curriculum follows it. */
+  intakeYear: number;
 }
-export interface Profile extends Omit<ProfileInput, 'currentSemesterId' | 'weeklyWorkingHours' | 'availableStudyHours' | 'learningCentreId'> {
+export interface Profile extends Omit<ProfileInput, 'currentSemesterId' | 'weeklyWorkingHours' | 'availableStudyHours' | 'learningCentreId' | 'intakeYear'> {
   studentId: number;
   /** Null for a legacy profile that has not chosen a centre yet. */
   learningCentreId: number | null;
@@ -19,6 +21,8 @@ export interface Profile extends Omit<ProfileInput, 'currentSemesterId' | 'weekl
   totalCreditRequired?: number | null;
   weeklyWorkingHours: number | null;
   availableStudyHours: number | null;
+  /** Null for a profile whose intake year was not backfilled; the student may set it once. */
+  intakeYear: number | null;
   programmeCode: string;
   programmeName: string;
   curriculumVersion: string;
@@ -28,6 +32,9 @@ export interface Profile extends Omit<ProfileInput, 'currentSemesterId' | 'weekl
 export interface CurriculumOption {
   curriculumId: number; curriculumVersion: string; programmeId: number;
   programmeCode: string; programmeName: string;
+  /** Curriculum effective year; null when not configured. */
+  effectiveYear: number | null;
+  totalCreditRequired: number;
 }
 export interface SubjectOption { subjectId: number; subjectCode: string; subjectName: string; creditHours: number; subjectCategory?: string | null; isCompulsory?: 0 | 1 }
 export interface SubjectGroupOption { category: string; requiredSubjects: number | null; availableSubjects: number }

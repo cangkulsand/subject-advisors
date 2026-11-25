@@ -1292,7 +1292,8 @@
           "totalCreditRequired",
           "effectiveYear",
           "isActive",
-          "subjectCount"
+          "subjectCount",
+          "intakes"
         ],
         "properties": {
           "curriculumId": {
@@ -1326,6 +1327,33 @@
           "subjectCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "intakes": {
+            "type": "array",
+            "description": "Students on this curriculum per intake year (student_profile.intake_year), year descending with intakeYear null (not set) last; empty when no student follows it. Create and update responses carry it too (a new curriculum has none). S3-P004-037.",
+            "items": {
+              "type": "object",
+              "required": [
+                "intakeYear",
+                "students"
+              ],
+              "properties": {
+                "intakeYear": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "students": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
           }
         }
       }

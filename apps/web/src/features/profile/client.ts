@@ -58,8 +58,8 @@ export function createAcademicClient(getToken: () => Promise<string | null>, bas
       throw new AcademicApiError(response.status, 'INVALID_RESPONSE', 'Academic data could not be loaded. Please retry.');
     }
     const contractVersions = path === '/api/profile'
-      ? ['current-semester-required-v1', 'configured-credit-total-v1', 'programme-admin-change-v1']
-      : path === '/api/profile/options' ? ['current-semester-required-v1', 'programme-admin-change-v1', 'profile-options-admin-current-semester-v3'] : [];
+      ? ['current-semester-required-v1', 'configured-credit-total-v1', 'programme-admin-change-v1', 'intake-year-v1']
+      : path === '/api/profile/options' ? ['current-semester-required-v1', 'programme-admin-change-v1', 'profile-options-admin-current-semester-v3', 'intake-year-v1'] : [];
     const cacheKey = JSON.stringify([sessionStamp, base, path, ...contractVersions]);
     if (cacheable && options.fresh) dropAcademicEntry(cacheKey);
     return cacheable ? cachedAcademicRead(cacheKey, request, options.signal, path === '/api/profile/options' ? ACADEMIC_CACHE_TTL : null) : request();

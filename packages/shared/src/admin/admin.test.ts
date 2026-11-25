@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ADMIN_REASON_MAX_LENGTH, SYSTEM_ADMIN_EMAIL_DOMAINS, isSystemAdminEmailDomain, normaliseEmail, normaliseReason, validateChangeAccessRequest,
   validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest,
-  validateRevokeRoleRequest,
+  validateRevokeRoleRequest, validateChangeIntakeYearRequest, ADMIN_INTAKE_YEAR_MIN, ADMIN_INTAKE_YEAR_MAX,
 } from './admin';
 
 describe('normaliseReason', () => {
@@ -69,5 +69,23 @@ describe('grant / revoke / access requests', () => {
     expect(validateChangeAccessRequest({ status: 'SUSPENDED', reason: 'r' })).toEqual({ ok: true, value: { status: 'SUSPENDED', reason: 'r' } });
     expect(validateChangeAccessRequest({ status: 'DELETED', reason: 'r' }).ok).toBe(false);
     expect(validateChangeAccessRequest({ status: 'ACTIVE', reason: '' }).ok).toBe(false);
+  });
+});
+
+describe('validateChangeIntakeYearRequest (S3-P004-037)', () => {
+  it('accepts an integer year in range and trims the reason', () => {
+    expect(validateChangeIntakeYearRequest({ intakeYear: 2022, reason: ' Wrong intake at setup ' })).toEqual({ ok: true, value: { intakeYear: 2022, reason: 'Wrong intake at setup' } });
+    expect(validateChangeIntakeYearRequest({ intakeYear: ADMIN_INTAKE_YEAR_MIN, reason: 'r' }).ok).toBe(true);
+    expect(validateChangeIntakeYearRequest({ intakeYear: ADMIN_INTAKE_YEAR_MAX, reason: 'r' }).ok).toBe(true);
+  });
+  it.each([1989, 2201, 2022.5, '2022', null, undefined, Number.NaN])('rejects intake year %j', intakeYear => {
+    expect(validateChangeIntakeYearRequest({ intakeYear, reason: 'r' })).toEqual({ ok: false, error: 'Enter an intake year between 1990 and 2200.' });
+  });
+  it('requires a bounded reason and rejects unknown fields', () => {
+    expect(validateChangeIntakeYearRequest({ intakeYear: 2022, reason: '  ' }).ok).toBe(false);
+    expect(validateChangeIntakeYearRequest({ intakeYear: 2022, reason: 'a'.repeat(ADMIN_REASON_MAX_LENGTH + 1) }).ok).toBe(false);
+    expect(validateChangeIntakeYearRequest({ intakeYear: 2022 }).ok).toBe(false);
+    expect(validateChangeIntakeYearRequest({ intakeYear: 2022, reason: 'r', curriculumId: 3 }).ok).toBe(false);
+    expect(validateChangeIntakeYearRequest(null).ok).toBe(false);
   });
 });

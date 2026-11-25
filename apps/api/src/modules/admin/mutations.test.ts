@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { parse } from 'libpg-query';
 import { createAdminRepository, type AdminQuery, type AdminStatement } from './repository';
 import { AdminMutationError, mapAdminDatabaseError } from './errors';
 import { checkRoleEligibility } from './eligibility';
@@ -284,7 +285,7 @@ describe('last-role guard and redemption lookups', () => {
 });
 
 describe('student programme change (S2-P004-026)', () => {
-  const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' };
+  const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme', intakeYear: 2022 };
   it('runs the database function in one audited transaction and returns the removed pick count', async () => {
     const { repository, calls, query } = harness({ rows: statements => statements.map((_, index) => index === 2 ? [{ removedPicks: '4' }] : index === 3 ? [programmeRow] : []) });
     const result = await repository.changeStudentProgramme(7, 2, 'user_admin', 'Wrong programme at setup');
@@ -365,5 +366,65 @@ describe('dummy accounts (S3-P004-029)', () => {
     expect(await some.repository.currentSemesterId()).toBe(24);
     const none = harness();
     expect(await none.repository.currentSemesterId()).toBeNull();
+  });
+});
+
+describe('student intake year change (S3-P004-037)', () => {
+  const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme', intakeYear: 2023 };
+  it('parses as SQL, binds values and runs guards, the update and the audit row in one audited transaction', async () => {
+    const parsed: string[] = [];
+    const { repository, calls, query } = harness({ rows: statements => statements.map((_, index) => index === statements.length - 1 ? [programmeRow] : index === statements.length - 2 ? [{ auditId: 41 }] : []) });
+    const result = await repository.changeStudentIntakeYear(7, 2023, 'user_admin', 'Wrong intake at setup');
+    expect(result).toEqual(programmeRow);
+    expect(query).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    const statements = calls[0]!;
+    for (const statement of statements) { await parse(statement.text); parsed.push(statement.text); }
+    expect(parsed).toHaveLength(statements.length);
+    const sql = sqlOf(statements);
+    expect(statements[0]!.values).toEqual(['user_admin', 'Wrong intake at setup']);
+    // Lock the profile row, then the guards in order: no account, no profile, unchanged.
+    expect(sql[1]).toContain('FOR UPDATE OF p');
+    expect(sql[2]).toContain('ADMIN_GUARD:NOT_FOUND');
+    expect(sql[3]).toContain('ADMIN_GUARD:STUDENT_PROFILE_NOT_FOUND');
+    expect(sql[4]).toContain('ADMIN_GUARD:UNCHANGED');
+    expect(sql[4]).toContain('p.intake_year IS NOT DISTINCT FROM $2::smallint');
+    expect(statements[4]!.values).toEqual([7, 2023]);
+    // The update and the append-only audit row are one statement.
+    const write = sql[5]!;
+    expect(write).toContain('UPDATE public.student_profile');
+    expect(write).toContain('SET intake_year=$2::smallint');
+    expect(write).not.toContain('curriculum_id=');
+    expect(write).toContain('INSERT INTO public.academic_setup_audit_log(entity_type,entity_id,action,actor,reason,before_data,after_data)');
+    expect(write).toContain("'student_intake'");
+    expect(write).toContain("'CHANGE_INTAKE_YEAR'");
+    expect(write).toContain("btrim(current_setting('app.access_actor',true))");
+    expect(write).toContain("jsonb_build_object('intakeYear',");
+    expect(statements[5]!.values).toEqual([7, 2023]);
+    expect(sql[6]).toContain('p.intake_year AS "intakeYear"');
+    for (const statement of statements) expect(statement.text).not.toContain('2023');
+  });
+  it('rejects a blank reason before touching the database', async () => {
+    const { repository, transaction } = harness();
+    await expect(repository.changeStudentIntakeYear(7, 2023, 'user_admin', '  ')).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+  it.each(['NOT_FOUND', 'STUDENT_PROFILE_NOT_FOUND', 'UNCHANGED'] as const)('maps the %s guard to its stable code', async code => {
+    const { repository } = harness({ fail: Object.assign(new Error(`invalid input syntax for type integer: "ADMIN_GUARD:${code}"`), { code: '22P02' }) });
+    await expect(repository.changeStudentIntakeYear(7, 2023, 'user_admin', 'Reason')).rejects.toMatchObject({ code });
+  });
+  it('UNCHANGED is a 409 with a plain message', () => {
+    expect(new AdminMutationError('UNCHANGED')).toMatchObject({ status: 409, message: 'The intake year is already set to this year.' });
+  });
+  it('fails safely when the readback is missing', async () => {
+    const { repository } = harness({ rows: statements => statements.map(() => []) });
+    await expect(repository.changeStudentIntakeYear(7, 2023, 'user_admin', 'Reason')).rejects.toMatchObject({ code: 'MUTATION_FAILED' });
+  });
+  it('reads the intake year with the student programme, null when not set', async () => {
+    const query = vi.fn<AdminQuery>(async () => [{ ...programmeRow, intakeYear: null }]);
+    expect(await createAdminRepository(query).studentProgramme(7)).toEqual({ ...programmeRow, intakeYear: null });
+    expect(query.mock.calls[0]![0]).toContain('p.intake_year AS "intakeYear"');
+    query.mockResolvedValueOnce([{ ...programmeRow, intakeYear: '2021' }]);
+    expect((await createAdminRepository(query).studentProgramme(7))?.intakeYear).toBe(2021);
   });
 });

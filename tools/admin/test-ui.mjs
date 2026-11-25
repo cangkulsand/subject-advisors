@@ -560,6 +560,44 @@ else {
       await dialog.getByRole('button', { name: 'Change programme', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Programme changed; 0 subject picks removed.' }).waitFor();
     });
+    await check('student intake year: shown on the card, corrected with a reason, unchanged rejected in the dialog, success notice (S3-P004-037)', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/4'); const card = page.getByLabel('Student programme', { exact: true }); await card.waitFor();
+      const intake = card.locator('.admin-account-facts div').filter({ has: page.getByText('Intake year', { exact: true }) });
+      assert.equal(await intake.locator('dd').innerText(), '2022');
+      await card.getByRole('button', { name: 'Change intake year', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Change intake year' }); await dialog.waitFor();
+      const year = dialog.getByLabel('New intake year', { exact: true }); assert.equal(await year.inputValue(), '2022');
+      await dialog.getByText('Current: 2022. Enter a year from 1990 to 2200.', { exact: true }).waitFor();
+      const confirm = dialog.getByRole('button', { name: 'Change intake year', exact: true });
+      await dialog.getByLabel(reasonLabel).fill('Fictional: admitted a year later.');
+      assert.equal(await confirm.isDisabled(), true, 'same year cannot be submitted');
+      await year.fill('1989'); assert.equal(await confirm.isDisabled(), true, 'out of range');
+      await year.fill('2023'); assert.equal(await confirm.isDisabled(), false);
+      await dialog.getByLabel(reasonLabel).fill(''); assert.equal(await confirm.isDisabled(), true, 'reason required');
+      await dialog.getByLabel(reasonLabel).fill('Fictional: admitted a year later.');
+      state.mutationError = { status: 409, code: 'UNCHANGED', message: 'The intake year is already set to this year.' };
+      await confirm.click(); await dialog.getByRole('alert').filter({ hasText: 'The intake year is already set to this year.' }).waitFor(); assert.equal(await dialog.isVisible(), true);
+      delete state.mutationError; await confirm.click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Intake year changed to 2023.' }).waitFor();
+      assert.equal(await intake.locator('dd').innerText(), '2023');
+      const patch = state.bodies.filter(item => item.method === 'PATCH').at(-1);
+      assert.deepEqual(patch, { method: 'PATCH', path: '/api/admin/users/4/intake', body: { intakeYear: 2023, reason: 'Fictional: admitted a year later.' } });
+      await card.getByText('DEMO — DEMO Not official', { exact: true }).waitFor(); // the programme is unchanged
+      // A student with no intake year recorded.
+      await page.goto(base + '/admin/users/5'); await card.waitFor();
+      assert.equal(await intake.locator('dd').innerText(), 'Not set');
+      for (const width of [375, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        await card.getByRole('button', { name: 'Change intake year', exact: true }).click(); await dialog.waitFor();
+        assert.equal(await year.inputValue(), '');
+        const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= width, 'dialog fits at ' + width);
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal scroll at ' + width);
+        if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/student-intake-dialog-375.png', fullPage: true });
+        await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal scroll at ' + width);
+        if (width === 375) await page.screenshot({ path: '.wrangler/admin-review/student-intake-card-375.png', fullPage: true });
+      }
+    });
     for (const width of [320, 375, 768]) await check('user management has no horizontal overflow and keeps dialog on screen at ' + width, async page => {
       const state = await mock(page); await page.setViewportSize({ width, height: 844 });
       await page.goto(base + '/admin/users'); const addDialog = await openAddDialog(page);

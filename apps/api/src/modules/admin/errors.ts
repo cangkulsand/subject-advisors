@@ -3,7 +3,7 @@ import type { AdminMutationErrorCode } from '../../../../../packages/shared/src/
 /** MT1 shared codes plus codes that only the data-access layer can raise. */
 export type AdminErrorCode = AdminMutationErrorCode | 'INVALID_REQUEST' | 'NOT_FOUND' | 'ROLE_NOT_ASSIGNED' |
   'INVITATION_NOT_PENDING' | 'INVITATION_EXPIRED' | 'CONFLICT' | 'MUTATION_FAILED' |
-  'STUDENT_PROFILE_NOT_FOUND' | 'CURRICULUM_UNAVAILABLE' | 'PROGRAMME_UNCHANGED';
+  'STUDENT_PROFILE_NOT_FOUND' | 'CURRICULUM_UNAVAILABLE' | 'PROGRAMME_UNCHANGED' | 'UNCHANGED';
 
 const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   ROLE_ALREADY_ASSIGNED: { status: 409, message: 'The account already holds this role.' },
@@ -33,6 +33,7 @@ const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   STUDENT_PROFILE_NOT_FOUND: { status: 404, message: 'This account has no student profile yet.' },
   CURRICULUM_UNAVAILABLE: { status: 409, message: 'The selected programme is not available. Choose an active programme.' },
   PROGRAMME_UNCHANGED: { status: 409, message: 'The student is already on this programme.' },
+  UNCHANGED: { status: 409, message: 'The intake year is already set to this year.' },
   MUTATION_FAILED: { status: 500, message: 'The change could not be completed. Please retry.' },
 };
 
