@@ -118,11 +118,20 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.equal(await page.getByRole('button', { name: 'Add department', exact: true }).isDisabled(), true);
     await page.getByText('Reactivate this faculty to add departments.', { exact: true }).waitFor();
     await region('Departments').getByRole('link', { name: 'DEPT', exact: true }).click(); await page.waitForURL(base + '/admin/faculties/1/departments/1');
-    await region('Programmes').waitFor(); assert.equal(await page.getByRole('button', { name: 'Add programme', exact: true }).isDisabled(), false);
+    // The database refuses a programme under an inactive faculty, so an active department of an inactive faculty cannot add one either.
+    await region('Programmes').waitFor(); assert.equal(await page.getByRole('button', { name: 'Add programme', exact: true }).isDisabled(), true);
+    await page.getByText('Reactivate faculty TEST to add programmes.', { exact: true }).waitFor();
   });
   await check('academic structure: department moved to another faculty from its page follows it; mismatched and unknown addresses show not found (S3-P004-038)', async page => {
     const state = await mock(page); academicStore(state).departments.push({ departmentId: 3, departmentCode: 'NEWD', departmentName: 'Fictional movable department', facultyId: 1, isActive: true });
-    const { crumbs } = structure(page); await page.goto(base + '/admin/faculties/1/departments/3');
+    const { crumbs, region } = structure(page);
+    // Moved from the faculty's list: the row leaves and the notice names the new faculty.
+    await page.goto(base + '/admin/faculties/1'); await region('Departments').getByRole('button', { name: 'Edit DEPT', exact: true }).waitFor();
+    academicStore(state).departments.push({ departmentId: 5, departmentCode: 'LISTD', departmentName: 'Fictional listed department', facultyId: 1, isActive: true }); await page.reload();
+    await region('Departments').getByRole('button', { name: 'Edit LISTD', exact: true }).click(); const fromList = page.getByRole('dialog', { name: 'Edit department', exact: true });
+    await fromList.getByLabel('Faculty', { exact: true }).selectOption('2'); await save(fromList); await fromList.waitFor({ state: 'hidden' });
+    await page.getByText('Moved LISTD to Fictional other faculty.', { exact: true }).waitFor(); assert.equal(await region('Departments').getByText('LISTD').count(), 0);
+    await page.goto(base + '/admin/faculties/1/departments/3');
     await page.getByRole('button', { name: 'Edit NEWD', exact: true }).click(); const edit = page.getByRole('dialog', { name: 'Edit department', exact: true });
     await edit.getByLabel('Faculty', { exact: true }).selectOption('2'); await save(edit); await edit.waitFor({ state: 'hidden' });
     await page.waitForURL(base + '/admin/faculties/2/departments/3');

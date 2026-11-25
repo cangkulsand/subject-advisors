@@ -50,6 +50,7 @@ export function StructureDialogs({ dialog, client, data, address, onClose, onSav
         await client.updateDepartment(row.departmentId, input);
         const open = address.level === 'department' || address.level === 'programme' ? address : null;
         if (open && open.departmentId === row.departmentId && facultyId !== row.facultyId) onSaved({ next: structurePath({ ...open, facultyId }) });
+        else if (facultyId !== row.facultyId) onSaved({ message: `Moved ${input.departmentCode} to ${data.faculties.find(f => f.facultyId === facultyId)?.facultyName ?? 'its new faculty'}.` });
         else done();
       }}/>;
     }

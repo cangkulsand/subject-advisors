@@ -96,10 +96,12 @@ export function AcademicStructurePage({ client, pathname }: { client: AcademicSe
       case 'department': {
         const { faculty, department, programmes } = resolved;
         description = descriptions.department(resolved);
-        action = addButton('Add programme', { kind: 'add-programme', departmentId: department.departmentId }, department.isActive);
+        // The database refuses a programme whose faculty is inactive, so both parents must be active.
+        action = addButton('Add programme', { kind: 'add-programme', departmentId: department.departmentId }, department.isActive && faculty.isActive);
         body = <>
           <Summary code={department.departmentCode} name={department.departmentName} active={department.isActive} onEdit={() => setDialog({ kind: 'edit-department', row: department })} onToggle={() => setDialog({ kind: 'toggle-department', row: department })}/>
           {inactiveNote('department', 'programmes', department.isActive)}
+          {department.isActive && !faculty.isActive && <p role="note" className="admin-muted">Reactivate faculty {faculty.facultyCode} to add programmes.</p>}
           {!programmes.length ? <p>No programmes in this department yet.</p> : <SetupTable label="Programmes" headings={['Code', 'Name', 'Curricula', 'Status', 'Actions']}>{programmes.map(row => <tr key={row.programmeId}>
             <td>{link({ level: 'programme', facultyId: faculty.facultyId, departmentId: department.departmentId, programmeId: row.programmeId }, row.programmeCode)}</td><td>{row.programmeName}</td><td>{countLabel(curriculumCount(row.programmeId, data), 'curriculum', 'curricula')}</td><td><StatusPill active={row.isActive}/></td>
             <td><RowActions code={row.programmeCode} active={row.isActive} onEdit={() => setDialog({ kind: 'edit-programme', row })} onToggle={() => setDialog({ kind: 'toggle-programme', row })}><MoveButton code={row.programmeCode} onClick={() => setDialog({ kind: 'move-programme', row })}/></RowActions></td></tr>)}</SetupTable>}

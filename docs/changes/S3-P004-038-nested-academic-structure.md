@@ -85,7 +85,11 @@ records under the selected parent and replace technical duplicate-code errors wi
 | `npm run test:ui:admin` | 69 PASS (8 new Academic Structure checks) |
 | `npm run test:ui:integration` | 81 PASS |
 
-- **Outcome:** PASS — SELF-REVIEW plus a whole-branch review (see the review section below once done); P001 review pending.
+- **Whole-branch review (2026-11-26, independent reviewer):** "With fixes", no critical issues. Fixed with a failing browser check first:
+  - **Add programme under an inactive faculty:** it was enabled when the department was active but its faculty was not, and the database then refused the insert. It is now disabled, with "Reactivate faculty <code> to add programmes."
+  - **Department moved from a faculty's list:** it now shows "Moved <code> to <faculty name>.", as the design requires, instead of "Academic setup saved."
+- **Deferred minors:** the disabled Add label while loading repeats the level mapping; each drill-down step reloads the four lists (fine at today's size); the Programmes table no longer shows the unused Level column.
+- **Outcome:** PASS — independent review fixes applied; P001 review pending.
 - **Known, pre-existing:** the reason counter (`<small>`) in setup dialogs renders at 11.67px, under the readability guard's 12px. It was not changed here.
 
 ## 4. Handover to Aisa
