@@ -4,6 +4,11 @@ import { createProfileRepository } from './repository';
 import { createReferenceCache, type CacheBindings } from '../../cache/redis';
 import { createRecordsRepository } from '../records/repository';
 
+/** S3-P004-037: a save sends an intake year; new profiles probe their programme's offered curricula (here: the one curriculum). */
+const INTAKE_YEAR = new Date().getUTCFullYear();
+const offeredProbe = (sql: string, curriculumId: number) =>
+  sql.includes('FROM public.curriculum o JOIN public.programme g') ? [{ curriculumId, curriculumVersion: 'V1', effectiveYear: null }] : null;
+
 const cacheBindings: CacheBindings = {
   REDIS_CACHE_ENABLED: 'true', REDIS_CURRICULUM_CACHE_ENABLED: 'true', UPSTASH_REDIS_REST_URL: 'https://cache.test.upstash.io',
   UPSTASH_REDIS_REST_TOKEN: 'test-secret', REDIS_CACHE_NAMESPACE: 'test', REDIS_CACHE_DATASET: 'profile',
@@ -75,7 +80,7 @@ describe('P001 profile options subject metadata', () => {
     const cache = referenceCacheHarness();
     const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
       if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
-        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
       ];
       if (sql.includes('SELECT semester_id AS "semesterId"')) return [
         { semesterId: 30, academicYear: 'whatever is configured', semesterNo: 1, semesterType: 'NORMAL' },
@@ -124,7 +129,7 @@ describe('P001 profile options subject metadata', () => {
     const cache = referenceCacheHarness(new Map(), () => clock);
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
-        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
       ];
       if (sql.includes('SELECT semester_id AS "semesterId"')) return [
         { semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' },
@@ -153,13 +158,13 @@ describe('P001 profile options subject metadata', () => {
     const cache = referenceCacheHarness(new Map([[curriculumKey, {
       version: 1, kind: 'curricula', namespace: 'test', dataset: 'profile', loadedAt: now - 1000,
       expiresAt: now + 100_000, data: [{ curriculumId: defect === 'invalid-id' ? 0 : 10, curriculumVersion: 'V1', programmeId: 20,
-        programmeCode: 'CS', programmeName: 'Computing', ...(defect === 'extra-field' ? { matricNo: 'must-not-appear' } : {}) }],
+        programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120, ...(defect === 'extra-field' ? { matricNo: 'must-not-appear' } : {}) }],
     }]]));
     const query = vi.fn(async (sql: string) => sql.includes('SELECT c.curriculum_id AS "curriculumId"') ? [
-      { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+      { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
     ] : [] as Record<string, unknown>[] ) as unknown as Query & ReturnType<typeof vi.fn>;
     const result = await createProfileRepository(query, cache.cache).options('student-a');
-    expect(result.curricula).toEqual([{ curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' }]);
+    expect(result.curricula).toEqual([{ curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 }]);
     expect(JSON.stringify(result.curricula)).not.toContain('must-not-appear');
     expect(query.mock.calls.filter(([sql]) => sql.includes('SELECT c.curriculum_id AS "curriculumId"'))).toHaveLength(1);
   });
@@ -184,21 +189,21 @@ describe('P001 profile options subject metadata', () => {
     const cache = referenceCacheHarness();
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
-        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
       ];
       if (sql.includes('SELECT semester_id AS "semesterId"')) return [
         { semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' },
       ];
       if (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1')) return [{ learning_centre_id: 1 }];
       if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' }];
-      return [];
+      return offeredProbe(sql, 10) ?? [];
     }) as Query & ReturnType<typeof vi.fn>;
     const profiles = createProfileRepository(query, cache.cache);
     await profiles.options('student-a');
     const cacheReadsBeforeSave = cache.gets.length;
     await expect(profiles.save('student-a', {
       studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 10, currentSemesterId: 30,
-      weeklyWorkingHours: 0, availableStudyHours: 8,
+      weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     })).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
     expect(query.mock.calls.some(([sql]) => sql.includes('JOIN public.academic_semester s ON s.semester_id=$5'))).toBe(true);
     expect(query.mock.calls.some(([sql, parameters]) => sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1') && parameters[0] === 30)).toBe(true);
@@ -219,7 +224,7 @@ describe('P001 curriculum-scoped options cache', () => {
         const id = current[String(parameters[0])]; return id ? [{ curriculumId: id }] : [];
       }
       if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
-        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
       ];
       if (sql.includes('SELECT semester_id AS "semesterId"')) return [
         { semesterId: 30, academicYear: 'configured', semesterNo: 1, semesterType: 'NORMAL' },
@@ -399,11 +404,11 @@ describe('P001 current semester persistence', () => {
     await expect(createProfileRepository(query).find('verified-student')).rejects.toThrow('Invalid profile curriculum total');
   });
   it('validates configured current semester in the profile upsert and returns it', async () => {
-    const query = vi.fn(async (sql: string) => sql.includes('INSERT INTO public.student_profile') ? [{ studentId: 9, studentName: 'Student', matricNo: null, learningCentreId: 1,
+    const query = vi.fn(async (sql: string) => offeredProbe(sql, 4) ?? (sql.includes('INSERT INTO public.student_profile') ? [{ studentId: 9, studentName: 'Student', matricNo: null, learningCentreId: 1,
       curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
-      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' }] : []) as unknown as Query & ReturnType<typeof vi.fn>;
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' }] : [])) as unknown as Query & ReturnType<typeof vi.fn>;
     const saved = await createProfileRepository(query).save('verified-student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     });
     expect(saved.currentSemesterId).toBe(22);
     expect(saved.learningCentreId).toBe(1);
@@ -414,22 +419,22 @@ describe('P001 current semester persistence', () => {
     expect(sql).toContain('SELECT semester_id FROM public.academic_semester WHERE is_current=true FOR SHARE');
     expect(sql).toContain('s.semester_id=cp.semester_id');
     expect(sql).toContain('current_semester_id=EXCLUDED.current_semester_id');
-    expect(parameters).toEqual(['verified-student', 'Student', null, 4, 22, 0, 8, 1, null]);
+    expect(parameters).toEqual(['verified-student', 'Student', null, 4, 22, 0, 8, 1, null, INTAKE_YEAR]);
   });
   it('rejects an unconfigured semester without accepting it as a valid profile', async () => {
-    const query = vi.fn(async (sql: string) => sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1') ? [{ learning_centre_id: 1 }] : []) as unknown as Query;
+    const query = vi.fn(async (sql: string) => offeredProbe(sql, 4) ?? (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1') ? [{ learning_centre_id: 1 }] : [])) as unknown as Query;
     await expect(createProfileRepository(query).save('verified-student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     })).rejects.toMatchObject({ status: 400, code: 'INVALID_SEMESTER' });
   });
   it('rejects profile saves when the admin has not configured a current academic year', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 99 }];
       if (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1')) return [{ learning_centre_id: 1 }];
-      return [];
+      return offeredProbe(sql, 4) ?? [];
     }) as unknown as Query;
     await expect(createProfileRepository(query).save('student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 99, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     })).rejects.toMatchObject({ status: 503, code: 'ACADEMIC_SEMESTER_UNAVAILABLE' });
   });
   it('rejects a different semester in the same year even when it remains configured', async () => {
@@ -437,10 +442,10 @@ describe('P001 current semester persistence', () => {
       if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 30 }];
       if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 31 }];
       if (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1')) return [{ learning_centre_id: 1 }];
-      return [];
+      return offeredProbe(sql, 4) ?? [];
     }) as unknown as Query;
     await expect(createProfileRepository(query).save('student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     })).rejects.toMatchObject({ status: 409, code: 'ACADEMIC_SEMESTER_MISMATCH' });
   });
   it('keeps the exact current semester eligible for the existing curriculum validation', async () => {
@@ -448,10 +453,10 @@ describe('P001 current semester persistence', () => {
       if (sql.includes('SELECT semester_id AS "semesterId" FROM public.academic_semester WHERE semester_id=$1')) return [{ semesterId: 30 }];
       if (sql.includes('FROM public.academic_semester a WHERE a.is_current=true')) return [{ semesterId: 30 }];
       if (sql.includes('FROM public.learning_centre WHERE learning_centre_id=$1')) return [{ learning_centre_id: 1 }];
-      return [];
+      return offeredProbe(sql, 4) ?? [];
     }) as unknown as Query;
     await expect(createProfileRepository(query).save('student', {
-      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8,
+      studentName: 'Student', matricNo: null, learningCentreId: 1, curriculumId: 4, currentSemesterId: 30, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR,
     })).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
   });
 });
@@ -463,7 +468,7 @@ describe('P001 live admin current-semester options', () => {
     const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
       if (sql.includes('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return [{ curriculumId: 12 }];
       if (sql.includes('SELECT c.curriculum_id AS "curriculumId"')) return [
-        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing' },
+        { curriculumId: 10, curriculumVersion: 'V1', programmeId: 20, programmeCode: 'CS', programmeName: 'Computing', effectiveYear: 2022, totalCreditRequired: 120 },
       ];
       if (sql.includes('FROM public.academic_semester ORDER BY')) return [
         { semesterId: 30, academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL' },
@@ -522,12 +527,13 @@ describe('P001 learning centre (S2-P004-023)', () => {
   const row = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22,
     weeklyWorkingHours: 0, availableStudyHours: 8, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
     curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' };
-  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 2, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8 };
+  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 2, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: 2024 };
   const now = () => new Date('2026-11-10T00:00:00Z');
   const isWindow = (sql: string) => sql.includes('AS "selectionOpensAt"');
   function repo(opts: { saved: number | null; window: Record<string, unknown>[]; upsert?: Record<string, unknown>[] }) {
     const query = vi.fn(async (sql: string) => {
       if (isWindow(sql)) return opts.window;
+      const probe = offeredProbe(sql, 4); if (probe) return probe;
       if (sql.includes('INSERT INTO public.student_profile')) return opts.upsert ?? [{ ...row, learningCentreId: input.learningCentreId }];
       if (sql.includes('SELECT learning_centre_id AS "learningCentreId",curriculum_id')) return opts.saved === null ? [] : [{ learningCentreId: opts.saved, curriculumId: 4 }];
       if (sql.includes('FROM public.student_profile p')) return [{ ...row, learningCentreId: opts.saved }];
@@ -592,10 +598,11 @@ describe('P001 programme lock (S2-P004-026)', () => {
   const row = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22,
     weeklyWorkingHours: 0, availableStudyHours: 8, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
     curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional' };
-  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8 };
+  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR };
   function repo(opts: { saved: number | null; current?: number | null; upsert?: Record<string, unknown>[] }) {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('AS "selectionOpensAt"')) return [];
+      const probe = offeredProbe(sql, 4); if (probe) return probe;
       if (sql.includes('INSERT INTO public.student_profile')) return opts.upsert ?? [row];
       if (sql.includes('SELECT learning_centre_id AS "learningCentreId",curriculum_id')) return opts.saved === null ? [] : [{ learningCentreId: 1, curriculumId: opts.saved }];
       if (sql.startsWith('SELECT curriculum_id AS "curriculumId" FROM public.student_profile')) return opts.current == null ? [] : [{ curriculumId: opts.current }];
@@ -627,5 +634,138 @@ describe('P001 programme lock (S2-P004-026)', () => {
   it('an administrator change between the check and the write is still rejected', async () => {
     const { repository } = repo({ saved: 4, current: 7, upsert: [] });
     await expect(repository.save('s', input)).rejects.toMatchObject({ status: 409, code: 'PROFILE_PROGRAMME_LOCKED' });
+  });
+});
+
+describe('P001 intake year and curriculum (S3-P004-037)', () => {
+  const now = () => new Date('2026-11-25T00:00:00Z');
+  const row = { studentId: 9, studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 3, currentSemesterId: 22,
+    weeklyWorkingHours: 0, availableStudyHours: 8, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    curriculumVersion: 'V1', programmeCode: 'SECRH', programmeName: 'Fictional', totalCreditRequired: 131, intakeYear: 2022 };
+  const input = { studentName: 'Student', matricNo: 'A22EC0001', learningCentreId: 1, curriculumId: 3, currentSemesterId: 22,
+    weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: 2024 };
+  const isProbe = (sql: string) => sql.includes('WHERE o.programme_id=(SELECT programme_id FROM public.curriculum WHERE curriculum_id=$1)');
+  const offered = [
+    { curriculumId: 8, curriculumVersion: 'V2', effectiveYear: 2026 },
+    { curriculumId: 3, curriculumVersion: 'V1', effectiveYear: 2022 },
+  ];
+  function repo(opts: { saved?: { curriculumId: number; intakeYear: number | null } | null; offered?: Record<string, unknown>[] } = {}) {
+    const query = vi.fn(async (sql: string, parameters: Parameter[]) => {
+      if (sql.includes('AS "selectionOpensAt"')) return [];
+      if (isProbe(sql)) return opts.offered ?? offered;
+      if (sql.includes('INSERT INTO public.student_profile')) return [{ ...row, curriculumId: parameters[3], intakeYear: opts.saved?.intakeYear ?? parameters[9] }];
+      if (sql.includes('SELECT learning_centre_id AS "learningCentreId",curriculum_id')) return opts.saved ? [{ learningCentreId: 1, ...opts.saved }] : [];
+      return [];
+    }) as unknown as Query & ReturnType<typeof vi.fn>;
+    return { query, repository: createProfileRepository(query, undefined, { now }) };
+  }
+  const inserted = (query: ReturnType<typeof vi.fn>) => query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO public.student_profile'));
+  const curriculaKey = 'sa:test:profile:v1:reference:curricula';
+  const cachedCurricula = (data: unknown[]) => {
+    const at = Date.now();
+    return new Map<string, unknown>([[curriculaKey, { version: 1, kind: 'curricula', namespace: 'test', dataset: 'profile', loadedAt: at - 1000, expiresAt: at + 100_000, data }]]);
+  };
+
+  it('options offer only active curricula with subjects, with effective year and credits, newest first per programme', async () => {
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT c.curriculum_id AS "curriculumId"') ? [
+      { curriculumId: 3, curriculumVersion: 'V1', programmeId: 2, programmeCode: 'SECRH', programmeName: 'Fictional', effectiveYear: 2022, totalCreditRequired: 131 },
+    ] : []) as unknown as Query & ReturnType<typeof vi.fn>;
+    const result = await createProfileRepository(query).options('s');
+    expect(result.curricula).toEqual([{ curriculumId: 3, curriculumVersion: 'V1', programmeId: 2, programmeCode: 'SECRH', programmeName: 'Fictional', effectiveYear: 2022, totalCreditRequired: 131 }]);
+    const sql = query.mock.calls.find(([text]) => String(text).includes('SELECT c.curriculum_id AS "curriculumId"'))![0] as string;
+    expect(sql).toContain('c.effective_year AS "effectiveYear"');
+    expect(sql).toContain('c.total_credit_required AS "totalCreditRequired"');
+    expect(sql).toContain('EXISTS (SELECT 1 FROM public.curriculum_subject cs WHERE cs.curriculum_id=c.curriculum_id)');
+    expect(sql).toContain('ORDER BY g.programme_code,c.effective_year DESC NULLS LAST,c.curriculum_version');
+  });
+  it('reloads a cached curriculum list in the old shape (no effective year or credits)', async () => {
+    const cache = referenceCacheHarness(cachedCurricula([{ curriculumId: 3, curriculumVersion: 'V1', programmeId: 2, programmeCode: 'SECRH', programmeName: 'Fictional' }]));
+    const fresh = { curriculumId: 3, curriculumVersion: 'V1', programmeId: 2, programmeCode: 'SECRH', programmeName: 'Fictional', effectiveYear: null, totalCreditRequired: 131 };
+    const query = vi.fn(async (sql: string) => sql.includes('SELECT c.curriculum_id AS "curriculumId"') ? [fresh] : []) as unknown as Query & ReturnType<typeof vi.fn>;
+    const result = await createProfileRepository(query, cache.cache).options('s');
+    expect(result.curricula).toEqual([fresh]);
+    expect(query.mock.calls.filter(([sql]) => String(sql).includes('SELECT c.curriculum_id AS "curriculumId"'))).toHaveLength(1);
+    expect(cache.sets.map(({ key }) => key)).toContain(curriculaKey);
+  });
+  it.each([['bad effective year', { effectiveYear: 2022.5 }], ['missing credits', { totalCreditRequired: undefined }], ['negative credits', { totalCreditRequired: -1 }]])
+  ('rejects cached curriculum rows with %s', async (_label, defect) => {
+    const cache = referenceCacheHarness(cachedCurricula([{ curriculumId: 3, curriculumVersion: 'V1', programmeId: 2, programmeCode: 'SECRH', programmeName: 'Fictional', effectiveYear: 2022, totalCreditRequired: 131, ...defect }]));
+    const query = vi.fn(async () => [] as Record<string, unknown>[]) as unknown as Query & ReturnType<typeof vi.fn>;
+    expect((await createProfileRepository(query, cache.cache).options('s')).curricula).toEqual([]);
+  });
+  it('find and save return the intake year', async () => {
+    const query = vi.fn(async () => [row]) as unknown as Query & ReturnType<typeof vi.fn>;
+    const found = await createProfileRepository(query, undefined, { now }).find('s');
+    expect(found?.intakeYear).toBe(2022);
+    expect(query.mock.calls[0]![0]).toContain('p.intake_year AS "intakeYear"');
+    const legacy = vi.fn(async () => [{ ...row, intakeYear: undefined }]) as unknown as Query;
+    expect((await createProfileRepository(legacy, undefined, { now }).find('s'))?.intakeYear).toBeNull();
+    const malformed = vi.fn(async () => [{ ...row, intakeYear: '2022' }]) as unknown as Query;
+    await expect(createProfileRepository(malformed, undefined, { now }).find('s')).rejects.toThrow('Invalid profile intake year');
+  });
+  it('a new profile saves the intake year with the curriculum the rule picks', async () => {
+    const { repository, query } = repo();
+    await expect(repository.save('s', input)).resolves.toMatchObject({ curriculumId: 3, intakeYear: 2024 });
+    const probe = query.mock.calls.find(([sql]) => isProbe(String(sql)))!;
+    expect(probe[1]).toEqual([3]);
+    expect(probe[0]).toContain('EXISTS (SELECT 1 FROM public.curriculum_subject cs WHERE cs.curriculum_id=o.curriculum_id)');
+    expect(probe[0]).toContain("coalesce(upper(o.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE'");
+    const [sql, parameters] = query.mock.calls.find(([text]) => String(text).includes('INSERT INTO public.student_profile'))!;
+    expect(sql).toContain('available_study_hours,intake_year)');
+    expect(sql).toContain('intake_year=COALESCE(public.student_profile.intake_year,EXCLUDED.intake_year)');
+    expect(sql).toContain('p.intake_year AS "intakeYear"');
+    expect(parameters).toEqual(['s', 'Student', 'A22EC0001', 3, 22, 0, 8, 1, null, 2024]);
+  });
+  it.each([undefined, null, 2013, 2027, 2024.5, '2024'])('a new profile with intake year %s is rejected with INVALID_INTAKE_YEAR before any write', async intakeYear => {
+    const { repository, query } = repo();
+    await expect(repository.save('s', { ...input, intakeYear: intakeYear as unknown as number }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_INTAKE_YEAR', message: 'Select your intake year.' });
+    expect(inserted(query)).toBe(false);
+  });
+  it('a new profile accepts both ends of the intake year range', async () => {
+    await expect(repo({ offered: [offered[1]!] }).repository.save('s', { ...input, intakeYear: 2014 })).resolves.toMatchObject({ intakeYear: 2014 });
+    await expect(repo().repository.save('s', { ...input, curriculumId: 8, intakeYear: 2026 })).resolves.toMatchObject({ curriculumId: 8, intakeYear: 2026 });
+  });
+  it('a new profile rejects a curriculum the intake year does not lead to, with no INSERT', async () => {
+    const { repository, query } = repo();
+    await expect(repository.save('s', { ...input, curriculumId: 8, intakeYear: 2024 }))
+      .rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM', message: 'Select an available configured curriculum.' });
+    expect(inserted(query)).toBe(false);
+  });
+  it('a new profile rejects a curriculum without subjects or not offered, with no INSERT', async () => {
+    const { repository, query } = repo({ offered: [offered[1]!] });
+    await expect(repository.save('s', { ...input, curriculumId: 8, intakeYear: 2026 })).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
+    expect(inserted(query)).toBe(false);
+    const none = repo({ offered: [] });
+    await expect(none.repository.save('s', input)).rejects.toMatchObject({ status: 400, code: 'INVALID_CURRICULUM' });
+    expect(inserted(none.query)).toBe(false);
+  });
+  it('a new profile may pick any curriculum the rule leaves to the student', async () => {
+    const tie = [{ curriculumId: 3, curriculumVersion: 'V1', effectiveYear: 2022 }, { curriculumId: 4, curriculumVersion: 'V1b', effectiveYear: 2022 }];
+    await expect(repo({ offered: tie }).repository.save('s', { ...input, curriculumId: 4 })).resolves.toMatchObject({ curriculumId: 4 });
+    const later = [{ curriculumId: 3, curriculumVersion: 'V1', effectiveYear: 2025 }, { curriculumId: 8, curriculumVersion: 'V2', effectiveYear: 2026 }];
+    await expect(repo({ offered: later }).repository.save('s', { ...input, curriculumId: 8, intakeYear: 2020 })).resolves.toMatchObject({ curriculumId: 8 });
+  });
+  it('an existing profile rejects a different intake year with PROFILE_INTAKE_LOCKED and no curriculum probe', async () => {
+    const { repository, query } = repo({ saved: { curriculumId: 3, intakeYear: 2022 } });
+    await expect(repository.save('s', { ...input, intakeYear: 2023 }))
+      .rejects.toMatchObject({ status: 409, code: 'PROFILE_INTAKE_LOCKED', message: 'Your intake year is set. Contact the admin to change it.' });
+    expect(inserted(query)).toBe(false);
+    expect(query.mock.calls.some(([sql]) => isProbe(String(sql)))).toBe(false);
+  });
+  it('an existing profile re-saves the same intake year without a curriculum re-check, even outside the pick range', async () => {
+    const { repository, query } = repo({ saved: { curriculumId: 8, intakeYear: 2001 }, offered: [] });
+    await expect(repository.save('s', { ...input, curriculumId: 8, intakeYear: 2001 })).resolves.toMatchObject({ curriculumId: 8, intakeYear: 2001 });
+    expect(query.mock.calls.some(([sql]) => isProbe(String(sql)))).toBe(false);
+  });
+  it('an existing profile without an intake year may set it once, within the range', async () => {
+    const { repository, query } = repo({ saved: { curriculumId: 8, intakeYear: null }, offered: [] });
+    await expect(repository.save('s', { ...input, curriculumId: 8, intakeYear: 2020 })).resolves.toMatchObject({ intakeYear: 2020 });
+    expect(query.mock.calls.some(([sql]) => isProbe(String(sql)))).toBe(false);
+    const parameters = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO public.student_profile'))![1];
+    expect(parameters[9]).toBe(2020);
+    const outOfRange = repo({ saved: { curriculumId: 8, intakeYear: null } });
+    await expect(outOfRange.repository.save('s', { ...input, curriculumId: 8, intakeYear: 2030 })).rejects.toMatchObject({ status: 400, code: 'INVALID_INTAKE_YEAR' });
+    expect(inserted(outOfRange.query)).toBe(false);
   });
 });

@@ -198,6 +198,14 @@
       "migration": "0014",
       "tables": ["academic_import_batch_removal"],
       "purpose": "P004 coordinator snapshot removal (S3-P004-022, UC20): one immutable row per removed (hidden) accepted import snapshot; snapshots and their freeze triggers are unchanged"
+    },
+    {
+      "migration": "0016",
+      "tables": [],
+      "columns": [
+        { "table": "student_profile", "name": "intake_year", "sqlType": "smallint", "nullable": true, "purpose": "Student intake year, separate from the curriculum effective year; the curriculum follows it (S3-P004-037)" }
+      ],
+      "purpose": "P004 student intake year (S3-P004-037): one nullable student_profile column backfilled from the curriculum effective year; excluded from the frozen SRS baseline"
     }
   ]
 }

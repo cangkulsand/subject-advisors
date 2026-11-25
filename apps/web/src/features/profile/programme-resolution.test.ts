@@ -3,9 +3,9 @@ import { resolveProgrammeCurriculum } from './programme-resolution';
 import type { CurriculumOption } from '../../../../api/src/modules/profile/contracts';
 
 const curricula: CurriculumOption[] = [
-  { curriculumId: 10, curriculumVersion: 'A', programmeId: 1, programmeCode: 'P1', programmeName: 'Programme 1' },
-  { curriculumId: 11, curriculumVersion: 'B', programmeId: 1, programmeCode: 'P1', programmeName: 'Programme 1' },
-  { curriculumId: 20, curriculumVersion: 'A', programmeId: 2, programmeCode: 'P2', programmeName: 'Programme 2' },
+  { curriculumId: 10, curriculumVersion: 'A', programmeId: 1, programmeCode: 'P1', programmeName: 'Programme 1', effectiveYear: null, totalCreditRequired: 120 },
+  { curriculumId: 11, curriculumVersion: 'B', programmeId: 1, programmeCode: 'P1', programmeName: 'Programme 1', effectiveYear: null, totalCreditRequired: 120 },
+  { curriculumId: 20, curriculumVersion: 'A', programmeId: 2, programmeCode: 'P2', programmeName: 'Programme 2', effectiveYear: null, totalCreditRequired: 120 },
 ];
 
 describe('resolveProgrammeCurriculum', () => {

@@ -24,6 +24,11 @@ export function matricNumber(value: unknown): string {
   if (!/^[A-Z0-9]{4,30}$/.test(result)) invalid('Matric number must be 4 to 30 letters or digits, for example A22EC0001.');
   return result;
 }
+/** Intake year (S3-P004-037): a whole year within the database range; the repository applies the pick range for new values. */
+export function intakeYear(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1990 || value > 2200) throw new P001Error(400, 'INVALID_INTAKE_YEAR', 'Select your intake year.');
+  return value;
+}
 export function fields(value: unknown, allowed: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('Provide a JSON object.');
   const result = value as Record<string, unknown>;
@@ -48,7 +53,7 @@ export async function jsonBody(request: Request): Promise<unknown> {
   catch { return invalid('The request body must be valid JSON.'); }
 }
 export function profileInput(value: unknown) {
-  const body = fields(value, ['studentName', 'matricNo', 'learningCentreId', 'curriculumId', 'currentSemesterId', 'weeklyWorkingHours', 'availableStudyHours']);
+  const body = fields(value, ['studentName', 'matricNo', 'learningCentreId', 'curriculumId', 'currentSemesterId', 'weeklyWorkingHours', 'availableStudyHours', 'intakeYear']);
   return {
     studentName: text(body.studentName, 'Student name', 255, true)!,
     matricNo: matricNumber(body.matricNo),
@@ -57,6 +62,7 @@ export function profileInput(value: unknown) {
     currentSemesterId: positiveId(body.currentSemesterId, 'Current semester'),
     weeklyWorkingHours: nonnegative(body.weeklyWorkingHours, 'Weekly working hours'),
     availableStudyHours: nonnegative(body.availableStudyHours, 'Available study hours'),
+    intakeYear: intakeYear(body.intakeYear),
   };
 }
 export function persistenceError(error: unknown): never {

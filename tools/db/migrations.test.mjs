@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015','0016']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -58,7 +58,7 @@ test('0005 is additive only and registers the approved nullable curriculum metad
  assert.match(migration.sql,/REVOKE ALL ON migration_meta\.reference_data_imports FROM PUBLIC/i);
  assert.doesNotMatch(migration.sql,/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|TRUNCATE|DROP\s+(?:TABLE|COLUMN|SCHEMA))\b/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['migration_meta.reference_data_imports']);
- const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,25);
+ const review=await reviewSchema();assert.equal(review.sourceContractColumns,171);assert.equal(review.engineeringExtensionColumns,26);
 });
 test('0006 audits access-status changes and adds a protected pending-invitation table',async()=>{
  const entries=await loadMigrations();const migration=entries.find(m=>m.version==='0006');
@@ -85,7 +85,7 @@ test('0007 adds programme-scoped forecast persistence and protected offering con
  assert.match(migration.sql,/REVOKE ALL ON public\.confirmed_offering_audit FROM PUBLIC/);
  assert.doesNotMatch(migration.sql.replace(/--.*$/gm,''),/coordinator_assignment|public\.faculty|is_current|ALTER TABLE public\.student_profile|student_offering_pick|DROP\s+(?:TABLE|COLUMN)|DELETE\s+FROM|INSERT\s+INTO/i);
  assert.deepEqual([...migration.sql.matchAll(/CREATE\s+TABLE\s+([^\s(]+)/gi)].map(match=>match[1]),['public.forecast_adjustment_audit','public.offering_confirmation','public.confirmed_offering','public.confirmed_offering_audit']);
- const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,25);
+ const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,26);
 });
 test('refuses unapproved, non-development and default application credentials',()=>{
  assert.throws(()=>validateTarget({...target,approvedForSchemaCreation:false},environment));
@@ -239,7 +239,7 @@ test('0014 follows 0013, adds only the immutable snapshot removal table and leav
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0014']);
 });
 test('0015 follows 0014, is pinned to the two owner Clerk IDs and only moves the owner flag and revokes the graduate staff roles',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0014','0015']);
+ const entries=(await loadMigrations()).slice(0,16);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0014','0015']);
  const code=entries.at(-1).sql.replace(/--.*$/gm,'');
  assert.match(code,/user_3L9068HIQmPtA3AzFTo6bBpRAyO/);assert.match(code,/user_3MPgmlCxY4NFIuYgPaypFquJ0l6/);
  assert.doesNotMatch(code,/CREATE\s|DROP\s|TRUNCATE|ALTER\s+TABLE\s+(?!public\.user_role_assignment\s+(?:DISABLE|ENABLE)\s+TRIGGER\s+user_role_audit_guard)/i);
@@ -247,4 +247,22 @@ test('0015 follows 0014, is pinned to the two owner Clerk IDs and only moves the
  assert.ok(code.indexOf('ENABLE TRIGGER')<code.indexOf('DELETE FROM'),'the revoke runs with the owner lock enabled');
  const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
  assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0015']);
+});
+test('0016 follows 0015, adds only the nullable student_profile intake year and backfills it from the curriculum effective year',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0015','0016']);
+ const code=entries.at(-1).sql.replace(/--.*$/gm,'');
+ assert.match(code,/ALTER TABLE public\.student_profile\s+ADD COLUMN IF NOT EXISTS intake_year smallint\s+CONSTRAINT student_profile_intake_year_range CHECK \(intake_year IS NULL OR intake_year BETWEEN 1990 AND 2200\);/);
+ assert.match(code,/UPDATE public\.student_profile p SET intake_year=c\.effective_year FROM public\.curriculum c\s+WHERE c\.curriculum_id=p\.curriculum_id AND p\.intake_year IS NULL AND c\.effective_year IS NOT NULL/);
+ assert.doesNotMatch(code,/CREATE\s|DROP\s|TRUNCATE|DELETE\s+FROM|INSERT\s+INTO|DEFAULT|NOT\s+NULL\b(?!\s+AND)|DISABLE\s+TRIGGER/i);
+ assert.doesNotMatch(code,/SET\s+(?:(?!FROM)[^;])*curriculum_id\s*=/i,'the backfill never writes curriculum_id');
+ assert.equal([...code.matchAll(/\bUPDATE\b/g)].length,1);
+ const review=await reviewSchema();assert.equal(review.engineeringExtensionColumns,26);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0016']);
+});
+test('0016 structural check is registered for verify, review and the disposable database run',async()=>{
+ const check=await readFile('db/checks/020_student_intake_year.sql','utf8');
+ assert.match(check,/intake_year/);assert.match(check,/preserve_student_curriculum/);
+ for(const file of ['tools/db/cli.mjs','tools/db/review.mjs','tools/admin/test-academic-database.mjs'])
+  assert.match(await readFile(file,'utf8'),/'020_student_intake_year\.sql'/,file);
 });
