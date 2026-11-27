@@ -527,3 +527,14 @@
   .admin-drawer-actions { display: block; }
   .admin-drawer-actions button.admin-view-as-button { width: 100%; color: var(--staff-nav-indicator); border-color: var(--staff-nav-indicator); }
 }
+
+/* Batch correction (S3-P004-039) */
+.admin-shell a.admin-button-link { min-height: 44px; padding: 9px 15px; border: 1.5px solid var(--color-brand); border-radius: 8px; color: var(--color-brand); font-weight: 600; text-decoration: none; }
+.admin-shell a.admin-button-link:hover { background: var(--color-surface-subtle); text-decoration: none; }
+.admin-batch { display: grid; gap: 12px; }
+.admin-batch textarea { width: 100%; min-height: 8rem; font: inherit; font-size: var(--font-size-control); padding: 8px 10px; border: 1px solid var(--admin-border); border-radius: 6px; }
+.admin-batch-problems { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.admin-batch-problem td { color: #991b1b; }
+.admin-batch-note { display: block; font-size: var(--font-size-table); color: var(--color-muted-text); }
+.admin-batch-intake { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.admin-batch-intake legend { font-size: var(--font-size-label); font-weight: 600; margin-bottom: 4px; }

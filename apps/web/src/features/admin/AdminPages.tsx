@@ -36,7 +36,7 @@ function Panel({ error, retry, children }: { error?: string; retry: () => void; 
   if (!children) return <section className="admin-card admin-loading" role="status">Loading administration data…</section>;
   return <>{children}</>;
 }
-function PageHeading({ title, text, refresh, action }: { title: string; text: string; refresh?: () => void; action?: ReactNode }) {
+export function PageHeading({ title, text, refresh, action }: { title: string; text: string; refresh?: () => void; action?: ReactNode }) {
   return <header className="admin-page-heading"><div><h1>{title}</h1><p>{text}</p></div>{(refresh || action) && <div className="admin-page-actions">{refresh && <IconButton icon="refresh" label="Refresh data" onClick={refresh}/>}{action}</div>}</header>;
 }
 export function RolePills({ roles }: { roles: AdminRole[] }) { return <span className="admin-pills">{roles.length ? roles.map(role => <span className={`admin-pill admin-role-${role.toLowerCase()}`} key={role}>{labels[role]}</span>) : <span className="admin-pill">No memberships</span>}</span>; }
@@ -94,7 +94,7 @@ export function AdminUsersPage({ client, academic, search }: { client: AdminClie
   const accountRows = accounts.data?.items ?? [], loaded = accounts.data !== undefined && invitations.data !== undefined && (waiting.data !== undefined || waiting.error !== undefined);
   const reset = () => { setTerm(''); setInvited(false); setInvitationFilter({ page: 1, status: 'PENDING' }); setFilters({ page: 1, q: '', role: '', status: '' }); retry(); };
   return <><PageHeading title="Users & Access" text="Find application accounts, add users, and manage invitations. Invitations are valid for 7 days." refresh={retry}
-      action={<div className="admin-heading-actions">{academic && <button type="button" className="admin-icon-button" aria-haspopup="dialog" onClick={() => setDummy(true)}>Create dummy user</button>}<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>}/>
+      action={<div className="admin-heading-actions"><AppLink className="admin-button-link admin-icon-button" href="/admin/users/batch">Batch correction</AppLink>{academic && <button type="button" className="admin-icon-button" aria-haspopup="dialog" onClick={() => setDummy(true)}>Create dummy user</button>}<button type="button" className="admin-primary admin-icon-button" aria-haspopup="dialog" onClick={() => setAdding(true)}><InviteIcon/>Add user</button></div>}/>
     <div id="admin-action-status" tabIndex={-1} className="admin-status-region">{notice && <p className="admin-success" role="status">{notice.text} {notice.accountId && <AppLink href={'/admin/users/' + notice.accountId}>View account →</AppLink>}</p>}</div>
     <section className="admin-card admin-users-card" aria-label="Users and invitations">
       <TableToolbar label="Search and filter users" onSubmit={() => { setFilters(old => ({ ...old, page: 1, q: term.trim() })); setInvitationFilter(old => ({ ...old, page: 1 })); }}>

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { assertReadable } from '../ui/readability.mjs';
 import { fixtureMutation, fixtureResponse } from './fixtures.mjs';
 import { academicUiChecks } from './academic-ui-checks.mjs';
+import { batchUiChecks } from './batch-ui-checks.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
 const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', loader: { '.png': 'dataurl' }, alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
@@ -783,6 +784,7 @@ else {
       assert.equal(await page.locator('.view-as-banner').count(), 0);
     });
     await academicUiChecks({ check, mock, base });
+    await batchUiChecks({ check, mock, base });
     console.log('PASS ' + passed + ' administration browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }
 }
