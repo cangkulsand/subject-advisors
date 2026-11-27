@@ -156,7 +156,8 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           JOIN public.academic_semester s ON s.semester_id=$5
           JOIN public.learning_centre lc ON lc.learning_centre_id=$8 AND (lc.is_active OR lc.learning_centre_id=$9)
           WHERE s.semester_id=cp.semester_id AND c.curriculum_id=$4 AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE'
-          ON CONFLICT(clerk_user_id) DO UPDATE SET student_name=EXCLUDED.student_name,matric_no=EXCLUDED.matric_no,
+          ON CONFLICT(clerk_user_id) DO UPDATE SET student_name=EXCLUDED.student_name,
+            matric_no=CASE WHEN coalesce(btrim(public.student_profile.matric_no),'')='' THEN EXCLUDED.matric_no ELSE public.student_profile.matric_no END,
             learning_centre_id=EXCLUDED.learning_centre_id,current_semester_id=EXCLUDED.current_semester_id,
             weekly_working_hours=EXCLUDED.weekly_working_hours,available_study_hours=EXCLUDED.available_study_hours,
             intake_year=COALESCE(public.student_profile.intake_year,EXCLUDED.intake_year)

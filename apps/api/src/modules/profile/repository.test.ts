@@ -810,3 +810,18 @@ describe('P001 matric lock and in-use check (S3-P004-039)', () => {
     expect(parameters).toEqual(['SX232315ECJHF04', 's']);
   });
 });
+
+describe('P001 matric lock in SQL (S3-P004-039 review)', () => {
+  it('the upsert never overwrites a saved matric number, even if an admin changed it after the check', async () => {
+    const row = { studentId: 9, studentName: 'Student', matricNo: 'SX1', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8,
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional', intakeYear: INTAKE_YEAR };
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('INSERT INTO public.student_profile')) return [row];
+      if (sql.includes('SELECT learning_centre_id AS "learningCentreId",curriculum_id')) return [{ learningCentreId: 1, curriculumId: 4, intakeYear: INTAKE_YEAR, matricNo: 'SX1234' }];
+      return [];
+    }) as unknown as Query & ReturnType<typeof vi.fn>;
+    await createProfileRepository(query).save('s', { studentName: 'Student', matricNo: 'SX1234', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR });
+    const sql = String(query.mock.calls.find(([text]) => String(text).includes('INSERT INTO public.student_profile'))![0]);
+    expect(sql).toContain("matric_no=CASE WHEN coalesce(btrim(public.student_profile.matric_no),'')='' THEN EXCLUDED.matric_no ELSE public.student_profile.matric_no END");
+  });
+});

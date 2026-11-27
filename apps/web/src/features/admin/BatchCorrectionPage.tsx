@@ -20,7 +20,7 @@ export function BatchCorrectionPage({ client }: { client: AdminClient }) {
   const [text, setText] = useState(''), [preview, setPreview] = useState<BatchPreview | null>(null), [checked, setChecked] = useState<string[]>([]);
   const [checking, setChecking] = useState(false), [error, setError] = useState(''), [stale, setStale] = useState(false), [result, setResult] = useState<BatchResult | null>(null);
   const [options, setOptions] = useState<AdminCurriculumOption[]>([]), [curriculum, setCurriculum] = useState('');
-  const [intake, setIntake] = useState<IntakeChoice>('keep'), [year, setYear] = useState(''), [confirming, setConfirming] = useState(false);
+  const [intake, setIntake] = useState<IntakeChoice>('keep'), [year, setYear] = useState(''), [confirming, setConfirming] = useState(false), [optionsVersion, setOptionsVersion] = useState(0);
   const textId = useId(), countId = useId(), intakeName = useId(), yearId = useId(), programmeId = useId();
   const list = useMemo(() => splitMatricList(text), [text]);
   const tooMany = list.matricNos.length > MATRIC_BATCH_MAX;
@@ -28,7 +28,7 @@ export function BatchCorrectionPage({ client }: { client: AdminClient }) {
     const controller = new AbortController();
     client.curriculumOptions(controller.signal).then(items => { if (!controller.signal.aborted) setOptions(items); }, () => { /* the programme select stays on Keep */ });
     return () => controller.abort();
-  }, [client]);
+  }, [client, optionsVersion]);
 
   async function check(numbers = list.matricNos) {
     setChecking(true); setError(''); setStale(false); setResult(null);
@@ -60,10 +60,13 @@ export function BatchCorrectionPage({ client }: { client: AdminClient }) {
     try {
       const done = await client.applyBatch({ matricNos: checked, curriculumId, intake: intakeChoice, reason,
         expected: preview.matches.map(match => ({ matricNo: match.matricNo, studentId: match.studentId, curriculumId: match.curriculumId, intakeYear: match.intakeYear })) });
-      setConfirming(false); setResult(done); setPreview(null);
+      setConfirming(false); setError(''); setStale(false); setResult(done); setPreview(null);
     } catch (failure) {
       if (failure instanceof AdminApiError && ['BATCH_STALE', 'BATCH_HAS_PROBLEMS', 'CURRICULUM_UNAVAILABLE'].includes(failure.code)) {
-        setConfirming(false); setError(failure.message); setStale(true); return;
+        // The preview is out of date: it cannot be applied again until it is checked again (review fix).
+        setConfirming(false); setError(failure.message); setStale(true); setPreview(null);
+        if (failure.code === 'CURRICULUM_UNAVAILABLE') { setCurriculum(''); setOptionsVersion(value => value + 1); }
+        return;
       }
       throw failure;
     }

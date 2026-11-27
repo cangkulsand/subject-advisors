@@ -99,12 +99,29 @@
 | --- | --- |
 | `npm run typecheck` | PASS |
 | `npm run lint` | PASS |
-| `npm test` | 2132 passed, 67 skipped |
-| `npm run test:ui:admin` | 76 PASS |
-| `npm run test:ui:integration` | 81 PASS |
+| `npm test` | 2135 passed, 67 skipped |
+| `npm run test:ui:admin` | 77 PASS |
+| `npm run test:ui:integration` | 81 PASS (one run hit a known navigation-timing flake in "signed-out pathway navigation requires sign-in"; it passed on rerun) |
 | `node tools/p001/test-ui.mjs` | 62 PASS with one check skipped. That check, "saved grade editing stays outside the table and preserves legacy semester", also fails on `main` (a focus assertion); it is not related to this change. |
 
-**Outcome:** pending the whole-branch review.
+**Whole-branch review (2026-11-27, independent reviewer):** no Critical or Important findings, "ready to merge with the Minor fixes recommended". Re-graded by what a user would hit, four were fixed, each with a failing test first:
+- **Matric lock in SQL:** an admin matric change landing between a student's check and their save could be written back without an audit row. The upsert now keeps a saved number (`CASE WHEN … = '' THEN EXCLUDED.matric_no ELSE …`).
+- **Future matric years:** a typo such as `SX92…` would have written 2092. "From each student's matric number" now treats a year after the current year as a problem, in the page and in the SQL guard.
+- **Stale error after success:** a later successful apply now clears the old error and its **Check again** button.
+- **Refused preview:** after a stale, problems or unavailable-programme refusal, the preview is cleared, so it can't be applied again until checked again. An unavailable programme also reloads the programme list.
+
+**Deferred minors:**
+- **Result line:** it does not repeat the "already correct" count.
+- **Check again:** it re-checks the last checked list, not edited text.
+- **All numbers removed:** removing problems when every number is a problem shows "Paste at least one matric number."
+- **Old duplicates:** a student whose number is already shared cannot save until an admin fixes it. There are none today.
+- **Unsaved changes:** a profile auto-filled on open counts as unsaved.
+- **Fill hint:** it stays after the number is deleted.
+- **No database check:** no `db/checks` script runs the batch SQL.
+
+**Reading of ACL A5:** a student whose programme and intake both change gets two audit rows, one per change, as in design 5.4.
+
+**Outcome:** PASS: independent review fixes applied; P001 review pending.
 
 ## 4. Changelog
 

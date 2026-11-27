@@ -515,3 +515,15 @@ describe('batch correction (S3-P004-039)', () => {
     expect(new AdminMutationError('BATCH_HAS_PROBLEMS')).toMatchObject({ status: 409, message: 'Remove the problem numbers, then check again.' });
   });
 });
+
+describe('batch review fixes (S3-P004-039)', () => {
+  it('the problems guard also refuses a matric year after the current year', async () => {
+    const { repository, calls } = harness({ rows: statements => statements.map(statement =>
+      statement.text.includes('AS "corrected"') ? [{ corrected: 1 }] : statement.text.includes('AS "removedPicks"') ? [{ removedPicks: 0, programmeChanges: 0 }]
+        : statement.text.includes('AS "intakeChanges"') ? [{ intakeChanges: 1 }] : []) });
+    await repository.applyBatch({ matricNos: ['SX232315ECJHF04'], curriculumId: null, intake: { mode: 'matric' }, reason: 'Fix',
+      expected: [{ matricNo: 'SX232315ECJHF04', studentId: 9, curriculumId: 2, intakeYear: null }] }, 'user_admin');
+    const problems = calls[0]!.map(statement => statement.text.replace(/\s+/g, ' ')).find(text => text.includes('ADMIN_GUARD:BATCH_HAS_PROBLEMS'))!;
+    expect(problems).toContain('2000 + substring(m.no FROM 3 FOR 2)::integer > extract(year FROM now())::integer');
+  });
+});

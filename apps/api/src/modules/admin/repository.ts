@@ -411,7 +411,7 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
         { text: `SELECT p.student_id FROM public.student_profile p WHERE ${BATCH_MATRIC}=ANY($1::text[]) ORDER BY p.student_id FOR UPDATE`, values: [numbers] },
         guard(`EXISTS (SELECT 1 FROM unnest($1::text[]) m(no) WHERE (SELECT count(*) FROM public.student_profile p WHERE ${BATCH_MATRIC}=m.no)<>1
             OR NOT EXISTS (SELECT 1 FROM public.student_profile p JOIN public.user_access_assignment a ON a.clerk_user_id=p.clerk_user_id WHERE ${BATCH_MATRIC}=m.no)
-            OR ($2::text='matric' AND m.no !~ '^SX[0-9]{2}'))`, [numbers, mode], 'BATCH_HAS_PROBLEMS'),
+            OR ($2::text='matric' AND (m.no !~ '^SX[0-9]{2}' OR 2000 + substring(m.no FROM 3 FOR 2)::integer > extract(year FROM now())::integer)))`, [numbers, mode], 'BATCH_HAS_PROBLEMS'),
         guard(`EXISTS (SELECT 1 FROM unnest($1::text[],$2::integer[],$3::integer[],$4::integer[]) e(no,sid,cid,yr) WHERE NOT EXISTS (
             SELECT 1 FROM public.student_profile p WHERE ${BATCH_MATRIC}=e.no AND p.student_id=e.sid AND p.curriculum_id=e.cid AND p.intake_year IS NOT DISTINCT FROM e.yr))`,
           [numbers, rows.map(row => row.studentId), rows.map(row => row.curriculumId), rows.map(row => row.intakeYear)], 'BATCH_STALE'),

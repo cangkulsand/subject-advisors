@@ -25,14 +25,16 @@ export const BATCH_PROBLEM_TEXT: Record<BatchProblemKind | 'INTAKE_UNREADABLE', 
 };
 
 /** What each student becomes. A row with a problem never changes; an unchanged row is skipped and gets no audit row. */
-export function planBatch(matches: BatchMatch[], curriculumId: number | null, intake: BatchIntake): BatchPlan {
+export function planBatch(matches: BatchMatch[], curriculumId: number | null, intake: BatchIntake, now: Date = new Date()): BatchPlan {
+  // A matric year after this year is a typo, not an intake (review fix).
+  const latest = Math.min(ADMIN_INTAKE_YEAR_MAX, now.getUTCFullYear());
   let intakeChanges = 0, programmeChanges = 0, unchanged = 0, problems = 0;
   const rows = matches.map((match): BatchRow => {
     let intakeYear = match.intakeYear;
     if (intake.mode === 'set') intakeYear = intake.year;
     if (intake.mode === 'matric') {
       const read = readMatric(match.matricNo)?.intakeYear;
-      if (read === undefined || read < ADMIN_INTAKE_YEAR_MIN || read > ADMIN_INTAKE_YEAR_MAX) {
+      if (read === undefined || read < ADMIN_INTAKE_YEAR_MIN || read > latest) {
         problems += 1;
         return { match, after: { curriculumId: match.curriculumId, intakeYear: match.intakeYear }, changes: false, problem: 'INTAKE_UNREADABLE' };
       }

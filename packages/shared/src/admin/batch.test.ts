@@ -59,3 +59,12 @@ describe('batch request validation', () => {
     expect(validateBatchApplyRequest({ ...body, curriculumId: 0 }).ok).toBe(false);
   });
 });
+
+describe('review fixes (S3-P004-039)', () => {
+  it('a matric year after the current year is a problem, not a write', () => {
+    const now = new Date('2026-11-27T00:00:00Z');
+    const plan = planBatch([match('SX920001ECJHF04', 2020), match('SX260001ECJHF04', 2020, 1, 2)], null, { mode: 'matric' }, now);
+    expect(plan.rows.map(row => row.problem ?? null)).toEqual(['INTAKE_UNREADABLE', null]);
+    expect(plan.rows[1]!.after.intakeYear).toBe(2026);
+  });
+});

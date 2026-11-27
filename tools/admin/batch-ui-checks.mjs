@@ -44,10 +44,34 @@ export async function batchUiChecks({ check, mock, base }) {
     state.mutationError = { status: 409, code: 'BATCH_STALE', message: 'Some students changed since you checked. Check again.' };
     await dialog.getByRole('button', { name: 'Apply correction', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
     await page.getByRole('alert').filter({ hasText: 'Some students changed since you checked. Check again.' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Apply correction', exact: true }).count(), 0, 'a refused preview cannot be applied again');
     delete state.mutationError;
     await page.getByRole('button', { name: 'Check again', exact: true }).click();
     await page.getByRole('alert').waitFor({ state: 'detached' });
     await page.getByRole('table', { name: 'Students to correct' }).waitFor();
+  });
+  await check('batch correction: an unavailable programme reloads the list, and a later success clears the error (S3-P004-039 review)', async page => {
+    const state = await mock(page); await page.goto(base + '/admin/users/batch');
+    await paste(page, 'SX232315ECJHF04'); await page.getByRole('button', { name: 'Check', exact: true }).click();
+    await page.getByRole('table', { name: 'Students to correct' }).waitFor();
+    await page.getByLabel('Programme', { exact: true }).selectOption('2');
+    await page.getByRole('button', { name: 'Apply correction', exact: true }).click();
+    let dialog = page.getByRole('dialog', { name: 'Apply batch correction' }); await dialog.getByLabel(reasonLabel).fill('Fictional: move.');
+    state.mutationError = { status: 409, code: 'CURRICULUM_UNAVAILABLE', message: 'The selected programme is not available. Choose an active programme.' };
+    const before = state.requests.filter(item => item.path === '/api/admin/curriculum-options').length;
+    await dialog.getByRole('button', { name: 'Apply correction', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+    await page.getByRole('alert').filter({ hasText: 'The selected programme is not available.' }).waitFor();
+    await page.waitForFunction(() => true); await page.waitForLoadState('networkidle');
+    assert.ok(state.requests.filter(item => item.path === '/api/admin/curriculum-options').length > before, 'the programme list is reloaded');
+    delete state.mutationError;
+    await page.getByRole('button', { name: 'Check again', exact: true }).click(); await page.getByRole('table', { name: 'Students to correct' }).waitFor();
+    await page.getByLabel('Programme', { exact: true }).selectOption('2');
+    await page.getByRole('button', { name: 'Apply correction', exact: true }).click();
+    dialog = page.getByRole('dialog', { name: 'Apply batch correction' }); await dialog.getByLabel(reasonLabel).fill('Fictional: move.');
+    await dialog.getByRole('button', { name: 'Apply correction', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+    await page.getByRole('status').filter({ hasText: /^Corrected 1 student/ }).waitFor();
+    assert.equal(await page.getByRole('alert').count(), 0, 'no stale error after a success');
+    assert.equal(await page.getByRole('button', { name: 'Check again', exact: true }).count(), 0);
   });
   await check('batch correction: more than 500 numbers disables Check (S3-P004-039)', async page => {
     await mock(page); await page.goto(base + '/admin/users/batch');
