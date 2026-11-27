@@ -4,6 +4,7 @@ import type { ReferenceCache } from '../../cache/redis';
 import { P001Error, persistenceError } from './validation';
 import { selectionPhase } from '../../../../../packages/shared/src/forecasting/selection-window';
 import { curriculumForIntake, intakeYearRange, type IntakeCurriculum } from '../../../../../packages/shared/src/profile/intake';
+import { normaliseMatric } from '../../../../../packages/shared/src/profile/matric';
 
 const curriculumOptionKeys = ['curriculumId', 'curriculumVersion', 'programmeId', 'programmeCode', 'programmeName', 'effectiveYear', 'totalCreditRequired'];
 const semesterOptionKeys = ['semesterId', 'academicYear', 'semesterNo', 'semesterType'];
@@ -77,6 +78,8 @@ function mapped(row: Record<string, unknown>): Profile {
 const ISO = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
 const PROGRAMME_LOCKED_MESSAGE = 'Your programme is set. Contact the admin to change it.';
 const INTAKE_LOCKED_MESSAGE = 'Your intake year is set. Contact the admin to change it.';
+const MATRIC_LOCKED_MESSAGE = 'Your matric number is set. Contact the admin to change it.';
+const MATRIC_TAKEN_MESSAGE = 'This matric number is already used by another student. Check it, or contact the admin.';
 const invalidIntake = () => new P001Error(400, 'INVALID_INTAKE_YEAR', 'Select your intake year.');
 const invalidCurriculum = () => new P001Error(400, 'INVALID_CURRICULUM', 'Select an available configured curriculum.');
 const CENTRE_LOCKED_MESSAGE = 'Your learning centre is locked while subject selection for the next semester is open. It unlocks when the next semester starts.';
@@ -106,7 +109,7 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
     find,
     async save(userId: string, input: ProfileInput) {
       try {
-        const existingRow = (await query('SELECT learning_centre_id AS "learningCentreId",curriculum_id AS "curriculumId",intake_year AS "intakeYear" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0];
+        const existingRow = (await query('SELECT learning_centre_id AS "learningCentreId",curriculum_id AS "curriculumId",intake_year AS "intakeYear",matric_no AS "matricNo" FROM public.student_profile WHERE clerk_user_id=$1', [userId]))[0];
         const existing = existingRow?.learningCentreId;
         const savedCentre = typeof existing === 'number' ? existing : null;
         // The programme is chosen once, when the profile is created (S2-P004-026); only an administrator changes it afterwards.
@@ -119,6 +122,13 @@ export function createProfileRepository(query: Query, referenceCache?: Reference
           const range = intakeYearRange(now());
           if (!Number.isInteger(input.intakeYear) || input.intakeYear < range.min || input.intakeYear > range.max) throw invalidIntake();
         }
+        // The matric number locks once saved (S3-P004-039); a profile without one may set it once. Both sides are normalised.
+        const savedMatric = typeof existingRow?.matricNo === 'string' ? normaliseMatric(existingRow.matricNo) : '';
+        const matric = input.matricNo === null ? '' : normaliseMatric(input.matricNo);
+        if (savedMatric && matric !== savedMatric) throw new P001Error(409, 'PROFILE_MATRIC_LOCKED', MATRIC_LOCKED_MESSAGE);
+        if (matric && (await query(`SELECT student_id AS "takenBy" FROM public.student_profile
+          WHERE upper(regexp_replace(matric_no,'[[:space:]]','','g'))=$1 AND clerk_user_id<>$2 LIMIT 1`, [matric, userId]))[0])
+          throw new P001Error(409, 'PROFILE_MATRIC_TAKEN', MATRIC_TAKEN_MESSAGE);
         if (!existingRow) {
           // A new profile: the curriculum must have subjects and follow from the intake year among its programme's offered curricula.
           const offered = await query(`SELECT o.curriculum_id AS "curriculumId",o.curriculum_version AS "curriculumVersion",o.effective_year AS "effectiveYear"

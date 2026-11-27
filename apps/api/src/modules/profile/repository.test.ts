@@ -769,3 +769,44 @@ describe('P001 intake year and curriculum (S3-P004-037)', () => {
     expect(inserted(outOfRange.query)).toBe(false);
   });
 });
+
+describe('P001 matric lock and in-use check (S3-P004-039)', () => {
+  const row = { studentId: 9, studentName: 'Student', matricNo: 'SX232315ECJHF04', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22,
+    weeklyWorkingHours: 0, availableStudyHours: 8, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    curriculumVersion: 'V1', programmeCode: 'X', programmeName: 'Fictional', intakeYear: INTAKE_YEAR };
+  const input = { studentName: 'Student', matricNo: 'SX232315ECJHF04', learningCentreId: 1, curriculumId: 4, currentSemesterId: 22, weeklyWorkingHours: 0, availableStudyHours: 8, intakeYear: INTAKE_YEAR };
+  function repo(opts: { saved?: string | null; exists?: boolean; taken?: boolean }) {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('AS "selectionOpensAt"')) return [];
+      const probe = offeredProbe(sql, 4); if (probe) return probe;
+      if (sql.includes('AS "takenBy"')) return opts.taken ? [{ takenBy: 77 }] : [];
+      if (sql.includes('INSERT INTO public.student_profile')) return [row];
+      if (sql.includes('SELECT learning_centre_id AS "learningCentreId",curriculum_id')) return opts.exists === false ? [] : [{ learningCentreId: 1, curriculumId: 4, intakeYear: INTAKE_YEAR, matricNo: opts.saved ?? null }];
+      return [];
+    }) as unknown as Query & ReturnType<typeof vi.fn>;
+    return { query, repository: createProfileRepository(query) };
+  }
+  const inserted = (query: ReturnType<typeof vi.fn>) => query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO public.student_profile'));
+  it('a saved matric number cannot be changed by the student', async () => {
+    const { repository, query } = repo({ saved: 'SX232315ECJHF04' });
+    await expect(repository.save('s', { ...input, matricNo: 'SX232316ECJHF04' }))
+      .rejects.toMatchObject({ status: 409, code: 'PROFILE_MATRIC_LOCKED', message: 'Your matric number is set. Contact the admin to change it.' });
+    expect(inserted(query)).toBe(false);
+  });
+  it('a lowercase or spaced saved number does not trip the lock', async () => {
+    await expect(repo({ saved: 'sx2203 ecrhs04' }).repository.save('s', { ...input, matricNo: 'SX2203ECRHS04' })).resolves.toMatchObject({ studentId: 9 });
+  });
+  it('a profile without a matric number may set it once', async () => {
+    await expect(repo({ saved: null }).repository.save('s', { ...input, matricNo: 'SX2302ECRHF04' })).resolves.toMatchObject({ studentId: 9 });
+  });
+  it('a number another student uses is refused, compared normalised and excluding the student', async () => {
+    const { repository, query } = repo({ exists: false, taken: true });
+    await expect(repository.save('s', input))
+      .rejects.toMatchObject({ status: 409, code: 'PROFILE_MATRIC_TAKEN', message: 'This matric number is already used by another student. Check it, or contact the admin.' });
+    expect(inserted(query)).toBe(false);
+    const [sql, parameters] = query.mock.calls.find(([text]) => String(text).includes('AS "takenBy"'))!;
+    expect(sql).toContain("upper(regexp_replace(matric_no,'[[:space:]]','','g'))=$1");
+    expect(sql).toContain('clerk_user_id<>$2');
+    expect(parameters).toEqual(['SX232315ECJHF04', 's']);
+  });
+});
