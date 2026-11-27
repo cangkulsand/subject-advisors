@@ -164,6 +164,14 @@ export function fixtureMutation(method, url, body, state = {}) {
     profile.intakeYear = body.intakeYear;
     return { status: 200, payload: { data: programmeOf(profile) } };
   }
+  const matricRoute = /^\/api\/admin\/users\/(\d+)\/matric$/.exec(url.pathname);
+  if (method === 'PATCH' && matricRoute) {
+    const profile = data.profiles[Number(matricRoute[1])];
+    if (!profile) return failure(404, 'STUDENT_PROFILE_NOT_FOUND', 'This account has no student profile yet.');
+    if (profile.matricNo === body.matricNo) return failure(409, 'MATRIC_UNCHANGED', 'The matric number is already set to this number.');
+    profile.matricNo = body.matricNo;
+    return { status: 200, payload: { data: programmeOf(profile) } };
+  }
   const route = /^\/api\/admin\/users\/(\d+)\/(roles|access)(?:\/([A-Z_]+))?$/.exec(url.pathname);
   if (!route) return null;
   const target = data.accounts.find(item => item.accountId === Number(route[1]));

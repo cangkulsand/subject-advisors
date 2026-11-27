@@ -43,6 +43,8 @@ export interface AdminRepository {
    * (student_intake / CHANGE_INTAKE_YEAR). Never changes the curriculum. Returns the student programme read back.
    */
   changeStudentIntakeYear(accountId: number, intakeYear: number, actor: string, reason: string): Promise<AdminStudentProgramme>;
+  /** Admin correction of a student's matric number (S3-P004-039); the value is already normalised. */
+  changeStudentMatric(accountId: number, matricNo: string, actor: string, reason: string): Promise<AdminStudentProgramme>;
   /**
    * Dummy users (S3-P004-029): one transaction creates the account with its role plus either a complete student profile
    * (admin current semester, hours 0 and 20) or one coordinator assignment. Guards raise ACADEMIC_SEMESTER_UNAVAILABLE

@@ -343,6 +343,30 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       if (!audited || !programme) throw new AdminMutationError('MUTATION_FAILED');
       return programmeRow(programme);
     },
+    async changeStudentMatric(accountId, matricNo, actor, reason): Promise<AdminStudentProgramme> {
+      const profileOf = `SELECT p.student_id, p.matric_no FROM public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
+        WHERE a.access_assignment_id=$1`;
+      const normalised = (column: string) => `upper(regexp_replace(${column},'[[:space:]]','','g'))`;
+      // Same shape as the intake change: lock, guards, then the update and its audit row in one statement. The intake year is never written.
+      const results = await run(actor, reason, [
+        { text: `${profileOf} FOR UPDATE OF p`, values: [accountId] },
+        guard(noAccount('$1'), [accountId], 'NOT_FOUND'),
+        guard(`NOT EXISTS (${profileOf})`, [accountId], 'STUDENT_PROFILE_NOT_FOUND'),
+        guard(`EXISTS (${profileOf} AND ${normalised("coalesce(p.matric_no,'')")}=$2)`, [accountId, matricNo], 'MATRIC_UNCHANGED'),
+        guard(`EXISTS (SELECT 1 FROM public.student_profile o WHERE ${normalised('o.matric_no')}=$2
+          AND o.student_id NOT IN (SELECT student_id FROM (${profileOf}) self))`, [accountId, matricNo], 'MATRIC_TAKEN'),
+        { text: `WITH target AS (${profileOf} FOR UPDATE OF p),
+          changed AS (UPDATE public.student_profile s SET matric_no=$2 FROM target t WHERE s.student_id=t.student_id
+            RETURNING s.student_id, t.matric_no AS before_no, s.matric_no AS after_no)
+          INSERT INTO public.academic_setup_audit_log(entity_type,entity_id,action,actor,reason,before_data,after_data)
+          SELECT 'student_matric', student_id, 'CHANGE_MATRIC_NO', btrim(current_setting('app.access_actor',true)), btrim(current_setting('app.access_reason',true)),
+            jsonb_build_object('matricNo', before_no), jsonb_build_object('matricNo', after_no) FROM changed RETURNING audit_id AS "auditId"`, values: [accountId, matricNo] },
+        { text: `SELECT ${programmeColumns} FROM ${programmeFrom} WHERE a.access_assignment_id=$1`, values: [accountId] },
+      ]);
+      const audited = results[5]?.[0], programme = results[6]?.[0];
+      if (!audited || !programme) throw new AdminMutationError('MUTATION_FAILED');
+      return programmeRow(programme);
+    },
     async acceptInvitation(invitationId, accountId, actor) {
       const results = await run(actor, 'Invitation accepted', [{
         text: `UPDATE public.admin_user_invitation SET status='ACCEPTED', accepted_at=now(), accepted_access_assignment_id=$2

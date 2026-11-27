@@ -25,6 +25,7 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
       changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
       changeStudentIntakeYear: vi.fn(async () => ({ ...programme, intakeYear: 2023 })),
+      changeStudentMatric: vi.fn(async () => ({ ...programme, matricNo: 'SX232316ECJHF04' })),
       createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24), existingClerkUserIds: vi.fn(async () => new Set<string>()),
     },
     identities: {
@@ -556,5 +557,27 @@ describe('dummy users (S3-P004-029)', () => {
     const response = await send(deps, '/api/admin/users/5/roles', 'POST', { role: 'SYSTEM_ADMIN', reason });
     expect(response.status).toBe(422);
     expect(deps.repository.grantRole).not.toHaveBeenCalled();
+  });
+});
+
+describe('student matric number (S3-P004-039)', () => {
+  it('changes the matric number as the authorized admin, normalised, and returns the student programme', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/users/5/matric', 'PATCH', { matricNo: ' sx23 2316ecjhf04 ', reason: ' ' + reason + ' ' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { ...programme, matricNo: 'SX232316ECJHF04' } });
+    expect(mocked(deps, 'changeStudentMatric')).toHaveBeenCalledWith(5, 'SX232316ECJHF04', ADMIN, reason);
+  });
+  it.each([
+    [{ matricNo: 'SX232316ECJHF04' }], [{ matricNo: 'SX232316ECJHF04', reason: '  ' }], [{ reason }], [{ matricNo: 'SX1', reason }],
+    [{ matricNo: 'SX-2323', reason }], [{ matricNo: 'X'.repeat(31), reason }], [{ matricNo: 12345, reason }], [{ matricNo: 'SX232316ECJHF04', intakeYear: 2023, reason }],
+  ])('rejects the invalid body %j without changing anything', async body => {
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/users/5/matric', 'PATCH', body)).status).toBe(400);
+    expect(mocked(deps, 'changeStudentMatric')).not.toHaveBeenCalled();
+  });
+  it('allows only PATCH', async () => {
+    const deps = fixture();
+    for (const method of ['GET', 'POST', 'PUT', 'DELETE']) expect((await send(deps, '/api/admin/users/5/matric', method)).status).toBe(405);
   });
 });

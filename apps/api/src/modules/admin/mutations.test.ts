@@ -428,3 +428,37 @@ describe('student intake year change (S3-P004-037)', () => {
     expect((await createAdminRepository(query).studentProgramme(7))?.intakeYear).toBe(2021);
   });
 });
+
+describe('student matric number change (S3-P004-039)', () => {
+  const programmeRow = { studentId: 9, studentName: 'Student', matricNo: 'SX232316ECJHF04', curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme', intakeYear: 2023 };
+  it('locks the profile, runs the guards, then the update and its audit row in one statement', async () => {
+    const { repository, calls } = harness({ rows: statements => statements.map((_, index) => index === statements.length - 1 ? [programmeRow] : index === statements.length - 2 ? [{ auditId: 42 }] : []) });
+    expect(await repository.changeStudentMatric(7, 'SX232316ECJHF04', 'user_admin', 'Typo at setup')).toEqual(programmeRow);
+    const statements = calls[0]!;
+    for (const statement of statements) await parse(statement.text);
+    const sql = sqlOf(statements);
+    expect(sql[1]).toContain('FOR UPDATE OF p');
+    expect(sql[2]).toContain('ADMIN_GUARD:NOT_FOUND');
+    expect(sql[3]).toContain('ADMIN_GUARD:STUDENT_PROFILE_NOT_FOUND');
+    expect(sql[4]).toContain('ADMIN_GUARD:MATRIC_UNCHANGED');
+    expect(sql[4]).toContain("upper(regexp_replace(coalesce(p.matric_no,''),'[[:space:]]','','g'))=$2");
+    expect(sql[5]).toContain('ADMIN_GUARD:MATRIC_TAKEN');
+    expect(sql[5]).toContain("upper(regexp_replace(o.matric_no,'[[:space:]]','','g'))=$2");
+    expect(statements[5]!.values).toEqual([7, 'SX232316ECJHF04']);
+    const write = sql[6]!;
+    expect(write).toContain('SET matric_no=$2');
+    expect(write).not.toContain('intake_year=');
+    expect(write).toContain("'student_matric'");
+    expect(write).toContain("'CHANGE_MATRIC_NO'");
+    expect(write).toContain("jsonb_build_object('matricNo',");
+    expect(statements[6]!.values).toEqual([7, 'SX232316ECJHF04']);
+  });
+  it.each(['NOT_FOUND', 'STUDENT_PROFILE_NOT_FOUND', 'MATRIC_UNCHANGED', 'MATRIC_TAKEN'] as const)('maps the %s guard to its stable code', async code => {
+    const { repository } = harness({ fail: Object.assign(new Error(`invalid input syntax for type integer: "ADMIN_GUARD:${code}"`), { code: '22P02' }) });
+    await expect(repository.changeStudentMatric(7, 'SX232316ECJHF04', 'user_admin', 'Reason')).rejects.toMatchObject({ code });
+  });
+  it('gives plain 409 messages', () => {
+    expect(new AdminMutationError('MATRIC_TAKEN')).toMatchObject({ status: 409, message: 'Another student already uses this matric number.' });
+    expect(new AdminMutationError('MATRIC_UNCHANGED')).toMatchObject({ status: 409, message: 'The matric number is already set to this number.' });
+  });
+});
