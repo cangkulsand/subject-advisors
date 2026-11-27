@@ -1,6 +1,6 @@
 # S3-P004-039 — Matric-number intake, matric lock and batch correction
 
-- **Status:** On branch `feature/batch-correction`; not merged yet; no migration
+- **Status:** Merged to `main` (23e182d) on 2026-11-27; deployed to dev and prod 2026-11-27; no migration. Mock intake-year fix not yet run
 - **Date:** 2026-11-27
 - **Sprint:** Sprint 3
 - **Owner:** P004, building P001's (Aisa) review item; to be handed over to Aisa
@@ -134,4 +134,4 @@
   - **Profile:** two new 409s on `PUT /api/profile`.
   - **API:** three new admin endpoints.
   - **Unchanged:** no migration and no schema change.
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-27); mock intake fix pending
