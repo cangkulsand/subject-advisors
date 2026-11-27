@@ -1733,6 +1733,313 @@
           }
         }
       }
+    },
+    "/api/admin/users/{id}/matric": {
+      "patch": {
+        "operationId": "changeStudentMatric",
+        "summary": "Correct a student's matric number (admin only)",
+        "description": "Students set their matric number when they create their profile; once saved it is locked (PUT /api/profile returns 409 PROFILE_MATRIC_LOCKED). This corrects it. The number is normalised (spaces removed, upper case) and must be 4-30 letters or digits. In ONE transaction the profile row is locked, an unchanged value (compared normalised) returns 409 MATRIC_UNCHANGED, a number another student profile holds returns 409 MATRIC_TAKEN, student_profile.matric_no is updated and an append-only row is written to academic_setup_audit_log (entity_type student_matric, action CHANGE_MATRIC_NO, before_data/after_data {matricNo}). The intake year is never changed. S3-P004-039.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeMatricRequest"
+              },
+              "example": {
+                "matricNo": "SX232315ECJHF04",
+                "reason": "Typo at profile setup"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The student programme with the new matric number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProgrammeEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown field, invalid id, a matric number that is not 4-30 letters or digits, or a missing reason (1-500 characters)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND (no account) or STUDENT_PROFILE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only PATCH is allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "MATRIC_UNCHANGED: already this number; MATRIC_TAKEN: another student uses this number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/students/batch/preview": {
+      "post": {
+        "operationId": "previewStudentBatch",
+        "summary": "Preview a batch correction by matric number (admin only, read-only)",
+        "description": "Looks up 1-500 matric numbers (normalised, repeats dropped). Each number is either a match (accountId, studentId, studentName, programmeCode, curriculumId, curriculumVersion, intakeYear, accountStatus ACTIVE/SUSPENDED, isStudent) or a problem: NOT_FOUND, DUPLICATE (used by more than one student profile) or NO_ACCOUNT (a profile without an access assignment). Suspended and non-student accounts are matches; the page shows a warning. Writes nothing. S3-P004-039.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "matricNos"
+                ],
+                "properties": {
+                  "matricNos": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "example": {
+                "matricNos": [
+                  "SX232315ECJHF04",
+                  "SX2302ECRHF04"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Matches and problems",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BatchPreview"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown field, none or more than 500 numbers (\"Paste at most 500 matric numbers.\"), or a number with characters other than letters and digits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only POST is allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/students/batch": {
+      "post": {
+        "operationId": "applyStudentBatch",
+        "summary": "Apply a batch correction of programme and/or intake year (admin only, all or nothing)",
+        "description": "Applies one change to every listed student in ONE transaction, or to none. Before any write: expected must cover exactly matricNos, otherwise 409 BATCH_STALE; the profile rows are locked; any number that is not found, used twice, has no account, or (intake mode matric) has no readable year (SX followed by two digits) returns 409 BATCH_HAS_PROBLEMS; a student whose studentId, curriculumId or intakeYear differs from expected returns 409 BATCH_STALE; an inactive chosen curriculum returns 409 CURRICULUM_UNAVAILABLE; nothing to change returns 409 UNCHANGED. Then each programme change runs db_change_student_programme (future picks removed, one student_programme audit row each) and each intake change writes intake_year with one student_intake / CHANGE_INTAKE_YEAR audit row each, all under the one reason. Students already correct are not written and get no audit row. intake.mode: keep, set (year 1990-2200) or matric (2000 + the two digits after SX). curriculumId null keeps each programme; keep with null is a 400. S3-P004-039.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchApplyRequest"
+              },
+              "example": {
+                "matricNos": [
+                  "SX232315ECJHF04"
+                ],
+                "curriculumId": null,
+                "intake": {
+                  "mode": "matric"
+                },
+                "reason": "Intake year corrected from matric number",
+                "expected": [
+                  {
+                    "matricNo": "SX232315ECJHF04",
+                    "studentId": 9,
+                    "curriculumId": 1,
+                    "intakeYear": 2020
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Counts of what changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BatchResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body: numbers, curriculumId, intake, reason or expected; or no change chosen (\"Choose a programme or an intake year to change.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired or revoked Clerk session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an active, eligible SYSTEM_ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only POST is allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "BATCH_HAS_PROBLEMS, BATCH_STALE (\"Some students changed since you checked. Check again.\"), CURRICULUM_UNAVAILABLE or UNCHANGED; nothing was written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2521,6 +2828,246 @@
           "signedUpAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ChangeMatricRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "matricNo",
+          "reason"
+        ],
+        "properties": {
+          "matricNo": {
+            "type": "string",
+            "description": "Normalised to no spaces, upper case; 4-30 letters or digits"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "BatchMatch": {
+        "type": "object",
+        "required": [
+          "matricNo",
+          "accountId",
+          "studentId",
+          "studentName",
+          "programmeCode",
+          "curriculumId",
+          "curriculumVersion",
+          "intakeYear",
+          "accountStatus",
+          "isStudent"
+        ],
+        "properties": {
+          "matricNo": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "integer"
+          },
+          "studentId": {
+            "type": "integer"
+          },
+          "studentName": {
+            "type": "string"
+          },
+          "programmeCode": {
+            "type": "string"
+          },
+          "curriculumId": {
+            "type": "integer"
+          },
+          "curriculumVersion": {
+            "type": "string"
+          },
+          "intakeYear": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "isStudent": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BatchPreview": {
+        "type": "object",
+        "required": [
+          "matches",
+          "problems"
+        ],
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchMatch"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "matricNo",
+                "kind"
+              ],
+              "properties": {
+                "matricNo": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "NOT_FOUND",
+                    "DUPLICATE",
+                    "NO_ACCOUNT"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "BatchApplyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "matricNos",
+          "intake",
+          "reason",
+          "expected"
+        ],
+        "properties": {
+          "matricNos": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string"
+            }
+          },
+          "curriculumId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "intake": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "const": "keep"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "mode",
+                  "year"
+                ],
+                "properties": {
+                  "mode": {
+                    "const": "set"
+                  },
+                  "year": {
+                    "type": "integer",
+                    "minimum": 1990,
+                    "maximum": 2200
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "const": "matric"
+                  }
+                }
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "expected": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "required": [
+                "matricNo",
+                "studentId",
+                "curriculumId",
+                "intakeYear"
+              ],
+              "properties": {
+                "matricNo": {
+                  "type": "string"
+                },
+                "studentId": {
+                  "type": "integer"
+                },
+                "curriculumId": {
+                  "type": "integer"
+                },
+                "intakeYear": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "BatchResult": {
+        "type": "object",
+        "required": [
+          "corrected",
+          "intakeChanges",
+          "programmeChanges",
+          "removedPicks"
+        ],
+        "properties": {
+          "corrected": {
+            "type": "integer"
+          },
+          "intakeChanges": {
+            "type": "integer"
+          },
+          "programmeChanges": {
+            "type": "integer"
+          },
+          "removedPicks": {
+            "type": "integer"
           }
         }
       }
