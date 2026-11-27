@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-27
 - **Owner:** P004, building P001's (Aisa) review item "batch correction of programme and intake"; to be handed over to Aisa
-- **Status:** Draft, for owner approval
+- **Status:** Draft, for owner approval (builder check done; four points settled as builder's calls)
 - **Builds on:**
   - S3-P004-037: intake year, single admin intake change
   - S2-P004-026: single admin programme change
@@ -99,6 +99,7 @@
 - **Conditions:** only if the year is inside the profile range, and only if the student hasn't picked a year themselves in this session.
 - **Out-of-range or unreadable number:** nothing is filled.
 - **A student pick wins:** changing the select by hand stops further filling.
+- **Saved number, empty intake (builder's call):** when the page opens on a profile that has a saved matric number but no intake year, the select is filled from the saved number under the same conditions, because a locked number is never typed again.
 
 **Hint text** (shown under the select while the fill applies): "Filled in from your matric number. Change it if it is wrong."
 
@@ -117,6 +118,7 @@
 **Profile page:**
 - **Read-only once saved:** a saved matric number shows as text with the hint "Contact the admin to change it", like the saved programme.
 - **Stored value:** it is normalised, as today.
+- **Lock comparison (builder's call):** both the saved value and the input are normalised before comparing, so the one lowercase saved number (`sx2203…`) does not trip the lock on every save.
 
 **Admin change on the account page** (Student programme card), button **Change matric number**:
 - **Endpoint:** `PATCH /api/admin/users/{id}/matric` with `{ matricNo, reason }`, SYSTEM_ADMIN only.
@@ -144,11 +146,14 @@
 - **Problems:**
   - "Not found".
   - "Used by more than one student", which can exist in old data despite the new rule.
+  - "No account for this student", for a profile with no `user_access_assignment` (builder's call: nothing is silently skipped).
+- **Account status (builder's call):** a suspended account, or one whose roles no longer include STUDENT, is still a match, because correcting records does not depend on access. The table shows a "Suspended" or "Not a student account" warning, and the warning does not block.
 - **The table:**
   - **Columns:** Matric number, Student, Programme (version), Intake year, then **After**, which recalculates live as the admin changes step 3.
   - **Problem rows:** listed first, with **Remove problem numbers**.
 - **Programme warning:**
   - **Wording:** "Matric says ECRH, programme is SECJ".
+  - **Compared with (builder's call):** the programme in the **After** column, so the warning recalculates in the page when step 3 picks a programme. That is the moment it matters most.
   - **When:** the matric programme code, prefixed with `S` and passed through the import aliases (`SECJH` becomes `SECJ`), doesn't equal the programme code.
   - **Unknown code:** no warning.
   - **Effect:** a warning never blocks the apply.
@@ -173,6 +178,8 @@
 - **Refused before any write:**
   - **Problems left:** any number with a problem returns 409 `BATCH_HAS_PROBLEMS`.
   - **Stale preview:** a student whose curriculum or intake differs from `expected` returns 409 `BATCH_STALE` with "Some students changed since you checked. Check again."
+    - **Also stale (builder's call):** a matric number that now belongs to a different student, or to no one, compared through `expected.studentId` per number.
+  - **Chosen programme gone (builder's call):** a curriculum that has become inactive since the preview returns 409 `CURRICULUM_UNAVAILABLE` with "The chosen programme is no longer available. Choose another." This is checked before any write.
   - **Nothing to change:** 409 `UNCHANGED`.
   - **No change chosen:** keep and keep together return 400.
 - **The write:** one transaction, with the rows locked first.
