@@ -462,3 +462,56 @@ describe('student matric number change (S3-P004-039)', () => {
     expect(new AdminMutationError('MATRIC_UNCHANGED')).toMatchObject({ status: 409, message: 'The matric number is already set to this number.' });
   });
 });
+
+describe('batch correction (S3-P004-039)', () => {
+  const found = (matricNo: string, studentId: number | null, accountId: number | null = studentId === null ? null : studentId + 100) => ({
+    matricNo, studentId, accountId, studentName: studentId === null ? null : 'Student ' + studentId, programmeCode: 'SECJ', curriculumId: 2, curriculumVersion: '1',
+    intakeYear: 2020, accessStatus: accountId === null ? null : 'ACTIVE', isStudent: accountId !== null });
+  it('previews matches and names each problem', async () => {
+    const query = vi.fn<AdminQuery>(async () => [found('SX232315ECJHF04', 9), found('SX000001', null), found('SX2302ECRHF04', 10), found('SX2302ECRHF04', 11), found('SX2402ECRHF04', 12, null)]);
+    const preview = await createAdminRepository(query).previewBatch(['SX232315ECJHF04', 'SX000001', 'SX2302ECRHF04', 'SX2402ECRHF04']);
+    expect(preview.matches).toEqual([{ matricNo: 'SX232315ECJHF04', accountId: 109, studentId: 9, studentName: 'Student 9', programmeCode: 'SECJ', curriculumId: 2, curriculumVersion: '1', intakeYear: 2020, accountStatus: 'ACTIVE', isStudent: true }]);
+    expect(preview.problems).toEqual([{ matricNo: 'SX000001', kind: 'NOT_FOUND' }, { matricNo: 'SX2302ECRHF04', kind: 'DUPLICATE' }, { matricNo: 'SX2402ECRHF04', kind: 'NO_ACCOUNT' }]);
+    const [sql, values] = query.mock.calls[0]!;
+    await parse(sql);
+    expect(sql).toContain("upper(regexp_replace(p.matric_no,'[[:space:]]','','g'))=w.matric_no");
+    expect(values).toEqual([['SX232315ECJHF04', 'SX000001', 'SX2302ECRHF04', 'SX2402ECRHF04']]);
+  });
+  const input = { matricNos: ['SX232315ECJHF04', 'SX2302ECRHF04'], curriculumId: null, intake: { mode: 'matric' as const }, reason: 'Backfill used the curriculum year',
+    expected: [{ matricNo: 'SX2302ECRHF04', studentId: 10, curriculumId: 2, intakeYear: 2022 }, { matricNo: 'SX232315ECJHF04', studentId: 9, curriculumId: 2, intakeYear: 2020 }] };
+  it('locks, runs every guard, then writes the programme and intake changes in one audited transaction', async () => {
+    const { repository, calls } = harness({ rows: statements => statements.map(statement =>
+      statement.text.includes('AS "corrected"') ? [{ corrected: 2 }] : statement.text.includes('AS "removedPicks"') ? [{ removedPicks: 0, programmeChanges: 0 }]
+        : statement.text.includes('AS "intakeChanges"') ? [{ intakeChanges: 2 }] : []) });
+    expect(await repository.applyBatch(input, 'user_admin')).toEqual({ corrected: 2, intakeChanges: 2, programmeChanges: 0, removedPicks: 0 });
+    const statements = calls[0]!;
+    for (const statement of statements) await parse(statement.text);
+    const sql = sqlOf(statements);
+    expect(statements[0]!.values).toEqual(['user_admin', 'Backfill used the curriculum year']);
+    expect(sql[1]).toContain('FOR UPDATE');
+    const order = ['BATCH_HAS_PROBLEMS', 'BATCH_STALE', 'CURRICULUM_UNAVAILABLE', 'UNCHANGED'].map(code => sql.findIndex(text => text.includes('ADMIN_GUARD:' + code)));
+    expect(order).toEqual([2, 3, 4, 5]);
+    const firstWrite = sql.findIndex(text => text.includes('db_change_student_programme') || text.includes('UPDATE public.student_profile'));
+    expect(firstWrite).toBeGreaterThan(6);
+    expect(sql.some(text => text.includes('public.db_change_student_programme(student_id, new_curriculum)'))).toBe(true);
+    const intake = sql.find(text => text.includes('AS "intakeChanges"'))!;
+    expect(intake).toContain("'student_intake'");
+    expect(intake).toContain("'CHANGE_INTAKE_YEAR'");
+    // Expected rows travel in the order of matricNos, as aligned arrays.
+    expect(statements[3]!.values).toEqual([['SX232315ECJHF04', 'SX2302ECRHF04'], [9, 10], [2, 2], [2020, 2022]]);
+    expect(statements[5]!.values).toEqual([['SX232315ECJHF04', 'SX2302ECRHF04'], null, 'matric', null]);
+  });
+  it('a preview that does not cover the same numbers is stale before touching the database', async () => {
+    const { repository, transaction } = harness();
+    await expect(repository.applyBatch({ ...input, expected: input.expected.slice(1) }, 'user_admin')).rejects.toMatchObject({ code: 'BATCH_STALE', status: 409 });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+  it.each(['BATCH_HAS_PROBLEMS', 'BATCH_STALE', 'CURRICULUM_UNAVAILABLE', 'UNCHANGED'] as const)('maps the %s guard', async code => {
+    const { repository } = harness({ fail: Object.assign(new Error(`invalid input syntax for type integer: "ADMIN_GUARD:${code}"`), { code: '22P02' }) });
+    await expect(repository.applyBatch(input, 'user_admin')).rejects.toMatchObject({ code });
+  });
+  it('gives the plain batch messages', () => {
+    expect(new AdminMutationError('BATCH_STALE')).toMatchObject({ status: 409, message: 'Some students changed since you checked. Check again.' });
+    expect(new AdminMutationError('BATCH_HAS_PROBLEMS')).toMatchObject({ status: 409, message: 'Remove the problem numbers, then check again.' });
+  });
+});

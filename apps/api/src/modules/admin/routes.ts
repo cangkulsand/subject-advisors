@@ -1,3 +1,4 @@
+import { validateBatchApplyRequest, validateBatchPreviewRequest } from '../../../../../packages/shared/src/admin/batch';
 import { authorize, AuthError, authErrorResponse, authJson } from '../auth';
 import { ADMIN_ROLES, isAdminRole, validateChangeAccessRequest, validateCreateAccountRequest, validateCreateInvitationRequest, validateGrantRoleRequest, validateRevokeRoleRequest, validateChangeProgrammeRequest, validateChangeIntakeYearRequest, validateChangeMatricRequest } from '../../../../../packages/shared/src/admin/admin';
 import type { AdminIdentity, AdminInvitationStatus, AdminUsersQuery, AdminAuditQuery, AdminValidation } from '../../../../../packages/shared/src/admin/admin';
@@ -191,6 +192,20 @@ export async function handleAdminRequest(request: Request, deps: AdminDependenci
       const accountId = positive(matricRoute[1]!, 'account ID');
       const input = validated(validateChangeMatricRequest(await readJson(request)));
       return authJson({ data: await deps.repository.changeStudentMatric(accountId, input.matricNo, actor, input.reason) });
+    }
+    if (url.pathname === '/api/admin/students/batch/preview') {
+      // Batch correction by matric number (S3-P004-039): read-only preview.
+      const denied = allow('POST'); if (denied) return denied;
+      parameters(url, []);
+      const input = validated(validateBatchPreviewRequest(await readJson(request)));
+      return authJson({ data: await deps.repository.previewBatch(input.matricNos) });
+    }
+    if (url.pathname === '/api/admin/students/batch') {
+      // All or nothing: the repository refuses a stale preview, problems or no change before any write.
+      const denied = allow('POST'); if (denied) return denied;
+      parameters(url, []);
+      const input = validated(validateBatchApplyRequest(await readJson(request)));
+      return authJson({ data: await deps.repository.applyBatch(input, actor) });
     }
     if (url.pathname === '/api/admin/waiting-users') {
       // Staff who signed up without an invitation and wait for a role (S3-P004-036). Granting uses POST /api/admin/users.
