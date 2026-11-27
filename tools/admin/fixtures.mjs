@@ -33,9 +33,14 @@ const curricula = [
 // Intake year (S3-P004-037): account 4 has 2022, account 5 has none recorded yet.
 const studentProfiles = { 4: { studentId: 14, studentName: 'Fictional Account 4', matricNo: 'A22EC0004', curriculumId: 1, picks: 3, intakeYear: 2022 }, 5: { studentId: 15, studentName: 'Fictional Account 5', matricNo: null, curriculumId: 2, picks: 0, intakeYear: null } };
 const programmeOf = profile => { const option = curricula.find(item => item.curriculumId === profile.curriculumId); return { studentId: profile.studentId, studentName: profile.studentName, matricNo: profile.matricNo, ...option, intakeYear: profile.intakeYear }; };
+// Batch correction (S3-P004-039): two fictional SX students on curriculum 1.
+const batchStudents = [
+  { matricNo: 'SX232315ECJHF04', accountId: 21, studentId: 31, studentName: 'Fictional Batch A', curriculumId: 1, intakeYear: 2020, accountStatus: 'ACTIVE', isStudent: true },
+  { matricNo: 'SX230001ECJHF04', accountId: 22, studentId: 32, studentName: 'Fictional Batch B', curriculumId: 1, intakeYear: 2023, accountStatus: 'SUSPENDED', isStudent: true },
+];
 /** Per-session mutable copy so one browser check never leaks edits into another. */
 function store(state) {
-  return state.store ??= { accounts: structuredClone(accounts), invitations: structuredClone(invitations), events: structuredClone(events), nextId: accounts.length + 1, profiles: structuredClone(studentProfiles) };
+  return state.store ??= { accounts: structuredClone(accounts), invitations: structuredClone(invitations), events: structuredClone(events), nextId: accounts.length + 1, profiles: structuredClone(studentProfiles), batch: structuredClone(batchStudents) };
 }
 function membershipsOf(account) {
   return account.memberships ?? account.roles.map(role => ({ role, emailPolicy: 'ROLE_DOMAIN', source: 'OPERATOR', protectedOwner: role === 'SYSTEM_ADMIN' && account.protectedOwner, reason: 'Explicit fictional fixture assignment.', grantedAt: generatedAt }));
@@ -101,6 +106,25 @@ export function fixtureMutation(method, url, body, state = {}) {
   const academic = academicMutation(method, url, body, state, data.accounts);
   if (academic !== undefined) return academic;
   const audit = (account, action, role, before, after, reason) => data.events.unshift({ eventId: 'mutation:' + data.events.length, accountId: account.accountId, target: account.clerkUserId, actor: 'user_test', kind: action === 'ACCESS_STATUS_CHANGE' ? 'ACCESS' : 'ROLE', action, role, before, after, reason, occurredAt: now });
+  const batchMatch = student => { const option = curricula.find(item => item.curriculumId === student.curriculumId); return { ...student, programmeCode: option.programmeCode, curriculumVersion: option.curriculumVersion }; };
+  if (method === 'POST' && url.pathname === '/api/admin/students/batch/preview') {
+    const matches = [], problems = [];
+    for (const matricNo of body.matricNos) { const student = data.batch.find(item => item.matricNo === matricNo); if (student) matches.push(batchMatch(student)); else problems.push({ matricNo, kind: 'NOT_FOUND' }); }
+    return { status: 200, payload: { data: { matches, problems } } };
+  }
+  if (method === 'POST' && url.pathname === '/api/admin/students/batch') {
+    let intakeChanges = 0, programmeChanges = 0, corrected = 0;
+    for (const matricNo of body.matricNos) {
+      const student = data.batch.find(item => item.matricNo === matricNo);
+      const year = body.intake.mode === 'set' ? body.intake.year : body.intake.mode === 'matric' ? 2000 + Number(matricNo.slice(2, 4)) : student.intakeYear;
+      const curriculumId = body.curriculumId ?? student.curriculumId;
+      const intake = year !== student.intakeYear, programme = curriculumId !== student.curriculumId;
+      if (intake) intakeChanges++; if (programme) programmeChanges++; if (intake || programme) corrected++;
+      student.intakeYear = year; student.curriculumId = curriculumId;
+    }
+    if (!corrected) return failure(409, 'UNCHANGED', 'The intake year is already set to this year.');
+    return { status: 200, payload: { data: { corrected, intakeChanges, programmeChanges, removedPicks: 0 } } };
+  }
   // Dummy users (S3-P004-029): fixed fictional credentials so the browser checks can read them.
   const dummyReset = /^\/api\/admin\/users\/(\d+)\/dummy-password$/.exec(url.pathname);
   if (method === 'POST' && dummyReset) {
@@ -162,6 +186,14 @@ export function fixtureMutation(method, url, body, state = {}) {
     if (!Number.isInteger(body.intakeYear) || body.intakeYear < 1990 || body.intakeYear > 2200) return failure(400, 'INVALID_REQUEST', 'Enter an intake year between 1990 and 2200.');
     if (profile.intakeYear === body.intakeYear) return failure(409, 'UNCHANGED', 'The intake year is already set to this year.');
     profile.intakeYear = body.intakeYear;
+    return { status: 200, payload: { data: programmeOf(profile) } };
+  }
+  const matricRoute = /^\/api\/admin\/users\/(\d+)\/matric$/.exec(url.pathname);
+  if (method === 'PATCH' && matricRoute) {
+    const profile = data.profiles[Number(matricRoute[1])];
+    if (!profile) return failure(404, 'STUDENT_PROFILE_NOT_FOUND', 'This account has no student profile yet.');
+    if (profile.matricNo === body.matricNo) return failure(409, 'MATRIC_UNCHANGED', 'The matric number is already set to this number.');
+    profile.matricNo = body.matricNo;
     return { status: 200, payload: { data: programmeOf(profile) } };
   }
   const route = /^\/api\/admin\/users\/(\d+)\/(roles|access)(?:\/([A-Z_]+))?$/.exec(url.pathname);

@@ -48,9 +48,25 @@ function ChangeIntakeYearDialog({ current, onCancel, onSubmit }: { current: numb
     onCancel={onCancel} onSubmit={reason => onSubmit(value, reason)}/>;
 }
 
+/** Admin correction of the matric number (S3-P004-039); students cannot change it once saved. */
+function ChangeMatricDialog({ current, onCancel, onSubmit }: { current: string | null; onCancel: () => void; onSubmit: (matricNo: string, reason: string) => Promise<void> }) {
+  const [value, setValue] = useState(current ?? '');
+  const inputId = useId(), helpId = useId();
+  const matricNo = value.replace(/\s+/g, '').toUpperCase();
+  const valid = /^[A-Z0-9]{4,30}$/.test(matricNo);
+  const description = <>
+    <p>Correct this student's matric number. The intake year is not changed; use Change intake year for that.</p>
+    <div className="admin-field"><label htmlFor={inputId}>New matric number</label>
+      <input id={inputId} type="text" maxLength={40} autoCapitalize="characters" spellCheck={false} value={value} aria-describedby={helpId} onChange={event => setValue(event.target.value)}/>
+      <span id={helpId} className="admin-muted">Current: {current ?? 'Not set'}. 4 to 30 letters or digits, for example SX232315ECJHF04.</span></div>
+  </>;
+  return <ReasonDialog title="Change matric number" description={description} confirmLabel="Change matric number" disabled={!valid || matricNo === (current ?? '')}
+    onCancel={onCancel} onSubmit={reason => onSubmit(matricNo, reason)}/>;
+}
+
 /** Student programme of an account that has a student profile, with the admin-only "Change programme" action. Renders nothing for other accounts. */
 export function StudentProgrammeCard({ client, accountId, version, onChanged }: { client: AdminClient; accountId: number; version: number; onChanged: (text: string) => void }) {
-  const [programme, setProgramme] = useState<AdminStudentProgramme | null>(), [loaded, setLoaded] = useState(false), [error, setError] = useState(''), [attempt, setAttempt] = useState(0), [changing, setChanging] = useState<'programme' | 'intake' | null>(null);
+  const [programme, setProgramme] = useState<AdminStudentProgramme | null>(), [loaded, setLoaded] = useState(false), [error, setError] = useState(''), [attempt, setAttempt] = useState(0), [changing, setChanging] = useState<'programme' | 'intake' | 'matric' | null>(null);
   useEffect(() => {
     const controller = new AbortController(); setLoaded(false); setError('');
     client.studentProgramme(accountId, controller.signal).then(value => { if (!controller.signal.aborted) { setProgramme(value); setLoaded(true); } },
@@ -67,17 +83,24 @@ export function StudentProgrammeCard({ client, accountId, version, onChanged }: 
     const result = await client.changeIntakeYear(accountId, { intakeYear, reason });
     setProgramme(result); setChanging(null); onChanged(intakeYearChangeNotice(intakeYear));
   }
+  async function changeMatric(matricNo: string, reason: string) {
+    const result = await client.changeMatric(accountId, { matricNo, reason });
+    setProgramme(result); setChanging(null); onChanged(`Matric number changed to ${matricNo}.`);
+  }
   return <section className="admin-card" aria-label="Student programme"><h2>Student programme</h2>
-    <p className="admin-muted">Students choose their programme and intake year once, when they set up their profile. Only a System Administrator changes them afterwards; every change is recorded in the audit log with its reason.</p>
-    <dl className="admin-account-facts"><div><dt>Student</dt><dd>{programme.studentName}{programme.matricNo ? ` (${programme.matricNo})` : ''}</dd></div>
+    <p className="admin-muted">Students choose their programme, intake year and matric number once, when they set up their profile. Only a System Administrator changes them afterwards; every change is recorded in the audit log with its reason.</p>
+    <dl className="admin-account-facts"><div><dt>Student</dt><dd>{programme.studentName}</dd></div>
+      <div><dt>Matric number</dt><dd>{programme.matricNo ?? 'Not set'}</dd></div>
       <div><dt>Programme</dt><dd>{programme.programmeCode} — {programme.programmeName}</dd></div>
       <div><dt>Curriculum version</dt><dd>{programme.curriculumVersion}</dd></div>
       <div><dt>Intake year</dt><dd>{intakeYearLabel(programme.intakeYear)}</dd></div></dl>
     <div className="admin-programme-actions">
       <button type="button" className="admin-secondary" onClick={() => setChanging('programme')}>Change programme</button>
       <button type="button" className="admin-secondary" onClick={() => setChanging('intake')}>Change intake year</button>
+      <button type="button" className="admin-secondary" onClick={() => setChanging('matric')}>Change matric number</button>
     </div>
     {changing === 'programme' && <ChangeProgrammeDialog client={client} current={programme} onCancel={() => setChanging(null)} onSubmit={change}/>}
+    {changing === 'matric' && <ChangeMatricDialog current={programme.matricNo} onCancel={() => setChanging(null)} onSubmit={changeMatric}/>}
     {changing === 'intake' && <ChangeIntakeYearDialog current={programme.intakeYear} onCancel={() => setChanging(null)} onSubmit={changeIntake}/>}
   </section>;
 }

@@ -1,6 +1,7 @@
+import type { BatchApplyRequest, BatchPreview, BatchResult } from '../../../../../packages/shared/src/admin/batch';
 import { accountSessionStamp, clearAccountCache } from '../auth/account-cache';
 import type { CreateDummyUserRequest, CreateDummyUserResponse, DummyCapacity, DummyCredentials } from '../../../../../packages/shared/src/admin/dummy';
-import type { AdminAccount, AdminAccountDetail, AdminChangeIntakeYearRequest, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery, AdminWaitingUser, AdminWaitingUsers } from '../../../../../packages/shared/src/admin/admin';
+import type { AdminAccount, AdminAccountDetail, AdminChangeIntakeYearRequest, AdminChangeMatricRequest, AdminChangeProgrammeRequest, AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditEvent, AdminAuditQuery, AdminChangeAccessRequest, AdminCreateAccountRequest, AdminCreateInvitationRequest, AdminGrantRoleRequest, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminOverview, AdminPage, AdminRevokeRoleRequest, AdminRole, AdminUsersQuery, AdminWaitingUser, AdminWaitingUsers } from '../../../../../packages/shared/src/admin/admin';
 import { ADMIN_ROLES } from '../../../../../packages/shared/src/admin/admin';
 export class AdminApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -96,6 +97,27 @@ function studentProgramme(value: unknown): AdminStudentProgramme | null {
   curriculumOption(value);
   return item as unknown as AdminStudentProgramme;
 }
+function batchPreview(value: unknown): BatchPreview {
+  const item = object(value);
+  if (!Array.isArray(item.matches) || !Array.isArray(item.problems)) throw new Error('Invalid administration response');
+  for (const match of item.matches) {
+    const row = object(match); text(row.matricNo); id(row.accountId); id(row.studentId); text(row.studentName); text(row.programmeCode); id(row.curriculumId); text(row.curriculumVersion);
+    if (row.intakeYear !== null) id(row.intakeYear);
+    if (row.accountStatus !== 'ACTIVE' && row.accountStatus !== 'SUSPENDED') throw new Error('Invalid administration response');
+    if (typeof row.isStudent !== 'boolean') throw new Error('Invalid administration response');
+  }
+  for (const problem of item.problems) {
+    const row = object(problem); text(row.matricNo);
+    if (!['NOT_FOUND', 'DUPLICATE', 'NO_ACCOUNT'].includes(row.kind as string)) throw new Error('Invalid administration response');
+  }
+  return item as unknown as BatchPreview;
+}
+function batchResult(value: unknown): BatchResult {
+  const item = object(value);
+  for (const key of ['corrected', 'intakeChanges', 'programmeChanges', 'removedPicks'] as const)
+    if (typeof item[key] !== 'number' || !Number.isSafeInteger(item[key]) || (item[key] as number) < 0) throw new Error('Invalid administration response');
+  return item as unknown as BatchResult;
+}
 function programmeChange(value: unknown): AdminProgrammeChange {
   const item = object(value); const programme = studentProgramme(item.programme);
   if (!programme || typeof item.removedPicks !== 'number' || !Number.isSafeInteger(item.removedPicks) || item.removedPicks < 0) throw new Error('Invalid administration response');
@@ -125,6 +147,11 @@ export interface AdminClient {
   changeProgramme(id: number, input: AdminChangeProgrammeRequest): Promise<AdminProgrammeChange>;
   /** Corrects the student's intake year (S3-P004-037); returns the student programme with the new intake year. */
   changeIntakeYear(id: number, input: AdminChangeIntakeYearRequest): Promise<AdminStudentProgramme>;
+  /** Batch correction by matric number (S3-P004-039). */
+  batchPreview(matricNos: string[], signal?: AbortSignal): Promise<BatchPreview>;
+  applyBatch(input: BatchApplyRequest): Promise<BatchResult>;
+  /** Corrects the student's matric number (S3-P004-039). */
+  changeMatric(id: number, input: AdminChangeMatricRequest): Promise<AdminStudentProgramme>;
   dummyCapacity(signal?: AbortSignal): Promise<DummyCapacity>;
   createDummyUser(input: CreateDummyUserRequest): Promise<CreateDummyUserResponse>;
   resetDummyPassword(accountId: number): Promise<DummyCredentials>;
@@ -179,6 +206,9 @@ export function createAdminClient(getToken: () => Promise<string | null>, baseUr
     studentProgramme: (accountId, signal) => request('/api/admin/users/' + accountId + '/programme', studentProgramme, signal),
     curriculumOptions: signal => request('/api/admin/curriculum-options', value => { if (!Array.isArray(value)) throw new Error('Invalid administration response'); return value.map(curriculumOption); }, signal),
     changeProgramme: (accountId, input) => request('/api/admin/users/' + accountId + '/programme', programmeChange, undefined, { method: 'PATCH', body: input }),
+    batchPreview: (matricNos, signal) => request('/api/admin/students/batch/preview', batchPreview, signal, { method: 'POST', body: { matricNos } }),
+    applyBatch: input => request('/api/admin/students/batch', batchResult, undefined, { method: 'POST', body: input }),
+    changeMatric: (accountId, input) => request('/api/admin/users/' + accountId + '/matric', value => { const programme = studentProgramme(value); if (!programme) throw new Error('Invalid administration response'); return programme; }, undefined, { method: 'PATCH', body: input }),
     changeIntakeYear: (accountId, input) => request('/api/admin/users/' + accountId + '/intake', value => { const programme = studentProgramme(value); if (!programme) throw new Error('Invalid administration response'); return programme; }, undefined, { method: 'PATCH', body: input }),
     dummyCapacity: signal => request('/api/admin/dummy-users/capacity', capacity, signal),
     createDummyUser: input => request('/api/admin/dummy-users', value => { const data = object(value); return { account: detail(data.account), credentials: credentials(data.credentials) }; }, undefined, { method: 'POST', body: input }),

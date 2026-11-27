@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { assertReadable } from '../ui/readability.mjs';
 import { fixtureMutation, fixtureResponse } from './fixtures.mjs';
 import { academicUiChecks } from './academic-ui-checks.mjs';
+import { batchUiChecks } from './batch-ui-checks.mjs';
 process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
 const output = await build({ entryPoints: ['tools/auth/local/main.tsx'], bundle: true, write: false, outdir: '.wrangler/admin-review', jsx: 'automatic', loader: { '.png': 'dataurl' }, alias: { '@clerk/react': resolve('apps/web/src/features/auth/testing/clerk-mock.tsx') }, define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"TEST_ONLY_PUBLIC_KEY"' } });
 const script = output.outputFiles.find(file => file.path.endsWith('.js')).text;
@@ -535,7 +536,7 @@ else {
       const state = await mock(page); await page.goto(base + '/admin/users/6'); await page.getByRole('heading', { name: 'Role memberships' }).waitFor();
       assert.equal(await page.getByRole('heading', { name: 'Student programme' }).count(), 0); // account 6 has no student profile
       await page.goto(base + '/admin/users/4'); const card = page.getByLabel('Student programme', { exact: true }); await card.waitFor();
-      await card.getByText('DEMO — DEMO Not official', { exact: true }).waitFor(); await card.getByText('Fictional Account 4 (A22EC0004)', { exact: true }).waitFor();
+      await card.getByText('DEMO — DEMO Not official', { exact: true }).waitFor(); await card.getByText('Fictional Account 4', { exact: true }).waitFor();
       await page.screenshot({ path: '.wrangler/admin-review/student-programme-desktop.png', fullPage: true });
       await card.getByRole('button', { name: 'Change programme', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Change programme' }); await dialog.waitFor();
@@ -560,6 +561,29 @@ else {
       await dialog.getByLabel('New programme', { exact: true }).selectOption('1'); await dialog.getByLabel(reasonLabel).fill('Fictional: correction.');
       await dialog.getByRole('button', { name: 'Change programme', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('status').filter({ hasText: 'Programme changed; 0 subject picks removed.' }).waitFor();
+    });
+    await check('student matric number: shown on the card, changed with a reason, taken rejected in the dialog (S3-P004-039)', async page => {
+      const state = await mock(page); await page.goto(base + '/admin/users/4'); const card = page.getByLabel('Student programme', { exact: true }); await card.waitFor();
+      const fact = card.locator('.admin-account-facts div').filter({ has: page.getByText('Matric number', { exact: true }) });
+      assert.equal(await fact.locator('dd').innerText(), 'A22EC0004');
+      await card.getByRole('button', { name: 'Change matric number', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Change matric number' }); await dialog.waitFor();
+      const input = dialog.getByLabel('New matric number', { exact: true }); assert.equal(await input.inputValue(), 'A22EC0004');
+      const confirm = dialog.getByRole('button', { name: 'Change matric number', exact: true });
+      await dialog.getByLabel(reasonLabel).fill('Fictional: typo at setup.');
+      assert.equal(await confirm.isDisabled(), true, 'same number cannot be submitted');
+      await input.fill('a22ec 0004'); assert.equal(await confirm.isDisabled(), true, 'same number after normalising');
+      await input.fill('SX1'); assert.equal(await confirm.isDisabled(), true, 'too short');
+      await input.fill('sx23 2316ecjhf04'); assert.equal(await confirm.isDisabled(), false);
+      state.mutationError = { status: 409, code: 'MATRIC_TAKEN', message: 'Another student already uses this matric number.' };
+      await confirm.click(); await dialog.getByRole('alert').filter({ hasText: 'Another student already uses this matric number.' }).waitFor(); assert.equal(await dialog.isVisible(), true);
+      delete state.mutationError; await confirm.click(); await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('status').filter({ hasText: 'Matric number changed to SX232316ECJHF04.' }).waitFor();
+      assert.equal(await fact.locator('dd').innerText(), 'SX232316ECJHF04');
+      const patch = state.bodies.filter(item => item.method === 'PATCH').at(-1);
+      assert.deepEqual(patch, { method: 'PATCH', path: '/api/admin/users/4/matric', body: { matricNo: 'SX232316ECJHF04', reason: 'Fictional: typo at setup.' } });
+      await page.goto(base + '/admin/users/5'); await card.waitFor();
+      assert.equal(await fact.locator('dd').innerText(), 'Not set');
     });
     await check('student intake year: shown on the card, corrected with a reason, unchanged rejected in the dialog, success notice (S3-P004-037)', async page => {
       const state = await mock(page); await page.goto(base + '/admin/users/4'); const card = page.getByLabel('Student programme', { exact: true }); await card.waitFor();
@@ -760,6 +784,7 @@ else {
       assert.equal(await page.locator('.view-as-banner').count(), 0);
     });
     await academicUiChecks({ check, mock, base });
+    await batchUiChecks({ check, mock, base });
     console.log('PASS ' + passed + ' administration browser checks');
   } finally { await browser?.close(); await new Promise(done => server.close(done)); }
 }

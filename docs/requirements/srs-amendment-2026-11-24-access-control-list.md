@@ -49,7 +49,7 @@ Students and coordinators cannot assign or change any role.
 | --- | --- |
 | **View** | Own profile, own academic records, degree progress, graduation check, graduation plan, pathway, recommendations, and the semester offerings their coordinator approved for their programme and learning centre |
 | **Edit** | Own profile fields; own academic records; own semester picks while the admin-set selection window is open; own plan (what-if scenario) |
-| **Locked after first save** | Programme (`PROFILE_PROGRAMME_LOCKED`) and intake year (`PROFILE_INTAKE_LOCKED`, S3-P004-037), changed only through a System Administrator; learning centre while the selection window is open until the admin moves the semester forward (S2-P004-023) |
+| **Locked after first save** | Programme (`PROFILE_PROGRAMME_LOCKED`), intake year (`PROFILE_INTAKE_LOCKED`, S3-P004-037) and matric number (`PROFILE_MATRIC_LOCKED`, S3-P004-039; a number another student holds is refused with `PROFILE_MATRIC_TAKEN`), changed only through a System Administrator; learning centre while the selection window is open until the admin moves the semester forward (S2-P004-023) |
 | **Approve** | Nothing. Graduation check confirmation is the student's own statement, not an approval |
 | **Recover** | Nothing beyond re-entering own data |
 
@@ -90,13 +90,14 @@ All student endpoints are scoped to the signed-in identity; a browser-supplied s
 | Student cannot sign in (lost access to Clerk) | Clerk account recovery for the same email; the application account is matched by Clerk user ID and keeps its data | Student, through Clerk | In force |
 | Wrong programme chosen at registration | Programme change with a reason (A2); records kept; future picks removed and counted | System Administrator | In force |
 | Wrong intake year | Change intake year with a reason on the account page; audited (`student_intake`); the curriculum is not changed (S3-P004-037) | System Administrator | In force |
+| Wrong matric number | Change matric number with a reason on the account page; audited (`student_matric` / `CHANGE_MATRIC_NO`); a number another student holds is refused; the intake year is not changed (S3-P004-039) | System Administrator | In force |
 | Learning centre, faculty, department, programme or curriculum deactivated by mistake | Set active again with a reason; nothing is hard-deleted | System Administrator | In force |
 | Coordinator assignment ended by mistake | Create a new assignment for the same scope; the ended row stays as history | System Administrator | In force |
 | Offering decision made by mistake | Change the decision again; each change is a new audit row | Coordinator, or System Administrator through View as | In force |
 | Student data snapshot hidden by mistake | Not recoverable from the UI (the snapshot stays frozen in the database and the removal is recorded in `academic_import_batch_removal`) | — | In force; import path is hidden since S3-P004-032 |
 | The last System Administrator or the protected owner | Cannot be suspended or lose the role; ownership moves only through a pinned, audited migration (as in 0015) | — | In force |
 | Student deletes or changes an academic record by mistake | **Gap:** academic records are deleted outright and changes are not audited, so they cannot be recovered | — | **Proposed:** keep deleted records as removed (soft delete) with who and when, and keep an append-only record history; only the student edits records, and the System Administrator can view the history and restore a removed record with a reason. Owner: P001 (UC04) |
-| Wrong intake or programme for many students | No batch correction yet | — | **Proposed with the batch-update item (Aisa):** System Administrator only, reason required, one audit row per student, same rules as the single programme change |
+| Wrong intake or programme for many students | **Batch correction** (Users & Access → Batch correction): paste up to 500 matric numbers, check the preview, choose the programme and/or intake year (a year for all, or each student's year from their matric number), give one reason. All students change together or none do; one audit row per student; a programme change follows the single-change rules and removes future picks (S3-P004-039) | System Administrator | In force |
 
 Audit logs (`user_role_audit_log`, `user_access_audit_log`, `academic_setup_audit_log`, `offering_decision_audit`, `forecast_decision_audit_log`, `confirmed_offering_audit`, `forecast_adjustment_audit`) are append-only: database triggers reject any update or delete (`db_immutable`, migrations 0001, 0004, 0007, 0008, 0009). No role can edit or delete them.
 
@@ -105,7 +106,7 @@ Audit logs (`user_role_audit_log`, `user_access_audit_log`, `academic_setup_audi
 1. **Subject and curriculum editing by coordinators.** Dr. Adila said subject additions are decided at department level and coordinators need the relevant permissions. Today only the System Administrator can edit curricula and prerequisites. Proposal: a coordinator may add, edit or remove subjects and prerequisites only for curricula of programmes in their own assignment, with the same audit; this follows the faculty-scope change (Idham).
 2. **Coordinator scope by faculty.** Today a coordinator is assigned per programme × learning centre. Proposal under discussion: one assignment per faculty that covers all its programmes across the chosen learning centres.
 3. **Academic record history** (A5, proposed rows) and whether a System Administrator may restore records.
-4. **Batch programme and intake correction** (A5, proposed row).
+4. **Batch programme and intake correction** (A5): delivered in S3-P004-039; no longer open.
 
 ## Amendments to the SRS text
 

@@ -3,6 +3,7 @@ import type { Profile, ProfileOptions } from '../../../../api/src/modules/profil
 import { AcademicApiError, type AcademicClient, errorMessage } from './client';
 import { curriculumOptionText, intakeYears, resolveIntakeCurriculum, savedIntakeSummary } from './programme-resolution';
 import { navigateApp, registerUnsavedChanges } from '../../app/navigation';
+import { readMatric } from '../../../../../packages/shared/src/profile/matric';
 import '../../app/typography.css';
 import './profile.css';
 const empty = { studentName: '', matricNo: '', learningCentreId: '', curriculumId: '', intakeYear: '', weeklyWorkingHours: '', availableStudyHours: '' };
@@ -14,6 +15,11 @@ function draftOf(p: Profile | null): Draft {
     availableStudyHours: p.availableStudyHours === null ? '' : String(p.availableStudyHours) } : { ...empty };
 }
 const programmeText = (p: Profile) => `${p.programmeCode} — ${p.programmeName}`;
+/** The intake year read from the matric number (S3-P004-039), as a select value, when it is one of the offered years. */
+function intakeFromMatric(matricNo: string, now: Date): string {
+  const read = readMatric(matricNo);
+  return read && intakeYears(now).some(year => Number(year) === read.intakeYear) ? String(read.intakeYear) : '';
+}
 export function ProfilePage({ api, setup = false, onSetupComplete = () => { navigateApp('/student'); } }: {
   api: AcademicClient; setup?: boolean; onSetupComplete?: () => void;
 }) {
@@ -30,12 +36,17 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
   const [saved, setSaved] = useState<Profile | null>(null);
   const [error, setError] = useState(''), [success, setSuccess] = useState(''), [periodNotice, setPeriodNotice] = useState('');
   const alert = useRef<HTMLParagraphElement>(null), unsaved = useRef(false);
+  // The intake year follows the matric number until the student picks a year by hand (S3-P004-039).
+  const intakeTouched = useRef(false), [intakeFilled, setIntakeFilled] = useState(false);
   useEffect(() => {
     const controller = new AbortController(); setLoaded(false); setError('');
     Promise.all([api<Profile | null>('/api/profile', { signal: controller.signal, fresh: true }), api<ProfileOptions>('/api/profile/options', { signal: controller.signal, fresh: true })])
       .then(([profile, choices]) => {
         if (controller.signal.aborted) return;
-        const value = draftOf(profile); setDraft(value); setInitial(value); setOptions(choices);
+        const value = draftOf(profile); setInitial(value); setOptions(choices);
+        // A saved number with no intake year never gets typed again, so it fills the intake when the page opens.
+        const filled = profile && profile.intakeYear === null && value.matricNo ? intakeFromMatric(value.matricNo, new Date()) : '';
+        intakeTouched.current = false; setIntakeFilled(Boolean(filled)); setDraft(filled ? { ...value, intakeYear: filled } : value);
         const savedPeriodId = profile?.currentSemesterId ?? null;
         setSavedSemesterId(savedPeriodId); setStaleSavedSemester(Boolean(savedPeriodId !== null && savedPeriodId !== choices.currentSemester?.semesterId));
         setLocked(profile?.learningCentreLocked === true); setSavedProgramme(profile ? programmeText(profile) : null); setSaved(profile);
@@ -76,7 +87,7 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
       } });
       const value = draftOf(profile);
       const savedProgramme = String(options.curricula.find(c => c.curriculumId === profile.curriculumId)?.programmeId ?? '');
-      unsaved.current = false; setLocked(profile.learningCentreLocked); setSavedProgramme(programmeText(profile)); setSaved(profile); setDraft(value); setInitial(value); setProgramme(savedProgramme); setInitialProgramme(savedProgramme);
+      unsaved.current = false; setIntakeFilled(false); setLocked(profile.learningCentreLocked); setSavedProgramme(programmeText(profile)); setSaved(profile); setDraft(value); setInitial(value); setProgramme(savedProgramme); setInitialProgramme(savedProgramme);
       setSavedSemesterId(profile.currentSemesterId); setStaleSavedSemester(false); setSuccess('Profile saved.');
       if (setup) onSetupComplete();
     } catch (reason) {
@@ -98,7 +109,14 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
   const years = intakeYears(new Date());
   // Changing programme or intake year clears a manual curriculum choice.
   function selectProgramme(value: string) { setProgramme(value); field('curriculumId', ''); }
-  function selectIntake(value: string) { setDraft(old => ({ ...old, intakeYear: value, curriculumId: savedProgramme === null ? '' : old.curriculumId })); setSuccess(''); setPeriodNotice(''); }
+  function typeMatric(value: string) {
+    const filled = intakeEditable && !intakeTouched.current ? intakeFromMatric(value, new Date()) : '';
+    setDraft(old => ({ ...old, matricNo: value, ...(filled ? { intakeYear: filled, curriculumId: savedProgramme === null ? '' : old.curriculumId } : {}) }));
+    if (filled) setIntakeFilled(true);
+    setSuccess(''); setPeriodNotice('');
+  }
+  const matricLocked = Boolean(initial.matricNo) && savedProgramme !== null;
+  function selectIntake(value: string) { intakeTouched.current = true; setIntakeFilled(false); setDraft(old => ({ ...old, intakeYear: value, curriculumId: savedProgramme === null ? '' : old.curriculumId })); setSuccess(''); setPeriodNotice(''); }
   return <section className="p001" aria-label="Academic profile">
     <header><p className="p001-eyebrow">Academic records</p><h1>{setup ? 'Complete your academic profile' : 'Your academic profile'}</h1>
       <p>{savedProgramme === null ? 'Choose your programme and tell us' : 'Tell us'} about your weekly work and study availability.</p></header>
@@ -112,14 +130,16 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
     {loaded && options.curricula.length > 0 && <form className="p001-card" onSubmit={event => { void save(event); }} aria-busy={saving || refreshingPeriod}>
       <fieldset disabled={saving || refreshingPeriod}><legend>Programme and identity</legend><div className="p001-grid">
         <label>Student name<input name="studentName" required maxLength={255} value={draft.studentName} onChange={e => field('studentName', e.target.value)} autoComplete="name" /></label>
-        <label>Matric number<input name="matricNo" required maxLength={30} pattern="\s*([A-Za-z0-9]\s*){4,30}" title="4 to 30 letters or digits, for example A22EC0001" autoCapitalize="characters" spellCheck={false} aria-describedby="profile-matric-help" value={draft.matricNo} onChange={e => field('matricNo', e.target.value)} /></label>
+        {matricLocked
+          ? <label>Matric number<input name="matricNo" readOnly value={initial.matricNo} aria-describedby="profile-matric-help" /></label>
+          : <label>Matric number<input name="matricNo" required maxLength={30} pattern="\s*([A-Za-z0-9]\s*){4,30}" title="4 to 30 letters or digits, for example SX232315ECJHF04" autoCapitalize="characters" spellCheck={false} aria-describedby="profile-matric-help" value={draft.matricNo} onChange={e => typeMatric(e.target.value)} /></label>}
         {savedProgramme === null
           ? <label>Programme<select aria-label="Programme" required value={programme} onChange={e => selectProgramme(e.target.value)}>
             <option value="">Select a programme</option>{programmes.map(c => <option key={c.programmeId} value={c.programmeId}>{c.programmeCode} — {c.programmeName}</option>)}
           </select></label>
           : <label>Programme<input name="programme" readOnly value={savedProgramme} aria-describedby="profile-programme-help" /></label>}
         {saved && savedProgramme !== null && <label>Intake and curriculum<input name="intakeCurriculum" readOnly value={savedIntakeSummary(saved, options.curricula)} aria-describedby="profile-programme-help" /></label>}
-        {intakeEditable && <label>Intake year<select aria-label="Intake year" required value={draft.intakeYear} aria-describedby={savedProgramme === null ? undefined : 'profile-intake-help'} onChange={e => selectIntake(e.target.value)}>
+        {intakeEditable && <label>Intake year<select aria-label="Intake year" required value={draft.intakeYear} aria-describedby={[savedProgramme === null ? '' : 'profile-intake-help', intakeFilled ? 'profile-intake-filled' : ''].filter(Boolean).join(' ') || undefined} onChange={e => selectIntake(e.target.value)}>
           <option value="">Select your intake year</option>{years.map(year => <option key={year} value={year}>{year}</option>)}
         </select></label>}
         {resolution?.kind === 'choose' && <label>Curriculum<select aria-label="Curriculum" required aria-describedby="profile-curriculum-help" value={resolution.selected ? String(resolution.selected.curriculumId) : ''} onChange={e => field('curriculumId', e.target.value)}>
@@ -129,11 +149,12 @@ export function ProfilePage({ api, setup = false, onSetupComplete = () => { navi
           <option value="">Select a learning centre</option>{options.learningCentres.map(c => <option key={c.learningCentreId} value={c.learningCentreId}>{c.centreName}</option>)}
         </select></label>
         </div>
+        {intakeEditable && intakeFilled && <p className="p001-help" id="profile-intake-filled">Filled in from your matric number. Change it if it is wrong.</p>}
         {savedProgramme !== null && intakeEditable && <p className="p001-help" id="profile-intake-help">Your intake year is not set. Choose it once; only the admin can change it after you save.</p>}
         {resolution?.kind === 'single' && <p className="p001-curriculum" role="status">Curriculum: {curriculumOptionText(resolution.curriculum)}</p>}
         {resolution?.kind === 'choose' && <p className="p001-help" id="profile-curriculum-help">Choose the curriculum you were admitted under. Only the admin can change it after you save.</p>}
         {locked && <p className="p001-help" id="profile-centre-help">Locked while subject selection for the next semester is open. It unlocks when the next semester starts.</p>}
-        <p className="p001-help" id="profile-matric-help">Your university matric number, for example A22EC0001. Coordinators use it to identify you when they plan class offerings.</p>
+        <p className="p001-help" id="profile-matric-help">{matricLocked ? 'Your matric number is set. Contact the admin to change it.' : 'Your university matric number, for example SX232315ECJHF04. Coordinators use it to identify you when they plan class offerings.'}</p>
         {savedProgramme !== null && <p className="p001-help" id="profile-programme-help">Your programme is set. Contact the admin to change it.</p>}
         <p className="p001-help">Your institutional email is managed through your account. You choose your programme and intake year once, when you set up your profile.</p>
       </fieldset>

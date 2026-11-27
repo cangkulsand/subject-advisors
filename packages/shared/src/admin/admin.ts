@@ -210,6 +210,19 @@ export function validateChangeProgrammeRequest(body: unknown): AdminValidation<A
   return { ok: true, value: { curriculumId: id, reason } };
 }
 
+// ---- Student matric number correction (S3-P004-039) ----
+export interface AdminChangeMatricRequest { matricNo: string; reason: string }
+
+export function validateChangeMatricRequest(body: unknown): AdminValidation<AdminChangeMatricRequest> {
+  const record = asRecord(body, ['matricNo', 'reason']);
+  if (typeof record === 'string') return { ok: false, error: record };
+  const matricNo = typeof record.matricNo === 'string' ? record.matricNo.replace(/\s+/g, '').toUpperCase() : '';
+  if (!/^[A-Z0-9]{4,30}$/.test(matricNo)) return { ok: false, error: 'Enter a matric number of 4 to 30 letters or digits.' };
+  const reason = normaliseReason(record.reason);
+  if (!reason) return { ok: false, error: `Reason is required (1-${ADMIN_REASON_MAX_LENGTH} characters).` };
+  return { ok: true, value: { matricNo, reason } };
+}
+
 // ---- Student intake year correction (S3-P004-037) ----
 /** Same range as the student_profile_intake_year_range CHECK (migration 0016). */
 export const ADMIN_INTAKE_YEAR_MIN = 1990;

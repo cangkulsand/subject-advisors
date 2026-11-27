@@ -3,7 +3,8 @@ import type { AdminMutationErrorCode } from '../../../../../packages/shared/src/
 /** MT1 shared codes plus codes that only the data-access layer can raise. */
 export type AdminErrorCode = AdminMutationErrorCode | 'INVALID_REQUEST' | 'NOT_FOUND' | 'ROLE_NOT_ASSIGNED' |
   'INVITATION_NOT_PENDING' | 'INVITATION_EXPIRED' | 'CONFLICT' | 'MUTATION_FAILED' |
-  'STUDENT_PROFILE_NOT_FOUND' | 'CURRICULUM_UNAVAILABLE' | 'PROGRAMME_UNCHANGED' | 'UNCHANGED';
+  'STUDENT_PROFILE_NOT_FOUND' | 'CURRICULUM_UNAVAILABLE' | 'PROGRAMME_UNCHANGED' | 'UNCHANGED' |
+  'MATRIC_UNCHANGED' | 'MATRIC_TAKEN' | 'BATCH_HAS_PROBLEMS' | 'BATCH_STALE';
 
 const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   ROLE_ALREADY_ASSIGNED: { status: 409, message: 'The account already holds this role.' },
@@ -34,6 +35,10 @@ const catalogue: Record<AdminErrorCode, { status: number; message: string }> = {
   CURRICULUM_UNAVAILABLE: { status: 409, message: 'The selected programme is not available. Choose an active programme.' },
   PROGRAMME_UNCHANGED: { status: 409, message: 'The student is already on this programme.' },
   UNCHANGED: { status: 409, message: 'The intake year is already set to this year.' },
+  MATRIC_UNCHANGED: { status: 409, message: 'The matric number is already set to this number.' },
+  MATRIC_TAKEN: { status: 409, message: 'Another student already uses this matric number.' },
+  BATCH_HAS_PROBLEMS: { status: 409, message: 'Remove the problem numbers, then check again.' },
+  BATCH_STALE: { status: 409, message: 'Some students changed since you checked. Check again.' },
   MUTATION_FAILED: { status: 500, message: 'The change could not be completed. Please retry.' },
 };
 

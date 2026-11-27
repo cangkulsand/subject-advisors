@@ -1,3 +1,4 @@
+import type { BatchApplyRequest, BatchPreview, BatchResult } from '../../../../../packages/shared/src/admin/batch';
 import type { AuthDependencies } from '../auth/contracts';
 import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAccount, AdminAuditEvent, AdminAuditQuery, AdminMembership, AdminOverview, AdminPage, AdminUsersQuery, AdminIdentity, AdminInvitation, AdminInvitationStatus, AdminRole, AdminStatus, AdminWaitingUser } from '../../../../../packages/shared/src/admin/admin';
 export type AccountRow = Omit<AdminAccount, 'identity'>;
@@ -43,6 +44,11 @@ export interface AdminRepository {
    * (student_intake / CHANGE_INTAKE_YEAR). Never changes the curriculum. Returns the student programme read back.
    */
   changeStudentIntakeYear(accountId: number, intakeYear: number, actor: string, reason: string): Promise<AdminStudentProgramme>;
+  /** Admin correction of a student's matric number (S3-P004-039); the value is already normalised. */
+  changeStudentMatric(accountId: number, matricNo: string, actor: string, reason: string): Promise<AdminStudentProgramme>;
+  /** Batch correction by matric number (S3-P004-039): a read-only preview, then an all-or-nothing apply. */
+  previewBatch(matricNos: string[]): Promise<BatchPreview>;
+  applyBatch(input: BatchApplyRequest, actor: string): Promise<BatchResult>;
   /**
    * Dummy users (S3-P004-029): one transaction creates the account with its role plus either a complete student profile
    * (admin current semester, hours 0 and 20) or one coordinator assignment. Guards raise ACADEMIC_SEMESTER_UNAVAILABLE

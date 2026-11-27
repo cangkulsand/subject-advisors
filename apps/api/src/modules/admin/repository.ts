@@ -1,3 +1,4 @@
+import type { BatchMatch, BatchPreview, BatchProblem, BatchResult } from '../../../../../packages/shared/src/admin/batch';
 import type { AdminCurriculumOption, AdminProgrammeChange, AdminStudentProgramme, AdminAuditQuery, AdminAuditEvent, AdminInvitation, AdminMembership, AdminOverview, AdminPage, AdminRole, AdminUsersQuery } from '../../../../../packages/shared/src/admin/admin';
 import type { AccountDetailRow, AccountRow, AdminRepository } from './contracts';
 import { AdminMutationError, GUARD_MARKER, mapAdminDatabaseError, type AdminErrorCode } from './errors';
@@ -31,6 +32,8 @@ const events = `SELECT 'role:' || l.user_role_audit_log_id AS "eventId", l.acces
 const programmeColumns = `p.student_id AS "studentId", p.student_name AS "studentName", p.matric_no AS "matricNo", p.curriculum_id AS "curriculumId",
   c.curriculum_version AS "curriculumVersion", g.programme_id AS "programmeId", g.programme_code AS "programmeCode", g.programme_name AS "programmeName",
   p.intake_year AS "intakeYear"`;
+/** Matric numbers compare normalised: no whitespace, upper case (S3-P004-039). */
+const BATCH_MATRIC = "upper(regexp_replace(p.matric_no,'[[:space:]]','','g'))";
 const programmeFrom = `public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
   JOIN public.curriculum c ON c.curriculum_id=p.curriculum_id JOIN public.programme g ON g.programme_id=c.programme_id`;
 function programmeRow(row: Record<string, unknown>): AdminStudentProgramme {
@@ -342,6 +345,95 @@ export function createAdminRepository(query: AdminQuery, transaction: AdminTrans
       const audited = results[4]?.[0], programme = results[5]?.[0];
       if (!audited || !programme) throw new AdminMutationError('MUTATION_FAILED');
       return programmeRow(programme);
+    },
+    async changeStudentMatric(accountId, matricNo, actor, reason): Promise<AdminStudentProgramme> {
+      const profileOf = `SELECT p.student_id, p.matric_no FROM public.user_access_assignment a JOIN public.student_profile p ON p.clerk_user_id=a.clerk_user_id
+        WHERE a.access_assignment_id=$1`;
+      const normalised = (column: string) => `upper(regexp_replace(${column},'[[:space:]]','','g'))`;
+      // Same shape as the intake change: lock, guards, then the update and its audit row in one statement. The intake year is never written.
+      const results = await run(actor, reason, [
+        { text: `${profileOf} FOR UPDATE OF p`, values: [accountId] },
+        guard(noAccount('$1'), [accountId], 'NOT_FOUND'),
+        guard(`NOT EXISTS (${profileOf})`, [accountId], 'STUDENT_PROFILE_NOT_FOUND'),
+        guard(`EXISTS (${profileOf} AND ${normalised("coalesce(p.matric_no,'')")}=$2)`, [accountId, matricNo], 'MATRIC_UNCHANGED'),
+        guard(`EXISTS (SELECT 1 FROM public.student_profile o WHERE ${normalised('o.matric_no')}=$2
+          AND o.student_id NOT IN (SELECT student_id FROM (${profileOf}) self))`, [accountId, matricNo], 'MATRIC_TAKEN'),
+        { text: `WITH target AS (${profileOf} FOR UPDATE OF p),
+          changed AS (UPDATE public.student_profile s SET matric_no=$2 FROM target t WHERE s.student_id=t.student_id
+            RETURNING s.student_id, t.matric_no AS before_no, s.matric_no AS after_no)
+          INSERT INTO public.academic_setup_audit_log(entity_type,entity_id,action,actor,reason,before_data,after_data)
+          SELECT 'student_matric', student_id, 'CHANGE_MATRIC_NO', btrim(current_setting('app.access_actor',true)), btrim(current_setting('app.access_reason',true)),
+            jsonb_build_object('matricNo', before_no), jsonb_build_object('matricNo', after_no) FROM changed RETURNING audit_id AS "auditId"`, values: [accountId, matricNo] },
+        { text: `SELECT ${programmeColumns} FROM ${programmeFrom} WHERE a.access_assignment_id=$1`, values: [accountId] },
+      ]);
+      const audited = results[5]?.[0], programme = results[6]?.[0];
+      if (!audited || !programme) throw new AdminMutationError('MUTATION_FAILED');
+      return programmeRow(programme);
+    },
+    async previewBatch(matricNos): Promise<BatchPreview> {
+      const rows = await query(`WITH wanted AS (SELECT DISTINCT unnest($1::text[]) AS matric_no)
+        SELECT w.matric_no AS "matricNo", p.student_id AS "studentId", a.access_assignment_id AS "accountId", p.student_name AS "studentName",
+          g.programme_code AS "programmeCode", p.curriculum_id AS "curriculumId", c.curriculum_version AS "curriculumVersion", p.intake_year AS "intakeYear",
+          a.access_status AS "accessStatus",
+          EXISTS (SELECT 1 FROM public.user_role_assignment r WHERE r.access_assignment_id=a.access_assignment_id AND r.app_role='STUDENT') AS "isStudent"
+        FROM wanted w
+        LEFT JOIN public.student_profile p ON ${BATCH_MATRIC}=w.matric_no
+        LEFT JOIN public.user_access_assignment a ON a.clerk_user_id=p.clerk_user_id
+        LEFT JOIN public.curriculum c ON c.curriculum_id=p.curriculum_id LEFT JOIN public.programme g ON g.programme_id=c.programme_id`, [matricNos]);
+      const byNumber = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) byNumber.set(String(row.matricNo), [...(byNumber.get(String(row.matricNo)) ?? []), row]);
+      const matches: BatchMatch[] = [], problems: BatchProblem[] = [];
+      for (const matricNo of matricNos) {
+        const found = (byNumber.get(matricNo) ?? []).filter(row => row.studentId != null);
+        if (!found.length) { problems.push({ matricNo, kind: 'NOT_FOUND' }); continue; }
+        if (found.length > 1) { problems.push({ matricNo, kind: 'DUPLICATE' }); continue; }
+        const row = found[0]!;
+        if (row.accountId == null) { problems.push({ matricNo, kind: 'NO_ACCOUNT' }); continue; }
+        matches.push({ matricNo, accountId: integer(row.accountId), studentId: integer(row.studentId), studentName: String(row.studentName), programmeCode: String(row.programmeCode),
+          curriculumId: integer(row.curriculumId), curriculumVersion: String(row.curriculumVersion), intakeYear: row.intakeYear == null ? null : integer(row.intakeYear),
+          accountStatus: row.accessStatus === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE', isStudent: row.isStudent === true });
+      }
+      return { matches, problems };
+    },
+    async applyBatch(input, actor): Promise<BatchResult> {
+      // The preview must cover exactly these numbers; the aligned arrays below follow matricNos order.
+      const expected = new Map(input.expected.map(row => [row.matricNo, row]));
+      if (expected.size !== input.matricNos.length || input.matricNos.some(no => !expected.has(no))) throw new AdminMutationError('BATCH_STALE');
+      const rows = input.matricNos.map(no => expected.get(no)!);
+      const numbers = input.matricNos, curriculum = input.curriculumId, mode = input.intake.mode, year = input.intake.mode === 'set' ? input.intake.year : null;
+      // $1 numbers, $2 target curriculum (null keeps), $3 intake mode, $4 year for 'set'. Matric years are 2000 + the two digits after SX.
+      const plan = `SELECT p.student_id, p.curriculum_id, p.intake_year, coalesce($2::integer, p.curriculum_id) AS new_curriculum,
+          CASE $3::text WHEN 'set' THEN $4::smallint WHEN 'matric' THEN (2000 + substring(${BATCH_MATRIC} FROM 3 FOR 2)::integer)::smallint ELSE p.intake_year END AS new_intake
+        FROM public.student_profile p WHERE ${BATCH_MATRIC}=ANY($1::text[])`;
+      const planValues = [numbers, curriculum, mode, year];
+      const changed = '(new_curriculum<>curriculum_id OR new_intake IS DISTINCT FROM intake_year)';
+      const results = await run(actor, input.reason, [
+        { text: `SELECT p.student_id FROM public.student_profile p WHERE ${BATCH_MATRIC}=ANY($1::text[]) ORDER BY p.student_id FOR UPDATE`, values: [numbers] },
+        guard(`EXISTS (SELECT 1 FROM unnest($1::text[]) m(no) WHERE (SELECT count(*) FROM public.student_profile p WHERE ${BATCH_MATRIC}=m.no)<>1
+            OR NOT EXISTS (SELECT 1 FROM public.student_profile p JOIN public.user_access_assignment a ON a.clerk_user_id=p.clerk_user_id WHERE ${BATCH_MATRIC}=m.no)
+            OR ($2::text='matric' AND (m.no !~ '^SX[0-9]{2}' OR 2000 + substring(m.no FROM 3 FOR 2)::integer > extract(year FROM now())::integer)))`, [numbers, mode], 'BATCH_HAS_PROBLEMS'),
+        guard(`EXISTS (SELECT 1 FROM unnest($1::text[],$2::integer[],$3::integer[],$4::integer[]) e(no,sid,cid,yr) WHERE NOT EXISTS (
+            SELECT 1 FROM public.student_profile p WHERE ${BATCH_MATRIC}=e.no AND p.student_id=e.sid AND p.curriculum_id=e.cid AND p.intake_year IS NOT DISTINCT FROM e.yr))`,
+          [numbers, rows.map(row => row.studentId), rows.map(row => row.curriculumId), rows.map(row => row.intakeYear)], 'BATCH_STALE'),
+        guard(`$1::integer IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.curriculum c JOIN public.programme g USING(programme_id)
+            WHERE c.curriculum_id=$1::integer AND coalesce(upper(c.status),'ACTIVE')='ACTIVE' AND coalesce(upper(g.status),'ACTIVE')='ACTIVE')`, [curriculum], 'CURRICULUM_UNAVAILABLE'),
+        guard(`NOT EXISTS (SELECT 1 FROM (${plan}) pl WHERE ${changed})`, planValues, 'UNCHANGED'),
+        { text: `SELECT count(*) FILTER (WHERE ${changed})::integer AS "corrected" FROM (${plan}) pl`, values: planValues },
+        // Each programme change goes through the single-change function: picks removed and its own audit row (S2-P004-026).
+        { text: `SELECT coalesce(sum(public.db_change_student_programme(student_id, new_curriculum)),0)::integer AS "removedPicks", count(*)::integer AS "programmeChanges"
+            FROM (${plan}) pl WHERE new_curriculum<>curriculum_id`, values: planValues },
+        // Each intake change gets the same update and audit row as the single intake change (S3-P004-037).
+        { text: `WITH pl AS (${plan}),
+            moved AS (UPDATE public.student_profile s SET intake_year=pl.new_intake FROM pl WHERE s.student_id=pl.student_id AND pl.new_intake IS DISTINCT FROM pl.intake_year
+              RETURNING s.student_id, pl.intake_year AS before_year, s.intake_year AS after_year),
+            audited AS (INSERT INTO public.academic_setup_audit_log(entity_type,entity_id,action,actor,reason,before_data,after_data)
+              SELECT 'student_intake', student_id, 'CHANGE_INTAKE_YEAR', btrim(current_setting('app.access_actor',true)), btrim(current_setting('app.access_reason',true)),
+                jsonb_build_object('intakeYear', before_year), jsonb_build_object('intakeYear', after_year) FROM moved RETURNING audit_id)
+            SELECT count(*)::integer AS "intakeChanges" FROM audited`, values: planValues },
+      ]);
+      const counted = results[5]?.[0], programme = results[6]?.[0], intake = results[7]?.[0];
+      if (!counted || !programme || !intake) throw new AdminMutationError('MUTATION_FAILED');
+      return { corrected: integer(counted.corrected), intakeChanges: integer(intake.intakeChanges), programmeChanges: integer(programme.programmeChanges), removedPicks: integer(programme.removedPicks) };
     },
     async acceptInvitation(invitationId, accountId, actor) {
       const results = await run(actor, 'Invitation accepted', [{

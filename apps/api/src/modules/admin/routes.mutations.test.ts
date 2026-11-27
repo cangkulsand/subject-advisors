@@ -25,6 +25,9 @@ function fixture(roles: ('STUDENT' | 'SYSTEM_ADMIN' | 'COORDINATOR')[] = ['SYSTE
       studentProgramme: vi.fn(async () => programme), curriculumOptions: vi.fn(async () => [{ curriculumId: 2, curriculumVersion: 'V2', programmeId: 8, programmeCode: 'PGM', programmeName: 'Programme' }]),
       changeStudentProgramme: vi.fn(async () => ({ programme: { ...programme, curriculumId: 2 }, removedPicks: 3 })),
       changeStudentIntakeYear: vi.fn(async () => ({ ...programme, intakeYear: 2023 })),
+      changeStudentMatric: vi.fn(async () => ({ ...programme, matricNo: 'SX232316ECJHF04' })),
+      previewBatch: vi.fn(async () => ({ matches: [], problems: [{ matricNo: 'SX1234', kind: 'NOT_FOUND' as const }] })),
+      applyBatch: vi.fn(async () => ({ corrected: 1, intakeChanges: 1, programmeChanges: 0, removedPicks: 0 })),
       createDummyAccount: vi.fn(async () => ({ ...account, clerkUserId: 'user_dummy', roles: ['STUDENT' as const] })), currentSemesterId: vi.fn(async () => 24), existingClerkUserIds: vi.fn(async () => new Set<string>()),
     },
     identities: {
@@ -556,5 +559,59 @@ describe('dummy users (S3-P004-029)', () => {
     const response = await send(deps, '/api/admin/users/5/roles', 'POST', { role: 'SYSTEM_ADMIN', reason });
     expect(response.status).toBe(422);
     expect(deps.repository.grantRole).not.toHaveBeenCalled();
+  });
+});
+
+describe('student matric number (S3-P004-039)', () => {
+  it('changes the matric number as the authorized admin, normalised, and returns the student programme', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/users/5/matric', 'PATCH', { matricNo: ' sx23 2316ecjhf04 ', reason: ' ' + reason + ' ' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { ...programme, matricNo: 'SX232316ECJHF04' } });
+    expect(mocked(deps, 'changeStudentMatric')).toHaveBeenCalledWith(5, 'SX232316ECJHF04', ADMIN, reason);
+  });
+  it.each([
+    [{ matricNo: 'SX232316ECJHF04' }], [{ matricNo: 'SX232316ECJHF04', reason: '  ' }], [{ reason }], [{ matricNo: 'SX1', reason }],
+    [{ matricNo: 'SX-2323', reason }], [{ matricNo: 'X'.repeat(31), reason }], [{ matricNo: 12345, reason }], [{ matricNo: 'SX232316ECJHF04', intakeYear: 2023, reason }],
+  ])('rejects the invalid body %j without changing anything', async body => {
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/users/5/matric', 'PATCH', body)).status).toBe(400);
+    expect(mocked(deps, 'changeStudentMatric')).not.toHaveBeenCalled();
+  });
+  it('allows only PATCH', async () => {
+    const deps = fixture();
+    for (const method of ['GET', 'POST', 'PUT', 'DELETE']) expect((await send(deps, '/api/admin/users/5/matric', method)).status).toBe(405);
+  });
+});
+
+describe('batch correction (S3-P004-039)', () => {
+  const expected = [{ matricNo: 'SX232315ECJHF04', studentId: 9, curriculumId: 2, intakeYear: 2020 }];
+  it('previews normalised numbers', async () => {
+    const deps = fixture();
+    const response = await send(deps, '/api/admin/students/batch/preview', 'POST', { matricNos: [' sx23 2315ecjhf04', 'SX232315ECJHF04'] });
+    expect(response.status).toBe(200);
+    expect(mocked(deps, 'previewBatch')).toHaveBeenCalledWith(['SX232315ECJHF04']);
+  });
+  it('applies a validated batch as the admin', async () => {
+    const deps = fixture();
+    const body = { matricNos: ['SX232315ECJHF04'], curriculumId: null, intake: { mode: 'matric' }, reason: ' ' + reason + ' ', expected };
+    const response = await send(deps, '/api/admin/students/batch', 'POST', body);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { corrected: 1, intakeChanges: 1, programmeChanges: 0, removedPicks: 0 } });
+    expect(mocked(deps, 'applyBatch')).toHaveBeenCalledWith({ ...body, reason }, ADMIN);
+  });
+  it.each([
+    [{ matricNos: ['SX232315ECJHF04'], curriculumId: null, intake: { mode: 'keep' }, reason, expected }],
+    [{ matricNos: Array.from({ length: 501 }, (_, i) => 'SX' + (1000 + i)), curriculumId: null, intake: { mode: 'matric' }, reason, expected }],
+    [{ matricNos: ['SX232315ECJHF04'], curriculumId: null, intake: { mode: 'matric' }, expected }],
+  ])('rejects the invalid body %# with 400', async body => {
+    const deps = fixture();
+    expect((await send(deps, '/api/admin/students/batch', 'POST', body)).status).toBe(400);
+    expect(mocked(deps, 'applyBatch')).not.toHaveBeenCalled();
+  });
+  it('allows only POST on both routes', async () => {
+    const deps = fixture();
+    for (const path of ['/api/admin/students/batch', '/api/admin/students/batch/preview'])
+      for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) expect((await send(deps, path, method)).status).toBe(405);
   });
 });
