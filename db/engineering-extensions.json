@@ -212,6 +212,12 @@
       "tables": [],
       "columns": [],
       "purpose": "P004 coordinator faculty scope (S3-P004-040): coordinator_assignment.programme_id becomes nullable so one row covers a whole faculty at a learning centre; no new columns"
+    },
+    {
+      "migration": "0018",
+      "tables": [],
+      "columns": [],
+      "purpose": "P004 curriculum audit (S3-P004-041): audit triggers on the curriculum tables, no new tables or columns"
     }
   ]
 }
