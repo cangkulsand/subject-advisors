@@ -1,6 +1,6 @@
 # S3-P004-040: Coordinator faculty scope and the Coordinators page
 
-- **Status:** Merged to `main` on 2026-11-28; migration 0017 applied to Neon 2026-11-28 (verify 66 PASS); deployed to dev and prod. Dummy-coordinator cleanup pending
+- **Status:** Merged to `main` on 2026-11-28; migration 0017 applied to Neon 2026-11-28 (verify 66 PASS); deployed to dev and prod; dummy coordinators cleaned up 2026-11-28
 - **Date:** 2026-11-28
 - **Sprint:** Sprint 3
 - **Owner:** P004, building Idham's review item. To be handed over to Idham.
@@ -80,6 +80,12 @@
 **Neon (2026-11-28, owner-approved):**
 - **Rehearsal:** 0017 plus checks 021 and 022 ran in one rolled-back transaction. The 6 structural checks and 9 behaviour checks passed, and nothing was kept.
 - **Applied:** `migrate` applied 0017, and `verify` passed all 66 checks.
+
+**Dummy coordinator cleanup (2026-11-28, owner-approved):**
+- **How it ran:** through the repository code paths. The actor was the protected owner, with the reason "Dummy coordinator cleanup: keep ecjh+/ecrh+ at all centres (S3-P004-040)".
+- **Kept and widened:** `ecjh+clerk_test@utm.my` (SECJ) and `ecrh+clerk_test@utm.my` (SECRH) each gained JB and Penang programme rows (assignments 21–24). Each now covers KL, JB and Penang.
+- **Ended and suspended:** the 6 assignments of `coord-ecjh-jb`, `coord-ecjh-pg`, `coord-ecrh-jb`, `coord-ecrh-pg` and `coord-ecjh-kl-jb` were ended, and their 5 app accounts were suspended. Removing their only role is refused (`LAST_ROLE`), so suspending was used instead.
+- **Clerk:** those 5 Clerk test logins were deleted, taking the instance from 56 to 51 users.
 
 **Whole-branch review (independent reviewer):** no Critical findings. Two Important findings were fixed:
 - **Database test:** a test expected `ASSIGNMENT_EXISTS` for a programme faculty move. It is back to `ASSIGNMENT_ACTIVE`.
