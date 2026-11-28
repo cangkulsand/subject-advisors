@@ -104,10 +104,13 @@ export function academicMutation(method, url, body, state, accounts) {
     if (method === 'POST' && !rawId) {
       const account = accounts.find(a => a.accountId === body.accountId); if (!account?.roles.includes('COORDINATOR')) return failure(409, 'COORDINATOR_ROLE_REQUIRED', 'Coordinator role required.');
       if (account.accessStatus !== 'ACTIVE') return failure(409, 'ACCOUNT_INACTIVE', 'Account inactive.');
-      if (!data.faculties.some(f => f.facultyId === body.facultyId && f.isActive) || !data.centres.some(c => c.learningCentreId === body.learningCentreId && c.isActive)) return failure(409, 'REFERENCE_INACTIVE', 'Reference inactive.');
-      if (!data.programmes.some(p => p.programmeId === body.programmeId && p.facultyId === body.facultyId)) return failure(409, 'PROGRAMME_FACULTY_MISMATCH', 'Programme faculty mismatch.');
-      if (data.assignments.some(a => !a.endedAt && a.accountId === body.accountId && a.programmeId === body.programmeId && a.learningCentreId === body.learningCentreId)) return failure(409, 'ASSIGNMENT_ACTIVE', 'An active assignment already exists.');
-      const row = { assignmentId: Math.max(0, ...data.assignments.map(a => a.assignmentId)) + 1, accountId: body.accountId, facultyId: body.facultyId, programmeId: body.programmeId, learningCentreId: body.learningCentreId, startedAt: '2026-11-02T00:00:00Z', endedAt: null }; data.assignments.push(row); return success(row, 201);
+      // S3-P004-040: one row per centre; programmeId null covers the whole faculty. A duplicate at any centre refuses the whole add.
+      const centres = body.learningCentreIds ?? [];
+      if (!data.faculties.some(f => f.facultyId === body.facultyId && f.isActive) || !centres.length || centres.some(id => !data.centres.some(c => c.learningCentreId === id && c.isActive))) return failure(409, 'REFERENCE_INACTIVE', 'Reference inactive.');
+      if (body.programmeId !== null && !data.programmes.some(p => p.programmeId === body.programmeId && p.facultyId === body.facultyId)) return failure(409, 'PROGRAMME_FACULTY_MISMATCH', 'Programme faculty mismatch.');
+      if (centres.some(id => data.assignments.some(a => !a.endedAt && a.accountId === body.accountId && a.facultyId === body.facultyId && a.programmeId === body.programmeId && a.learningCentreId === id))) return failure(409, 'ASSIGNMENT_EXISTS', 'This coordinator already has this assignment at this learning centre.');
+      const rows = centres.map((learningCentreId, index) => ({ assignmentId: Math.max(0, ...data.assignments.map(a => a.assignmentId)) + 1 + index, accountId: body.accountId, facultyId: body.facultyId, programmeId: body.programmeId, learningCentreId, startedAt: '2026-11-02T00:00:00Z', endedAt: null }));
+      data.assignments.push(...rows); return success(rows, 201);
     }
   }
   return failure(405, 'METHOD_NOT_ALLOWED', 'Method not supported.');

@@ -50,7 +50,7 @@ function Chooser({ client, context }: { client: CoordinatorClient; context: Fore
   const [programmeId, setProgramme] = useState<number | null>(pairs[0]?.programmeId ?? null);
   const [centreId, setCentre] = useState<number | null>(pairs[0]?.learningCentreId ?? null);
   const [semesterId, setSemester] = useState<number | null>(semesters[0]?.semesterId ?? null);
-  if (pairs.length === 0) return <section className="admin-card"><p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.</p></section>;
+  if (pairs.length === 0) return <section className="admin-card"><p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinators.</p></section>;
   if (semesters.length === 0) return <section className="admin-card"><p className="admin-empty" role="status">{NO_CLOSED}</p></section>;
   const programmes = context.programmes.filter(programme => pairs.some(pair => pair.programmeId === programme.programmeId));
   const centres = context.learningCentres.filter(centre => pairs.some(pair => pair.programmeId === programmeId && pair.learningCentreId === centre.learningCentreId));

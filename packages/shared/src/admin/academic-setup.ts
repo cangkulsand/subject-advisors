@@ -6,6 +6,8 @@ export const ACADEMIC_SETUP_ERROR_CODES = [
   'COORDINATOR_ROLE_REQUIRED', 'ACCOUNT_INACTIVE', 'REFERENCE_INACTIVE',
   'PROGRAMME_FACULTY_MISMATCH', 'ASSIGNMENT_ACTIVE', 'ASSIGNMENT_ENDED', 'DEPARTMENT_HAS_PROGRAMMES',
   'FACULTY_CODE_TAKEN', 'DEPARTMENT_CODE_TAKEN', 'PROGRAMME_CODE_TAKEN', 'CENTRE_CODE_TAKEN', 'CURRICULUM_VERSION_TAKEN',
+  // S3-P004-040: a live identical coordinator assignment already exists.
+  'ASSIGNMENT_EXISTS',
 ] as const;
 export type AcademicSetupErrorCode = typeof ACADEMIC_SETUP_ERROR_CODES[number];
 export interface AcademicSetupError { error: { code: AcademicSetupErrorCode; message: string } }
@@ -36,8 +38,9 @@ export interface AcademicSemester {
   /** Admin-set picking window (ISO date-time, UTC). Both null means selection is not scheduled. */
   selectionOpensAt: string | null; selectionClosesAt: string | null;
 }
-export interface AdminCoordinatorAssignment extends CoordinatorAssignment {
-  assignmentId: number; accountId: number; startedAt: string; endedAt: string | null;
+/** programmeId null: the row covers every active programme of the faculty (S3-P004-040). */
+export interface AdminCoordinatorAssignment extends Omit<CoordinatorAssignment, 'programmeId'> {
+  programmeId: number | null; assignmentId: number; accountId: number; startedAt: string; endedAt: string | null;
 }
 export interface CreateLearningCentreRequest { centreCode: string; centreName: string; reason: string }
 export interface UpdateLearningCentreRequest { centreCode?: string; centreName?: string; isActive?: boolean; reason: string }
@@ -63,7 +66,9 @@ export type SemesterFields = Pick<AcademicSemester, 'academicYear' | 'semesterNo
 export interface CreateSemesterRequest extends SemesterFields { reason: string }
 export type UpdateSemesterRequest = Partial<SemesterFields> & { reason: string };
 export interface SetCurrentSemesterRequest { semesterId: number; reason: string }
-export interface CreateCoordinatorAssignmentRequest extends CoordinatorAssignment { accountId: number; reason: string }
+/** One row per centre, created together (S3-P004-040). programmeId null = whole faculty. */
+export interface CreateCoordinatorAssignmentRequest { accountId: number; facultyId: number; programmeId: number | null; learningCentreIds: number[]; reason: string }
+export const COORDINATOR_CENTRES_MAX = 20;
 export interface EndCoordinatorAssignmentRequest { reason: string }
 
 type RecordValue = Record<string, unknown>;
@@ -269,12 +274,17 @@ export function validateSetCurrentSemesterRequest(body: unknown): AdminValidatio
   return why.ok ? { ok: true, value: { semesterId: parsed.value.semesterId as number, reason: why.value } } : why;
 }
 export function validateCreateCoordinatorAssignmentRequest(body: unknown): AdminValidation<CreateCoordinatorAssignmentRequest> {
-  const parsed = record(body, ['accountId', 'facultyId', 'programmeId', 'learningCentreId', 'reason']);
+  const parsed = record(body, ['accountId', 'facultyId', 'programmeId', 'learningCentreIds', 'reason']);
   if (!parsed.ok) return parsed;
-  for (const field of ['accountId', 'facultyId', 'programmeId', 'learningCentreId']) if (!id(parsed.value[field])) return fail(`Invalid ${field}.`);
+  for (const field of ['accountId', 'facultyId']) if (!id(parsed.value[field])) return fail(`Invalid ${field}.`);
+  const programmeId = parsed.value.programmeId;
+  if (programmeId !== null && !id(programmeId)) return fail('Invalid programmeId.');
+  const centres = parsed.value.learningCentreIds;
+  if (!Array.isArray(centres) || !centres.length || centres.length > COORDINATOR_CENTRES_MAX || !centres.every(id) || new Set(centres).size !== centres.length)
+    return fail(`Choose 1 to ${COORDINATOR_CENTRES_MAX} different learning centres.`);
   const why = reason(parsed.value);
   return why.ok ? { ok: true, value: { accountId: parsed.value.accountId as number, facultyId: parsed.value.facultyId as number,
-    programmeId: parsed.value.programmeId as number, learningCentreId: parsed.value.learningCentreId as number, reason: why.value } } : why;
+    programmeId: programmeId as number | null, learningCentreIds: centres as number[], reason: why.value } } : why;
 }
 export function validateEndCoordinatorAssignmentRequest(body: unknown): AdminValidation<EndCoordinatorAssignmentRequest> {
   const parsed = record(body, ['reason']);

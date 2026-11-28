@@ -43,7 +43,7 @@ it.each([
   [(c: Client) => c.createSemester({ academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL', maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason: 'Why' }), 'POST', '/semesters', semester],
   [(c: Client) => c.updateSemester(4, { maxCredits: 15, reason: 'Why' }), 'PATCH', '/semesters/4', { ...semester, maxCredits: 15 }],
   [(c: Client) => c.setCurrentSemester({ semesterId: 4, reason: 'Why' }), 'PUT', '/current-semester', semester],
-  [(c: Client) => c.createAssignment({ accountId: 6, facultyId: 2, programmeId: 3, learningCentreId: 1, reason: 'Why' }), 'POST', '/coordinator-assignments', assignment],
+  [(c: Client) => c.createAssignment({ accountId: 6, facultyId: 2, programmeId: 3, learningCentreIds: [1], reason: 'Why' }), 'POST', '/coordinator-assignments', [assignment]],
   [(c: Client) => c.endAssignment(5, 'Why'), 'POST', '/coordinator-assignments/5/end', { ...assignment, endedAt: '2026-11-03T00:00:00Z' }],
 ])('sends contract mutation %s with a reason and decodes its response', async (call, method, path, data) => {
   const fetcher = vi.fn(async () => Response.json({ data })); vi.stubGlobal('fetch', fetcher);

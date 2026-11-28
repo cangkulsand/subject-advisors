@@ -118,6 +118,7 @@ The atomic setter permits at most one current row, with no automatic date-based 
 
 `coordinator_assignment` records account/faculty/programme/centre plus start/end timestamps.
 Only one unended account/programme/centre scope is permitted; ending retains history.
+**Faculty scope (0017, S3-P004-040):** `programme_id` is nullable; NULL means the row covers every active programme of `faculty_id` at its centre, read live (`scopeSelect` in `academic-repository.ts` expands it, so consumers still receive programme × centre scopes). One unended faculty row per account/faculty/centre (`coordinator_assignment_one_live_faculty_idx`). The insert guard skips the programme checks for faculty rows. A programme covered only by faculty rows may move to another faculty; its coverage follows it. A duplicate on either index returns 409 `ASSIGNMENT_EXISTS`. The admin adds one row per chosen centre in one transaction. Rollback: end the faculty rows, drop the index, restore the 0008 guard, then `SET NOT NULL`.
 Creation requires an ACTIVE account with a current COORDINATOR membership, active
 faculty/centre/programme and matching programme/faculty. Admin history remains readable
 after suspension, role removal or reference deactivation. Immutable

@@ -87,6 +87,11 @@
       "version": "0016",
       "file": "0016_student_intake_year.sql",
       "description": "Student intake year on student_profile (nullable, 1990-2200), backfilled from the curriculum effective year"
+    },
+    {
+      "version": "0017",
+      "file": "0017_coordinator_faculty_scope.sql",
+      "description": "Coordinator faculty scope: coordinator_assignment.programme_id nullable (NULL = whole faculty), one-live faculty-row index, assignment guard skips programme checks for faculty rows"
     }
   ],
   "historicalExcluded": [

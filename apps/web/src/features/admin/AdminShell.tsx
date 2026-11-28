@@ -5,7 +5,7 @@ const groups: StaffNavigationGroup[] = [
   // Single-link groups render as plain menu links with no heading; only Academic setup keeps a heading for its five pages.
   { label: 'Overview', links: [{ href: '/admin', label: 'Overview', icon: 'overview' }] },
   { label: 'Users & Access', links: [{ href: '/admin/users', label: 'Users & Access', icon: 'users' }] },
-  { label: 'Academic setup', links: [{ href: '/admin/learning-centres', label: 'Learning Centres', icon: 'centre' }, { href: '/admin/faculties', label: 'Academic Structure', icon: 'faculty' }, { href: '/admin/coordinator-assignments', label: 'Coordinator Assignments', icon: 'users' }, { href: '/admin/semesters', label: 'Academic Semesters', icon: 'calendar' }, { href: '/admin/curriculum', label: 'Subjects & Prerequisites', icon: 'curriculum' }] },
+  { label: 'Academic setup', links: [{ href: '/admin/learning-centres', label: 'Learning Centres', icon: 'centre' }, { href: '/admin/faculties', label: 'Academic Structure', icon: 'faculty' }, { href: '/admin/coordinator-assignments', label: 'Coordinators', icon: 'users' }, { href: '/admin/semesters', label: 'Academic Semesters', icon: 'calendar' }, { href: '/admin/curriculum', label: 'Subjects & Prerequisites', icon: 'curriculum' }] },
   { label: 'Audit', links: [{ href: '/admin/audit', label: 'Audit Log', icon: 'audit' }] },
 ];
 

@@ -16,6 +16,7 @@ const catalogue: Record<AcademicSetupErrorCode, { status: number; message: strin
   PROGRAMME_CODE_TAKEN: { status: 409, message: 'Another programme already uses this code. Choose a different code.' },
   CENTRE_CODE_TAKEN: { status: 409, message: 'Another learning centre already uses this code. Choose a different code.' },
   CURRICULUM_VERSION_TAKEN: { status: 409, message: 'This programme already has a curriculum with this version. Choose a different version.' },
+  ASSIGNMENT_EXISTS: { status: 409, message: 'This coordinator already has this assignment at this learning centre.' },
 };
 /** Repository domain boundary: fixed messages only, never driver messages or SQL. */
 export class AcademicSetupDomainError extends Error {
@@ -29,7 +30,7 @@ export class AcademicSetupDomainError extends Error {
 
 /** Unique constraints whose violation means a reused code (S3-P004-038); any other 23505 stays CONFLICT. */
 const uniqueConstraintCodes: Partial<Record<string, AcademicSetupErrorCode>> = {
-  coordinator_assignment_one_live_scope_idx: 'ASSIGNMENT_ACTIVE',
+  coordinator_assignment_one_live_scope_idx: 'ASSIGNMENT_EXISTS', coordinator_assignment_one_live_faculty_idx: 'ASSIGNMENT_EXISTS',
   faculty_faculty_code_key: 'FACULTY_CODE_TAKEN',
   department_department_code_key: 'DEPARTMENT_CODE_TAKEN',
   programme_programme_code_key: 'PROGRAMME_CODE_TAKEN',

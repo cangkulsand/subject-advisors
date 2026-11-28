@@ -538,3 +538,7 @@
 .admin-batch-note { display: block; font-size: var(--font-size-table); color: var(--color-muted-text); }
 .admin-batch-intake { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .admin-batch-intake legend { font-size: var(--font-size-label); font-weight: 600; margin-bottom: 4px; }
+
+/* Coordinators dialog (S3-P004-040): Covers radios and the learning centre checkboxes */
+.admin-choice-group { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.admin-choice-group legend { font-size: var(--font-size-label); font-weight: 600; margin-bottom: 4px; }

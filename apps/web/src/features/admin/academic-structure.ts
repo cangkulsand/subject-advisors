@@ -95,6 +95,6 @@ export function curriculumVersionTaken(programmeId: number, version: string, cur
 /** Moving a programme to another faculty is blocked while it has a live coordinator assignment; say so plainly. */
 export function moveErrorText(error: unknown, programmeCode: string): string {
   if (error instanceof AdminApiError && error.code === 'ASSIGNMENT_ACTIVE')
-    return `${programmeCode} has an active coordinator assignment. End it in Coordinator Assignments before moving the programme to another faculty.`;
+    return `${programmeCode} has an active coordinator assignment. End it in Coordinators before moving the programme to another faculty.`;
   return errorText(error);
 }

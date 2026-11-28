@@ -141,7 +141,7 @@ export function ScopeFields({ context, path, programmeId, learningCentreId, keep
       <div className="coordinator-readonly"><span id={semesterField + '-label'} className="coordinator-field-label"><FieldIcon name="semester"/>Target semester</span>
         <output id={semesterField} aria-labelledby={semesterField + '-label'} className="coordinator-readonly-value" title="Set by the system administrator">{semesterLabel(target)}<svg className="coordinator-lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></output></div>
     </div>
-    {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.</p>}
+    {!context.programmes.length && <p className="admin-notice" role="status">You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinators.</p>}
     {context.currentSemesterId == null
       ? <p className="admin-notice" role="status">No current semester is set. Ask a system administrator to set it in Academic Semesters.</p>
       : context.targetSemesterId == null && <p className="admin-notice" role="status">No next Normal semester is configured yet. Ask a system administrator to add it in Academic Semesters.</p>}

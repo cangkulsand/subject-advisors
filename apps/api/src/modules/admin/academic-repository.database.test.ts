@@ -54,7 +54,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     const programmeId = Number((await client.query("INSERT INTO public.programme(programme_code,programme_name) VALUES ('TEST_P','Test programme') RETURNING programme_id")).rows[0]!.programme_id);
     await repository.setProgrammeDepartment(programmeId, { departmentId: department.departmentId, reason }, actor);
     const account = await accounts.createAccount('user_academic_coordinator', ['COORDINATOR'], actor, reason);
-    return { faculty, department, centre, account, programmeId, assignment: { accountId: account.accountId, facultyId: faculty.facultyId, programmeId, learningCentreId: centre.learningCentreId, reason } };
+    return { faculty, department, centre, account, programmeId, assignment: { accountId: account.accountId, facultyId: faculty.facultyId, programmeId, learningCentreIds: [centre.learningCentreId], reason } };
   }
   it('creates and sparsely updates references, lists inactive rows deliberately and records normalized audit context', async () => {
     const centre = await repository.createLearningCentre({ centreCode: 'QA', centreName: 'QA centre', reason: '  Reviewed test change  ' }, actor);
@@ -167,10 +167,10 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
   });
   it('creates, filters and ends assignment history, with direct missing and duplicate codes', async () => {
     const data = await seed();
-    const created = await repository.createCoordinatorAssignment(data.assignment, actor);
+    const created = (await repository.createCoordinatorAssignment(data.assignment, actor))[0]!;
     expect(created).toMatchObject({ accountId: data.account.accountId, facultyId: data.faculty.facultyId, programmeId: data.programmeId, learningCentreId: data.centre.learningCentreId, endedAt: null });
     expect(created.startedAt).toMatch(/Z$/);
-    await expect(repository.createCoordinatorAssignment(data.assignment, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_ACTIVE' });
+    await expect(repository.createCoordinatorAssignment(data.assignment, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_EXISTS' });
     expect(await repository.listCoordinatorAssignments({ accountId: data.account.accountId, programmeId: data.programmeId, learningCentreId: data.centre.learningCentreId })).toEqual([created]);
     expect(await repository.listCoordinatorAssignments({ accountId: 2147483647 })).toEqual([]);
     const ended = await repository.endCoordinatorAssignment(created.assignmentId, { reason }, actor);
@@ -178,7 +178,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     await expect(repository.endCoordinatorAssignment(created.assignmentId, { reason }, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_ENDED' });
     expect(await repository.listCoordinatorAssignments({})).toContainEqual(ended);
     expect(await repository.listScopes(data.account.clerkUserId)).toEqual([]);
-    expect((await repository.createCoordinatorAssignment(data.assignment, actor)).assignmentId).not.toBe(created.assignmentId);
+    expect((await repository.createCoordinatorAssignment(data.assignment, actor))[0]!.assignmentId).not.toBe(created.assignmentId);
   });
   it.each(['centre', 'faculty', 'programme', 'account', 'role'] as const)('rechecks live %s state on every scope read', async kind => {
     const data = await seed();

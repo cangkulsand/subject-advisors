@@ -41,7 +41,7 @@ export function SetupCard({ title, description, data, error, refresh, children, 
     {error ? <div><p role="alert" className="admin-form-error">{error}</p><button onClick={refresh}>Retry</button></div> : !data ? <p role="status">Loading academic setup…</p> : children}
   </section></>;
 }
-export function SetupForm({ title, fields, initial, onSave, onClose, children }: { title: string; fields: Field[]; initial: Values; onSave: (v: Values, reason: string) => Promise<void>; onClose: () => void; children?: (v: Values, set: (key: string, value: string) => void) => ReactNode }) {
+export function SetupForm({ title, fields, initial, onSave, onClose, children, canSave }: { title: string; fields: Field[]; initial: Values; onSave: (v: Values, reason: string) => Promise<void>; onClose: () => void; canSave?: (v: Values) => boolean; children?: (v: Values, set: (key: string, value: string) => void) => ReactNode }) {
   const [values, setValues] = useState(initial), [reason, setReason] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const dialog = useRef<HTMLDialogElement>(null), alive = useRef(true), flight = useRef(false), id = useId();
   useLayoutEffect(() => {
@@ -57,7 +57,7 @@ export function SetupForm({ title, fields, initial, onSave, onClose, children }:
     {fields.map(f => <div className="admin-field" key={f.key}><label htmlFor={id + f.key}>{f.label}</label>{f.options ? <select id={id + f.key} required={!f.optional} value={values[f.key] ?? ''} onChange={e => set(f.key, e.target.value)}><option value="">{f.optional ? 'None' : 'Choose…'}</option>{f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> : <input id={id + f.key} type={f.type ?? 'text'} required={!f.optional} maxLength={f.maxLength} min={f.type === 'number' ? 0 : undefined} max={f.type === 'number' ? 32767 : undefined} step={f.type === 'number' ? 1 : undefined} value={values[f.key] ?? ''} onChange={e => set(f.key, e.target.value)}/>}</div>)}
     {children?.(values, set)}
     <div className="admin-field"><label htmlFor={id + 'reason'}>Reason (recorded in the audit log)</label><textarea id={id + 'reason'} required maxLength={ADMIN_REASON_MAX_LENGTH} value={reason} onChange={e => setReason(e.target.value)}/><small>{reason.trim().length} / {ADMIN_REASON_MAX_LENGTH} characters · required</small></div></fieldset>
-    {error && <p role="alert" className="admin-form-error">{error}</p>}<div className="admin-dialog-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" className="admin-primary" disabled={busy || !normaliseReason(reason)} aria-busy={busy}>{busy ? 'Working…' : 'Save'}</button></div></form></dialog>;
+    {error && <p role="alert" className="admin-form-error">{error}</p>}<div className="admin-dialog-actions"><button type="button" disabled={busy} onClick={onClose}>Cancel</button><button type="submit" className="admin-primary" disabled={busy || !normaliseReason(reason) || (canSave ? !canSave(values) : false)} aria-busy={busy}>{busy ? 'Working…' : 'Save'}</button></div></form></dialog>;
 }
 /** On phones each row stacks with a visible label per value (S3-P004-025), so every cell gets its column heading as data-label. */
 /** Stacked rows use display: block on phones, which makes some browsers drop table semantics; explicit roles keep rows and cells announced (S3-P004-026). */

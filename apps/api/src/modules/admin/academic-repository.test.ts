@@ -5,7 +5,8 @@ import type { AdminStatement } from './repository';
 
 describe('academic SQL boundary', () => {
   it.each([
-    ['23505', 'coordinator_assignment_one_live_scope_idx', 'ASSIGNMENT_ACTIVE'],
+    ['23505', 'coordinator_assignment_one_live_scope_idx', 'ASSIGNMENT_EXISTS'],
+    ['23505', 'coordinator_assignment_one_live_faculty_idx', 'ASSIGNMENT_EXISTS'],
     ['23505', 'faculty_faculty_code_key', 'FACULTY_CODE_TAKEN'],
     ['23505', 'department_department_code_key', 'DEPARTMENT_CODE_TAKEN'],
     ['23505', 'programme_programme_code_key', 'PROGRAMME_CODE_TAKEN'],
@@ -157,5 +158,36 @@ describe('academic SQL boundary', () => {
     expect(transaction.mock.calls[0]![0][1]!.text).toContain('AS "intakes"');
     await repository.updateCurriculum(4, { isActive: false, reason: 'Edit' }, 'user_verified');
     expect(transaction.mock.calls[1]![0][2]!.text).toContain('AS "intakes"');
+  });
+});
+
+describe('coordinator faculty scope (S3-P004-040)', () => {
+  it('expands a whole-faculty row to every active programme of the faculty and filters on the expanded programme', async () => {
+    const query = vi.fn(async (_text: string, _values: unknown[]) => { void _text; void _values; return [{ facultyId: 1, programmeId: 7, learningCentreId: 2 }, { facultyId: 1, programmeId: 8, learningCentreId: 2 }]; });
+    const repository = createAcademicSetupRepository(query, vi.fn());
+    expect(await repository.listScopes('user_c')).toEqual([{ facultyId: 1, programmeId: 7, learningCentreId: 2 }, { facultyId: 1, programmeId: 8, learningCentreId: 2 }]);
+    const sql = String(query.mock.calls[0]![0]).replace(/\s+/g, ' ');
+    expect(sql).toContain('SELECT DISTINCT c.faculty_id AS "facultyId", p.programme_id AS "programmeId"');
+    expect(sql).toContain('c.programme_id=p.programme_id OR (c.programme_id IS NULL AND p.faculty_id=c.faculty_id)');
+    expect(sql).toContain("coalesce(upper(p.status),'ACTIVE')='ACTIVE'");
+    await repository.isScopeAssigned('user_c', 8, 2);
+    const check = String(query.mock.calls[1]![0]);
+    expect(check).toContain('p.programme_id=$2');
+    expect(check).not.toContain('c.programme_id=$2');
+  });
+  it('creates one row per centre in one statement, with a null programme for a whole-faculty row', async () => {
+    const rows = [5, 6].map(id => ({ assignmentId: 40 + id, accountId: 2, facultyId: 3, programmeId: null, learningCentreId: id, startedAt: '2026-11-28T00:00:00Z', endedAt: null }));
+    const transaction = vi.fn<(statements: AdminStatement[]) => Promise<Record<string, unknown>[][]>>().mockResolvedValue([[], rows]);
+    const repository = createAcademicSetupRepository(vi.fn(), transaction);
+    const created = await repository.createCoordinatorAssignment({ accountId: 2, facultyId: 3, programmeId: null, learningCentreIds: [5, 6], reason: 'Cover Computing' }, 'user_admin');
+    expect(created.map(row => [row.programmeId, row.learningCentreId])).toEqual([[null, 5], [null, 6]]);
+    const statements = transaction.mock.calls[0]![0];
+    expect(statements).toHaveLength(2);
+    expect(statements[1]!.text).toContain('unnest($4::integer[])');
+    expect(statements[1]!.values).toEqual([2, 3, null, [5, 6]]);
+  });
+  it('a duplicate on either one-live index is ASSIGNMENT_EXISTS with a plain message', () => {
+    const error = mapAcademicDatabaseError({ code: '23505', constraint: 'coordinator_assignment_one_live_faculty_idx', message: 'x' });
+    expect(error).toMatchObject({ code: 'ASSIGNMENT_EXISTS', message: 'This coordinator already has this assignment at this learning centre.' });
   });
 });
