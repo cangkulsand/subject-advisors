@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-28
 - **Owner:** P004, building Idham's review item; to be handed over to Idham
-- **Status:** Draft, for owner approval
+- **Status:** Draft, for owner approval. The builder check is done, and six points are settled as builder's calls in §8.
 - **Follow-up (separate design):** coordinators get create, edit and delete for subjects within their scope. This also closes Harraz's subject-removal item.
 
 ## 1. Why
@@ -119,7 +119,8 @@ The owner also asked to rename the menu item. "Coordinator Assignments" reads as
 - Returns the created rows.
 
 **Refusals:**
-- **Live row already exists:** if any centre already has a live identical row (same account, same programme or faculty, same centre), the whole add is refused with 409 `ASSIGNMENT_EXISTS`: "This coordinator already covers <faculty or programme> at <centre>."
+- **Live row already exists:** if any centre already has a live identical row (same account, same programme or faculty, same centre), the whole add is refused with 409 `ASSIGNMENT_EXISTS`: "This coordinator already has this assignment at <centre>."
+- **Overlap is allowed:** a programme row and a faculty row may both cover the same programme × centre. `DISTINCT` gives one scope, and ending one leaves the other in force. The table shows both rows, so the admin can see why access remains.
 - **Programme row mismatch:** `programmeId` set means a programme row, and `facultyId` must match the programme's faculty (the existing guard).
 
 **Reads:** the list response includes faculty rows with `programmeId: null`.
@@ -163,7 +164,7 @@ The owner also asked to rename the menu item. "Coordinator Assignments" reads as
 **Docs:**
 - **API:** `docs/api/admin-academic-setup.openapi.json`.
 - **Data contracts:** a faculty scope paragraph.
-- **ACL amendment:** open decision 2 (faculty scope) becomes In force, and the coordinator row in A3 is updated.
+- **ACL amendment:** open decision 2 (faculty scope) is marked implemented (see §8), and the coordinator row in A3 is updated.
 - **Change record and README row.**
 
 **Tests:**
@@ -182,6 +183,22 @@ The owner also asked to rename the menu item. "Coordinator Assignments" reads as
 - The SQL form of the expansion, as long as it is one query and `DISTINCT`.
 - How the dialog's account list is loaded. Reuse what the page has.
 - The exact wording of helper hints, within the themeguide.
+
+## 8. Builder's calls (after the builder check, 2026-11-28)
+
+1. **Cleanup target and starting state:**
+   - **Database:** the cleanup runs against the shared Neon database (dev and prod are one database) and the Clerk development instance that holds the `+clerk_test` logins. Before deleting anything, confirm that this instance is the one the deployed apps use.
+   - **Starting state:** the runbook reads the current rows first.
+   - **Create where missing:** for `ecjh+` (programme code `SECJ`; `SECJH` is only an import alias) and `ecrh+` (`SECRH`), it creates any missing programme × centre rows for JB, KL and Penang.
+   - **End and revoke:** then it ends the five other accounts' rows and revokes their COORDINATOR role.
+2. **`ASSIGNMENT_EXISTS` means the identical row only** (see §5.3). Overlap between a faculty row and a programme row is allowed.
+3. **Error codes:**
+   - **Both unique indexes:** `coordinator_assignment_one_live_scope_idx` and the new faculty index both map to `ASSIGNMENT_EXISTS`, which changes today's `ASSIGNMENT_ACTIVE` mapping for duplicates.
+   - **`ASSIGNMENT_ACTIVE`** keeps only its meaning "the programme has a live assignment and cannot change faculty".
+   - **Updates:** the OpenAPI and tests are updated.
+4. **Dummy coordinators stay programme × centre:** the S3-P004-029 dummy-coordinator flow is unchanged, with no Whole faculty option.
+5. **ACL amendment:** open decision 2 is marked "Implemented in S3-P004-040; to confirm at the 5–6 December review", not "In force".
+6. **No parallel work:** Idham has no parallel branch for this. As with the last items, P004 builds it and hands it over.
 
 ## 7. After deploy (asked again before running)
 
