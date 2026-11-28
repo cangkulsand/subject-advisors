@@ -59,7 +59,7 @@ All student endpoints are scoped to the signed-in identity; a browser-supplied s
 
 | | Scope |
 | --- | --- |
-| **View** | Class Offering Forecast and the student list behind each count, for their assigned programme × learning centre only (`apps/api/src/modules/forecasting/scope-provider.ts`); Offering History for past semesters of that scope |
+| **View** | Class Offering Forecast and the student list behind each count, for their assigned scope only: a programme × learning centre, or a whole faculty × learning centre covering every active programme of the faculty (S3-P004-040; `apps/api/src/modules/forecasting/scope-provider.ts`); Offering History for past semesters of that scope |
 | **Edit / Approve** | Offering decisions (Pending / Approved / Removed) for the next Normal semester of their scope; open or close a subject for picks. Each change is audited (`offering_decision_audit`, `forecast_decision_audit_log`) |
 | **Cannot** | See or change student records or profiles directly; change curricula, subjects, prerequisites, semesters, roles or other coordinators' scopes |
 | **Recover** | Change a decision back (every change is a new audit row) |
@@ -104,7 +104,7 @@ Audit logs (`user_role_audit_log`, `user_access_audit_log`, `academic_setup_audi
 ## A6. Open decisions for 5 and 6 December
 
 1. **Subject and curriculum editing by coordinators.** Dr. Adila said subject additions are decided at department level and coordinators need the relevant permissions. Today only the System Administrator can edit curricula and prerequisites. Proposal: a coordinator may add, edit or remove subjects and prerequisites only for curricula of programmes in their own assignment, with the same audit; this follows the faculty-scope change (Idham).
-2. **Coordinator scope by faculty.** Today a coordinator is assigned per programme × learning centre. Proposal under discussion: one assignment per faculty that covers all its programmes across the chosen learning centres.
+2. **Coordinator scope by faculty.** Implemented in S3-P004-040; to confirm at the 5–6 December review. An admin assigns a coordinator to a whole faculty (or one programme) at one or more learning centres; a faculty row covers every active programme of the faculty, including programmes added later.
 3. **Academic record history** (A5, proposed rows) and whether a System Administrator may restore records.
 4. **Batch programme and intake correction** (A5): delivered in S3-P004-039; no longer open.
 
