@@ -1,6 +1,6 @@
 # S3-P004-041: Coordinator subject editing, subject removal, curriculum audit
 
-- **Status:** On branch `feature/coordinator-subjects`. Not merged. Migration 0018 is not applied.
+- **Status:** Merged to `main` on 2026-11-28; migration 0018 applied to Neon 2026-11-28 (rehearsal 16/16 PASS, verify 73 PASS); deployed to dev and prod
 - **Date:** 2026-11-28
 - **Sprint:** Sprint 3
 - **Owner:** P004, building Harraz's review items. To be handed over to Harraz.
@@ -125,4 +125,4 @@
 - **Compatibility/impact:**
   - **Migration:** 0018, additive.
   - **API:** curriculum write bodies now require `reason`, the dependency DELETE body is `{ revision, reason }`, and there are new 403 and 409 codes.
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-28); migration 0018 applied
