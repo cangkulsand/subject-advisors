@@ -28,7 +28,7 @@ test('authoritative source maps exactly 26 entities, 171 fields and 39 FKs; nati
 });
 test('ordered canonical manifest includes registered forward extensions and excludes superseded UUID migration',async()=>{
  const entries=await loadMigrations();
- assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015','0016','0017']);
+ assert.deepEqual(entries.map(m=>m.version),['0000','0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015','0016','0017','0018']);
  assert.ok(entries.every(m=>m.sha256.length===64));
  assert.ok(entries.every(m=>!m.file.startsWith('20261024')));
  assert.match(entries[3].sql,/ADD COLUMN current_semester_id integer NULL/);
@@ -268,7 +268,7 @@ test('0016 structural check is registered for verify, review and the disposable 
 });
 
 test('0017 follows 0016 and only relaxes coordinator_assignment.programme_id, adds the faculty index and replaces the assignment guard (S3-P004-040)',async()=>{
- const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0016','0017']);
+ const entries=(await loadMigrations()).slice(0,18);assert.deepEqual(entries.slice(-2).map(m=>m.version),['0016','0017']);
  const code=entries.at(-1).sql.replace(/--.*$/gm,'');
  assert.match(code,/ALTER TABLE public\.coordinator_assignment ALTER COLUMN programme_id DROP NOT NULL;/);
  assert.match(code,/CREATE UNIQUE INDEX IF NOT EXISTS coordinator_assignment_one_live_faculty_idx\s+ON public\.coordinator_assignment\(access_assignment_id, faculty_id, learning_centre_id\) WHERE programme_id IS NULL AND ended_at IS NULL;/);
@@ -288,4 +288,25 @@ test('0017 structural check is registered for verify, review and the disposable 
   assert.match(await readFile(file,'utf8'),/'022_coordinator_faculty_scope_behavior\.sql'/,file);
  for(const file of ['tools/db/cli.mjs','tools/db/review.mjs','tools/admin/test-academic-database.mjs'])
   assert.match(await readFile(file,'utf8'),/'021_coordinator_faculty_scope\.sql'/,file);
+});
+
+test('0018 follows 0017 and only adds the curriculum audit function and its five triggers (S3-P004-041)',async()=>{
+ const entries=await loadMigrations();assert.deepEqual(entries.slice(-2).map(m=>m.version),['0017','0018']);
+ const code=entries.at(-1).sql.replace(/--.*$/gm,'');
+ assert.match(code,/CREATE OR REPLACE FUNCTION public\.db_curriculum_audit\(\)/);
+ for(const table of ['subject','curriculum_subject','subject_prerequisite','subject_semester_rule'])
+  assert.match(code,new RegExp('AFTER INSERT OR UPDATE OR DELETE ON public\\.'+table+'\\s+FOR EACH ROW EXECUTE FUNCTION public\\.db_curriculum_audit\\(\\)'),table);
+ assert.match(code,/AFTER DELETE ON public\.simulation_subject\s+FOR EACH ROW EXECUTE FUNCTION public\.db_curriculum_audit\(\)/);
+ assert.doesNotMatch(code,/DROP\s+TABLE|TRUNCATE|DELETE\s+FROM|UPDATE\s+public|ALTER\s+TABLE|DISABLE\s+TRIGGER/i);
+ const applied=entries.slice(0,-1).map(m=>({version:m.version,filename:m.file,sha256:m.sha256}));
+ assert.deepEqual((await migrationStatus(client({applied}),entries)).pending.map(m=>m.version),['0018']);
+});
+test('0018 checks are registered for verify, review and the disposable database run',async()=>{
+ const check=await readFile('db/checks/023_curriculum_audit.sql','utf8');assert.match(check,/db_curriculum_audit/);
+ const behaviour=await readFile('db/checks/024_curriculum_audit_behavior.sql','utf8');
+ assert.match(behaviour,/^-- DEVELOPMENT ONLY/);assert.match(behaviour,/ROLLBACK;\s*$/);assert.match(behaviour,/no-op update writes no audit row/);
+ for(const file of ['tools/db/cli.mjs','tools/db/review.mjs','tools/admin/test-academic-database.mjs']){
+  const text=await readFile(file,'utf8');
+  assert.match(text,/'023_curriculum_audit\.sql'/,file);assert.match(text,/'024_curriculum_audit_behavior\.sql'/,file);
+ }
 });

@@ -61,7 +61,8 @@ All student endpoints are scoped to the signed-in identity; a browser-supplied s
 | --- | --- |
 | **View** | Class Offering Forecast and the student list behind each count, for their assigned scope only: a programme × learning centre, or a whole faculty × learning centre covering every active programme of the faculty (S3-P004-040; `apps/api/src/modules/forecasting/scope-provider.ts`); Offering History for past semesters of that scope |
 | **Edit / Approve** | Offering decisions (Pending / Approved / Removed) for the next Normal semester of their scope; open or close a subject for picks. Each change is audited (`offering_decision_audit`, `forecast_decision_audit_log`) |
-| **Cannot** | See or change student records or profiles directly; change curricula, subjects, prerequisites, semesters, roles or other coordinators' scopes |
+| **Edit subjects** | Add, edit and remove subjects and prerequisites in curricula of programmes their assignment covers, with a reason, audited in `academic_setup_audit_log` (S3-P004-041) |
+| **Cannot** | See or change student records or profiles directly; change semesters, roles or other coordinators' scopes; edit curricula outside their scope, or change the code, name or credits of a subject another programme outside their scope also uses (S3-P004-041) |
 | **Recover** | Change a decision back (every change is a new audit row) |
 
 ### System Administrator (In force)
@@ -103,7 +104,7 @@ Audit logs (`user_role_audit_log`, `user_access_audit_log`, `academic_setup_audi
 
 ## A6. Open decisions for 5 and 6 December
 
-1. **Subject and curriculum editing by coordinators.** Dr. Adila said subject additions are decided at department level and coordinators need the relevant permissions. Today only the System Administrator can edit curricula and prerequisites. Proposal: a coordinator may add, edit or remove subjects and prerequisites only for curricula of programmes in their own assignment, with the same audit; this follows the faculty-scope change (Idham).
+1. **Subject and curriculum editing by coordinators.** Implemented in S3-P004-041; to confirm at the 5–6 December review. A coordinator adds, edits and removes subjects and prerequisites in curricula of programmes their assignment covers; a subject's shared code, name and credits are locked when another programme outside their scope uses it. Every curriculum change, by an admin or a coordinator, needs a reason and is audited.
 2. **Coordinator scope by faculty.** Implemented in S3-P004-040; to confirm at the 5–6 December review. An admin assigns a coordinator to a whole faculty (or one programme) at one or more learning centres; a faculty row covers every active programme of the faculty, including programmes added later.
 3. **Academic record history** (A5, proposed rows) and whether a System Administrator may restore records.
 4. **Batch programme and intake correction** (A5): delivered in S3-P004-039; no longer open.

@@ -1,11 +1,23 @@
 import { fields, invalid, nonnegative, positiveId, text, P001Error } from '../profile/validation';
+import { normaliseReason } from '../../../../../packages/shared/src/admin/admin';
+/** Every curriculum change carries a reason for the audit log (S3-P004-041). */
+export function reasonOf(value: unknown): string {
+  const reason = normaliseReason(value);
+  if (!reason) invalid('Give a reason (1 to 500 characters). It is recorded in the audit log.');
+  return reason!;
+}
+export function removalInput(value: unknown): { revision: string; reason: string } {
+  const b = fields(value, ['revision','reason']);
+  return { revision: revision(b.revision), reason: reasonOf(b.reason) };
+}
 import type { CurriculumData, LinkInput, PrerequisiteSelection, SubjectInput } from './contracts';
 export function revision(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-f0-9]{32}$/.test(value)) invalid('Reload the curriculum before saving.');
   return value;
 }
 export function subjectInput(value: unknown, editing: boolean): SubjectInput {
-  const b = fields(value, ['revision','existingSubjectId','code','name','credits','category','compulsory','semesterTypes','confirmSharedChanges','prerequisites']);
+  const b = fields(value, ['revision','existingSubjectId','code','name','credits','category','compulsory','semesterTypes','confirmSharedChanges','prerequisites','reason']);
+  const reason = reasonOf(b.reason);
   const existingSubjectId = b.existingSubjectId == null ? null : positiveId(b.existingSubjectId, 'Existing subject');
   if (editing && existingSubjectId !== null) invalid('An existing mapping cannot be moved to another subject.');
   if (editing && b.prerequisites !== undefined) invalid('Initial prerequisites can only be selected when creating a subject.');
@@ -27,7 +39,7 @@ export function subjectInput(value: unknown, editing: boolean): SubjectInput {
     name: existingSubjectId ? '' : text(b.name, 'Subject name', 255, true)!,
     credits: existingSubjectId ? 0 : nonnegative(b.credits, 'Credit hours'),
     category: text(b.category, 'Classification', 50, true)!, compulsory: b.compulsory,
-    semesterTypes: b.semesterTypes as SubjectInput['semesterTypes'], confirmSharedChanges: b.confirmSharedChanges === true, prerequisites };
+    semesterTypes: b.semesterTypes as SubjectInput['semesterTypes'], confirmSharedChanges: b.confirmSharedChanges === true, prerequisites, reason };
 }
 /** Initial prerequisites must already be mapped subjects of this curriculum and match their canonical code. */
 export function validatePrerequisites(data: CurriculumData, prerequisites: PrerequisiteSelection[]): void {
@@ -35,13 +47,14 @@ export function validatePrerequisites(data: CurriculumData, prerequisites: Prere
   for (const p of prerequisites) if (codes.get(p.mappingId) !== p.code) invalid('Every prerequisite must be a subject in this curriculum. Reload and select it again.');
 }
 export function linkInput(value: unknown): LinkInput {
-  const b = fields(value, ['revision','from','required','kind']);
+  const b = fields(value, ['revision','from','required','kind','reason']);
+  const reason = reasonOf(b.reason);
   if (!['MANDATORY','COREQUISITE','RECOMMENDED'].includes(String(b.kind))) invalid('Select a supported relationship type.');
   const from = positiveId(b.from,'Dependent subject'), required = positiveId(b.required,'Required subject');
   if (from === required) invalid('A subject cannot depend on itself.');
-  return { revision: revision(b.revision), from, required, kind: b.kind as LinkInput['kind'] };
+  return { revision: revision(b.revision), from, required, kind: b.kind as LinkInput['kind'], reason };
 }
-export function validateDependency(data: CurriculumData, input: LinkInput, editingId: number | null = null): void {
+export function validateDependency(data: CurriculumData, input: Omit<LinkInput, 'reason'>, editingId: number | null = null): void {
   const ids = new Set(data.subjects.map(s => s.mappingId));
   if (!ids.has(input.from) || !ids.has(input.required)) invalid('Both subjects must belong to this curriculum.');
   if (editingId !== null && !data.links.some(l => l.id === editingId)) throw new P001Error(404,'LINK_NOT_FOUND','The relationship is unavailable.');
