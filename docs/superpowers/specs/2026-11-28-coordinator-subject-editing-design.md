@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-28
 - **Owner:** P004. This builds Harraz's review item and ACL open decision 1. It is to be handed over to Harraz.
-- **Status:** draft, waiting for owner approval.
+- **Status:** approved by the owner on 2026-11-28 (approach A, two steps). The builder check is done, and the settled points are in §8.
 - **Builds on:** S3-P004-040 (coordinator faculty scope), and Harraz's Curriculum & Prerequisites editor (`/api/p001-sprint2`, `CurriculumPage.tsx`).
 
 ## 1. Why
@@ -63,7 +63,9 @@ Academic records and offering decisions point at `subject`, not the mapping.
    - Its prerequisite links in both directions and its semester rules are removed.
    - Students' what-if scenario rows for it are removed and counted.
    - The shared `subject` row, academic records and offering decisions are kept.
-4. **Refused deletes.** A delete is refused while any student has the subject in saved picks or a graduation plan. The message gives the count, for example "6 students have this subject in their picks."
+4. **Refused deletes.** A delete is refused while any student has **ever** had the subject in saved picks (`semester_offering`, any semester) or a graduation plan (`plan_subject`), because those rows keep the mapping (ON DELETE RESTRICT).
+   - **Message:** it gives the count and the semesters, for example "Picked by 6 students in 2026/2027 S1. It can't be removed yet."
+   - **Follow-up (owner decision, 2026-11-28):** "retire" a picked subject. It would be hidden going forward and kept in history, and it touches about 13 reader files across every module. It is a separate change, not part of this one.
 5. **Audit for everyone.** Every change, by an admin or a coordinator, needs a reason (1–500 characters) and is audited automatically in `academic_setup_audit_log`.
 6. **Coordinator menu.** The coordinator app gets **Curriculum & Subjects** (`/coordinator/curriculum`). It reuses Harraz's editor, limited to their curricula.
 
@@ -151,7 +153,8 @@ File: `db/migrations/0018_curriculum_audit.sql`, additive.
   3. Delete the `subject_semester_rule` rows.
   4. Delete the `curriculum_subject` row.
 - **Result:** the new snapshot plus `removed: { scenarioRows, prerequisiteLinks }`.
-- **Audit:** the 0018 triggers record each deleted mapping, link and rule. `simulation_subject` has no trigger; its count goes into the result and the change record.
+- **Audit:** the 0018 triggers record each deleted mapping, link and rule.
+  - **Scenario rows:** `simulation_subject` gets a DELETE-only audit trigger too (a fifth trigger), so each cleared scenario row is logged with its student's scenario id.
 
 **Errors:**
 - New codes: `CURRICULUM_OUT_OF_SCOPE`, `SUBJECT_SHARED_OUTSIDE_SCOPE`, `SUBJECT_IN_USE`.
@@ -192,6 +195,13 @@ File: `db/migrations/0018_curriculum_audit.sql`, additive.
 - ACL amendment: open decision 1 marked "Implemented in S3-P004-041; to confirm at the 5–6 December review". The A3 coordinator "Cannot" row is updated.
 - Data contracts: the curriculum audit paragraph.
 - OpenAPI, if a sprint2 contract file exists. Otherwise the change record lists the routes.
+
+## 8. Settled after the builder check (2026-11-28)
+
+1. **Delete rule:** removal is a true delete, refused when the subject has ever been picked or planned (§3 goal 4). The owner chose to do "retire" as a follow-up.
+2. **Scenario rows:** clearing what-if scenario rows is audited by a DELETE trigger on `simulation_subject` (actor context only), within the same `db_curriculum_audit()` function.
+3. **Who builds it:** P004 builds it and hands it over to Harraz. Harraz has no open branch on `p001-sprint2`.
+4. **No on/off switch:** coordinator access is not put behind a switch. If the 5–6 December review says no, coordinator access can be taken away by ending assignments, or by reverting the role list in `routes.ts`. The audit triggers stay useful either way.
 
 ## 6. Left to the builder
 
