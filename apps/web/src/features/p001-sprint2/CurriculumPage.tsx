@@ -4,17 +4,21 @@ import { errorMessage } from '../profile/client';
 import type { Sprint2Client } from './client';
 import '../../app/typography.css';
 import { SetupTable } from '../admin/academic-ui';
+import { ADMIN_REASON_MAX_LENGTH, normaliseReason } from '../../../../../packages/shared/src/admin/admin';
+type Removal = CurriculumSnapshot & { removed?: { scenarioRows: number; prerequisiteLinks: number } };
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const blankSubject={existingSubjectId:'',code:'',name:'',credits:'',category:'',compulsory:false,semesterTypes:[] as SemesterType[],confirmSharedChanges:false};
 const blankLink={from:'',required:'',kind:'MANDATORY' as LinkKind};
 const labels:Record<LinkKind,string>={MANDATORY:'Mandatory prerequisite',COREQUISITE:'Co-requisite / concurrent study',RECOMMENDED:'Recommended prior knowledge (advisory)'};
 const ACTIONS=[{id:'subjects',label:'Subject List'},{id:'create',label:'Create Subject'},{id:'relationships',label:'Prerequisite List'},{id:'prerequisites',label:'Manage Prerequisites'}] as const;
 type Action=typeof ACTIONS[number]['id'];
-export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;initialCurriculumId?:string}) {
+/** Harraz's curriculum editor. S3-P004-041: every change needs a reason; Remove subject; coordinators see shared fields locked. */
+export function CurriculumPage({api,initialCurriculumId='',role='admin'}:{api:Sprint2Client;initialCurriculumId?:string;role?:'admin'|'coordinator'}) {
   const [catalogue,setCatalogue]=useState<Catalogue>(),[id,setId]=useState(''),[snapshot,setSnapshot]=useState<CurriculumSnapshot>();
   const [attempt,setAttempt]=useState(0),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
   const [draft,setDraft]=useState({...blankSubject}),[editing,setEditing]=useState<number|null>(null),[link,setLink]=useState({...blankLink}),[linkId,setLinkId]=useState<number|null>(null);
   const [prerequisites,setPrerequisites]=useState<CurriculumSubject[]>([]),[prerequisiteSearch,setPrerequisiteSearch]=useState('');
-  const [review,setReview]=useState<{summary:string;run:()=>Promise<CurriculumSnapshot>;done?:string}|null>(null);
+  const [review,setReview]=useState<{summary:string;run:(reason:string)=>Promise<Removal>;done?:string|((result:Removal)=>string)}|null>(null),[reason,setReason]=useState('');
   const seeded=useRef(false);
   const [action,setAction]=useState<Action>('subjects');
   const reviewHeading=useRef<HTMLHeadingElement>(null),alert=useRef<HTMLParagraphElement>(null),workspaceHeading=useRef<HTMLHeadingElement>(null),pendingScroll=useRef(false);
@@ -30,7 +34,7 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
   useEffect(()=>{if(error)alert.current?.focus();},[error]);
   useEffect(()=>{if(!pendingScroll.current)return;pendingScroll.current=false;workspaceHeading.current?.scrollIntoView({block:'start',behavior:'auto'});},[action]);
   useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
-  function reset(){setDraft({...blankSubject});setEditing(null);setLink({...blankLink});setLinkId(null);setPrerequisites([]);setPrerequisiteSearch('');setReview(null);}
+  function reset(){setDraft({...blankSubject});setEditing(null);setLink({...blankLink});setLinkId(null);setPrerequisites([]);setPrerequisiteSearch('');setReview(null);setReason('');}
   function changeCurriculum(value:string){if(dirty&&!window.confirm('Discard unsaved curriculum changes?'))return;reset();setId(value);setAction('subjects');setSuccess('');}
   function selectAction(next:Action){if(next===action||busy||review)return;if(dirty&&!window.confirm('Discard unsaved curriculum changes?'))return;reset();setAction(next);setError('');setSuccess('');pendingScroll.current=true;}
   function focusWorkspace(){const el=workspaceHeading.current;if(!el)return;el.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});el.focus({preventScroll:true});}
@@ -60,16 +64,22 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
     const prerequisiteText=creating?(prerequisites.length?' Initial mandatory prerequisites: '+prerequisites.map(s=>s.name+' ('+s.code+')').join(', ')+'.':' No initial prerequisites.'):'';
     setReview({summary:`${creating?'Create':'Update'} ${nameLabel} (${attached?attached.code:draft.code.trim()}): ${attached?attached.credits:draft.credits} credit hours, ${draft.category}, ${draft.compulsory?'compulsory':'optional / elective'}, permitted in ${draft.semesterTypes.join(' and ')}, in ${snapshot.data.programme} · ${snapshot.data.version}. Subject code, name and credits are shared across curriculum versions.${prerequisiteText}`,
       done:creating?'Subject created and saved.'+(prerequisites.length?' Initial prerequisites: '+prerequisites.map(s=>s.name+' ('+s.code+')').join(', ')+'.':''):undefined,
-      run:()=>api('/curricula/'+id+'/subjects'+(editing===null?'':'/'+editing),{method:creating?'POST':'PUT',body})});setError('');setSuccess('');
+      run:reason=>api('/curricula/'+id+'/subjects'+(editing===null?'':'/'+editing),{method:creating?'POST':'PUT',body:{...body,reason}})});setError('');setSuccess('');
   }
   function saveLink(e:FormEvent){e.preventDefault();if(!snapshot)return;
-    setReview({summary:`Save ${labels[link.kind]}: ${name(Number(link.from))} requires ${name(Number(link.required))}.`,run:()=>api('/curricula/'+id+'/dependencies'+(linkId===null?'':'/'+linkId),{method:linkId===null?'POST':'PUT',body:{revision:snapshot.revision,from:Number(link.from),required:Number(link.required),kind:link.kind}})});setError('');setSuccess('');
+    setReview({summary:`Save ${labels[link.kind]}: ${name(Number(link.from))} requires ${name(Number(link.required))}.`,run:reason=>api('/curricula/'+id+'/dependencies'+(linkId===null?'':'/'+linkId),{method:linkId===null?'POST':'PUT',body:{revision:snapshot.revision,from:Number(link.from),required:Number(link.required),kind:link.kind,reason}})});setError('');setSuccess('');
   }
   function remove(l:Dependency){if(!snapshot)return;if(dirty&&!window.confirm('Discard form changes before removing this relationship?'))return;reset();
-    setReview({summary:`Remove ${labels[l.kind]}: ${name(l.from)} requires ${name(l.required)}.`,run:()=>api('/curricula/'+id+'/dependencies/'+l.id,{method:'DELETE',body:{revision:snapshot.revision}})});setError('');setSuccess('');
+    setReview({summary:`Remove ${labels[l.kind]}: ${name(l.from)} requires ${name(l.required)}.`,run:reason=>api('/curricula/'+id+'/dependencies/'+l.id,{method:'DELETE',body:{revision:snapshot.revision,reason}})});setError('');setSuccess('');
   }
-  async function confirm(){if(!review||busy)return;setBusy(true);setError('');
-    try{const done=review.done;setSnapshot(await review.run());reset();setSuccess(done??'Curriculum change saved.');
+  /** Subject removal (S3-P004-041): a true delete from this curriculum; the server refuses it while students picked or planned the subject. */
+  function removeSubject(s:CurriculumSubject){if(!snapshot)return;if(dirty&&!window.confirm('Discard form changes before removing this subject?'))return;reset();
+    setReview({summary:`Remove ${s.name} (${s.code}) from ${snapshot.data.programme} · ${snapshot.data.version}. Its prerequisite links and semester rules are removed, and students' what-if scenario rows for it are cleared. Students' academic records are kept, and the subject stays in other curricula.`,
+      done:result=>`Subject removed. ${count(result.removed?.prerequisiteLinks??0,'prerequisite link','prerequisite links')} and ${count(result.removed?.scenarioRows??0,'what-if scenario row','what-if scenario rows')} were cleared.`,
+      run:reason=>api<Removal>('/curricula/'+id+'/subjects/'+s.mappingId,{method:'DELETE',body:{revision:snapshot.revision,reason}})});setError('');setSuccess('');
+  }
+  async function confirm(){const clean=normaliseReason(reason);if(!review||busy||!clean)return;setBusy(true);setError('');
+    try{const done=review.done;const result=await review.run(clean);setSnapshot({revision:result.revision,data:result.data});reset();setSuccess(typeof done==='function'?done(result):done??'Curriculum change saved.');
       const fresh=await api<Catalogue>('/curricula').catch(()=>null);if(fresh)setCatalogue(fresh);
     }catch(e){setError(errorMessage(e));setReview(null);}finally{setBusy(false);}
   }
@@ -77,6 +87,9 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
   const prerequisiteQuery=prerequisiteSearch.trim().toLowerCase();
   const prerequisiteMatches=snapshot&&prerequisiteQuery?snapshot.data.subjects.filter(s=>!prerequisites.some(p=>p.mappingId===s.mappingId)&&(s.name.toLowerCase().includes(prerequisiteQuery)||s.code.toLowerCase().includes(prerequisiteQuery))):[];
   const disabled=busy||review!==null;
+  // Coordinators may not change code, name or credits of a subject other programmes use (owner option 1); the server enforces it too.
+  const lockedBy=role==='coordinator'&&editing!==null?(snapshot?.data.subjects.find(x=>x.mappingId===editing)?.lockedBy??[]):[];
+  const locked=lockedBy.length>0;
   return <><header className="admin-page-heading"><div><h1>Subjects and prerequisites</h1><p>Maintain the selected curriculum’s subjects, relationships and permitted semester types.</p></div></header>
   <section className="admin-card admin-curriculum" aria-label="Curriculum management">
     <p className="admin-muted">Use verified programme rules. Mandatory prerequisites, concurrent study and advisory prior knowledge are separate relationship types.</p>
@@ -84,7 +97,7 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
     <div className="admin-curriculum-selector"><label className="admin-field">Curriculum<select aria-label="Curriculum" value={id} disabled={disabled} onChange={e=>changeCurriculum(e.target.value)}><option value="">Select an existing curriculum</option>{catalogue?.curricula.map(c=><option key={c.curriculumId} value={c.curriculumId}>{c.programme} · {c.version}</option>)}</select></label>
       <button disabled={disabled} onClick={()=>{if(dirty&&!window.confirm('Discard unsaved changes and reload?'))return;reset();setAttempt(n=>n+1);setSuccess('');}}>Reload saved data</button></div>
     {!catalogue&&!error&&<p role="status" className="admin-loading">Loading curricula…</p>}{catalogue&&!catalogue.curricula.length&&<p className="admin-muted">No curricula are configured. The programme/curriculum foundation must be supplied before managing subjects.</p>}{loading&&<p role="status" className="admin-loading">Loading curriculum…</p>}
-    {review&&<section className="admin-curriculum-review" aria-label="Review change"><h2 ref={reviewHeading} tabIndex={-1}>Review change</h2><p>{review.summary}</p><div className="admin-curriculum-actions"><button className="admin-primary" disabled={busy} onClick={()=>void confirm()}>{busy?'Saving…':'Confirm save'}</button><button disabled={busy} onClick={()=>setReview(null)}>Back to editing</button></div></section>}
+    {review&&<section className="admin-curriculum-review" aria-label="Review change"><h2 ref={reviewHeading} tabIndex={-1}>Review change</h2><p>{review.summary}</p><label className="admin-field">Reason (recorded in the audit log)<textarea required maxLength={ADMIN_REASON_MAX_LENGTH} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label><div className="admin-curriculum-actions"><button className="admin-primary" disabled={busy||!normaliseReason(reason)} onClick={()=>void confirm()}>{busy?'Saving…':'Confirm save'}</button><button disabled={busy} onClick={()=>setReview(null)}>Back to editing</button></div></section>}
     {snapshot&&<>
       <h2 ref={workspaceHeading} tabIndex={-1}>{snapshot.data.programme} · {snapshot.data.version}</h2>
       <div className="admin-curriculum-workspace">
@@ -93,12 +106,13 @@ export function CurriculumPage({api,initialCurriculumId=''}:{api:Sprint2Client;i
       </div>
       <div className="admin-curriculum-panes">
       <div role="tabpanel" id="s2-panel-subjects" aria-labelledby="s2-tab-subjects" hidden={action!=='subjects'}>
-      <section><h2>Curriculum subjects</h2>{snapshot.data.subjects.length?<SetupTable label="Curriculum subjects" headings={['Code','Name','Credits','Classification','Type','Permitted semesters','Actions']}>{snapshot.data.subjects.map(s=><tr key={s.mappingId}><td>{s.code}</td><td><strong>{s.name}</strong></td><td className="admin-number">{s.credits}</td><td>{s.category}</td><td>{s.compulsory?'Compulsory':'Optional / elective'}</td><td>{s.semesterTypes.join(', ')||'Not configured'}</td><td><button disabled={disabled} onClick={()=>editSubject(s)} aria-label={'Edit subject '+s.code}>Edit</button></td></tr>)}</SetupTable>:<p className="admin-muted">No subjects are mapped to this curriculum yet.</p>}</section>
+      <section><h2>Curriculum subjects</h2>{snapshot.data.subjects.length?<SetupTable label="Curriculum subjects" headings={['Code','Name','Credits','Classification','Type','Permitted semesters','Actions']}>{snapshot.data.subjects.map(s=><tr key={s.mappingId}><td>{s.code}</td><td><strong>{s.name}</strong></td><td className="admin-number">{s.credits}</td><td>{s.category}</td><td>{s.compulsory?'Compulsory':'Optional / elective'}</td><td>{s.semesterTypes.join(', ')||'Not configured'}</td><td><div className="admin-curriculum-actions"><button disabled={disabled} onClick={()=>editSubject(s)} aria-label={'Edit subject '+s.code}>Edit</button><button disabled={disabled} onClick={()=>removeSubject(s)} aria-label={'Remove subject '+s.code}>Remove</button></div></td></tr>)}</SetupTable>:<p className="admin-muted">No subjects are mapped to this curriculum yet.</p>}</section>
       </div>
       <div role="tabpanel" id="s2-panel-create" aria-labelledby="s2-tab-create" hidden={action!=='create'}>
       <form onSubmit={saveSubject} className="admin-form"><h2>{editing===null?'Create subject (UC24)':'Edit existing subject (UC06)'}</h2><fieldset disabled={disabled} className="admin-setup-fields"><legend>Subject and classification</legend>
         <div className="admin-curriculum-grid">{editing===null&&<label className="admin-field">Existing catalogue subject (optional)<select aria-label="Existing catalogue subject (optional)" value={draft.existingSubjectId} onChange={e=>setDraft(d=>({...d,existingSubjectId:e.target.value}))}><option value="">Create a new subject</option>{catalogue?.subjects.map(s=><option key={s.subjectId} value={s.subjectId}>{s.name} — {s.code} ({s.credits} credits)</option>)}</select></label>}
-          {!draft.existingSubjectId&&<><label className="admin-field">Subject code<input required maxLength={20} value={draft.code} onChange={e=>setDraft(d=>({...d,code:e.target.value}))}/></label><label className="admin-field">Subject name<input required maxLength={255} value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))}/></label><label className="admin-field">Credit hours<input type="number" min={0} max={2147483647} step={1} required value={draft.credits} onChange={e=>setDraft(d=>({...d,credits:e.target.value}))}/></label></>}
+          {!draft.existingSubjectId&&<><label className="admin-field">Subject code<input required maxLength={20} readOnly={locked} aria-describedby={locked?'s2-locked':undefined} value={draft.code} onChange={e=>setDraft(d=>({...d,code:e.target.value}))}/></label><label className="admin-field">Subject name<input required maxLength={255} readOnly={locked} aria-describedby={locked?'s2-locked':undefined} value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))}/></label><label className="admin-field">Credit hours<input type="number" min={0} max={2147483647} step={1} required readOnly={locked} aria-describedby={locked?'s2-locked':undefined} value={draft.credits} onChange={e=>setDraft(d=>({...d,credits:e.target.value}))}/></label></>}
+          {locked&&<p className="admin-muted" id="s2-locked">Also used by {lockedBy.join(', ')}. Ask its coordinator or the admin.</p>}
           <label className="admin-field">Classification<input required maxLength={50} list="s2-categories" value={draft.category} onChange={e=>setDraft(d=>({...d,category:e.target.value}))}/><datalist id="s2-categories">{['CORE','ELECTIVE','FYP1','FYP2','INDUSTRIAL_TRAINING'].map(c=><option key={c} value={c}/>)}</datalist></label>
         </div><label className="admin-check"><input type="checkbox" checked={draft.compulsory} onChange={e=>setDraft(d=>({...d,compulsory:e.target.checked}))}/>Compulsory subject in this curriculum</label>
         <fieldset className="admin-checks"><legend>Permitted semester types</legend>{(['NORMAL','SHORT'] as const).map(type=><label className="admin-check" key={type}><input type="checkbox" checked={draft.semesterTypes.includes(type)} onChange={e=>setDraft(d=>({...d,semesterTypes:e.target.checked?[...d.semesterTypes,type]:d.semesterTypes.filter(t=>t!==type)}))}/>{type==='NORMAL'?'Normal semester (1 or 2)':'Short semester (3)'}</label>)}<p className="admin-muted">Configure the verified subject rule explicitly. Two-credit subjects normally use the short semester; Final Year Project 1 may have a normal-semester exception. Credit value alone does not establish availability.</p></fieldset>

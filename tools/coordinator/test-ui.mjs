@@ -104,7 +104,7 @@ else {
       const sidebar = page.locator('.admin-sidebar');
       assert.equal(await sidebar.getByText('WORKSPACE', { exact: true }).count(), 0, 'no WORKSPACE caption above the menu');
       assert.equal(await sidebar.getByText('Forecast planning').count(), 0, 'no Forecast planning group heading');
-      assert.deepEqual((await sidebar.locator('nav .admin-nav-link').allInnerTexts()).map(text => text.trim()), ['Overview', 'Offering Forecast', 'Offering History'], 'the menu is plain links; Data Imports left the menu (S3-P004-032)');
+      assert.deepEqual((await sidebar.locator('nav .admin-nav-link').allInnerTexts()).map(text => text.trim()), ['Overview', 'Offering Forecast', 'Offering History', 'Curriculum & Subjects'], 'the menu is plain links; Data Imports left the menu (S3-P004-032)');
       assert.equal(await page.getByText('Forecast data setup', { exact: true }).count(), 0, 'no repeated setup card title');
       assert.equal(await page.locator('.admin-topbar-title .admin-admin-badge').innerText(), 'Academic coordinator', 'the role badge replaces the Coordinator title');
       assert.equal(await page.locator('.admin-topbar-title > span:not(.admin-admin-badge)').count(), 0, 'no plain Coordinator title');
@@ -934,6 +934,33 @@ else {
       if (width === 375) await page.screenshot({ path: shots + 'imports-combined-report-mobile.png', fullPage: true });
     });
 
+    await check('curriculum & subjects: menu, in-scope curricula, shared subject fields locked, category still editable (S3-P004-041)', async page => {
+      const state = await mock(page); await page.goto(base + '/coordinator');
+      await page.getByRole('navigation', { name: 'Coordinator navigation' }).getByRole('link', { name: 'Curriculum & Subjects', exact: true }).click();
+      await page.waitForURL('**/coordinator/curriculum');
+      const picker = page.getByLabel('Curriculum', { exact: true }); await picker.waitFor();
+      assert.deepEqual(await picker.locator('option').allInnerTexts(), ['Select an existing curriculum', 'DEMO — Fictional programme · V1']);
+      await picker.selectOption('5');
+      await page.getByRole('button', { name: 'Edit subject DEMO101', exact: true }).click();
+      const code = page.getByLabel('Subject code', { exact: true });
+      assert.equal(await code.evaluate(el => el.readOnly), true);
+      assert.equal(await page.getByLabel('Credit hours', { exact: true }).evaluate(el => el.readOnly), true);
+      await page.getByText('Also used by OTHER. Ask its coordinator or the admin.', { exact: true }).waitFor();
+      await page.getByLabel('Classification', { exact: true }).fill('ELECTIVE');
+      await page.getByLabel('I understand that code, name and credit changes affect every curriculum using this subject.').check();
+      await page.getByRole('button', { name: 'Review subject change', exact: true }).click();
+      const review = page.getByRole('region', { name: 'Review change' });
+      await review.getByLabel('Reason (recorded in the audit log)', { exact: true }).fill('Department decision.');
+      await review.getByRole('button', { name: 'Confirm save' }).click(); await page.getByRole('status').filter({ hasText: 'Curriculum change saved.' }).waitFor();
+      assert.deepEqual({ code: state.curriculumBodies.at(-1).code, category: state.curriculumBodies.at(-1).category, reason: state.curriculumBodies.at(-1).reason }, { code: 'DEMO101', category: 'ELECTIVE', reason: 'Department decision.' });
+      await page.getByRole('tab', { name: 'Subject List', exact: true }).click();
+      await page.getByRole('button', { name: 'Edit subject DEMO102', exact: true }).click();
+      assert.equal(await page.getByLabel('Subject code', { exact: true }).evaluate(el => el.readOnly), false, 'a subject only this programme uses stays editable');
+    });
+    await check('curriculum & subjects: a coordinator with no assignment is told how to get one (S3-P004-041)', async page => {
+      await mock(page, { noAssignments: true }); await page.goto(base + '/coordinator/curriculum');
+      await page.getByText('You are not assigned to any programme yet. Ask a system administrator to assign you in Coordinators.', { exact: true }).waitFor();
+    });
     await check('a service error shows a retryable alert', async page => {
       const state = await mock(page, { seed: 'run' }); state.failNext = { status: 503, code: 'FORECASTING_UNAVAILABLE', message: 'Forecasting data is unavailable. Please retry.' };
       await page.goto(base + '/coordinator/forecasts' + scoped);
@@ -1078,7 +1105,7 @@ else {
         await page.getByRole('heading', { name: 'Page not found' }).first().waitFor();
       }
       const links = await page.getByRole('navigation', { name: 'Coordinator navigation' }).first().getByRole('link').allInnerTexts();
-      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Offering Forecast', 'Offering History']);
+      assert.deepEqual(links.map(text => text.trim()), ['Overview', 'Offering Forecast', 'Offering History', 'Curriculum & Subjects']);
     });
 
     console.log('PASS ' + passed + ' coordinator browser checks');

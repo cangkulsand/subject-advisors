@@ -5,6 +5,8 @@ export interface CurriculumSubject {
   category: string; compulsory: boolean; semesterTypes: SemesterType[];
   /** Other programmes whose curricula use the same shared subject (S3-P004-041); outside the revision. */
   sharedWith?: { programmeId: number; programmeCode: string }[];
+  /** For a coordinator: programmes outside their scope that also use the subject, so code, name and credits are locked. */
+  lockedBy?: string[];
 }
 export interface Dependency { id: number; from: number; required: number; kind: LinkKind }
 export interface CurriculumData {

@@ -48,6 +48,12 @@ async function mock(page, state = {}) {
       const added = { mappingId: 99, subjectId: 9, code: body.code, name: body.name, credits: body.credits, category: body.category, compulsory: body.compulsory, semesterTypes: body.semesterTypes };
       return json(201, { data: snapshot([...baseLinks, ...(body.prerequisites ?? []).map((p, i) => ({ id: 1000 + i, from: 99, required: p.mappingId, kind: 'MANDATORY' }))], [added]) });
     }
+    const removeSubject = /^\/api\/p001-sprint2\/curricula\/1\/subjects\/(\d+)$/.exec(path);
+    if (removeSubject && method === 'DELETE') {
+      const body = route.request().postDataJSON(); (state.removals ??= []).push({ mappingId: Number(removeSubject[1]), ...body });
+      if (state.inUse) return json(409, { error: { code: 'SUBJECT_IN_USE', message: "Picked by 6 students in 2026/2027 S1. It can't be removed yet.", details: { picks: 6, plans: 0 } } });
+      return json(200, { data: { ...snapshot(baseLinks.filter(l => l.from !== Number(removeSubject[1]) && l.required !== Number(removeSubject[1]))), removed: { scenarioRows: 2, prerequisiteLinks: 1 } } });
+    }
     const dep = /^\/api\/p001-sprint2\/curricula\/1\/dependencies(?:\/(\d+))?$/.exec(path);
     if (dep && method !== 'GET') {
       const body = route.request().postDataJSON(); (state.depBodies ??= []).push({ ...body, _method: method });
@@ -70,6 +76,8 @@ async function check(name, body, width = 1440) {
   catch (error) { console.error(name, errors, await page.locator('body').innerText()); await page.screenshot({ path: '.wrangler/uc24-horizontal-review/failed-' + name.replace(/\W+/g, '_') + '.png' }); throw error; }
   finally { await page.close(); }
 }
+// S3-P004-041: every curriculum change asks for a reason in the review step.
+async function confirmSave(scope) { await scope.getByLabel('Reason (recorded in the audit log)', { exact: true }).fill('Fictional UC24 change.'); await scope.getByRole('button', { name: 'Confirm save' }).click(); }
 const SECTION_LABELS = { subjects: 'Subject List', create: 'Create Subject', relationships: 'Prerequisite List', prerequisites: 'Manage Prerequisites' };
 async function chooseSection(page, action) {
   await page.getByRole('tab', { name: SECTION_LABELS[action], exact: true }).click();
@@ -115,7 +123,7 @@ try {
     const text = await review.innerText();
     assert.ok(text.includes('Fictional new subject (DEMO900)')); assert.ok(text.includes('3 credit hours'));
     assert.ok(text.includes('Fictional Foundations (DEMO101)')); assert.ok(text.includes('Fictional Writing (DEMO103)'));
-    await review.getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(review);
     await page.getByText(/Subject created and saved/).waitFor();
     assert.equal(state.bodies.length, 1);
     assert.deepEqual(state.bodies[0].prerequisites, [{ mappingId: 11, code: 'DEMO101' }, { mappingId: 13, code: 'DEMO103' }]);
@@ -253,7 +261,7 @@ try {
     const review = page.getByRole('region', { name: 'Review change' });
     await review.getByRole('heading', { name: 'Review change' }).waitFor();
     assert.ok((await review.innerText()).includes('Fictional Analysis (DEMO102) requires Fictional Foundations (DEMO101)'));
-    await review.getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(review);
     await page.getByText('Curriculum change saved.').waitFor();
     assert.equal(state.depBodies.length, 1);
     assert.deepEqual([state.depBodies[0].from, state.depBodies[0].required, state.depBodies[0].kind], [12, 11, 'MANDATORY']);
@@ -268,7 +276,7 @@ try {
     await review.getByRole('heading', { name: 'Review change' }).waitFor();
     assert.deepEqual(state.depBodies ?? [], []); // no write until Confirm
     for (const label of Object.values(SECTION_LABELS)) assert.equal(await page.getByRole('tab', { name: label, exact: true }).isDisabled(), true);
-    await review.getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(review);
     await page.getByText('Curriculum change saved.').waitFor();
     assert.equal(state.depBodies.length, 1);
     assert.equal(state.depBodies[0]._method, 'DELETE');
@@ -280,7 +288,7 @@ try {
     await chooseSection(page, 'create');
     await fillDraft(page, 'DEMO903');
     await page.getByRole('button', { name: 'Review subject change' }).click();
-    await page.getByRole('region', { name: 'Review change' }).getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(page.getByRole('region', { name: 'Review change' }));
     await page.getByRole('alert').waitFor();
     assert.equal(await currentSection(page), 'create');
     assert.equal(await page.getByLabel('Subject code', { exact: true }).inputValue(), 'DEMO903');
@@ -308,7 +316,7 @@ try {
     const review = page.getByRole('region', { name: 'Review change' });
     await review.getByRole('heading', { name: 'Review change' }).waitFor();
     assert.ok((await review.innerText()).includes('No initial prerequisites'));
-    await review.getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(review);
     await page.getByText(/Subject created and saved/).waitFor();
     assert.deepEqual(state.bodies[0].prerequisites, []);
   });
@@ -338,7 +346,7 @@ try {
     // A stale-curriculum failure keeps the draft and selection.
     state.createError = { status: 409, code: 'STALE_CURRICULUM', message: 'The curriculum changed since you opened it. Reload before saving.' };
     await page.getByRole('button', { name: 'Review subject change' }).click();
-    await page.getByRole('region', { name: 'Review change' }).getByRole('button', { name: 'Confirm save' }).click();
+    await confirmSave(page.getByRole('region', { name: 'Review change' }));
     await page.getByRole('alert').waitFor();
     assert.ok((await page.getByRole('alert').innerText()).includes('changed'));
     assert.equal(await page.getByLabel('Subject code', { exact: true }).inputValue(), 'DEMO902');
@@ -401,6 +409,29 @@ try {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'horizontal overflow on ' + action);
     }
   }, 768);
+  await check('curriculum: the review step needs a reason, which is sent with the change (S3-P004-041)', async page => {
+    const state = await mock(page); await page.goto(base + '/admin/curriculum?curriculum=1');
+    await chooseSection(page, 'prerequisites');
+    await page.getByLabel('Dependent subject', { exact: true }).selectOption('12'); await page.getByLabel('Required or related subject', { exact: true }).selectOption('11');
+    await page.getByRole('button', { name: 'Review relationship change', exact: true }).click();
+    const review = page.getByRole('region', { name: 'Review change' }); await review.waitFor();
+    assert.equal(await review.getByRole('button', { name: 'Confirm save' }).isDisabled(), true, 'no reason yet');
+    await review.getByLabel('Reason (recorded in the audit log)', { exact: true }).fill('  Verified programme rule.  ');
+    await review.getByRole('button', { name: 'Confirm save' }).click(); await page.getByRole('status').filter({ hasText: 'Curriculum change saved.' }).waitFor();
+    assert.equal(state.depBodies.at(-1).reason, 'Verified programme rule.');
+  });
+  await check('curriculum: Remove subject reviews, removes and reports what was cleared; a subject in use is refused (S3-P004-041)', async page => {
+    const state = await mock(page); await page.goto(base + '/admin/curriculum?curriculum=1');
+    await page.getByRole('button', { name: 'Remove subject DEMO102', exact: true }).click();
+    let review = page.getByRole('region', { name: 'Review change' }); await review.waitFor();
+    await review.getByText(/Remove Fictional Analysis \(DEMO102\) from DEMO NOT OFFICIAL — Fictional programme · DEMO\./).waitFor();
+    state.inUse = true; await confirmSave(review);
+    await page.getByRole('alert').filter({ hasText: "Picked by 6 students in 2026/2027 S1. It can't be removed yet." }).waitFor();
+    state.inUse = false;
+    await page.getByRole('button', { name: 'Remove subject DEMO102', exact: true }).click(); review = page.getByRole('region', { name: 'Review change' }); await confirmSave(review);
+    await page.getByRole('status').filter({ hasText: 'Subject removed. 1 prerequisite link and 2 what-if scenario rows were cleared.' }).waitFor();
+    assert.deepEqual(state.removals.at(-1), { mappingId: 12, revision: rev, reason: 'Fictional UC24 change.' });
+  });
   await check('UC24 workspace at 1024px with 200% zoom stays usable', async page => {
     await mock(page); await open(page, 'create');
     await page.evaluate(() => { document.body.style.zoom = '2'; });

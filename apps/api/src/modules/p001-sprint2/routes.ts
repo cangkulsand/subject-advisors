@@ -37,7 +37,8 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
     if (!match[2] && request.method==='GET') {
       const snapshot=await deps.repository.curriculum(id);
       if (!snapshot) throw new P001Error(404,'CURRICULUM_NOT_FOUND','The curriculum is unavailable.');
-      return authJson({data:snapshot});
+      if (!scope) return authJson({data:snapshot});
+      return authJson({data:{...snapshot,data:{...snapshot.data,subjects:snapshot.data.subjects.map(s=>({...s,lockedBy:(s.sharedWith??[]).filter(o=>!scope.includes(o.programmeId)).map(o=>o.programmeCode)}))}}});
     }
     if (match[2]==='subjects' && request.method===(item===null?'POST':'PUT')) {
       const input=subjectInput(await jsonBody(request),item!==null);

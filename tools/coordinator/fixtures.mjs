@@ -184,6 +184,17 @@ export function handle(state, request) {
   state.requests.push({ path: url.pathname, search: url.search, method });
   if (url.pathname === '/api/me') return ok(fixtureResponse(url, state));
   if (state.failNext && url.pathname.startsWith('/api/coordinator')) { const next = state.failNext; state.failNext = null; return failure(next.status, next.code, next.message, next.details); }
+  // Curriculum & Subjects (S3-P004-041): the coordinator's in-scope curricula; DEMO101 is shared with an out-of-scope programme.
+  if (url.pathname.startsWith('/api/p001-sprint2/')) {
+    const rev = 'b'.repeat(32);
+    const snapshot = { revision: rev, data: { curriculumId: 5, programme: 'DEMO — Fictional programme', version: 'V1', totalCredits: 120, links: [], subjects: [
+      { mappingId: 51, subjectId: 1, code: 'DEMO101', name: 'Fictional shared subject', credits: 3, category: 'CORE', compulsory: true, semesterTypes: ['NORMAL'], sharedWith: [{ programmeId: 9, programmeCode: 'OTHER' }], lockedBy: ['OTHER'] },
+      { mappingId: 52, subjectId: 2, code: 'DEMO102', name: 'Fictional own subject', credits: 3, category: 'CORE', compulsory: true, semesterTypes: ['NORMAL'], sharedWith: [], lockedBy: [] }] } };
+    if (url.pathname === '/api/p001-sprint2/curricula' && method === 'GET') return ok({ curricula: state.noAssignments ? [] : [{ curriculumId: 5, programme: 'DEMO — Fictional programme', version: 'V1' }], subjects: [] });
+    if (url.pathname === '/api/p001-sprint2/curricula/5' && method === 'GET') return ok(snapshot);
+    if (/^\/api\/p001-sprint2\/curricula\/5\/subjects\/\d+$/.test(url.pathname) && method === 'PUT') { (state.curriculumBodies ??= []).push(safeJson(body)); return ok(snapshot); }
+    return failure(404, 'NOT_FOUND', 'Not found.');
+  }
   const route = url.pathname.replace('/api/coordinator/', '');
   if (!url.pathname.startsWith('/api/coordinator/')) return null;
   if (method !== 'GET') state.bodies.push({ method, path: url.pathname, headers, body: headers['content-type']?.startsWith('multipart') ? '[multipart]' : safeJson(body) });
