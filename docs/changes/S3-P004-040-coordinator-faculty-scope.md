@@ -1,6 +1,6 @@
 # S3-P004-040: Coordinator faculty scope and the Coordinators page
 
-- **Status:** On branch `feature/faculty-scope`; not merged yet. Migration 0017 is not applied.
+- **Status:** Merged to `main` on 2026-11-28; migration 0017 applied to Neon 2026-11-28 (verify 66 PASS); deployed to dev and prod. Dummy-coordinator cleanup pending
 - **Date:** 2026-11-28
 - **Sprint:** Sprint 3
 - **Owner:** P004, building Idham's review item. To be handed over to Idham.
@@ -77,7 +77,21 @@
 | `npm run test:ui:admin` | 78 PASS |
 | `npm run test:ui:coordinator` | 65 PASS. One run hit a page-load timeout flake in a forecast check; the rerun passed. |
 
-**Outcome:** pending the whole-branch review.
+**Neon (2026-11-28, owner-approved):**
+- **Rehearsal:** 0017 plus checks 021 and 022 ran in one rolled-back transaction. The 6 structural checks and 9 behaviour checks passed, and nothing was kept.
+- **Applied:** `migrate` applied 0017, and `verify` passed all 66 checks.
+
+**Whole-branch review (independent reviewer):** no Critical findings. Two Important findings were fixed:
+- **Database test:** a test expected `ASSIGNMENT_EXISTS` for a programme faculty move. It is back to `ASSIGNMENT_ACTIVE`.
+- **Behaviour checks:** 0017 had no behaviour checks. The new `db/checks/022_coordinator_faculty_scope_behavior.sql` covers them, and it ran in the rehearsal above.
+
+**Deferred minors:**
+- **Duplicate message:** it doesn't name the centre that clashed.
+- **Covers column:** it shows only the programme code, not the code and name.
+- **Programme count:** it is also shown for ended rows and inactive faculties.
+- **List filter:** the `?programmeId=` filter leaves out the faculty rows that cover the programme.
+
+**Outcome:** PASS; independent review fixes applied; Idham's review is pending.
 
 ## 4. Handover to Idham
 
@@ -95,4 +109,4 @@
 - **Compatibility/impact:**
   - **Migration:** 0017, additive.
   - **API:** the create request uses `learningCentreIds[]` instead of `learningCentreId`, returns an array, and duplicates now return `ASSIGNMENT_EXISTS`.
-- **Status:** READY_FOR_REVIEW
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-28); migration 0017 applied
