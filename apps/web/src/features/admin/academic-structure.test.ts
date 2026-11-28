@@ -96,7 +96,7 @@ describe('reused codes', () => {
 
 describe('move errors', () => {
   it('explains a coordinator assignment that blocks a move to another faculty', () => {
-    expect(moveErrorText(new AdminApiError(409, 'ASSIGNMENT_ACTIVE', 'x'), 'SECJ')).toBe('SECJ has an active coordinator assignment. End it in Coordinator Assignments before moving the programme to another faculty.');
+    expect(moveErrorText(new AdminApiError(409, 'ASSIGNMENT_ACTIVE', 'x'), 'SECJ')).toBe('SECJ has an active coordinator assignment. End it in Coordinators before moving the programme to another faculty.');
     expect(moveErrorText(new AdminApiError(409, 'REFERENCE_INACTIVE', 'The selected reference must be active.'), 'SECJ')).toBe('The selected reference must be active.');
     expect(moveErrorText(new Error('boom'), 'SECJ')).toBe('The change could not be completed. Please retry.');
   });

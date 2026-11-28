@@ -971,7 +971,7 @@ else {
       await page.keyboard.press('Escape');
     }, width);
 
-    const noAssignmentText = 'You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinator Assignments.';
+    const noAssignmentText = 'You are not assigned to any programme and learning centre yet. Ask a system administrator to assign you in Coordinators.';
     const noSemesterText = 'No current semester is set. Ask a system administrator to set it in Academic Semesters.';
     for (const [path, heading, shot] of [['/coordinator/imports', 'Data Imports', 'imports'], ['/coordinator/forecasts', 'Class Offering Forecast', 'forecasts']]) {
       await check(`${shot}: a coordinator without assignments sees the empty state and no actions`, async page => {

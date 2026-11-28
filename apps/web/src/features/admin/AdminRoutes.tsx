@@ -32,7 +32,7 @@ function Workspace() {
   const location = new URL(useAppLocation(), window.location.origin);
   const pathname = location.pathname.replace(/\/$/, '');
   const detail = /^\/admin\/users\/([1-9]\d*)$/.exec(pathname);
-  const setupTitles: Record<string, string> = { '/admin/learning-centres': 'Learning Centres', '/admin/departments': 'Academic Structure', '/admin/programmes': 'Academic Structure', '/admin/semesters': 'Academic Semesters', '/admin/coordinator-assignments': 'Coordinator Assignments' };
+  const setupTitles: Record<string, string> = { '/admin/learning-centres': 'Learning Centres', '/admin/departments': 'Academic Structure', '/admin/programmes': 'Academic Structure', '/admin/semesters': 'Academic Semesters', '/admin/coordinator-assignments': 'Coordinators' };
   const structure = parseStructurePath(pathname) !== null;
   const title = structure ? 'Academic Structure' : setupTitles[pathname] ?? ( pathname === '/admin/users' ? 'Users & Access' : pathname === '/admin/users/batch' ? 'Batch correction' : detail ? 'Account details' : pathname === '/admin/audit' ? 'Audit Log' : pathname === '/admin/curriculum' ? 'Curriculum & Prerequisites' : (pathname === '/admin' ? 'Overview' : 'Page not found'));
   const key = [userId, sessionId, pathname, location.search].join('|');

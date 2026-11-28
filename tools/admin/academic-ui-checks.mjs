@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { academicStore } from './academic-fixtures.mjs';
 const reasonLabel = 'Reason (recorded in the audit log)';
 const reason = 'Fictional browser verification.';
-const routes = [['learning-centres', 'Learning Centres', 'Add learning centre'], ['faculties', 'Academic Structure', 'Add faculty'], ['semesters', 'Academic Semesters', 'Add semester'], ['coordinator-assignments', 'Coordinator Assignments', 'Add assignment']];
+const routes = [['learning-centres', 'Learning Centres', 'Add learning centre'], ['faculties', 'Academic Structure', 'Add faculty'], ['semesters', 'Academic Semesters', 'Add semester'], ['coordinator-assignments', 'Coordinators', 'Add coordinator']];
 // S3-P004-038: the drill-down levels below the Faculties root, checked for layout with the pages above.
 const levels = [['faculties/1', 'Academic Structure', 'Add department'], ['faculties/1/departments/1', 'Academic Structure', 'Add programme'], ['faculties/1/departments/1/programmes/1', 'Academic Structure', 'Add curriculum']];
 async function save(dialog) { await dialog.getByLabel(reasonLabel).fill(reason); await dialog.getByRole('button', { name: 'Save', exact: true }).click(); }
@@ -164,7 +164,7 @@ export async function academicUiChecks({ check, mock, base }) {
     assert.deepEqual(await dialog.getByLabel('Department', { exact: true }).locator('option').allInnerTexts(), ['Choose…', 'Fictional other department · Fictional other faculty']);
     await dialog.getByLabel('Department', { exact: true }).selectOption('2'); await dialog.getByText('Faculty will be set to Fictional other faculty.').waitFor();
     await save(dialog);
-    await dialog.getByRole('alert').filter({ hasText: 'TEST has an active coordinator assignment. End it in Coordinator Assignments before moving the programme to another faculty.' }).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: 'TEST has an active coordinator assignment. End it in Coordinators before moving the programme to another faculty.' }).waitFor();
     data.assignments[0].endedAt = '2026-11-02T00:00:00Z'; await save(dialog); await dialog.waitFor({ state: 'hidden' });
     await page.getByText('Moved TEST to Fictional other department.', { exact: true }).waitFor();
     assert.equal(await region('Programmes').count() + await page.getByText('No programmes in this department yet.', { exact: true }).count(), 1);
@@ -287,36 +287,64 @@ export async function academicUiChecks({ check, mock, base }) {
     await page.getByRole('button', { name: 'Set current 2026/2027 · Semester 2', exact: true }).waitFor();
     await page.screenshot({ path: '.wrangler/admin-review/academic-semesters-375.png', fullPage: true });
   });
-  await check('coordinator assignments: eligible picker, search/empty, active reference filtering, duplicate, end history and add', async page => {
+  await check('coordinators: eligible picker, search/empty, active reference filtering, duplicate, end history and add one programme (S3-P004-040)', async page => {
     const state = await mock(page), data = academicStore(state);
     data.faculties.push({ facultyId: 3, facultyCode: 'OLD', facultyName: 'Fictional inactive faculty', isActive: false });
     data.centres.push({ learningCentreId: 3, centreCode: 'OLD', centreName: 'Fictional inactive centre', isActive: false });
-    await page.goto(base + '/admin/coordinator-assignments'); await page.getByRole('button', { name: 'Add assignment', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Add coordinator assignment', exact: true }), picker = dialog.getByLabel('Coordinator account', { exact: true }); await picker.waitFor();
+    await page.goto(base + '/admin/coordinator-assignments'); await page.getByRole('heading', { name: 'Coordinators', exact: true }).first().waitFor();
+    await page.getByRole('navigation').getByRole('link', { name: 'Coordinators', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Add coordinator', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add coordinator', exact: true }), picker = dialog.getByLabel('Coordinator account', { exact: true }); await picker.waitFor();
     await page.screenshot({ path: '.wrangler/admin-review/academic-assignments-dialog-desktop.png', fullPage: true });
     assert.equal(await picker.locator('option').count(), 3);
     assert.equal(await dialog.getByLabel('Faculty', { exact: true }).locator('option').count(), 3);
-    assert.equal(await dialog.getByLabel('Learning centre', { exact: true }).locator('option').count(), 2);
+    const centres = dialog.getByRole('group', { name: 'Learning centres' });
+    assert.equal(await centres.getByRole('checkbox').count(), 1, 'only active centres');
     const search = dialog.getByLabel('Find coordinator by name or email', { exact: true }); await search.fill('no-such-coordinator');
     await dialog.getByText('No eligible coordinators found.', { exact: false }).waitFor(); await search.fill('Account 2');
     await picker.locator('option[value="2"]').waitFor({ state: 'attached' }); await picker.selectOption('2');
-    await dialog.getByLabel('Faculty', { exact: true }).selectOption('1'); await dialog.getByLabel('Programme', { exact: true }).selectOption('1'); await dialog.getByLabel('Learning centre', { exact: true }).selectOption('1');
-    await save(dialog); await dialog.getByRole('alert').filter({ hasText: 'An active assignment already exists.' }).waitFor();
+    await dialog.getByLabel('Faculty', { exact: true }).selectOption('1');
+    assert.equal(await dialog.getByLabel('Programme', { exact: true }).count(), 0, 'whole faculty is the default');
+    await dialog.getByLabel('One programme', { exact: true }).check(); await dialog.getByLabel('Programme', { exact: true }).selectOption('1');
+    await dialog.getByLabel(reasonLabel).fill(reason);
+    assert.equal(await dialog.getByRole('button', { name: 'Save', exact: true }).isDisabled(), true, 'a centre is required');
+    await centres.getByLabel('Fictional learning centre', { exact: true }).check();
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click(); await dialog.getByRole('alert').filter({ hasText: 'This coordinator already has this assignment at this learning centre.' }).waitFor();
     assert.equal(state.requests.filter(r => r.path === '/api/admin/users').every(r => r.search.includes('role=COORDINATOR') && r.search.includes('status=ACTIVE')), true);
     await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
-    // S3-P004-025: the account shows its name and email, not "Account 2"; the end button names who and where, and times have no seconds.
     const assignmentsTable = page.getByRole('region', { name: 'Coordinator assignments', exact: true });
     await assignmentsTable.getByRole('link', { name: 'Fictional Account 2', exact: true }).waitFor(); await assignmentsTable.getByText('fixture2@example.invalid', { exact: true }).waitFor();
     const assignmentsText = await assignmentsTable.innerText(); assert.doesNotMatch(assignmentsText, /Account #|\d\d:\d\d:\d\d/);
-    assert.equal(await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).innerText(), 'End assignment');
-    await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).click();
-    await page.getByRole('dialog', { name: 'End coordinator assignment', exact: true }).getByText('End Fictional Account 2’s assignment to TEST at Fictional learning centre. Its history is retained.').waitFor();
+    const endButton = page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true });
+    assert.equal(await endButton.innerText(), 'End assignment');
+    await endButton.click();
+    await page.getByRole('dialog', { name: 'End coordinator assignment', exact: true }).getByText('End Fictional Account 2’s coverage of TEST at Fictional learning centre. Its history is kept.').waitFor();
     await confirm(page, 'End coordinator assignment', 'End assignment');
-    assert.equal(await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).count(), 0); assert.ok(data.assignments[0].endedAt);
-    await page.getByRole('button', { name: 'Add assignment', exact: true }).click(); await picker.selectOption('2');
-    await dialog.getByLabel('Faculty', { exact: true }).selectOption('1'); await dialog.getByLabel('Programme', { exact: true }).selectOption('1'); await dialog.getByLabel('Learning centre', { exact: true }).selectOption('1'); await save(dialog); await dialog.waitFor({ state: 'hidden' });
-    await page.getByRole('button', { name: 'End assignment for Fictional Account 2, TEST at Fictional learning centre', exact: true }).waitFor(); assert.equal(data.assignments.length, 2); assert.ok(data.assignments[0].endedAt);
+    assert.equal(await endButton.count(), 0); assert.ok(data.assignments[0].endedAt);
     await page.screenshot({ path: '.wrangler/admin-review/academic-assignments-desktop.png', fullPage: true });
+  });
+  await check('coordinators: a whole-faculty coordinator at two centres shows Whole faculty with its programme count, and one centre can be ended (S3-P004-040)', async page => {
+    const state = await mock(page), data = academicStore(state);
+    data.centres.push({ learningCentreId: 4, centreCode: 'PG', centreName: 'Fictional Penang', isActive: true });
+    await page.goto(base + '/admin/coordinator-assignments'); await page.getByRole('button', { name: 'Add coordinator', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add coordinator', exact: true }), picker = dialog.getByLabel('Coordinator account', { exact: true });
+    await dialog.getByLabel('Find coordinator by name or email', { exact: true }).fill('Account 2');
+    await picker.locator('option[value="2"]').waitFor({ state: 'attached' }); await picker.selectOption('2');
+    await dialog.getByLabel('Faculty', { exact: true }).selectOption('1');
+    assert.equal(await dialog.getByLabel('Whole faculty (all its programmes, including new ones)', { exact: true }).isChecked(), true);
+    const centres = dialog.getByRole('group', { name: 'Learning centres' });
+    await centres.getByLabel('Fictional learning centre', { exact: true }).check(); await centres.getByLabel('Fictional Penang', { exact: true }).check();
+    await dialog.getByLabel(reasonLabel).fill(reason); await dialog.getByRole('button', { name: 'Save', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+    const post = state.bodies.filter(b => b.path === '/api/admin/academic-setup/coordinator-assignments' && b.method === 'POST').at(-1);
+    assert.deepEqual({ programmeId: post.body.programmeId, learningCentreIds: post.body.learningCentreIds }, { programmeId: null, learningCentreIds: [1, 4] });
+    const table = page.getByRole('region', { name: 'Coordinator assignments', exact: true });
+    const faculty = table.locator('tbody tr').filter({ hasText: 'Whole faculty' });
+    assert.equal(await faculty.count(), 2);
+    assert.match(await faculty.first().innerText(), /1 programme\b/);
+    await page.getByRole('button', { name: 'End assignment for Fictional Account 2, whole faculty at Fictional Penang', exact: true }).click();
+    await page.getByRole('dialog', { name: 'End coordinator assignment', exact: true }).getByText('End Fictional Account 2’s coverage of Fictional faculty (whole faculty) at Fictional Penang. Its history is kept.', { exact: false }).waitFor();
+    await confirm(page, 'End coordinator assignment', 'End assignment');
+    assert.equal(await page.getByRole('button', { name: /^End assignment for Fictional Account 2, whole faculty/ }).count(), 1);
   });
   for (const width of [320, 375, 768]) await check('academic pages single card, responsive tables/dialogs and focus at ' + width, async page => {
     await mock(page); await page.setViewportSize({ width, height: 844 });
