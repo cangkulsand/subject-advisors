@@ -5,6 +5,8 @@ import type { Sprint2Client } from './client';
 import '../../app/typography.css';
 import { SetupTable } from '../admin/academic-ui';
 import { ADMIN_REASON_MAX_LENGTH, normaliseReason } from '../../../../../packages/shared/src/admin/admin';
+import { creditCheck } from '../../../../../packages/shared/src/curriculum/credit-check';
+import { ClearFilters, SearchField, TableToolbar } from '../../components/table-toolbar/TableToolbar';
 type Removal = CurriculumSnapshot & { removed?: { scenarioRows: number; prerequisiteLinks: number } };
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const blankSubject={existingSubjectId:'',code:'',name:'',credits:'',category:'',compulsory:false,semesterTypes:[] as SemesterType[],confirmSharedChanges:false};
@@ -20,7 +22,7 @@ export function CurriculumPage({api,initialCurriculumId='',role='admin'}:{api:Sp
   const [prerequisites,setPrerequisites]=useState<CurriculumSubject[]>([]),[prerequisiteSearch,setPrerequisiteSearch]=useState('');
   const [review,setReview]=useState<{summary:string;run:(reason:string)=>Promise<Removal>;done?:string|((result:Removal)=>string)}|null>(null),[reason,setReason]=useState('');
   const seeded=useRef(false);
-  const [action,setAction]=useState<Action>('subjects');
+  const [action,setAction]=useState<Action>('subjects'),[subjectSearch,setSubjectSearch]=useState('');
   const reviewHeading=useRef<HTMLHeadingElement>(null),alert=useRef<HTMLParagraphElement>(null),workspaceHeading=useRef<HTMLHeadingElement>(null),pendingScroll=useRef(false);
   const dirty=JSON.stringify(draft)!==JSON.stringify(blankSubject)||JSON.stringify(link)!==JSON.stringify(blankLink)||editing!==null||linkId!==null||prerequisites.length>0||prerequisiteSearch!=='';
   useEffect(()=>{const c=new AbortController();api<Catalogue>('/curricula',{signal:c.signal}).then(v=>{if(!c.signal.aborted){setCatalogue(v);if(initialCurriculumId&&!seeded.current&&v.curricula.some(x=>String(x.curriculumId)===initialCurriculumId)){seeded.current=true;setId(initialCurriculumId);}}}).catch(e=>{if(!c.signal.aborted)setError(errorMessage(e));});return()=>c.abort();},[api,attempt]);
@@ -35,7 +37,7 @@ export function CurriculumPage({api,initialCurriculumId='',role='admin'}:{api:Sp
   useEffect(()=>{if(!pendingScroll.current)return;pendingScroll.current=false;workspaceHeading.current?.scrollIntoView({block:'start',behavior:'auto'});},[action]);
   useEffect(()=>{if(!dirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
   function reset(){setDraft({...blankSubject});setEditing(null);setLink({...blankLink});setLinkId(null);setPrerequisites([]);setPrerequisiteSearch('');setReview(null);setReason('');}
-  function changeCurriculum(value:string){if(dirty&&!window.confirm('Discard unsaved curriculum changes?'))return;reset();setId(value);setAction('subjects');setSuccess('');}
+  function changeCurriculum(value:string){if(dirty&&!window.confirm('Discard unsaved curriculum changes?'))return;reset();setId(value);setAction('subjects');setSuccess('');setSubjectSearch('');}
   function selectAction(next:Action){if(next===action||busy||review)return;if(dirty&&!window.confirm('Discard unsaved curriculum changes?'))return;reset();setAction(next);setError('');setSuccess('');pendingScroll.current=true;}
   function focusWorkspace(){const el=workspaceHeading.current;if(!el)return;el.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});el.focus({preventScroll:true});}
   function editSubject(s:CurriculumSubject){if(dirty&&!window.confirm('Replace unsaved changes with this subject?'))return;reset();setDraft({existingSubjectId:'',code:s.code,name:s.name,credits:String(s.credits),category:s.category,compulsory:s.compulsory,semesterTypes:[...s.semesterTypes],confirmSharedChanges:false});setEditing(s.mappingId);setAction('create');setError('');setSuccess('');focusWorkspace();}
@@ -87,6 +89,10 @@ export function CurriculumPage({api,initialCurriculumId='',role='admin'}:{api:Sp
   const prerequisiteQuery=prerequisiteSearch.trim().toLowerCase();
   const prerequisiteMatches=snapshot&&prerequisiteQuery?snapshot.data.subjects.filter(s=>!prerequisites.some(p=>p.mappingId===s.mappingId)&&(s.name.toLowerCase().includes(prerequisiteQuery)||s.code.toLowerCase().includes(prerequisiteQuery))):[];
   const disabled=busy||review!==null;
+  // S3-P004-044: subject search (shared table toolbar) and the warning-only credit check.
+  const searchText=subjectSearch.trim().toLowerCase();
+  const shownSubjects=snapshot?snapshot.data.subjects.filter(s=>!searchText||s.code.toLowerCase().includes(searchText)||s.name.toLowerCase().includes(searchText)):[];
+  const check=snapshot?creditCheck(snapshot.data.subjects,snapshot.data.requirements??[],snapshot.data.totalCredits):null;
   // Coordinators may not change code, name or credits of a subject other programmes use (owner option 1); the server enforces it too.
   const lockedBy=role==='coordinator'&&editing!==null?(snapshot?.data.subjects.find(x=>x.mappingId===editing)?.lockedBy??[]):[];
   const locked=lockedBy.length>0;
@@ -106,7 +112,15 @@ export function CurriculumPage({api,initialCurriculumId='',role='admin'}:{api:Sp
       </div>
       <div className="admin-curriculum-panes">
       <div role="tabpanel" id="s2-panel-subjects" aria-labelledby="s2-tab-subjects" hidden={action!=='subjects'}>
-      <section><h2>Curriculum subjects</h2>{snapshot.data.subjects.length?<SetupTable label="Curriculum subjects" headings={['Code','Name','Credits','Classification','Type','Permitted semesters','Actions']}>{snapshot.data.subjects.map(s=><tr key={s.mappingId}><td>{s.code}</td><td><strong>{s.name}</strong></td><td className="admin-number">{s.credits}</td><td>{s.category}</td><td>{s.compulsory?'Compulsory':'Optional / elective'}</td><td>{s.semesterTypes.join(', ')||'Not configured'}</td><td><div className="admin-curriculum-actions"><button disabled={disabled} onClick={()=>editSubject(s)} aria-label={'Edit subject '+s.code}>Edit</button><button disabled={disabled} onClick={()=>removeSubject(s)} aria-label={'Remove subject '+s.code}>Remove</button></div></td></tr>)}</SetupTable>:<p className="admin-muted">No subjects are mapped to this curriculum yet.</p>}</section>
+      {check&&<section className="admin-credit-check" aria-label="Credit check"><h2>{check.total===null?'Credit check':`Credit check: required ${check.total} credits`}</h2>
+        <dl className="admin-credit-lines"><div><dt>Compulsory subjects</dt><dd>{check.compulsory}</dd></div>{check.groups.filter(g=>!g.unmet).map(g=><div key={g.type}><dt>{g.label}</dt><dd>+{g.extra}</dd></div>)}</dl>
+        <p className={check.status==='MATCHES'?'admin-success':'admin-notice'} role="status">{check.status==='NOT_SET'?check.summary:`Minimum to graduate ${check.minimum} · ${check.summary}`}</p>
+        {check.groups.filter(g=>g.unmet).map(g=><p key={g.type} className="admin-notice">{g.unmet}</p>)}
+        <p className="admin-muted">A warning only: saving is never blocked. The minimum takes the compulsory subjects and the cheapest subjects that meet each requirement group.</p></section>}
+      <section><h2>Curriculum subjects</h2>{snapshot.data.subjects.length?<>
+        <TableToolbar label="Search curriculum subjects"><SearchField label="Search subjects" value={subjectSearch} onChange={setSubjectSearch} placeholder="Search by code or name" maxLength={100}/>{subjectSearch&&<ClearFilters onClear={()=>setSubjectSearch('')}/>}</TableToolbar>
+        <p className="admin-muted">{searchText?`${shownSubjects.length} of ${snapshot.data.subjects.length} subjects`:`${snapshot.data.subjects.length} subjects`}</p>
+        {!shownSubjects.length?<p className="admin-muted">No subjects match the search.</p>:<SetupTable label="Curriculum subjects" headings={['Code','Name','Credits','Classification','Type','Permitted semesters','Actions']}>{shownSubjects.map(s=><tr key={s.mappingId}><td>{s.code}</td><td><strong>{s.name}</strong></td><td className="admin-number">{s.credits}</td><td>{s.category}</td><td>{s.compulsory?'Compulsory':'Optional / elective'}</td><td>{s.semesterTypes.join(', ')||'Not configured'}</td><td><div className="admin-curriculum-actions"><button disabled={disabled} onClick={()=>editSubject(s)} aria-label={'Edit subject '+s.code}>Edit</button><button disabled={disabled} onClick={()=>removeSubject(s)} aria-label={'Remove subject '+s.code}>Remove</button></div></td></tr>)}</SetupTable>}</>:<p className="admin-muted">No subjects are mapped to this curriculum yet.</p>}</section>
       </div>
       <div role="tabpanel" id="s2-panel-create" aria-labelledby="s2-tab-create" hidden={action!=='create'}>
       <form onSubmit={saveSubject} className="admin-form"><h2>{editing===null?'Create subject (UC24)':'Edit existing subject (UC06)'}</h2><fieldset disabled={disabled} className="admin-setup-fields"><legend>Subject and classification</legend>
