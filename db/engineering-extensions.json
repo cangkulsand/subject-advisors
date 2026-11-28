@@ -206,6 +206,12 @@
         { "table": "student_profile", "name": "intake_year", "sqlType": "smallint", "nullable": true, "purpose": "Student intake year, separate from the curriculum effective year; the curriculum follows it (S3-P004-037)" }
       ],
       "purpose": "P004 student intake year (S3-P004-037): one nullable student_profile column backfilled from the curriculum effective year; excluded from the frozen SRS baseline"
+    },
+    {
+      "migration": "0017",
+      "tables": [],
+      "columns": [],
+      "purpose": "P004 coordinator faculty scope (S3-P004-040): coordinator_assignment.programme_id becomes nullable so one row covers a whole faculty at a learning centre; no new columns"
     }
   ]
 }
