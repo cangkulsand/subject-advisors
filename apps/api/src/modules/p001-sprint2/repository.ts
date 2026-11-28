@@ -75,7 +75,10 @@ export function createSprint2Repository(db: Database): Sprint2Repository {
       GROUP BY 1,2,3 ORDER BY 1,3`, [snapshot.data.curriculumId]);
     const shared = new Map<number, { programmeId: number; programmeCode: string }[]>();
     for (const row of rows) { const key = Number(row.mappingId); shared.set(key, [...(shared.get(key) ?? []), { programmeId: Number(row.programmeId), programmeCode: String(row.programmeCode) }]); }
-    return { ...snapshot, data: { ...snapshot.data, subjects: snapshot.data.subjects.map(s => ({ ...s, sharedWith: shared.get(s.mappingId) ?? [] })) } };
+    const requirements = (await db.query(`SELECT requirement_type AS type, required_credits AS credits, required_subjects AS subjects
+      FROM public.curriculum_requirement WHERE curriculum_id=$1 ORDER BY requirement_id`, [snapshot.data.curriculumId]))
+      .map(row => ({ type: String(row.type), credits: row.credits == null ? null : Number(row.credits), subjects: row.subjects == null ? null : Number(row.subjects) }));
+    return { ...snapshot, data: { ...snapshot.data, requirements, subjects: snapshot.data.subjects.map(s => ({ ...s, sharedWith: shared.get(s.mappingId) ?? [] })) } };
   }
   function semesterCommands(input: SubjectInput): Command[] {
     return [

@@ -27,7 +27,9 @@ const subjects = [
   ...Array.from({ length: 57 }, (_, i) => ({ mappingId: 100 + i, subjectId: 100 + i, code: 'DEMO' + (200 + i), name: 'Fictional elective ' + (i + 1), credits: 3, category: 'ELECTIVE', compulsory: false, semesterTypes: ['NORMAL'] })),
 ];
 const baseLinks = Array.from({ length: 24 }, (_, i) => ({ id: 30 + i, from: 101 + i, required: 100 + i, kind: 'MANDATORY' }));
-const snapshot = (links = baseLinks, extra = []) => ({ revision: rev, data: { curriculumId: 1, programme: 'DEMO NOT OFFICIAL — Fictional programme', version: 'DEMO', totalCredits: 12, subjects: [...subjects, ...extra], links } });
+// S3-P004-044: requirement groups for the credit check (outside the revision).
+const requirements = [{ type: 'ELECTIVE', credits: null, subjects: 2 }, { type: 'INDUSTRIAL_TRAINING', credits: 92, subjects: null }];
+const snapshot = (links = baseLinks, extra = []) => ({ revision: rev, data: { curriculumId: 1, programme: 'DEMO NOT OFFICIAL — Fictional programme', version: 'DEMO', totalCredits: 12, subjects: [...subjects, ...extra], links, requirements } });
 const catalogue = { curricula: [{ curriculumId: 1, programme: 'DEMO NOT OFFICIAL — Fictional programme', version: 'DEMO' }, { curriculumId: 2, programme: 'DEMO NOT OFFICIAL — Fictional programme', version: 'OTHER' }], subjects: subjects.map(s => ({ subjectId: s.subjectId, code: s.code, name: s.name, credits: s.credits })).concat([{ subjectId: 8, code: 'DUP1', name: 'Fictional duplicate code', credits: 3 }]) };
 await mkdir('.wrangler/uc24-horizontal-review', { recursive: true });
 let browser, passed = 0;
@@ -431,6 +433,28 @@ try {
     await page.getByRole('button', { name: 'Remove subject DEMO102', exact: true }).click(); review = page.getByRole('region', { name: 'Review change' }); await confirmSave(review);
     await page.getByRole('status').filter({ hasText: 'Subject removed. 1 prerequisite link and 2 what-if scenario rows were cleared.' }).waitFor();
     assert.deepEqual(state.removals.at(-1), { mappingId: 12, revision: rev, reason: 'Fictional UC24 change.' });
+  });
+  await check('curriculum: credit check shows the minimum to graduate and warns, without blocking (S3-P004-044)', async page => {
+    await mock(page); await page.goto(base + '/admin/curriculum?curriculum=1');
+    const panel = page.getByRole('region', { name: 'Credit check' }); await panel.waitFor();
+    await panel.getByText('Credit check: required 12 credits', { exact: true }).waitFor();
+    await panel.getByText('Minimum to graduate 11 · Short by 1 credit', { exact: true }).waitFor();
+    await panel.getByText('INDUSTRIAL_TRAINING needs 92 credits; only 0 are available.', { exact: true }).waitFor();
+    assert.match(await panel.innerText(), /Compulsory subjects\s+6/);
+    assert.match(await panel.innerText(), /ELECTIVE \(2 subjects\)\s+\+5/);
+    assert.equal(await page.getByRole('button', { name: 'Edit subject DEMO101', exact: true }).isDisabled(), false, 'the warning never blocks editing');
+  });
+  await check('curriculum: subject search filters by code or name, shows the count and clears (S3-P004-044)', async page => {
+    await mock(page); await page.goto(base + '/admin/curriculum?curriculum=1');
+    const table = page.getByRole('region', { name: 'Curriculum subjects' }); await table.waitFor();
+    await page.getByText('60 subjects', { exact: true }).waitFor();
+    const search = page.getByLabel('Search subjects', { exact: true });
+    await search.fill('analysis'); await page.getByText('1 of 60 subjects', { exact: true }).waitFor();
+    assert.equal(await table.locator('tbody tr').count(), 1); assert.match(await table.innerText(), /DEMO102/);
+    await search.fill('demo20'); await page.getByText('10 of 60 subjects', { exact: true }).waitFor();
+    await search.fill('zzz'); await page.getByText('No subjects match the search.', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await page.getByText('60 subjects', { exact: true }).waitFor(); assert.equal(await search.inputValue(), '');
   });
   await check('UC24 workspace at 1024px with 200% zoom stays usable', async page => {
     await mock(page); await open(page, 'create');

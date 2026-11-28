@@ -12,6 +12,8 @@ export interface Dependency { id: number; from: number; required: number; kind: 
 export interface CurriculumData {
   curriculumId: number; programme: string; version: string; totalCredits: number;
   subjects: CurriculumSubject[]; links: Dependency[];
+  /** Requirement groups for the credit check (S3-P004-044); outside the revision. */
+  requirements?: Requirement[];
 }
 export interface CurriculumSnapshot { revision: string; data: CurriculumData }
 export interface CurriculumOption { curriculumId: number; programme: string; version: string }

@@ -542,3 +542,11 @@
 /* Coordinators dialog (S3-P004-040): Covers radios and the learning centre checkboxes */
 .admin-choice-group { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .admin-choice-group legend { font-size: var(--font-size-label); font-weight: 600; margin-bottom: 4px; }
+
+/* Curriculum credit check (S3-P004-044) */
+.admin-credit-check { display: grid; gap: 8px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid var(--admin-border); border-radius: 8px; }
+.admin-credit-check h2 { margin: 0; }
+.admin-credit-lines { display: grid; gap: 2px; margin: 0; }
+.admin-credit-lines div { display: flex; justify-content: space-between; gap: 16px; max-width: 28rem; }
+.admin-credit-lines dt { font-size: var(--font-size-label); }
+.admin-credit-lines dd { margin: 0; font-variant-numeric: tabular-nums; }
