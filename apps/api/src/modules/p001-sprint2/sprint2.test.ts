@@ -164,7 +164,7 @@ describe('coordinator subject editing review fixes (S3-P004-041)',()=>{
 
 describe('snapshot requirement groups (S3-P004-044)',()=>{
  it('the snapshot carries the curriculum requirement groups outside the revision',async()=>{
-  const query=vi.fn(async(text:string)=>text.includes('FROM public.curriculum_requirement')?[{type:'ELECTIVE_E1',credits:null,subjects:4}]:text.includes('md5(')?[{revision:rev,data:structuredClone(curriculum)}]:[]);
+  const query=vi.fn(async(text:string,_values:unknown[]):Promise<Record<string,unknown>[]>=>{void _values;return text.includes('FROM public.curriculum_requirement')?[{type:'ELECTIVE_E1',credits:null,subjects:4}]:text.includes('md5(')?[{revision:rev,data:structuredClone(curriculum)}]:[];});
   const snapshot=await createSprint2Repository({query,transaction:vi.fn()} as unknown as Database).curriculum(1);
   expect(snapshot?.revision).toBe(rev);expect(snapshot?.data.requirements).toEqual([{type:'ELECTIVE_E1',credits:null,subjects:4}]);
   const sql=query.mock.calls.find(([t])=>String(t).includes('FROM public.curriculum_requirement'))!;expect(sql[1]).toEqual([1]);});
