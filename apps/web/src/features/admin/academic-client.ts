@@ -40,7 +40,9 @@ function semester(v: unknown): Contract.AcademicSemester {
   return checked.ok ? item : invalid();
 }
 function assignment(v: unknown): Contract.AdminCoordinatorAssignment {
-  const item = row<Contract.AdminCoordinatorAssignment>(v, ['assignmentId', 'accountId', 'facultyId', 'programmeId', 'learningCentreId'], ['startedAt']);
+  const item = row<Contract.AdminCoordinatorAssignment>(v, ['assignmentId', 'accountId', 'facultyId', 'learningCentreId'], ['startedAt']);
+  // programmeId null: the row covers the whole faculty (S3-P004-040).
+  if (item.programmeId !== null && !Contract.isAcademicSetupId(item.programmeId)) return invalid();
   if (item.endedAt !== null && typeof item.endedAt !== 'string') return invalid();
   return item;
 }
@@ -102,7 +104,7 @@ export function createAcademicSetupClient(getToken: () => Promise<string | null>
     updateSemester: (id: number, input: Contract.UpdateSemesterRequest) => request(path + '/semesters/' + id, semester, undefined, { method: 'PATCH', body: input }),
     setCurrentSemester: (input: Contract.SetCurrentSemesterRequest) => request(path + '/current-semester', semester, undefined, { method: 'PUT', body: input }),
     assignments: (signal?: AbortSignal) => request(path + '/coordinator-assignments', list(assignment), signal),
-    createAssignment: (input: Contract.CreateCoordinatorAssignmentRequest) => request(path + '/coordinator-assignments', assignment, undefined, { method: 'POST', body: input }),
+    createAssignment: (input: Contract.CreateCoordinatorAssignmentRequest) => request(path + '/coordinator-assignments', list(assignment), undefined, { method: 'POST', body: input }),
     endAssignment: (id: number, reason: string) => request(path + '/coordinator-assignments/' + id + '/end', assignment, undefined, { method: 'POST', body: { reason } }),
   };
 }

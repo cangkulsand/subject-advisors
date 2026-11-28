@@ -15,7 +15,7 @@ const semester: AcademicSemester = {
 };
 const createSemester = { academicYear: '2026/2027', semesterNo: 1, semesterType: 'NORMAL',
   maxSubjects: 5, maxCredits: 20, startDate: null, endDate: null, reason: ' calendar ' };
-const assignment = { accountId: 2, facultyId: 3, programmeId: 4, learningCentreId: 5, reason: ' appointment ' };
+const assignment = { accountId: 2, facultyId: 3, programmeId: 4, learningCentreIds: [5], reason: ' appointment ' };
 
 describe('academic setup reference requests', () => {
   it('normalises centre fields and requires an explicit reason', () => {
@@ -103,7 +103,7 @@ describe('current semester and coordinator assignment requests', () => {
     expect(validateCreateCoordinatorAssignmentRequest(assignment)).toEqual({
       ok: true, value: { ...assignment, reason: 'appointment' },
     });
-    for (const field of ['accountId', 'facultyId', 'programmeId', 'learningCentreId']) {
+    for (const field of ['accountId', 'facultyId', 'programmeId']) {
       expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, [field]: 0 }).ok).toBe(false);
     }
     expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, endedAt: null }).ok).toBe(false);
@@ -147,5 +147,19 @@ describe('programme and curriculum validators', () => {
     expect(validateUpdateCurriculumRequest({ reason: 'r' }).ok).toBe(false);
     expect(validateUpdateCurriculumRequest({ isActive: false, effectiveYear: null, reason: 'r' }))
       .toEqual({ ok: true, value: { isActive: false, effectiveYear: null, reason: 'r' } });
+  });
+});
+
+describe('faculty-wide coordinator assignments (S3-P004-040)', () => {
+  it('accepts a whole-faculty row (programmeId null) at several centres', () => {
+    expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, programmeId: null, learningCentreIds: [5, 6, 7] }))
+      .toEqual({ ok: true, value: { accountId: 2, facultyId: 3, programmeId: null, learningCentreIds: [5, 6, 7], reason: 'appointment' } });
+  });
+  it('rejects a bad centre list or programme and the old single centre field', () => {
+    for (const learningCentreIds of [[], [5, 5], Array.from({ length: 21 }, (_, i) => i + 1), [0], ['5'], 5])
+      expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, learningCentreIds }).ok).toBe(false);
+    for (const programmeId of [0, 'x', undefined]) expect(validateCreateCoordinatorAssignmentRequest({ ...assignment, programmeId }).ok).toBe(false);
+    const { learningCentreIds: _ids, ...rest } = assignment; void _ids;
+    expect(validateCreateCoordinatorAssignmentRequest({ ...rest, learningCentreId: 5 }).ok).toBe(false);
   });
 });

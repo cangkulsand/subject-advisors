@@ -35,12 +35,14 @@ const withStatus = <T extends { isActive?: boolean }>(input: T): object => {
 };
 const assignmentColumns = `assignment_id AS "assignmentId", access_assignment_id AS "accountId", faculty_id AS "facultyId",
   programme_id AS "programmeId", learning_centre_id AS "learningCentreId", started_at AS "startedAt", ended_at AS "endedAt"`;
-const scopeSelect = `SELECT DISTINCT c.faculty_id AS "facultyId", c.programme_id AS "programmeId", c.learning_centre_id AS "learningCentreId"
+/** One row per covered programme x centre. A whole-faculty row (programme_id NULL, S3-P004-040) expands to every active
+ * programme of its faculty, read live; DISTINCT folds a faculty row and a programme row for the same scope into one. */
+const scopeSelect = `SELECT DISTINCT c.faculty_id AS "facultyId", p.programme_id AS "programmeId", c.learning_centre_id AS "learningCentreId"
   FROM public.coordinator_assignment c JOIN public.user_access_assignment a USING(access_assignment_id)
   JOIN public.user_role_assignment r ON r.access_assignment_id=a.access_assignment_id AND r.app_role='COORDINATOR'
   JOIN public.faculty f ON f.faculty_id=c.faculty_id AND f.is_active
   JOIN public.learning_centre l ON l.learning_centre_id=c.learning_centre_id AND l.is_active
-  JOIN public.programme p ON p.programme_id=c.programme_id AND p.faculty_id=c.faculty_id
+  JOIN public.programme p ON (c.programme_id=p.programme_id OR (c.programme_id IS NULL AND p.faculty_id=c.faculty_id)) AND p.faculty_id=c.faculty_id
   WHERE a.clerk_user_id=$1 AND a.access_status='ACTIVE' AND c.ended_at IS NULL
   AND coalesce(upper(p.status),'ACTIVE')='ACTIVE'`;
 const centre = (r: Row): C.LearningCentre => ({ learningCentreId: Number(r.learningCentreId), centreCode: String(r.centreCode), centreName: String(r.centreName), isActive: r.isActive === true });
@@ -66,7 +68,7 @@ const curriculum = (r: Row): C.Curriculum => ({ curriculumId: Number(r.curriculu
   effectiveYear: r.effectiveYear == null ? null : Number(r.effectiveYear), isActive: r.isActive === true, subjectCount: Number(r.subjectCount), intakes: intakes(r.intakes) });
 const scope = (r: Row): CoordinatorAssignment => ({ facultyId: Number(r.facultyId), programmeId: Number(r.programmeId), learningCentreId: Number(r.learningCentreId) });
 const timestamp = (v: unknown) => (v instanceof Date ? v : new Date(String(v))).toISOString();
-const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });
+const assignment = (r: Row): C.AdminCoordinatorAssignment => ({ ...scope(r), programmeId: r.programmeId == null ? null : Number(r.programmeId), assignmentId: Number(r.assignmentId), accountId: Number(r.accountId), startedAt: timestamp(r.startedAt), endedAt: r.endedAt == null ? null : timestamp(r.endedAt) });
 const semesterFields = { academicYear: 'academic_year', semesterNo: 'semester_no', semesterType: 'semester_type', maxSubjects: 'max_subjects', maxCredits: 'max_credits', startDate: 'start_date', endDate: 'end_date', selectionOpensAt: 'selection_opens_at', selectionClosesAt: 'selection_closes_at' };
 
 /** Each mutation submits context + bound statements in one non-interactive transaction. */
@@ -83,6 +85,16 @@ export function createAcademicSetupRepository(query: AdminQuery, transaction: Ad
       const row = results.at(-1)?.[0];
       if (!row) throw new AcademicSetupDomainError('NOT_FOUND');
       return map(row);
+    } catch (error) { throw mapAcademicDatabaseError(error); }
+  }
+  async function writeAll<T>(actor: string, reason: string, statements: AdminStatement[], map: (row: Row) => T): Promise<T[]> {
+    const normalized = normaliseReason(reason);
+    if (!actor.trim() || !normalized) throw new AcademicSetupDomainError('INVALID_REQUEST');
+    try {
+      const results = await transaction([{ text: "SELECT set_config('app.access_actor',$1,true), set_config('app.access_reason',$2,true)", values: [actor, normalized] }, ...statements]);
+      const rows = results.at(-1) ?? [];
+      if (!rows.length) throw new AcademicSetupDomainError('NOT_FOUND');
+      return rows.map(map);
     } catch (error) { throw mapAcademicDatabaseError(error); }
   }
   function patch(table: string, key: string, id: number, input: object, fields: Record<string, string>, columns: string): AdminStatement {
@@ -130,12 +142,13 @@ export function createAcademicSetupRepository(query: AdminQuery, transaction: Ad
     listCoordinatorAssignments: filters => read(`SELECT ${assignmentColumns} FROM public.coordinator_assignment
       WHERE ($1::integer IS NULL OR access_assignment_id=$1) AND ($2::integer IS NULL OR programme_id=$2)
       AND ($3::integer IS NULL OR learning_centre_id=$3) ORDER BY assignment_id DESC`, [filters.accountId ?? null, filters.programmeId ?? null, filters.learningCentreId ?? null], assignment),
-    createCoordinatorAssignment: (input, actor) => write(actor, input.reason, [statement(`INSERT INTO public.coordinator_assignment(access_assignment_id,faculty_id,programme_id,learning_centre_id)
-      VALUES ($1,$2,$3,$4) RETURNING ${assignmentColumns}`, [input.accountId, input.facultyId, input.programmeId, input.learningCentreId])], assignment),
+    // One row per centre in one statement, so a duplicate at any centre refuses the whole add (S3-P004-040).
+    createCoordinatorAssignment: (input, actor) => writeAll(actor, input.reason, [statement(`INSERT INTO public.coordinator_assignment(access_assignment_id,faculty_id,programme_id,learning_centre_id)
+      SELECT $1,$2,$3::integer,centre FROM unnest($4::integer[]) AS centre RETURNING ${assignmentColumns}`, [input.accountId, input.facultyId, input.programmeId, input.learningCentreIds])], assignment),
     endCoordinatorAssignment: (id, input, actor) => write(actor, input.reason, [statement(`UPDATE public.coordinator_assignment SET ended_at=clock_timestamp() WHERE assignment_id=$1 RETURNING ${assignmentColumns}`, [id])], assignment),
     async currentSemesterId() { return (await read('SELECT semester_id AS id FROM public.academic_semester WHERE is_current', [], row => Number(row.id)))[0] ?? null; },
     listActiveLearningCentres: () => read(`SELECT ${centreColumns} FROM public.learning_centre WHERE is_active ORDER BY centre_code, learning_centre_id`, [], centre),
     listScopes: clerkUserId => read(scopeSelect + ' ORDER BY "facultyId", "programmeId", "learningCentreId"', [clerkUserId], scope),
-    async isScopeAssigned(clerkUserId, programmeId, learningCentreId) { return (await read(scopeSelect + ' AND c.programme_id=$2 AND c.learning_centre_id=$3 LIMIT 1', [clerkUserId, programmeId, learningCentreId], scope)).length > 0; },
+    async isScopeAssigned(clerkUserId, programmeId, learningCentreId) { return (await read(scopeSelect + ' AND p.programme_id=$2 AND c.learning_centre_id=$3 LIMIT 1', [clerkUserId, programmeId, learningCentreId], scope)).length > 0; },
   };
 }

@@ -17,7 +17,7 @@ const curriculum = { curriculumId: 4, programmeId: 9, curriculumVersion: '2026',
 const semester = { semesterId: 10, academicYear: '2026/2027', semesterNo: 1 as const, semesterType: 'NORMAL' as const, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, isCurrent: false, selectionOpensAt: null, selectionClosesAt: null };
 const semesterInput = { academicYear: semester.academicYear, semesterNo: semester.semesterNo, semesterType: semester.semesterType, maxSubjects: 4, maxCredits: 12, startDate: null, endDate: null, selectionOpensAt: null, selectionClosesAt: null, reason };
 const assignment = { assignmentId: 11, accountId: 12, facultyId: 8, programmeId: 9, learningCentreId: 7, startedAt: '2026-11-02T00:00:00Z', endedAt: null };
-const assignmentInput = { accountId: 12, facultyId: 8, programmeId: 9, learningCentreId: 7, reason };
+const assignmentInput = { accountId: 12, facultyId: 8, programmeId: 9, learningCentreIds: [7], reason };
 function fixture(): AcademicSetupDependencies {
   return {
     auth: {
@@ -36,7 +36,7 @@ function fixture(): AcademicSetupDependencies {
       listCurricula: vi.fn(async () => [curriculum]), createCurriculum: vi.fn(async () => curriculum), updateCurriculum: vi.fn(async () => curriculum),
       listAcademicSemesters: vi.fn(async () => [semester]), createAcademicSemester: vi.fn(async () => semester), updateAcademicSemester: vi.fn(async () => semester),
       getCurrentAcademicSemester: vi.fn(async () => null), setCurrentAcademicSemester: vi.fn(async () => ({ ...semester, isCurrent: true })),
-      listCoordinatorAssignments: vi.fn(async () => [assignment]), createCoordinatorAssignment: vi.fn(async () => assignment), endCoordinatorAssignment: vi.fn(async () => ({ ...assignment, endedAt: '2026-11-02T01:00:00Z' })),
+      listCoordinatorAssignments: vi.fn(async () => [assignment]), createCoordinatorAssignment: vi.fn(async () => [assignment]), endCoordinatorAssignment: vi.fn(async () => ({ ...assignment, endedAt: '2026-11-02T01:00:00Z' })),
     },
   };
 }
@@ -74,7 +74,7 @@ const operations: Operation[] = [
   { path: '/current-semester', method: 'GET', repo: 'getCurrentAcademicSemester', args: [], data: null },
   { path: '/current-semester', method: 'PUT', repo: 'setCurrentAcademicSemester', body: { semesterId: 10, reason }, args: [{ semesterId: 10, reason }, ACTOR], data: { ...semester, isCurrent: true } },
   { path: '/coordinator-assignments', method: 'GET', repo: 'listCoordinatorAssignments', args: [{}], data: [assignment] },
-  { path: '/coordinator-assignments', method: 'POST', repo: 'createCoordinatorAssignment', body: assignmentInput, args: [assignmentInput, ACTOR], data: assignment, status: 201 },
+  { path: '/coordinator-assignments', method: 'POST', repo: 'createCoordinatorAssignment', body: assignmentInput, args: [assignmentInput, ACTOR], data: [assignment], status: 201 },
   { path: '/coordinator-assignments/11/end', method: 'POST', repo: 'endCoordinatorAssignment', body: { reason }, args: [11, { reason }, ACTOR], data: { ...assignment, endedAt: '2026-11-02T01:00:00Z' } },
 ];
 

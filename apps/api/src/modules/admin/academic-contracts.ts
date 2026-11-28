@@ -45,7 +45,7 @@ export interface AcademicSetupRepository {
   setCurrentAcademicSemester(input: C.SetCurrentSemesterRequest, actor: string): Promise<C.AcademicSemester>;
   /** Includes ended history, optionally filtered. Live forecast scopes use AcademicScopeReader. */
   listCoordinatorAssignments(filters: AssignmentFilters): Promise<C.AdminCoordinatorAssignment[]>;
-  createCoordinatorAssignment(input: C.CreateCoordinatorAssignmentRequest, actor: string): Promise<C.AdminCoordinatorAssignment>;
+  createCoordinatorAssignment(input: C.CreateCoordinatorAssignmentRequest, actor: string): Promise<C.AdminCoordinatorAssignment[]>;
   endCoordinatorAssignment(id: number, input: C.EndCoordinatorAssignmentRequest, actor: string): Promise<C.AdminCoordinatorAssignment>;
 }
 export interface AcademicSetupDependencies { auth: AuthDependencies; repository: AcademicSetupRepository }
