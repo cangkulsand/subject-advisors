@@ -79,14 +79,28 @@
 | --- | --- |
 | `npm run typecheck` | PASS |
 | `npm run lint` | PASS |
-| `npm test` | 2154 passed, 67 skipped |
+| `npm test` | 2157 passed, 67 skipped |
 | `npm run test:db-tooling` | PASS |
 | `npm run test:ui:admin` | 78 PASS |
 | `npm run test:ui:coordinator` | 67 PASS |
 | `npm run test:ui:integration` | 81 PASS |
 | `node tools/p001-sprint2/test-uc24-ui.mjs` | All checks pass until "UC24 workspace at 1024px with 200% zoom stays usable", which also fails on `main` (pre-existing) |
 
-**Outcome:** pending the whole-branch review.
+**Whole-branch review (independent reviewer):** no Critical findings. Two Important findings were fixed, each with a failing test first:
+- **Admin bypass:** it used stored roles. An account whose email domain does not allow System Administrator, but which still has that role stored, got unscoped edits. The bypass now uses the roles the email allows (`availableRoles`).
+- **Lock after save:** the shared-subject lock disappeared after any save, because only the GET response carried `lockedBy`. Every snapshot returned to a coordinator now carries it.
+
+**Deferred minors:**
+- **Audit noise:** every subject save rewrites its semester rules, so the audit gets rows even when nothing changed.
+- **Removal check order:** a removal checks "in use" before the revision check.
+- **Lock and in-use checks:** both run outside the write transaction, so a concurrent change can slip past them. The database keeps the data safe either way.
+- **Padded values:** saved code or name with stray spaces can refuse a category-only edit.
+- **Stale reason:** the reason box keeps its text after a failed save or Back.
+- **Failure after commit:** if reading shared subjects fails after a write is saved, the error says 503.
+- **Test gap:** the coordinator 403 test doesn't cover the dependency routes.
+- **Duplicate fetch:** the coordinator page loads the curriculum list twice.
+
+**Outcome:** PASS; independent review fixes applied; Harraz's review is pending.
 
 ## 4. Handover to Harraz
 

@@ -151,3 +151,13 @@ describe('curriculum writes carry the actor context (S3-P004-041)',()=>{
   expect(at('DELETE FROM public.curriculum_subject')).toBeGreaterThan(at('DELETE FROM public.subject_semester_rule'));
   for(const needle of ['simulation_subject','subject_prerequisite','subject_semester_rule','DELETE FROM public.curriculum_subject']) expect(texts[at(needle.startsWith('DELETE')?needle:'DELETE FROM public.'+needle)]).toContain("current_setting('p001s2.allowed',true)='true'");});
 });
+
+describe('coordinator subject editing review fixes (S3-P004-041)',()=>{
+ it('a stored SYSTEM_ADMIN role that the email domain does not allow gives no admin bypass',async()=>{const d=coordinator(deps());d.auth.access.find=vi.fn(async()=>({clerkUserId:'coord_a',appRole:'COORDINATOR' as const,accessStatus:'ACTIVE' as const,roles:['SYSTEM_ADMIN' as const,'COORDINATOR' as const]}));
+  expect((await handleSprint2Request(request('/curricula'),d))?.status).toBe(200);expect(d.repository.catalogue).toHaveBeenCalledWith([1]);expect(d.scopes.programmeIds).toHaveBeenCalledWith('coord_a');});
+ it('every snapshot returned to a coordinator carries the shared-subject lock, including after a save',async()=>{const d=coordinator(deps());d.repository.curriculum=vi.fn(async()=>({revision:rev,data:sharedCurriculum()}));d.repository.subject=vi.fn(async()=>({revision:rev,data:sharedCurriculum()}));
+  const r=await handleSprint2Request(request('/curricula/1/subjects/1','PUT',{...edit,category:'ELECTIVE'}),d);expect(r?.status).toBe(200);
+  const body=await r!.json();expect(body.data.data.subjects[0].lockedBy).toEqual(['SECRH']);expect(body.data.data.subjects[1].lockedBy).toEqual([]);});
+ it('an admin never gets a lock',async()=>{const d=admin(deps());d.repository.subject=vi.fn(async()=>({revision:rev,data:sharedCurriculum()}));
+  const body=await (await handleSprint2Request(request('/curricula/1/subjects/1','PUT',{...edit,category:'ELECTIVE'}),d))!.json();expect(body.data.data.subjects[0].lockedBy).toBeUndefined();});
+});

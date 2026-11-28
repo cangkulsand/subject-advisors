@@ -1,7 +1,7 @@
 import { authorize, authJson, authErrorResponse, AuthError } from '../auth';
 import type { AuthDependencies } from '../auth/contracts';
 import { jsonBody, positiveId, P001Error } from '../profile/validation';
-import type { Sprint2Repository } from './contracts';
+import type { CurriculumSnapshot, Sprint2Repository } from './contracts';
 import { calculateProgress } from './progress';
 import { databaseError } from './repository';
 import { linkInput, removalInput, subjectInput, validateDependency, validatePrerequisites } from './validation';
@@ -17,8 +17,12 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
     const progress = path === prefix+'/progress';
     // S3-P004-041: coordinators edit curricula of programmes in their scope; holding the admin role means no scope limit.
     const me = await authorize(request,deps.auth,{ roles: progress?['STUDENT']:['SYSTEM_ADMIN','COORDINATOR'],requireProfile:progress });
-    const isAdmin = !progress && (me.roles ?? []).includes('SYSTEM_ADMIN');
+    // The admin bypass follows the roles the account's email may use (availableRoles), not stored memberships (review fix).
+    const isAdmin = !progress && (me.availableRoles ?? []).includes('SYSTEM_ADMIN');
     const scope = progress || isAdmin ? null : await deps.scopes.programmeIds(me.clerkUserId);
+    // Every snapshot sent to a coordinator says which shared subjects are locked, so the page keeps the lock after a save (review fix).
+    const locked = <T extends CurriculumSnapshot>(snapshot: T): T => !scope ? snapshot
+      : { ...snapshot, data: { ...snapshot.data, subjects: snapshot.data.subjects.map(s => ({ ...s, lockedBy: (s.sharedWith ?? []).filter(o => !scope.includes(o.programmeId)).map(o => o.programmeCode) })) } };
     const inScope = async (curriculumId: number) => {
       if (!scope) return;
       const programmeId = await deps.repository.curriculumProgrammeId(curriculumId);
@@ -37,8 +41,7 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
     if (!match[2] && request.method==='GET') {
       const snapshot=await deps.repository.curriculum(id);
       if (!snapshot) throw new P001Error(404,'CURRICULUM_NOT_FOUND','The curriculum is unavailable.');
-      if (!scope) return authJson({data:snapshot});
-      return authJson({data:{...snapshot,data:{...snapshot.data,subjects:snapshot.data.subjects.map(s=>({...s,lockedBy:(s.sharedWith??[]).filter(o=>!scope.includes(o.programmeId)).map(o=>o.programmeCode)}))}}});
+      return authJson({data:locked(snapshot)});
     }
     if (match[2]==='subjects' && request.method===(item===null?'POST':'PUT')) {
       const input=subjectInput(await jsonBody(request),item!==null);
@@ -52,19 +55,19 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
         if (outside.length) throw new P001Error(403,'SUBJECT_SHARED_OUTSIDE_SCOPE',`This subject is also used by ${outside.join(', ')}. Ask its coordinator or the admin to change its code, name or credits.`);
       }
       if (item===null && input.prerequisites) validatePrerequisites(snapshot.data,input.prerequisites);
-      return authJson({data:await deps.repository.subject(id,item,input,me.clerkUserId)},item===null?201:200);
+      return authJson({data:locked(await deps.repository.subject(id,item,input,me.clerkUserId))},item===null?201:200);
     }
     if (match[2]==='dependencies' && request.method===(item===null?'POST':'PUT')) {
       const input=linkInput(await jsonBody(request)), snapshot=await deps.repository.curriculum(id);
       if (!snapshot) throw new P001Error(404,'CURRICULUM_NOT_FOUND','The curriculum is unavailable.');
       validateDependency(snapshot.data,input,item);
-      return authJson({data:await deps.repository.dependency(id,item,input,me.clerkUserId)},item===null?201:200);
+      return authJson({data:locked(await deps.repository.dependency(id,item,input,me.clerkUserId))},item===null?201:200);
     }
     if (match[2]==='dependencies' && item!==null && request.method==='DELETE') {
       const input=removalInput(await jsonBody(request));
       const snapshot=await deps.repository.curriculum(id);
       if (!snapshot?.data.links.some(l=>l.id===item)) throw new P001Error(404,'LINK_NOT_FOUND','The relationship is unavailable.');
-      return authJson({data:await deps.repository.removeDependency(id,item,input.revision,input.reason,me.clerkUserId)});
+      return authJson({data:locked(await deps.repository.removeDependency(id,item,input.revision,input.reason,me.clerkUserId))});
     }
     if (match[2]==='subjects' && item!==null && request.method==='DELETE') {
       // Subject removal (S3-P004-041): a true delete from this curriculum, refused while picks or plans keep the mapping.
@@ -77,7 +80,7 @@ export async function handleSprint2Request(request: Request, deps: Sprint2Depend
           use.plans>0?`${use.picks>0?'in':'In'} ${plural(use.plans,'graduation plan','graduation plans')}`:''].filter(Boolean);
         return Response.json({error:{code:'SUBJECT_IN_USE',message:`${parts.join(' and ')}. It can't be removed yet.`,details:{picks:use.picks,plans:use.plans}}},{status:409,headers:{'Cache-Control':'no-store',Vary:'Authorization'}});
       }
-      return authJson({data:await deps.repository.removeSubject(id,item,input.revision,input.reason,me.clerkUserId)});
+      return authJson({data:locked(await deps.repository.removeSubject(id,item,input.revision,input.reason,me.clerkUserId))});
     }
     return authJson({error:{code:'METHOD_NOT_ALLOWED',message:'This method is not supported.'}},405);
   } catch (error) {
