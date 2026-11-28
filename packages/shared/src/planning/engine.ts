@@ -294,7 +294,7 @@ function assumptions(input: PlanningInput, needed: Needed, usedDefaults: boolean
   if (firstLabel !== null) {
     list.push(input.approvedFirst !== null
       ? `${firstLabel} uses only the subjects your coordinator approved. Projects and industrial training need no approval.`
-      : `Your coordinator has not approved subjects for ${firstLabel} yet, so it assumes any subject can be offered.`);
+      : `${firstLabel} does not check the coordinator's offering decisions, so you may plan any subject. See Semester Offerings for what is offered next semester.`);
   }
   list.push('Later semesters assume every subject is offered in the semester type it runs in.');
   if (usedDefaults) list.push('Some semesters have no configured limits, so the usual limits are used (Normal: 3 subjects, 10 credits; Short: 3 subjects, 6 credits).');

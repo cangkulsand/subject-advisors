@@ -144,10 +144,9 @@ export function createPlanningRepository(db: Database): PlanningRepository {
         semesterId: Number(r.semester_id), academicYear: String(r.academic_year), semesterNo: Number(r.semester_no),
         maxSubjects: Number(r.max_subjects), maxCredits: Number(r.max_credits), isCurrent: r.is_current === true,
       }));
-      const start = startSemester(semesterRows);
-      const decisions = start?.semesterId != null ? await db.query(
-        `SELECT subject_id, status FROM public.offering_decision WHERE programme_id = $1 AND learning_centre_id = $2 AND semester_id = $3`,
-        [Number(profileRow.programme_id), Number(profileRow.learning_centre_id), start.semesterId]) : [];
+      // Hotfix 2026-11-28 (owner): for now the plan does not depend on the coordinator's offering decisions, so students may plan
+      // any subject in their next semester. With no decisions approvedFirst is null; the planner's approval support stays for later.
+      const decisions: Record<string, unknown>[] = [];
       return toPlanningInput({
         profile: {
           curriculumId, programmeId: Number(profileRow.programme_id), learningCentreId: Number(profileRow.learning_centre_id),

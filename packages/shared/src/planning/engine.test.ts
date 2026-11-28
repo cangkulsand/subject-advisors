@@ -93,6 +93,13 @@ describe('planBaseline', () => {
     expect(plan.assumptions.join(' ')).toContain('approved');
     expect(plan.assumptions.join(' ')).toContain('Projects and industrial training need no approval.');
   });
+  it('without offering decisions the note points the student to Semester Offerings (hotfix 2026-11-28)', () => {
+    const plan = planBaseline(input({ approvedFirst: null }));
+    const notes = plan.assumptions.join(' ');
+    expect(notes).toContain("does not check the coordinator's offering decisions");
+    expect(notes).toContain('Semester Offerings');
+    expect(notes).not.toContain('has not approved');
+  });
   it('respects subject and credit limits', () => {
     const plan = planBaseline(input({ limits: [{ semesterId: 21, academicYear: '2026/2027', semesterNo: 2, maxSubjects: 1, maxCredits: 10 }] }));
     expect(plan.semesters[0]!.subjects).toHaveLength(1);
