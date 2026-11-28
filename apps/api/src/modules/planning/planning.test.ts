@@ -102,8 +102,9 @@ describe('createPlanningRepository', () => {
       return [];
     });
     const input = await createPlanningRepository({ query, transaction: vi.fn() }).load('student_a');
-    expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: [11, 14], subjects: [{ subjectCode: 'SECJ1013', compulsory: true }, { subjectCode: 'SECJ4118' }] });
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('FROM public.offering_decision'), [5, 2, 4]);
+    // Hotfix 2026-11-28 (owner): the plan no longer depends on the coordinator's offering decisions; any subject may be planned.
+    expect(input).toMatchObject({ start: { academicYear: '2026/2027', semesterNo: 2 }, approvedFirst: null, subjects: [{ subjectCode: 'SECJ1013', compulsory: true }, { subjectCode: 'SECJ4118' }] });
+    expect(query).not.toHaveBeenCalledWith(expect.stringContaining('FROM public.offering_decision'), expect.anything());
   });
   it('reads mandatory and co-requisite links with one parameterized query', async () => {
     const query = vi.fn(async (text: string) => {
