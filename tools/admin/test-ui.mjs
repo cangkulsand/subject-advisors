@@ -118,7 +118,7 @@ else {
       const state = await mock(page, { roles: ['COORDINATOR'] }); await page.goto(base + '/coordinator');
       await page.getByRole('heading', { name: 'Overview', exact: true }).waitFor();
       const quicklinks = page.locator('.coordinator-quicklinks');
-      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Offering Forecast', 'Offering History']);
+      assert.deepEqual((await quicklinks.getByRole('link').locator('strong').allInnerTexts()).map(text => text.trim()), ['Offering Forecast', 'Offering History', 'Curriculum & Subjects']);
       assert.equal(await quicklinks.getByText('Planned workspace').count(), 0);
       const overviewText = await page.locator('main').innerText();
       assert.ok(!/snapshot/i.test(overviewText), 'the Overview no longer talks about importing snapshots (S3-P004-032)');
