@@ -3,6 +3,8 @@ export type LinkKind = 'MANDATORY' | 'COREQUISITE' | 'RECOMMENDED';
 export interface CurriculumSubject {
   mappingId: number; subjectId: number; code: string; name: string; credits: number;
   category: string; compulsory: boolean; semesterTypes: SemesterType[];
+  /** Other programmes whose curricula use the same shared subject (S3-P004-041); outside the revision. */
+  sharedWith?: { programmeId: number; programmeCode: string }[];
 }
 export interface Dependency { id: number; from: number; required: number; kind: LinkKind }
 export interface CurriculumData {
@@ -29,13 +31,21 @@ export interface SubjectInput {
   revision: string; existingSubjectId: number | null; code: string; name: string; credits: number;
   category: string; compulsory: boolean; semesterTypes: SemesterType[]; confirmSharedChanges: boolean;
   prerequisites?: PrerequisiteSelection[];
+  /** Recorded in the audit log (S3-P004-041). */
+  reason: string;
 }
-export interface LinkInput { revision: string; from: number; required: number; kind: LinkKind }
+export interface LinkInput { revision: string; from: number; required: number; kind: LinkKind; reason: string }
+export interface SubjectUse { picks: number; plans: number; semesters: string[] }
+export interface SubjectRemoval extends CurriculumSnapshot { removed: { scenarioRows: number; prerequisiteLinks: number } }
 export interface Sprint2Repository {
   progress(userId: string): Promise<ProgressSource | null>;
-  catalogue(): Promise<Catalogue>;
+  /** Curricula of the given programmes only, or all when omitted (coordinator scope, S3-P004-041). */
+  catalogue(programmeIds?: number[]): Promise<Catalogue>;
   curriculum(id: number): Promise<CurriculumSnapshot | null>;
-  subject(id: number, mappingId: number | null, input: SubjectInput): Promise<CurriculumSnapshot>;
-  dependency(id: number, linkId: number | null, input: LinkInput): Promise<CurriculumSnapshot>;
-  removeDependency(id: number, linkId: number, revision: string): Promise<CurriculumSnapshot>;
+  curriculumProgrammeId(id: number): Promise<number | null>;
+  subjectUse(mappingId: number): Promise<SubjectUse>;
+  subject(id: number, mappingId: number | null, input: SubjectInput, actor: string): Promise<CurriculumSnapshot>;
+  dependency(id: number, linkId: number | null, input: LinkInput, actor: string): Promise<CurriculumSnapshot>;
+  removeDependency(id: number, linkId: number, revision: string, reason: string, actor: string): Promise<CurriculumSnapshot>;
+  removeSubject(id: number, mappingId: number, revision: string, reason: string, actor: string): Promise<SubjectRemoval>;
 }
