@@ -1,6 +1,6 @@
 # S3-P004-039 — Matric-number intake, matric lock and batch correction
 
-- **Status:** Merged to `main` (23e182d) on 2026-11-27; deployed to dev and prod 2026-11-27; no migration. Mock intake-year fix not yet run
+- **Status:** Merged to `main` (23e182d) on 2026-11-27; deployed to dev and prod 2026-11-27; no migration. Mock intake years corrected 2026-11-28
 - **Date:** 2026-11-27
 - **Sprint:** Sprint 3
 - **Owner:** P004, building P001's (Aisa) review item; to be handed over to Aisa
@@ -123,6 +123,19 @@
 
 **Outcome:** PASS: independent review fixes applied; P001 review pending.
 
+**Mock intake-year fix (2026-11-28, owner-approved):**
+- **How it was run:** the batch repository code ran on the 324 SX-form profiles with "From each student's matric number".
+- **Actor:** the protected owner admin.
+- **Reason:** "Intake year corrected from matric number (backfill 0016 used the curriculum year); S3-P004-039 batch".
+- **Result:**
+  - 293 intake years changed, with 293 `student_intake` audit rows.
+  - 31 were already correct.
+  - No programme changes, and no picks removed.
+- **Students by intake now:**
+  - **SECJ:** 2020: 14, 2021: 23, 2022: 41, 2023: 69, 2025: 2.
+  - **SECRH:** 2020: 10, 2021: 20, 2022: 67, 2023: 22, 2024: 52, 2025: 55.
+  - The 51 `DUMMY-…` test students keep the backfilled year. They are 2 of the SECJ 2020 count and 49 of the SECRH 2022 count.
+
 ## 4. Changelog
 
 - **Date:** 2026-11-27 · **Type:** Added · **Owner:** P004 (for P001)
@@ -134,4 +147,4 @@
   - **Profile:** two new 409s on `PUT /api/profile`.
   - **API:** three new admin endpoints.
   - **Unchanged:** no migration and no schema change.
-- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-27); mock intake fix pending
+- **Status:** MERGED, DEPLOYED (dev and prod, 2026-11-27); mock intake years corrected (2026-11-28)
