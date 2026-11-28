@@ -217,7 +217,7 @@ describe.skipIf(!databaseUrl)('academic repository on disposable PostgreSQL', ()
     await expect(repository.createCoordinatorAssignment({ ...data.assignment, facultyId: other.facultyId }, actor)).rejects.toMatchObject({ code: 'PROGRAMME_FACULTY_MISMATCH' });
     await repository.createCoordinatorAssignment(data.assignment, actor);
     const otherDepartment = await repository.createDepartment({ departmentCode: 'OTHER_D', departmentName: 'Other department', facultyId: other.facultyId, reason }, actor);
-    await expect(repository.setProgrammeDepartment(data.programmeId, { departmentId: otherDepartment.departmentId, reason }, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_EXISTS' });
+    await expect(repository.setProgrammeDepartment(data.programmeId, { departmentId: otherDepartment.departmentId, reason }, actor)).rejects.toMatchObject({ code: 'ASSIGNMENT_ACTIVE' });
     await accounts.grantRole(data.account.accountId, 'STUDENT', actor, reason);
     await accounts.revokeRole(data.account.accountId, 'COORDINATOR', actor, reason);
     await expect(repository.createCoordinatorAssignment(data.assignment, actor)).rejects.toMatchObject({ code: 'COORDINATOR_ROLE_REQUIRED' });

@@ -282,6 +282,10 @@ test('0017 follows 0016 and only relaxes coordinator_assignment.programme_id, ad
 test('0017 structural check is registered for verify, review and the disposable database run',async()=>{
  const check=await readFile('db/checks/021_coordinator_faculty_scope.sql','utf8');
  assert.match(check,/coordinator_assignment_one_live_faculty_idx/);assert.match(check,/attnotnull/);
+ const behaviour=await readFile('db/checks/022_coordinator_faculty_scope_behavior.sql','utf8');
+ assert.match(behaviour,/^-- DEVELOPMENT ONLY/);assert.match(behaviour,/ROLLBACK;\s*$/);assert.match(behaviour,/do not block moving a programme/);
+ for(const file of ['tools/db/cli.mjs','tools/db/review.mjs','tools/admin/test-academic-database.mjs'])
+  assert.match(await readFile(file,'utf8'),/'022_coordinator_faculty_scope_behavior\.sql'/,file);
  for(const file of ['tools/db/cli.mjs','tools/db/review.mjs','tools/admin/test-academic-database.mjs'])
   assert.match(await readFile(file,'utf8'),/'021_coordinator_faculty_scope\.sql'/,file);
 });
